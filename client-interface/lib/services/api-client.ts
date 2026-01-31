@@ -39,10 +39,7 @@ class ApiClient {
             const refreshToken = this.getRefreshToken();
             if (!refreshToken) {
               // No refresh token, clear and redirect
-              this.clearTokens();
-              if (typeof window !== 'undefined') {
-                window.location.href = '/login';
-              }
+              this.handleAuthFailure('Session expired. Please log in again.');
               return Promise.reject(error);
             }
 
@@ -52,8 +49,8 @@ class ApiClient {
               { refreshToken },
               { headers: { 'Content-Type': 'application/json' } }
             );
-            console.log('Token refreshed successfully', response.data);
-            // Extract new token from response - backend returns accessToken in data object
+            
+            // Extract new token from response
             const newToken = response.data?.data?.accessToken || response.data?.accessToken || response.data?.data?.token || response.data?.token;
             if (!newToken) {
               console.error('Refresh response:', response.data);
@@ -67,10 +64,7 @@ class ApiClient {
           } catch (refreshError) {
             // Refresh failed, clear tokens and redirect
             console.error('Token refresh failed:', refreshError);
-            this.clearTokens();
-            if (typeof window !== 'undefined') {
-              window.location.href = '/login';
-            }
+            this.handleAuthFailure('Your session has expired. Redirecting to login...');
             return Promise.reject(refreshError);
           }
         }
@@ -78,6 +72,21 @@ class ApiClient {
         return Promise.reject(error);
       }
     );
+  }
+
+  private handleAuthFailure(message: string): void {
+    this.clearTokens();
+    if (typeof window !== 'undefined') {
+      // Show toast notification if available
+      if ((window as any).toast?.error) {
+        (window as any).toast.error(message);
+      }
+      
+      // Redirect after a short delay to allow toast to show
+      setTimeout(() => {
+        window.location.href = '/login?expired=true';
+      }, 1500);
+    }
   }
 
   private getToken(): string | null {

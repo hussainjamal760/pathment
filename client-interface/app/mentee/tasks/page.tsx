@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Clock, CheckCircle2, AlertCircle, FileText, Loader2, Star, Calendar, XCircle, BookOpen, Sparkles } from 'lucide-react';
 import { taskApi } from '@/lib/services/task-api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { toast } from 'sonner';
 
 export default function MenteeTasks() {
+  const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<any[]>([]);
@@ -127,25 +129,37 @@ export default function MenteeTasks() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="text-slate-600 text-sm mb-1">Total Tasks</div>
-          <div className="text-slate-900 text-2xl">{stats?.total || 0}</div>
+          <div className="text-slate-900 text-2xl font-bold">{stats?.total || 0}</div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="text-slate-600 text-sm mb-1">Completed</div>
-          <div className="text-green-600 text-2xl">{stats?.completed || 0}</div>
+          <div className="text-green-600 text-2xl font-bold flex items-center gap-2">
+            {stats?.completed || 0}
+            {stats?.total > 0 && (
+              <span className="text-xs text-slate-500">
+                ({Math.round(((stats?.completed || 0) / stats?.total) * 100)}%)
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 border border-slate-200">
+          <div className="text-slate-600 text-sm mb-1">Pending Review</div>
+          <div className="text-purple-600 text-2xl font-bold">{stats?.submitted || 0}</div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="text-slate-600 text-sm mb-1">In Progress</div>
-          <div className="text-yellow-600 text-2xl">{stats?.inProgress || 0}</div>
+          <div className="text-yellow-600 text-2xl font-bold">{stats?.inProgress || 0}</div>
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="text-slate-600 text-sm mb-1">Overdue</div>
-          <div className="text-red-600 text-2xl">{stats?.overdue || 0}</div>
+          <div className="text-red-600 text-2xl font-bold">{stats?.overdue || 0}</div>
         </div>
       </div>
 
@@ -287,7 +301,7 @@ export default function MenteeTasks() {
                       
                       {(task.status === 'in_progress' || task.status === 'revision_needed') && (
                         <button
-                          onClick={() => toast.info('Submit task feature coming soon!')}
+                          onClick={() => router.push(`/mentee/tasks/${task.id}/submit`)}
                           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
                         >
                           Submit Work
@@ -314,6 +328,14 @@ export default function MenteeTasks() {
                           View Feedback
                         </button>
                       )}
+                      
+                      {/* Always show a way to view task details */}
+                      <button
+                        onClick={() => router.push(`/mentee/tasks/${task.id}/submit`)}
+                        className="text-slate-600 hover:text-indigo-600 text-sm transition-colors"
+                      >
+                        View Details
+                      </button>
                     </div>
                   </div>
 

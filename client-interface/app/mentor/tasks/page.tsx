@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Filter, ClipboardList, Clock, CheckCircle2, AlertCircle, Plus, Loader2, FileText, Star, XCircle, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Filter, ClipboardList, Clock, CheckCircle2, AlertCircle, Plus, Loader2, FileText, Star, XCircle, Trash2, AlertTriangle, BookOpen } from 'lucide-react';
 import { taskApi } from '@/lib/services/task-api';
 import { matchingApi } from '@/lib/services/enrollment-api';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -10,7 +11,8 @@ import { toast } from 'sonner';
 
 export default function MentorTasks() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'pending' | 'all' | 'create'>('pending');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'pending' | 'all' | 'roadmap' | 'create'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [pendingTasks, setPendingTasks] = useState<any[]>([]);
@@ -19,6 +21,11 @@ export default function MentorTasks() {
   const [mentees, setMentees] = useState<any[]>([]);
   const [cancellingTask, setCancellingTask] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [roadmapData, setRoadmapData] = useState<any>(null);
+  const [selectedProgram, setSelectedProgram] = useState<string>('');
+  const [selectedLevel, setSelectedLevel] = useState<string>('');
+  const [selectedMenteeForAssign, setSelectedMenteeForAssign] = useState<string>('');
+  const [assigningTask, setAssigningTask] = useState<string | null>(null);
   
   // Form state for custom task
   const [formData, setFormData] = useState({
@@ -46,26 +53,81 @@ export default function MentorTasks() {
       
       // Fetch stats
       const statsRes = await taskApi.getMentorTaskStats(user!.id);
-      setStats(statsRes.data.data.stats);
+      setStats(statsRes?.data?.stats);
       
       // Fetch pending review tasks
       const pendingRes = await taskApi.getMentorTasks(user!.id, { pendingReview: true });
-      setPendingTasks(pendingRes.data.data.tasks || []);
+      setPendingTasks(pendingRes?.data?.tasks || []);
       
       // Fetch all tasks
       const allRes = await taskApi.getMentorTasks(user!.id);
-      setAllTasks(allRes.data.data.tasks || []);
+      setAllTasks(allRes?.data?.tasks || []);
       
       // Fetch mentees for custom task form
       const menteesRes = await matchingApi.getMatches({ mentorId: user!.id, status: 'active' });
       const matchesList = menteesRes?.data?.matches || menteesRes?.matches || [];
       setMentees(matchesList);
       
+      // Auto-select first mentee's program if available
+      if (matchesList.length > 0 && !selectedProgram) {
+        const firstMatch = matchesList[0];
+        if (firstMatch.enrollment?.programId && firstMatch.enrollment?.currentLevelId) {
+          setSelectedProgram(firstMatch.enrollment.programId);
+          setSelectedLevel(firstMatch.enrollment.currentLevelId);
+          fetchRoadmap(firstMatch.enrollment.programId, firstMatch.enrollment.currentLevelId);
+        }
+      }
+      
     } catch (error: any) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load tasks');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRoadmap = async (programId: string, levelId: string) => {
+    try {
+      const response = await taskApi.getRoadmapTasks(programId, levelId);
+      setRoadmapData(response.data.roadmap);
+    } catch (error: any) {
+      console.error('Failed to fetch roadmap:', error);
+      toast.error('Failed to load roadmap');
+    }
+  };
+
+  const handleAssignRoadmapTask = async (taskId: string, weekNumber: number) => {
+    if (!selectedMenteeForAssign) {
+      toast.error('Please select a mentee first');
+      return;
+    }
+
+    try {
+      const selectedMatch = mentees.find(m => m.menteeId === selectedMenteeForAssign);
+      if (!selectedMatch) return;
+
+      await taskApi.createCustomTask({
+        menteeId: selectedMenteeForAssign,
+        enrollmentId: selectedMatch.enrollmentId,
+        title: `Week ${weekNumber} - Roadmap Task`,
+        description: 'Assigned from roadmap',
+        roadmapTaskId: taskId
+      } as any);
+
+      toast.success('Roadmap task assigned successfully!');
+      setAssigningTask(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Failed to assign task:', error);
+      toast.error(error.response?.data?.message || 'Failed to assign task');
+    }
+  };
+
+  const handleProgramLevelChange = (programId: string, levelId: string) => {
+    setSelectedProgram(programId);
+    setSelectedLevel(levelId);
+    if (programId && levelId) {
+      fetchRoadmap(programId, levelId);
     }
   };
 
@@ -114,8 +176,7 @@ export default function MentorTasks() {
   };
 
   const handleReviewClick = (taskId: string) => {
-    // TODO: Open review modal or navigate to review page
-    toast.info('Review interface coming soon!');
+    router.push(`/mentor/tasks/${taskId}/feedback`);
   };
 
   const handleCancelTask = async (taskId: string) => {
@@ -244,6 +305,19 @@ export default function MentorTasks() {
               </div>
             </button>
             <button
+              onClick={() => setActiveTab('roadmap')}
+              className={`py-4 px-2 border-b-2 transition-colors ${
+                activeTab === 'roadmap'
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Program Roadmap
+              </div>
+            </button>
+            <button
               onClick={() => setActiveTab('create')}
               className={`py-4 px-2 border-b-2 transition-colors ${
                 activeTab === 'create'
@@ -306,9 +380,10 @@ export default function MentorTasks() {
 
                       {task.submissions?.[0] && (
                         <div className="mb-4 p-4 bg-white rounded-lg">
-                          <p className="text-slate-700 text-sm line-clamp-3">
-                            {task.submissions[0].submissionText}
-                          </p>
+                          <div 
+                            className="prose prose-sm max-w-none text-slate-700 line-clamp-3"
+                            dangerouslySetInnerHTML={{ __html: task.submissions[0].submissionText }}
+                          />
                           {task.submissions[0].submissionUrls?.length > 0 && (
                             <div className="mt-2">
                               <p className="text-slate-600 text-xs mb-1">Attachments:</p>
@@ -493,6 +568,181 @@ export default function MentorTasks() {
                       )}
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Program Roadmap Tab */}
+          {!loading && activeTab === 'roadmap' && (
+            <div>
+              <h3 className="text-slate-900 mb-6">Program Roadmap & Task Assignment</h3>
+              
+              {/* Program/Level Selector */}
+              <div className="grid md:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="block text-slate-700 text-sm mb-2">Program & Level</label>
+                  <select
+                    value={selectedProgram ? `${selectedProgram}:${selectedLevel}` : ''}
+                    onChange={(e) => {
+                      const [programId, levelId] = e.target.value.split(':');
+                      handleProgramLevelChange(programId, levelId);
+                    }}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Select program & level...</option>
+                    {mentees.map((match) => (
+                      <option 
+                        key={match.id} 
+                        value={`${match.enrollment?.programId}:${match.enrollment?.currentLevelId}`}
+                      >
+                        {match.enrollment?.program?.name} - {match.enrollment?.currentLevel?.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 text-sm mb-2">Select Mentee to Assign</label>
+                  <select
+                    value={selectedMenteeForAssign}
+                    onChange={(e) => setSelectedMenteeForAssign(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">Choose mentee...</option>
+                    {mentees
+                      .filter(m => 
+                        m.enrollment?.programId === selectedProgram && 
+                        m.enrollment?.currentLevelId === selectedLevel
+                      )
+                      .map((match) => (
+                        <option key={match.menteeId} value={match.menteeId}>
+                          {match.mentee?.firstName} {match.mentee?.lastName}
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+              </div>
+
+              {/* Roadmap Display */}
+              {!roadmapData && selectedProgram && selectedLevel && (
+                <div className="text-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
+                  <p className="text-slate-600">Loading roadmap...</p>
+                </div>
+              )}
+
+              {!roadmapData && !selectedProgram && (
+                <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 mb-2">Select a program to view roadmap</p>
+                  <p className="text-slate-500 text-sm">
+                    Choose a program and level from the dropdown above
+                  </p>
+                </div>
+              )}
+
+              {roadmapData && (
+                <div className="space-y-6">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <BookOpen className="w-5 h-5 text-indigo-600 mt-0.5" />
+                      <div>
+                        <h4 className="text-indigo-900 font-medium mb-1">{roadmapData.title}</h4>
+                        {roadmapData.description && (
+                          <p className="text-indigo-700 text-sm">{roadmapData.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Weeks */}
+                  {roadmapData.weeks?.map((week: any) => (
+                    <div key={week.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                        <h4 className="text-slate-900 font-medium">Week {week.weekNumber}: {week.title}</h4>
+                        {week.description && (
+                          <p className="text-slate-600 text-sm mt-1">{week.description}</p>
+                        )}
+                      </div>
+
+                      <div className="p-6 space-y-4">
+                        {week.tasks && week.tasks.length > 0 ? (
+                          week.tasks.map((task: any) => (
+                            <div key={task.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h5 className="text-slate-900 font-medium">{task.title}</h5>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                      task.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                                      task.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                      task.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-red-100 text-red-700'
+                                    }`}>
+                                      {task.difficulty}
+                                    </span>
+                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                                      {task.type}
+                                    </span>
+                                  </div>
+                                  <p className="text-slate-600 text-sm mb-2">{task.description}</p>
+                                  <div className="flex items-center gap-4 text-xs text-slate-500">
+                                    <span>⏱️ {task.estimatedHours}h</span>
+                                    <span>⭐ {task.pointsBase} points</span>
+                                    {task.isMandatory && <span className="text-red-600">● Mandatory</span>}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {task.deliverable && (
+                                <div className="mb-2">
+                                  <p className="text-slate-700 text-sm font-medium mb-1">Deliverable:</p>
+                                  <p className="text-slate-600 text-sm">{task.deliverable}</p>
+                                </div>
+                              )}
+
+                              {task.acceptanceCriteria && task.acceptanceCriteria.length > 0 && (
+                                <div className="mb-3">
+                                  <p className="text-slate-700 text-sm font-medium mb-1">Acceptance Criteria:</p>
+                                  <ul className="text-slate-600 text-sm space-y-1">
+                                    {task.acceptanceCriteria.map((criteria: string, idx: number) => (
+                                      <li key={idx} className="flex items-start gap-2">
+                                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                                        <span>{criteria}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              <button
+                                onClick={() => handleAssignRoadmapTask(task.id, week.weekNumber)}
+                                disabled={!selectedMenteeForAssign}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                  selectedMenteeForAssign
+                                    ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                }`}
+                              >
+                                {selectedMenteeForAssign ? 'Assign to Mentee' : 'Select a mentee first'}
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-slate-500 text-sm text-center py-4">No tasks for this week</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                  {(!roadmapData.weeks || roadmapData.weeks.length === 0) && (
+                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                      <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600">No weeks found in this roadmap</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

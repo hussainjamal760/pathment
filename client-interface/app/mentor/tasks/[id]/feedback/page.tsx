@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
@@ -13,61 +13,216 @@ import {
   Download,
   User,
   Calendar,
-  RotateCw
+  RotateCw,
+  ThumbsUp,
+  ThumbsDown,
+  Loader2
 } from 'lucide-react';
+import RichTextEditor from '@/components/shared/RichTextEditor';
+import { submissionService } from '@/lib/services/submissionService';
+import { taskApi } from '@/lib/services/task-api';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+interface Submission {
+  id: string;
+  version: number;
+  submissionText: string;
+  submissionUrls?: string[];
+  submittedAt: string;
+  status: string;
+  extensionRequested?: boolean;
+  extensionDays?: number;
+  extensionReason?: string;
+  files?: Array<{
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize: number;
+  }>;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  type: string;
+  difficulty: string;
+  deliverable?: string;
+  acceptanceCriteria?: string[];
+  status: string;
+  isCustomTask: boolean;
+  roadmapTask?: {
+    title: string;
+    description: string;
+    deliverable?: string;
+    acceptanceCriteria?: string[];
+  };
+  mentee?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  enrollment?: {
+    program?: {
+      name: string;
+    };
+  };
+  submissions?: Submission[];
+}
+
 export default function FeedbackProvision({ params }: PageProps) {
-  use(params);
+  const resolvedParams = use(params);
   const router = useRouter();
+  const [task, setTask] = useState<Task | null>(null);
+  const [submission, setSubmission] = useState<Submission | null>(null);
+  const [loading, setLoading] = useState(true);
   const [rating, setRating] = useState(0);
-  const [feedback, setFeedback] = useState('');
+  const [hoveredRating, setHoveredRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [revisionNotes, setRevisionNotes] = useState('');
   const [decision, setDecision] = useState<'approve' | 'revision' | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [pointsAwarded, setPointsAwarded] = useState(10);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [inlineFeedback, setInlineFeedback] = useState<Array<{
+    id: number;
+    comment: string;
+    type: 'suggestion' | 'issue' | 'praise';
+  }>>([]);
 
-  const submission = {
-    id: 1,
-    mentee: {
-      name: 'Alex Thompson',
-      program: 'Full Stack Development'
-    },
-    task: {
-      title: 'Build a React component library',
-      description: 'Create reusable React components with TypeScript. Include at least 5 different components (Button, Input, Card, Modal, Dropdown) with proper props and styling.',
-      dueDate: '2024-02-20'
-    },
-    submittedDate: '2024-02-18',
-    submission: {
-      description: 'I built a comprehensive React component library with TypeScript. The library includes Button, Input, Card, Modal, Dropdown, and Tooltip components. Each component is fully typed with TypeScript interfaces, includes proper prop validation, and is responsive. I used CSS modules for styling and created a demo page to showcase all components. The biggest challenge was making the Modal component accessible with proper focus management and keyboard navigation.',
-      links: [
-        { title: 'GitHub Repository', url: 'https://github.com/alexthompson/component-library' },
-        { title: 'Live Demo', url: 'https://component-library-demo.netlify.app' }
-      ],
-      files: [
-        { name: 'component-screenshots.pdf', size: '2.4 MB' },
-        { name: 'type-definitions.ts', size: '45 KB' }
-      ]
-    }
+  useEffect(() => {
+    const fetchTaskAndSubmission = async () => {
+      try {
+        const response = await taskApi.getTaskById(resolvedParams.id);
+        const taskData = response.data.data.task;
+        setTask(taskData);
+        
+        // Get the latest submission
+        if (taskData.submissions && taskData.submissions.length > 0) {
+          setSubmission(taskData.submissions[0]);
+        }
+        
+        // Set default points based on task
+        if (taskData.pointsBase) {
+          setPointsAwarded(taskData.pointsBase);
+        }
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { message?: string } } };
+        setError(error.response?.data?.message || 'Failed to load task');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTaskAndSubmission();
+  }, [resolvedParams.id]);
+
+  const addInlineFeedback = () => {
+    setInlineFeedback([
+      ...inlineFeedback,
+      { id: Date.now(), comment: '', type: 'suggestion' }
+    ]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const updateInlineFeedback = (id: number, field: string, value: string) => {
+    setInlineFeedback(
+      inlineFeedback.map(item =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
+  const removeInlineFeedback = (id: number) => {
+    setInlineFeedback(inlineFeedback.filter(item => item.id !== id));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!decision || rating === 0) {
-      alert('Please provide a rating and decision');
+    setError('');
+
+    if (!submission) {
+      setError('No submission found');
       return;
     }
-    setShowSuccess(true);
-    setTimeout(() => router.push('/mentor/tasks/review'), 2000);
+
+    if (!decision || rating === 0) {
+      setError('Please provide a rating and decision');
+      return;
+    }
+
+    if (!feedbackText.trim()) {
+      setError('Please provide feedback');
+      return;
+    }
+
+    if (decision === 'revision' && !revisionNotes.trim()) {
+      setError('Please provide revision notes');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const validInlineFeedback = inlineFeedback
+        .filter(item => item.comment.trim())
+        .map(item => ({
+          line: 0,
+          comment: item.comment,
+          type: item.type
+        }));
+
+      await submissionService.reviewSubmission(submission.id, {
+        rating,
+        feedbackText,
+        inlineFeedback: validInlineFeedback.length > 0 ? validInlineFeedback : undefined,
+        isApproved: decision === 'approve',
+        revisionNotes: decision === 'revision' ? revisionNotes : undefined,
+        pointsAwarded: decision === 'approve' ? pointsAwarded : undefined
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => router.push('/mentor/tasks'), 2000);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!task || !submission) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+        <p className="text-red-900">Task or submission not found</p>
+      </div>
+    );
+  }
+
+  const taskTitle = task.roadmapTask?.title || task.title;
+  const taskDescription = task.roadmapTask?.description || task.description;
+  const taskDeliverable = task.roadmapTask?.deliverable || task.deliverable;
+  const acceptanceCriteria = task.roadmapTask?.acceptanceCriteria || task.acceptanceCriteria || [];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <button
-        onClick={() => router.push('/mentor/tasks/review')}
+        onClick={() => router.push('/mentor/tasks')}
         className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -85,6 +240,14 @@ export default function FeedbackProvision({ params }: PageProps) {
         </div>
       )}
 
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-red-900">{error}</p>
+        </div>
+      )}
+
       {/* Mentee & Task Info */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
         <div className="flex items-start gap-4 mb-4">
@@ -92,53 +255,97 @@ export default function FeedbackProvision({ params }: PageProps) {
             <User className="w-6 h-6 text-slate-600" />
           </div>
           <div className="flex-1">
-            <h2 className="text-slate-900 mb-1">{submission.mentee.name}</h2>
-            <p className="text-slate-600 text-sm mb-3">{submission.mentee.program}</p>
+            <h2 className="text-slate-900 mb-1">
+              {task.mentee?.firstName} {task.mentee?.lastName}
+            </h2>
+            <p className="text-slate-600 text-sm mb-3">{task.enrollment?.program?.name}</p>
             <div className="flex items-center gap-4 text-sm text-slate-600">
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
-                Submitted {submission.submittedDate}
+                Submitted {new Date(submission.submittedAt).toLocaleDateString()}
               </span>
+              {submission.version > 1 && (
+                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                  Version {submission.version}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="p-4 bg-slate-50 rounded-xl">
-          <h3 className="text-slate-900 mb-2">{submission.task.title}</h3>
-          <p className="text-slate-600 text-sm">{submission.task.description}</p>
+        <div className="border-t pt-4">
+          <div className="flex items-center gap-3 mb-2">
+            <h3 className="text-lg text-slate-900">{taskTitle}</h3>
+            {task.isCustomTask && (
+              <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">Custom</span>
+            )}
+            <span className={`px-2 py-1 text-xs rounded ${
+              task.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+              task.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {task.difficulty}
+            </span>
+          </div>
+          <p className="text-slate-600 text-sm mb-4">{taskDescription}</p>
+          
+          {taskDeliverable && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900"><strong>Expected Deliverable:</strong> {taskDeliverable}</p>
+            </div>
+          )}
+
+          {acceptanceCriteria.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm text-slate-700 mb-2">Acceptance Criteria</h4>
+              <ul className="space-y-1">
+                {acceptanceCriteria.map((criterion, index) => (
+                  <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
+                    <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                    {criterion}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {submission.extensionRequested && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5" />
+                <div>
+                  <p className="text-sm text-orange-900 font-medium">Extension Requested</p>
+                  <p className="text-sm text-orange-700">{submission.extensionDays} days - {submission.extensionReason}</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Submission Details */}
+      {/* Submission Content */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <h2 className="text-slate-900 mb-4">Mentee&apos;s Submission</h2>
+        <h3 className="text-lg text-slate-900 mb-4">Mentee&apos;s Submission</h3>
         
-        {/* Description */}
-        <div className="mb-6">
-          <h3 className="text-slate-700 text-sm mb-2">Description</h3>
-          <div className="p-4 bg-slate-50 rounded-xl">
-            <p className="text-slate-700 leading-relaxed">{submission.submission.description}</p>
-          </div>
+        <div className="prose prose-sm max-w-none mb-6 p-4 bg-slate-50 rounded-lg">
+          <div dangerouslySetInnerHTML={{ __html: submission.submissionText }} />
         </div>
 
         {/* Links */}
-        {submission.submission.links.length > 0 && (
+        {submission.submissionUrls && submission.submissionUrls.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-slate-700 text-sm mb-3">Project Links</h3>
+            <h4 className="text-sm text-slate-700 mb-3">Project Links</h4>
             <div className="space-y-2">
-              {submission.submission.links.map((link, idx) => (
+              {submission.submissionUrls.map((url, index) => (
                 <a
-                  key={idx}
-                  href={link.url}
+                  key={index}
+                  href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-3 p-4 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors"
+                  className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                 >
-                  <ExternalLink className="w-5 h-5 text-indigo-600" />
-                  <div className="flex-1">
-                    <div className="text-indigo-900">{link.title}</div>
-                    <div className="text-indigo-600 text-sm">{link.url}</div>
-                  </div>
+                  <ExternalLink className="w-4 h-4 text-blue-600" />
+                  <span className="text-blue-700 text-sm">{url}</span>
                 </a>
               ))}
             </div>
@@ -146,23 +353,31 @@ export default function FeedbackProvision({ params }: PageProps) {
         )}
 
         {/* Files */}
-        {submission.submission.files.length > 0 && (
+        {submission.files && submission.files.length > 0 && (
           <div>
-            <h3 className="text-slate-700 text-sm mb-3">Attached Files</h3>
+            <h4 className="text-sm text-slate-700 mb-3">File Attachments</h4>
             <div className="space-y-2">
-              {submission.submission.files.map((file, idx) => (
-                <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+              {submission.files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <FileText className="w-5 h-5 text-slate-600" />
                     <div>
-                      <div className="text-slate-900">{file.name}</div>
-                      <div className="text-slate-500 text-sm">{file.size}</div>
+                      <p className="text-sm text-slate-900">{file.fileName}</p>
+                      <p className="text-xs text-slate-500">{(file.fileSize / 1024).toFixed(2)} KB</p>
                     </div>
                   </div>
-                  <button className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
+                  <a
+                    href={file.fileUrl}
+                    download
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 hover:bg-slate-200 rounded transition-colors"
+                  >
+                    <Download className="w-4 h-4 text-slate-600" />
+                  </a>
                 </div>
               ))}
             </div>
@@ -170,135 +385,189 @@ export default function FeedbackProvision({ params }: PageProps) {
         )}
       </div>
 
-      {/* Feedback Form */}
-      <form onSubmit={handleSubmit}>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-          <h2 className="text-slate-900">Provide Feedback</h2>
+      {/* Review Form */}
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+        <h3 className="text-lg text-slate-900">Provide Feedback</h3>
 
-          {/* Rating */}
-          <div>
-            <label className="block text-slate-900 mb-3">
-              Rating <span className="text-red-600">*</span>
-            </label>
-            <div className="flex items-center gap-3">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className="group"
-                >
-                  <Star
-                    className={`w-10 h-10 transition-colors ${
-                      star <= rating
-                        ? 'text-yellow-500 fill-yellow-500'
-                        : 'text-slate-300 group-hover:text-yellow-400'
-                    }`}
-                  />
-                </button>
-              ))}
-              {rating > 0 && (
-                <span className="text-slate-600 ml-2">{rating}/5</span>
-              )}
-            </div>
-          </div>
-
-          {/* Feedback Text */}
-          <div>
-            <label className="block text-slate-900 mb-2">
-              Detailed Feedback <span className="text-red-600">*</span>
-            </label>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              rows={12}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-              placeholder="Provide constructive feedback. Include:&#10;&#10;**Strengths:**&#10;- What the mentee did well&#10;- Specific examples of good practices&#10;&#10;**Areas for Improvement:**&#10;- Specific suggestions for enhancement&#10;- Best practices to consider&#10;&#10;**Key Takeaways:**&#10;- What they should remember for future tasks"
-              required
-            />
-            <p className="text-slate-500 text-sm mt-2">
-              Markdown formatting is supported. Be specific and constructive in your feedback.
-            </p>
-          </div>
-
-          {/* Decision */}
-          <div>
-            <label className="block text-slate-900 mb-3">
-              Decision <span className="text-red-600">*</span>
-            </label>
-            <div className="grid sm:grid-cols-2 gap-4">
+        {/* Rating */}
+        <div>
+          <label className="block text-sm text-slate-700 mb-2">
+            Rating <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
               <button
+                key={star}
                 type="button"
-                onClick={() => setDecision('approve')}
-                className={`p-4 border-2 rounded-xl transition-all text-left ${
-                  decision === 'approve'
-                    ? 'border-green-600 bg-green-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoveredRating(star)}
+                onMouseLeave={() => setHoveredRating(0)}
+                className="transition-transform hover:scale-110"
               >
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className={`w-6 h-6 shrink-0 ${decision === 'approve' ? 'text-green-600' : 'text-slate-600'}`} />
-                  <div>
-                    <div className={`mb-1 ${decision === 'approve' ? 'text-green-900' : 'text-slate-900'}`}>
-                      Approve & Complete
-                    </div>
-                    <div className={`text-sm ${decision === 'approve' ? 'text-green-700' : 'text-slate-600'}`}>
-                      Mark task as completed
-                    </div>
-                  </div>
-                </div>
+                <Star
+                  className={`w-8 h-8 ${
+                    star <= (hoveredRating || rating)
+                      ? 'fill-yellow-400 text-yellow-400'
+                      : 'text-slate-300'
+                  }`}
+                />
               </button>
-
-              <button
-                type="button"
-                onClick={() => setDecision('revision')}
-                className={`p-4 border-2 rounded-xl transition-all text-left ${
-                  decision === 'revision'
-                    ? 'border-orange-600 bg-orange-50'
-                    : 'border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <RotateCw className={`w-6 h-6 shrink-0 ${decision === 'revision' ? 'text-orange-600' : 'text-slate-600'}`} />
-                  <div>
-                    <div className={`mb-1 ${decision === 'revision' ? 'text-orange-900' : 'text-slate-900'}`}>
-                      Request Revision
-                    </div>
-                    <div className={`text-sm ${decision === 'revision' ? 'text-orange-700' : 'text-slate-600'}`}>
-                      Ask for improvements
-                    </div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Info Message */}
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-blue-900 text-sm">
-                Your mentee will receive an email notification with your feedback. Be constructive and specific to help them grow.
-              </p>
-            </div>
+            ))}
+            <span className="ml-3 text-slate-600 self-center">
+              {rating > 0 ? `${rating}/5` : 'Not rated'}
+            </span>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="mt-6 flex gap-4">
+        {/* General Feedback */}
+        <div>
+          <label className="block text-sm text-slate-700 mb-2">
+            General Feedback <span className="text-red-500">*</span>
+          </label>
+          <RichTextEditor
+            content={feedbackText}
+            onChange={setFeedbackText}
+            placeholder="Provide detailed feedback on the submission..."
+            minHeight="200px"
+          />
+        </div>
+
+        {/* Inline Feedback */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-sm text-slate-700">
+              Inline Feedback (Optional)
+            </label>
+            <button
+              type="button"
+              onClick={addInlineFeedback}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              + Add inline comment
+            </button>
+          </div>
+          <div className="space-y-3">
+            {inlineFeedback.map((item) => (
+              <div key={item.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <div className="flex gap-2 mb-2">
+                  <select
+                    value={item.type}
+                    onChange={(e) => updateInlineFeedback(item.id, 'type', e.target.value)}
+                    className="px-2 py-1 text-sm border border-slate-300 rounded"
+                  >
+                    <option value="suggestion">💡 Suggestion</option>
+                    <option value="issue">⚠️ Issue</option>
+                    <option value="praise">👍 Praise</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeInlineFeedback(item.id)}
+                    className="ml-auto text-sm text-slate-600 hover:text-red-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <textarea
+                  value={item.comment}
+                  onChange={(e) => updateInlineFeedback(item.id, 'comment', e.target.value)}
+                  placeholder="Add your comment..."
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={2}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Decision */}
+        <div>
+          <label className="block text-sm text-slate-700 mb-3">
+            Decision <span className="text-red-500">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => setDecision('approve')}
+              className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all ${
+                decision === 'approve'
+                  ? 'border-green-500 bg-green-50'
+                  : 'border-slate-200 hover:border-green-300'
+              }`}
+            >
+              <ThumbsUp className={`w-6 h-6 ${decision === 'approve' ? 'text-green-600' : 'text-slate-400'}`} />
+              <div className="text-left">
+                <p className="text-slate-900">Approve</p>
+                <p className="text-xs text-slate-500">Task completed successfully</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDecision('revision')}
+              className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all ${
+                decision === 'revision'
+                  ? 'border-orange-500 bg-orange-50'
+                  : 'border-slate-200 hover:border-orange-300'
+              }`}
+            >
+              <RotateCw className={`w-6 h-6 ${decision === 'revision' ? 'text-orange-600' : 'text-slate-400'}`} />
+              <div className="text-left">
+                <p className="text-slate-900">Request Revision</p>
+                <p className="text-xs text-slate-500">Needs improvements</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {/* Points (if approved) */}
+        {decision === 'approve' && (
+          <div>
+            <label className="block text-sm text-slate-700 mb-2">
+              Points Awarded
+            </label>
+            <input
+              type="number"
+              value={pointsAwarded}
+              onChange={(e) => setPointsAwarded(Number(e.target.value))}
+              min="0"
+              max="100"
+              className="w-32 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        )}
+
+        {/* Revision Notes (if revision requested) */}
+        {decision === 'revision' && (
+          <div>
+            <label className="block text-sm text-slate-700 mb-2">
+              Revision Notes <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              value={revisionNotes}
+              onChange={(e) => setRevisionNotes(e.target.value)}
+              placeholder="Specify what needs to be improved or corrected..."
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px]"
+            />
+          </div>
+        )}
+
+        {/* Submit Button */}
+        <div className="flex justify-end pt-4 border-t">
           <button
             type="submit"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <Send className="w-5 h-5" />
-            Submit Feedback
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/mentor/tasks/review')}
-            className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
-          >
-            Cancel
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Submit Review
+              </>
+            )}
           </button>
         </div>
       </form>

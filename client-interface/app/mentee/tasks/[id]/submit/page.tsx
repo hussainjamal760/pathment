@@ -1,78 +1,186 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, use, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Link as LinkIcon,
-  Upload,
-  File,
-  X,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Calendar,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
+import RichTextEditor from '@/components/shared/RichTextEditor';
+import FileUploader from '@/components/shared/FileUploader';
+import { submissionService } from '@/lib/services/submissionService';
+import { taskApi } from '@/lib/services/task-api';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function TaskSubmission({ params }: PageProps) {
-  use(params);
-  const router = useRouter();
-  const [submission, setSubmission] = useState({
-    description: '',
-    links: [''],
-    files: [] as File[]
-  });
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  const task = {
-    id: 1,
-    title: 'Build a React component library',
-    description: 'Create reusable React components with TypeScript. Include at least 5 different components (Button, Input, Card, Modal, Dropdown) with proper props and styling.',
-    dueDate: '2024-02-20',
-    requirements: [
-      'Minimum 5 components',
-      'TypeScript implementation',
-      'Responsive design',
-      'Documentation for each component',
-      'Demo/Storybook examples'
-    ],
-    resources: [
-      { title: 'React TypeScript Cheatsheet', url: '#' },
-      { title: 'Component Design Patterns', url: '#' }
-    ]
+interface Task {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  type: string;
+  difficulty: string;
+  deliverable?: string;
+  acceptanceCriteria?: string[];
+  roadmapTask?: {
+    title: string;
+    description: string;
+    deliverable?: string;
+    acceptanceCriteria?: string[];
+    resources?: Array<{
+      id: string;
+      title: string;
+      url: string;
+      type: string;
+    }>;
   };
+  status: string;
+  isCustomTask: boolean;
+}
+
+export default function TaskSubmission({ params }: PageProps) {
+  const resolvedParams = use(params);
+  const router = useRouter();
+  const [task, setTask] = useState<Task | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submissionText, setSubmissionText] = useState('');
+  const [links, setLinks] = useState<string[]>(['']);
+  const [files, setFiles] = useState<File[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showExtensionForm, setShowExtensionForm] = useState(false);
+  const [extensionDays, setExtensionDays] = useState(3);
+  const [extensionReason, setExtensionReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTask = async () => {
+      try {
+        const response = await taskApi.getTaskById(resolvedParams.id);
+        setTask(response.data.data.task);
+      } catch (err: unknown) {
+        const error = err as { response?: { data?: { message?: string } } };
+        setError(error.response?.data?.message || 'Failed to load task');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTask();
+  }, [resolvedParams.id]);
 
   const addLink = () => {
-    setSubmission({ ...submission, links: [...submission.links, ''] });
+    setLinks([...links, '']);
   };
 
   const updateLink = (index: number, value: string) => {
-    const newLinks = [...submission.links];
+    const newLinks = [...links];
     newLinks[index] = value;
-    setSubmission({ ...submission, links: newLinks });
+    setLinks(newLinks);
   };
 
   const removeLink = (index: number) => {
-    setSubmission({ ...submission, links: submission.links.filter((_, i) => i !== index) });
+    setLinks(links.filter((_, i) => i !== index));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSubmission({ ...submission, files: [...submission.files, ...Array.from(e.target.files)] });
+  const handleFilesAdded = (newFiles: File[]) => {
+    setFiles([...files, ...newFiles]);
+  };
+
+  const handleFileRemoved = (index: number) => {
+    setFiles(files.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!submissionText.trim()) {
+      setError('Please provide a description of your work');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const validLinks = links.filter(link => link.trim() !== '');
+      
+      await submissionService.submitTask(resolvedParams.id, {
+        submissionText,
+        submissionUrls: validLinks,
+        files,
+        extensionRequested: false
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => router.push('/mentee/tasks'), 2000);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to submit task');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const removeFile = (index: number) => {
-    setSubmission({ ...submission, files: submission.files.filter((_, i) => i !== index) });
+  const handleExtensionRequest = async () => {
+    if (!extensionReason.trim()) {
+      setError('Please provide a reason for the extension');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      await submissionService.requestExtension(resolvedParams.id, {
+        reason: extensionReason,
+        days: extensionDays
+      });
+
+      setShowSuccess(true);
+      setTimeout(() => router.push('/mentee/tasks'), 2000);
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || 'Failed to request extension');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowSuccess(true);
-    setTimeout(() => router.push('/mentee/tasks'), 2000);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!task) {
+    return (
+      <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+        <p className="text-red-900">Task not found</p>
+      </div>
+    );
+  }
+
+  const daysUntilDue = Math.ceil(
+    (new Date(task.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+  );
+  const isOverdue = daysUntilDue < 0;
+
+  // Get task details from roadmapTask or custom task fields
+  const taskTitle = task.roadmapTask?.title || task.title;
+  const taskDescription = task.roadmapTask?.description || task.description;
+  const taskDeliverable = task.roadmapTask?.deliverable || task.deliverable;
+  const acceptanceCriteria = task.roadmapTask?.acceptanceCriteria || task.acceptanceCriteria || [];
+  const resources = task.roadmapTask?.resources || [];
 
   return (
     <div className="space-y-6">
@@ -90,181 +198,260 @@ export default function TaskSubmission({ params }: PageProps) {
         <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-green-900">Task submitted successfully!</p>
-            <p className="text-green-700 text-sm mt-1">Your mentor will review it shortly.</p>
+            <p className="text-green-900">
+              {showExtensionForm ? 'Extension request submitted!' : 'Task submitted successfully!'}
+            </p>
+            <p className="text-green-700 text-sm mt-1">
+              {showExtensionForm ? 'Your mentor will review your request.' : 'Your mentor will review it shortly.'}
+            </p>
           </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <p className="text-red-900">{error}</p>
         </div>
       )}
 
       {/* Task Details */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <h1 className="text-slate-900 mb-2">{task.title}</h1>
-            <p className="text-slate-600 mb-4">{task.description}</p>
-          </div>
-          <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg text-sm whitespace-nowrap">
-            Due: {task.dueDate}
-          </span>
-        </div>
-
-        {/* Requirements */}
-        <div className="mb-4">
-          <h3 className="text-slate-900 mb-3">Requirements</h3>
-          <div className="space-y-2">
-            {task.requirements.map((req, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-slate-700">
-                <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full mt-2" />
-                <span className="text-sm">{req}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Resources */}
-        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
-          <h4 className="text-indigo-900 text-sm mb-2">Learning Resources</h4>
-          <div className="space-y-1">
-            {task.resources.map((resource, idx) => (
-              <a
-                key={idx}
-                href={resource.url}
-                className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm"
-              >
-                <LinkIcon className="w-4 h-4" />
-                {resource.title}
-              </a>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Submission Form */}
-      <form onSubmit={handleSubmit}>
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
-          <h2 className="text-slate-900">Submit Your Work</h2>
-
-          {/* Description */}
           <div>
-            <label className="block text-slate-900 mb-2">
-              Description <span className="text-red-600">*</span>
-            </label>
-            <textarea
-              value={submission.description}
-              onChange={(e) => setSubmission({ ...submission, description: e.target.value })}
-              rows={8}
-              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-              placeholder="Describe your work, approach, challenges faced, and what you learned..."
-              required
-            />
-            <p className="text-slate-500 text-sm mt-2">
-              Be specific about your implementation and any decisions you made.
-            </p>
-          </div>
-
-          {/* Project Links */}
-          <div>
-            <label className="block text-slate-900 mb-2">Project Links</label>
-            <div className="space-y-3">
-              {submission.links.map((link, index) => (
-                <div key={index} className="flex gap-2">
-                  <div className="relative flex-1">
-                    <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                      type="url"
-                      value={link}
-                      onChange={(e) => updateLink(index, e.target.value)}
-                      className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="https://github.com/username/project or https://demo-url.com"
-                    />
-                    {submission.links.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeLink(index)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addLink}
-                className="text-indigo-600 hover:text-indigo-700 text-sm"
-              >
-                + Add another link
-              </button>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl text-slate-900">{taskTitle}</h1>
+              {task.isCustomTask && (
+                <span className="px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded">Custom</span>
+              )}
+              <span className={`px-2 py-1 text-xs rounded ${
+                task.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                task.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {task.difficulty}
+              </span>
             </div>
-          </div>
-
-          {/* File Upload */}
-          <div>
-            <label className="block text-slate-900 mb-2">Attachments</label>
-            <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
-              <Upload className="w-8 h-8 text-slate-400 mx-auto mb-3" />
-              <p className="text-slate-700 mb-1">Drop files here or click to browse</p>
-              <p className="text-slate-500 text-sm mb-4">PDF, images, or ZIP files (Max 10MB)</p>
-              <input
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload"
-              />
-              <label
-                htmlFor="file-upload"
-                className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-sm cursor-pointer inline-block transition-colors"
-              >
-                Choose Files
-              </label>
-            </div>
-
-            {/* File List */}
-            {submission.files.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {submission.files.map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <File className="w-5 h-5 text-slate-600" />
-                      <div>
-                        <div className="text-slate-900 text-sm">{file.name}</div>
-                        <div className="text-slate-500 text-xs">{(file.size / 1024).toFixed(2)} KB</div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(index)}
-                      className="text-slate-400 hover:text-red-600"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                ))}
+            <p className="text-slate-600">{taskDescription}</p>
+            {taskDeliverable && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900"><strong>Deliverable:</strong> {taskDeliverable}</p>
               </div>
             )}
           </div>
+          <div className={`px-3 py-1 rounded-full text-sm whitespace-nowrap ${
+            isOverdue 
+              ? 'bg-red-100 text-red-700'
+              : daysUntilDue <= 2
+              ? 'bg-orange-100 text-orange-700'
+              : 'bg-blue-100 text-blue-700'
+          }`}>
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              {isOverdue ? 'Overdue' : `${daysUntilDue} days left`}
+            </div>
+          </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
-          >
-            <Send className="w-5 h-5" />
-            Submit Task
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push('/mentee/tasks')}
-            className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+        {acceptanceCriteria.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-slate-900 mb-3">Acceptance Criteria</h3>
+            <ul className="space-y-2">
+              {acceptanceCriteria.map((criterion, index) => (
+                <li key={index} className="flex items-start gap-2 text-slate-700">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                  <span className="text-sm">{criterion}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {resources.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-sm font-medium text-slate-900 mb-3">Learning Resources</h3>
+            <ul className="space-y-2">
+              {resources.map((resource) => (
+                <li key={resource.id}>
+                  <a 
+                    href={resource.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:underline flex items-center gap-2"
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    {resource.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {!showExtensionForm ? (
+        <>
+          {/* Submission Form */}
+          <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+            <div>
+              <h2 className="text-xl text-slate-900 mb-4">Submit Your Work</h2>
+              
+              {/* Rich Text Editor */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-700 mb-2">
+                  Description <span className="text-red-500">*</span>
+                </label>
+                <RichTextEditor
+                  content={submissionText}
+                  onChange={setSubmissionText}
+                  placeholder="Describe your work, challenges faced, and what you learned..."
+                  minHeight="250px"
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Provide a detailed explanation of your implementation, challenges, and learnings
+                </p>
+              </div>
+
+              {/* Links */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-700 mb-2">
+                  Project Links
+                </label>
+                <div className="space-y-3">
+                  {links.map((link, index) => (
+                    <div key={index} className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <LinkIcon className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
+                        <input
+                          type="url"
+                          value={link}
+                          onChange={(e) => updateLink(index, e.target.value)}
+                          placeholder="https://github.com/username/project"
+                          className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      {links.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeLink(index)}
+                          className="px-3 py-2 text-slate-600 hover:bg-slate-100 rounded-lg"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addLink}
+                    className="text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    + Add another link
+                  </button>
+                </div>
+              </div>
+
+              {/* File Upload */}
+              <div className="mb-6">
+                <label className="block text-sm text-slate-700 mb-2">
+                  File Attachments
+                </label>
+                <FileUploader
+                  files={files}
+                  onFilesAdded={handleFilesAdded}
+                  onFileRemoved={handleFileRemoved}
+                  maxFiles={5}
+                  maxSize={10 * 1024 * 1024}
+                />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t">
+              <button
+                type="button"
+                onClick={() => setShowExtensionForm(true)}
+                className="text-slate-600 hover:text-slate-900 text-sm flex items-center gap-2"
+              >
+                <Clock className="w-4 h-4" />
+                Request Extension
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Submit Task
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </>
+      ) : (
+        <>
+          {/* Extension Request Form */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-6">
+            <h2 className="text-xl text-slate-900">Request Extension</h2>
+            
+            <div>
+              <label className="block text-sm text-slate-700 mb-2">
+                Extension Duration
+              </label>
+              <select
+                value={extensionDays}
+                onChange={(e) => setExtensionDays(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={1}>1 day</option>
+                <option value={2}>2 days</option>
+                <option value={3}>3 days</option>
+                <option value={5}>5 days</option>
+                <option value={7}>1 week</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-700 mb-2">
+                Reason <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={extensionReason}
+                onChange={(e) => setExtensionReason(e.target.value)}
+                placeholder="Explain why you need more time..."
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[120px]"
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExtensionForm(false)}
+                className="px-6 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExtensionRequest}
+                disabled={isSubmitting}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Requesting...' : 'Request Extension'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
