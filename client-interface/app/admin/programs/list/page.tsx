@@ -201,7 +201,7 @@ export default function ProgramListPage() {
               {/* Stats */}
               <div className="flex items-center gap-6">
                 <div className="text-center">
-                  <div className="text-slate-900 text-2xl mb-1">{program._count?.enrollments || program.enrollments || 0}</div>
+                  <div className="text-slate-900 text-2xl mb-1">{program._count?.enrollments || 0}</div>
                   <div className="text-slate-600 text-sm flex items-center gap-1">
                     <Users className="w-4 h-4" />
                     Mentees
