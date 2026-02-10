@@ -12,6 +12,8 @@ const levelMentorRoutes = require('./levelMentors');
 const mentorRoutes = require('./mentors');
 const taskRoutes = require('./tasks');
 const submissionRoutes = require('./submissions');
+const profileRoutes = require('./profile');
+const skillRoutes = require('./skills');
 
 /**
  * API Routes
@@ -28,6 +30,10 @@ router.get('/health', (req, res) => {
 
 // Auth routes
 router.use('/auth', authRoutes);
+
+// Profile and skills routes
+router.use('/profile', profileRoutes);
+router.use('/skills', skillRoutes);
 
 // Admin routes (protected)
 router.use('/admin', adminRoutes);

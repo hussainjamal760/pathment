@@ -42,7 +42,7 @@ export const taskApi = {
     deliverable?: string;
     acceptanceCriteria?: string[];
   }) =>
-    api.post('/tasks/custom', data),
+    apiClient.post('/tasks/custom', data),
 
   reviewTask: (taskId: string, data: {
     rating: number;
@@ -50,13 +50,13 @@ export const taskApi = {
     status: 'completed' | 'revision_needed';
     pointsAwarded?: number;
   }) =>
-    api.post(`/tasks/${taskId}/review`, data),
+    apiClient.post(`/tasks/${taskId}/review`, data),
 
   cancelTask: (taskId: string, reason?: string) =>
-    api.post(`/tasks/${taskId}/cancel`, { reason }),
+    apiClient.post(`/tasks/${taskId}/cancel`, { reason }),
 
   deleteCustomTask: (taskId: string) =>
-    api.delete(`/tasks/${taskId}`),
+    apiClient.delete(`/tasks/${taskId}`),
 
   // Roadmap APIs
   getRoadmapTasks: (programId: string, levelId: string) =>

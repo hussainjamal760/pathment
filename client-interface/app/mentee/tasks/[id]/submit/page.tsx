@@ -64,7 +64,7 @@ export default function TaskSubmission({ params }: PageProps) {
     const fetchTask = async () => {
       try {
         const response = await taskApi.getTaskById(resolvedParams.id);
-        setTask(response.data.data.task);
+        setTask(response.data.task);
       } catch (err: unknown) {
         const error = err as { response?: { data?: { message?: string } } };
         setError(error.response?.data?.message || 'Failed to load task');

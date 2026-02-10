@@ -29,6 +29,13 @@ const USER_MESSAGES = {
   PROFILE_UPDATE_SUCCESS: 'Profile updated successfully'
 };
 
+const PROFILE_MESSAGES = {
+  PROFILE_UPDATED: 'Profile updated successfully',
+  PROFILE_COMPLETED: 'Profile completed successfully',
+  SKILLS_ADDED: 'Skills added successfully',
+  ONBOARDING_COMPLETED: 'Onboarding completed successfully'
+};
+
 const PROGRAM_MESSAGES = {
   CREATE_SUCCESS: 'Program created successfully',
   UPDATE_SUCCESS: 'Program updated successfully',
@@ -90,6 +97,7 @@ const COMMON_MESSAGES = {
 module.exports = {
   AUTH_MESSAGES,
   USER_MESSAGES,
+  PROFILE_MESSAGES,
   PROGRAM_MESSAGES,
   TASK_MESSAGES,
   NOTIFICATION_MESSAGES,

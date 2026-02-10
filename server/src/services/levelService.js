@@ -17,11 +17,31 @@ class LevelService {
       throw new ForbiddenError('You do not have permission to add levels to this program');
     }
 
+    const levelOrder = data.orderIndex ?? data.levelOrder;
+
+    // Check if a level with the same order already exists for this program
+    const existingLevelByOrder = await models.ProgramLevel.findOne({
+      where: { programId, levelOrder }
+    });
+
+    if (existingLevelByOrder) {
+      throw new ValidationError(`A level with order ${levelOrder} already exists for this program`);
+    }
+
+    // Check if a level with the same name already exists for this program
+    const existingLevelByName = await models.ProgramLevel.findOne({
+      where: { programId, name: data.name }
+    });
+
+    if (existingLevelByName) {
+      throw new ValidationError(`A level with the name "${data.name}" already exists for this program`);
+    }
+
     const level = await models.ProgramLevel.create({
       programId,
       name: data.name,
       description: data.description,
-      levelOrder: data.orderIndex ?? data.levelOrder,
+      levelOrder: levelOrder,
       durationWeeks: data.durationWeeks,
       learningOutcomes: data.learningOutcomes || [],
       prerequisites: data.prerequisites || [],
@@ -68,7 +88,45 @@ class LevelService {
       throw new ForbiddenError('You do not have permission to update this level');
     }
 
-    await level.update(data);
+    // If updating levelOrder, check for conflicts
+    const newLevelOrder = data.orderIndex ?? data.levelOrder;
+    if (newLevelOrder !== undefined && newLevelOrder !== level.levelOrder) {
+      const existingLevelByOrder = await models.ProgramLevel.findOne({
+        where: { 
+          programId: level.programId, 
+          levelOrder: newLevelOrder,
+          id: { [models.Sequelize.Op.ne]: levelId }
+        }
+      });
+
+      if (existingLevelByOrder) {
+        throw new ValidationError(`A level with order ${newLevelOrder} already exists for this program`);
+      }
+    }
+
+    // If updating name, check for conflicts
+    if (data.name && data.name !== level.name) {
+      const existingLevelByName = await models.ProgramLevel.findOne({
+        where: { 
+          programId: level.programId, 
+          name: data.name,
+          id: { [models.Sequelize.Op.ne]: levelId }
+        }
+      });
+
+      if (existingLevelByName) {
+        throw new ValidationError(`A level with the name "${data.name}" already exists for this program`);
+      }
+    }
+
+    // Prepare update data
+    const updateData = { ...data };
+    if (newLevelOrder !== undefined) {
+      updateData.levelOrder = newLevelOrder;
+      delete updateData.orderIndex;
+    }
+
+    await level.update(updateData);
     return level;
   }
 

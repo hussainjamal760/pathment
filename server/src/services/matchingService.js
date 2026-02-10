@@ -1,5 +1,6 @@
 const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
+const { Op } = require('sequelize');
 
 class MatchingService {
   async createMatch(enrollmentId, mentorId, levelId, matchedBy) {
@@ -204,6 +205,249 @@ class MatchingService {
 
     await match.update({ status });
     return match;
+  }
+
+  /**
+   * AI MATCHING HELPER METHODS
+   * Get comprehensive mentee data for AI matching algorithm
+   */
+  async getMenteeMatchingProfile(menteeId) {
+    const mentee = await models.User.findByPk(menteeId, {
+      attributes: ['id', 'firstName', 'lastName', 'email', 'createdAt'],
+      include: [
+        {
+          model: models.MenteeProfile,
+          as: 'menteeProfile',
+          attributes: [
+            'currentEducation',
+            'currentOccupation',
+            'learningGoals',
+            'interests',
+            'priorExperience',
+            'preferredLearningStyle',
+            'totalProgramsEnrolled',
+            'totalProgramsCompleted',
+            'totalTasksCompleted',
+            'avgTaskRating'
+          ]
+        },
+        {
+          model: models.Skill,
+          as: 'skills',
+          through: {
+            model: models.UserSkill,
+            attributes: ['proficiencyLevel', 'yearsOfExperience']
+          },
+          attributes: ['id', 'name', 'category']
+        }
+      ]
+    });
+
+    if (!mentee) {
+      throw new NotFoundError('Mentee not found');
+    }
+
+    // Get active enrollments
+    const enrollments = await models.Enrollment.findAll({
+      where: {
+        menteeId,
+        status: { [Op.in]: ['pending_match', 'active', 'in_progress'] }
+      },
+      include: [
+        {
+          model: models.Program,
+          as: 'program',
+          attributes: ['id', 'name', 'type', 'targetAudience']
+        }
+      ]
+    });
+
+    return {
+      id: mentee.id,
+      name: `${mentee.firstName} ${mentee.lastName}`,
+      profile: mentee.menteeProfile,
+      skills: mentee.skills.map(skill => ({
+        id: skill.id,
+        name: skill.name,
+        category: skill.category,
+        proficiencyLevel: skill.UserSkill.proficiencyLevel,
+        yearsOfExperience: skill.UserSkill.yearsOfExperience
+      })),
+      enrollments: enrollments.map(e => ({
+        programId: e.programId,
+        programName: e.program.name,
+        programType: e.program.type,
+        status: e.status
+      }))
+    };
+  }
+
+  /**
+   * Get comprehensive mentor data for AI matching
+   */
+  async getMentorMatchingProfiles(mentorId = null) {
+    const where = mentorId ? { id: mentorId } : {};
+
+    const mentors = await models.User.findAll({
+      where: {
+        ...where,
+        role: 'mentor'
+      },
+      attributes: ['id', 'firstName', 'lastName', 'email', 'bio'],
+      include: [
+        {
+          model: models.MentorProfile,
+          as: 'mentorProfile',
+          where: {
+            isAcceptingMentees: true,
+            currentMenteeCount: {
+              [Op.lt]: models.Sequelize.col('mentorProfile.max_mentees')
+            }
+          },
+          required: true,
+          attributes: [
+            'title',
+            'organization',
+            'yearsOfExperience',
+            'specialization',
+            'maxMentees',
+            'currentMenteeCount',
+            'preferredMenteeLevel',
+            'avgFeedbackRating',
+            'totalMenteesGuided',
+            'successRate',
+            'avgResponseTimeHours'
+          ]
+        },
+        {
+          model: models.Skill,
+          as: 'skills',
+          through: {
+            model: models.UserSkill,
+            attributes: ['proficiencyLevel', 'yearsOfExperience']
+          },
+          attributes: ['id', 'name', 'category']
+        }
+      ]
+    });
+
+    return mentors.map(mentor => ({
+      id: mentor.id,
+      name: `${mentor.firstName} ${mentor.lastName}`,
+      bio: mentor.bio,
+      profile: mentor.mentorProfile,
+      skills: mentor.skills.map(skill => ({
+        id: skill.id,
+        name: skill.name,
+        category: skill.category,
+        proficiencyLevel: skill.UserSkill.proficiencyLevel,
+        yearsOfExperience: skill.UserSkill.yearsOfExperience
+      })),
+      availability: mentor.mentorProfile.maxMentees - mentor.mentorProfile.currentMenteeCount,
+      rating: mentor.mentorProfile.avgFeedbackRating,
+      successRate: mentor.mentorProfile.successRate
+    }));
+  }
+
+  /**
+   * Calculate basic match score between mentee and mentor
+   * This provides data for AI matching algorithms
+   */
+  calculateBasicMatchScore(menteeProfile, mentorProfile) {
+    let score = 0;
+    const reasons = [];
+
+    // 1. Skill overlap (40% weight)
+    const menteeSkillIds = new Set(menteeProfile.skills.map(s => s.id));
+    const mentorSkillIds = new Set(mentorProfile.skills.map(s => s.id));
+    const commonSkills = [...menteeSkillIds].filter(id => mentorSkillIds.has(id));
+    const skillOverlapScore = (commonSkills.length / Math.max(menteeSkillIds.size, 1)) * 40;
+    score += skillOverlapScore;
+    
+    if (commonSkills.length > 0) {
+      reasons.push(`${commonSkills.length} overlapping skills`);
+    }
+
+    // 2. Specialization match (30% weight)
+    const menteeInterests = menteeProfile.profile?.interests || [];
+    const mentorSpecializations = mentorProfile.profile?.specialization || [];
+    let specializationMatches = 0;
+    
+    menteeInterests.forEach(interest => {
+      mentorSpecializations.forEach(spec => {
+        if (spec.toLowerCase().includes(interest.toLowerCase()) || 
+            interest.toLowerCase().includes(spec.toLowerCase())) {
+          specializationMatches++;
+        }
+      });
+    });
+    
+    const specializationScore = Math.min(specializationMatches * 10, 30);
+    score += specializationScore;
+    
+    if (specializationMatches > 0) {
+      reasons.push(`Matching specialization areas`);
+    }
+
+    // 3. Mentor quality metrics (20% weight)
+    const mentorRating = mentorProfile.rating || 0;
+    const mentorSuccessRate = mentorProfile.successRate || 0;
+    const qualityScore = ((mentorRating / 5) * 10) + ((mentorSuccessRate / 100) * 10);
+    score += qualityScore;
+    
+    if (mentorRating >= 4) {
+      reasons.push(`High mentor rating (${mentorRating.toFixed(1)}/5)`);
+    }
+
+    // 4. Availability (10% weight)
+    const availabilityScore = (mentorProfile.availability / mentorProfile.profile.maxMentees) * 10;
+    score += availabilityScore;
+    
+    if (mentorProfile.availability > 0) {
+      reasons.push(`Currently available for mentees`);
+    }
+
+    return {
+      score: Math.min(score, 100).toFixed(2),
+      reasons: reasons.length > 0 ? reasons : ['Basic compatibility'],
+      breakdown: {
+        skillOverlap: skillOverlapScore.toFixed(2),
+        specialization: specializationScore.toFixed(2),
+        quality: qualityScore.toFixed(2),
+        availability: availabilityScore.toFixed(2)
+      }
+    };
+  }
+
+  /**
+   * Find best mentor matches for a mentee
+   * Used by AI matching system
+   */
+  async findMentorMatches(menteeId, limit = 5) {
+    // Get mentee profile
+    const menteeProfile = await this.getMenteeMatchingProfile(menteeId);
+
+    // Get available mentors
+    const mentors = await this.getMentorMatchingProfiles();
+
+    // Calculate match scores
+    const matches = mentors.map(mentor => {
+      const matchResult = this.calculateBasicMatchScore(menteeProfile, mentor);
+      return {
+        mentor,
+        matchScore: parseFloat(matchResult.score),
+        matchReasons: matchResult.reasons,
+        breakdown: matchResult.breakdown
+      };
+    });
+
+    // Sort by score and return top matches
+    matches.sort((a, b) => b.matchScore - a.matchScore);
+
+    return {
+      mentee: menteeProfile,
+      topMatches: matches.slice(0, limit)
+    };
   }
 }
 

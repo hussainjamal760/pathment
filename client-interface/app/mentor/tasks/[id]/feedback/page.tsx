@@ -101,7 +101,7 @@ export default function FeedbackProvision({ params }: PageProps) {
     const fetchTaskAndSubmission = async () => {
       try {
         const response = await taskApi.getTaskById(resolvedParams.id);
-        const taskData = response.data.data.task;
+        const taskData = response.data.task;
         setTask(taskData);
         
         // Get the latest submission

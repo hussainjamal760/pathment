@@ -28,7 +28,7 @@ export default function MenteeTasks() {
       
       // Fetch stats
       const statsRes = await taskApi.getMenteeTaskStats(user!.id);
-      setStats(statsRes.data.data.stats);
+      setStats(statsRes?.data?.stats);
       
       // Fetch tasks
       const params: any = {};
@@ -37,7 +37,7 @@ export default function MenteeTasks() {
       }
       
       const tasksRes = await taskApi.getMenteeTasks(user!.id, params);
-      setTasks(tasksRes.data.data.tasks || []);
+      setTasks(tasksRes.data.tasks || []);
       
     } catch (error: any) {
       console.error('Failed to fetch tasks:', error);

@@ -70,6 +70,17 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0,
       field: 'login_count'
     },
+    profileCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: 'profile_completed'
+    },
+    onboardingStep: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: 'onboarding_step',
+      comment: '0=registered, 1=profile_completed, 2=skills_added, 3=onboarding_finished'
+    },
     deletedAt: {
       type: DataTypes.DATE,
       field: 'deleted_at'

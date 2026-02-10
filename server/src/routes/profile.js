@@ -1,0 +1,51 @@
+const express = require('express');
+const router = express.Router();
+const profileController = require('../controllers/profileController');
+const { authenticate } = require('../middlewares/auth');
+
+// All routes require authentication
+router.use(authenticate);
+
+/**
+ * @route   GET /api/profile
+ * @desc    Get current user's profile
+ * @access  Private
+ */
+router.get('/', profileController.getProfile);
+
+/**
+ * @route   PUT /api/profile
+ * @desc    Update user profile
+ * @access  Private
+ */
+router.put('/', profileController.updateProfile);
+
+/**
+ * @route   POST /api/profile/complete-mentee
+ * @desc    Complete mentee profile during onboarding
+ * @access  Private (Mentee only)
+ */
+router.post('/complete-mentee', profileController.completeMenteeProfile);
+
+/**
+ * @route   POST /api/profile/complete-mentor
+ * @desc    Complete mentor profile during onboarding
+ * @access  Private (Mentor only)
+ */
+router.post('/complete-mentor', profileController.completeMentorProfile);
+
+/**
+ * @route   POST /api/profile/add-skills
+ * @desc    Add skills to user profile
+ * @access  Private
+ */
+router.post('/add-skills', profileController.addUserSkills);
+
+/**
+ * @route   POST /api/profile/skip-skills
+ * @desc    Skip skills step in onboarding
+ * @access  Private
+ */
+router.post('/skip-skills', profileController.skipSkills);
+
+module.exports = router;
