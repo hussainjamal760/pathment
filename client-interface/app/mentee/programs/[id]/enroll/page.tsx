@@ -1,30 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Clock, BookOpen, Calendar, Target, Users, Star, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock, BookOpen, Target, Users, Star, Loader2 } from 'lucide-react';
 import { programManagementApi } from '@/lib/services/program-api';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/context/AuthContext';
 
 export default function ProgramEnrollment() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const id = params?.id as string;
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [program, setProgram] = useState<any>(null);
   const [levels, setLevels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [enrolling, setEnrolling] = useState(false);
+  const [existingEnrollment, setExistingEnrollment] = useState<any>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchProgram();
-      fetchLevels();
-    }
-  }, [id]);
-
-  const fetchProgram = async () => {
+  const fetchProgram = useCallback(async () => {
     try {
       setLoading(true);
       const response = await programManagementApi.programs.getById(id);
@@ -36,9 +32,9 @@ export default function ProgramEnrollment() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchLevels = async () => {
+  const fetchLevels = useCallback(async () => {
     try {
       const response = await programManagementApi.levels.getByProgram(id);
       const levelsList = response?.data?.levels || response?.levels || response || [];
@@ -46,7 +42,31 @@ export default function ProgramEnrollment() {
     } catch (error: any) {
       console.error('Failed to fetch levels:', error);
     }
-  };
+  }, [id]);
+
+  const checkEnrollmentStatus = useCallback(async () => {
+    try {
+      if (!user?.id) return;
+      const response = await enrollmentApi.getAll({ 
+        programId: id, 
+        menteeId: user.id 
+      });
+      const enrollments = response?.data?.enrollments || response?.enrollments || [];
+      if (enrollments.length > 0) {
+        setExistingEnrollment(enrollments[0]);
+      }
+    } catch (error: any) {
+      console.error('Failed to check enrollment status:', error);
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    if (id && user) {
+      fetchProgram();
+      fetchLevels();
+      checkEnrollmentStatus();
+    }
+  }, [id, user, fetchProgram, fetchLevels, checkEnrollmentStatus]);
 
   const handleEnroll = async () => {
     try {
@@ -186,9 +206,31 @@ export default function ProgramEnrollment() {
           <h2 className="text-slate-900 mb-4">Program Levels</h2>
           <div className="space-y-3">
             {levels.slice(0, 3).map((level: any) => (
-              <div key={level.id} className="p-4 border border-slate-200 rounded-xl">
-                <div className="text-slate-900 mb-1">{level.name}</div>
-                <div className="text-slate-600 text-sm">{level.durationWeeks} weeks · Level {level.levelOrder}</div>
+              <div key={level.id} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-200 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="text-slate-900 font-medium">{level.name}</div>
+                  <span className="text-indigo-600 text-sm font-medium">Level {level.levelOrder}</span>
+                </div>
+                <div className="text-slate-600 text-sm mb-3">{level.durationWeeks} weeks</div>
+                {level.description && (
+                  <p className="text-slate-600 text-sm mb-3 line-clamp-2">{level.description}</p>
+                )}
+                {level.learningOutcomes && level.learningOutcomes.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-slate-100">
+                    <div className="text-slate-700 text-sm font-medium mb-2">Learning Outcomes:</div>
+                    <ul className="space-y-1">
+                      {level.learningOutcomes.slice(0, 3).map((outcome: string, idx: number) => (
+                        <li key={idx} className="text-slate-600 text-sm flex items-start gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                          <span>{outcome}</span>
+                        </li>
+                      ))}
+                      {level.learningOutcomes.length > 3 && (
+                        <li className="text-slate-500 text-xs ml-6">+ {level.learningOutcomes.length - 3} more outcomes</li>
+                      )}
+                    </ul>
+                  </div>
+                )}
               </div>
             ))}
             {levels.length > 3 && (
@@ -205,23 +247,109 @@ export default function ProgramEnrollment() {
         </div>
       </div>
 
+      {/* Detailed Level Information */}
+      {levels.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8">
+          <h2 className="text-slate-900 mb-6">Complete Program Curriculum</h2>
+          <div className="space-y-6">
+            {levels.map((level: any) => (
+              <div key={level.id} className="pb-6 last:pb-0 border-b last:border-b-0 border-slate-200">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0">
+                    <span className="text-indigo-600 font-bold text-lg">{level.levelOrder}</span>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-slate-900 font-semibold mb-2">{level.name}</h3>
+                    <div className="flex gap-4 mb-3">
+                      <span className="text-slate-600 text-sm flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {level.durationWeeks} weeks
+                      </span>
+                    </div>
+                    
+                    {level.description && (
+                      <p className="text-slate-600 mb-4">{level.description}</p>
+                    )}
+
+                    {level.targetAudience && (
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <div className="text-blue-900 text-sm font-medium mb-1">Target Audience:</div>
+                        <div className="text-blue-700 text-sm">{level.targetAudience}</div>
+                      </div>
+                    )}
+
+                    {level.learningOutcomes && level.learningOutcomes.length > 0 && (
+                      <div className="mb-4">
+                        <div className="text-slate-700 font-medium mb-2">Learning Outcomes:</div>
+                        <ul className="space-y-2">
+                          {level.learningOutcomes.map((outcome: string, idx: number) => (
+                            <li key={idx} className="text-slate-600 text-sm flex items-start gap-2">
+                              <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 shrink-0" />
+                              <span>{outcome}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {level.prerequisites && level.prerequisites.length > 0 && (
+                      <div>
+                        <div className="text-slate-700 font-medium mb-2">Prerequisites:</div>
+                        <ul className="space-y-2">
+                          {level.prerequisites.map((prereq: string, idx: number) => (
+                            <li key={idx} className="text-slate-600 text-sm flex items-start gap-2">
+                              <Star className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                              <span>{prereq}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Enrollment CTA */}
       <div className="bg-white rounded-2xl border border-slate-200 p-8">
         <div className="max-w-xl mx-auto text-center">
-          <h2 className="text-slate-900 mb-3">Ready to Start Your Journey?</h2>
-          <p className="text-slate-600 mb-6">
-            Submit your enrollment request and our admin team will review it. Once approved, you'll be matched with an expert mentor.
-          </p>
-          <button
-            onClick={() => setShowConfirmDialog(true)}
-            disabled={enrolling}
-            className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
-          >
-            {enrolling ? 'Submitting...' : 'Request Enrollment'}
-          </button>
-          <p className="text-slate-500 text-sm mt-4">
-            Admin will review your request within 24-48 hours
-          </p>
+          {existingEnrollment ? (
+            <>
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h2 className="text-slate-900 mb-3">Already Enrolled</h2>
+              <p className="text-slate-600 mb-6">
+                You are already enrolled in this program with status: <strong className="capitalize">{existingEnrollment.status.replace(/_/g, ' ')}</strong>
+              </p>
+              <button
+                onClick={() => router.push('/mentee/programs')}
+                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+              >
+                View My Programs
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="text-slate-900 mb-3">Ready to Start Your Journey?</h2>
+              <p className="text-slate-600 mb-6">
+                Submit your enrollment request and our admin team will review it. Once approved, you&apos;ll be matched with an expert mentor.
+              </p>
+              <button
+                onClick={() => setShowConfirmDialog(true)}
+                disabled={enrolling}
+                className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+              >
+                {enrolling ? 'Submitting...' : 'Request Enrollment'}
+              </button>
+              <p className="text-slate-500 text-sm mt-4">
+                Admin will review your request within 24-48 hours
+              </p>
+            </>
+          )}
         </div>
       </div>
 
