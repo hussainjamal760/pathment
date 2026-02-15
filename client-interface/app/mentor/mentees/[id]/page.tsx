@@ -80,7 +80,7 @@ export default function MenteeDetail() {
   const mentee = match.mentee;
   const enrollment = match.enrollment;
   const profile = mentee?.menteeProfile;
-  const progress = enrollment?.overallProgressPercentage || 0;
+  const progress = parseFloat(enrollment?.overallProgressPercentage) || 0;
 
   return (
     <div className="space-y-6">

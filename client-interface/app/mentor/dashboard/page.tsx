@@ -141,11 +141,11 @@ export default function MentorDashboard() {
                         <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-indigo-600 rounded-full"
-                            style={{ width: `${enrollment?.overallProgressPercentage || 0}%` }}
+                            style={{ width: `${parseFloat(enrollment?.overallProgressPercentage) || 0}%` }}
                           />
                         </div>
                         <span className="text-sm text-slate-600">
-                          {enrollment?.overallProgressPercentage || 0}%
+                          {parseFloat(enrollment?.overallProgressPercentage) || 0}%
                         </span>
                       </div>
                     </div>

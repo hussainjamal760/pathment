@@ -233,10 +233,10 @@ export default function EnrollmentOverview() {
                         <div className="flex-1 max-w-[120px] h-2 bg-slate-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-indigo-600 rounded-full"
-                            style={{ width: `${enrollment.overallProgressPercentage || 0}%` }}
+                            style={{ width: `${parseFloat(enrollment.overallProgressPercentage) || 0}%` }}
                           />
                         </div>
-                        <span className="text-slate-600 text-sm">{enrollment.overallProgressPercentage || 0}%</span>
+                        <span className="text-slate-600 text-sm">{parseFloat(enrollment.overallProgressPercentage) || 0}%</span>
                       </div>
                       <div className="text-slate-500 text-xs mt-1">
                         Week {enrollment.currentWeek || 1}

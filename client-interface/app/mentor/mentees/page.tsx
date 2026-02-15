@@ -88,7 +88,7 @@ export default function MyMentees() {
           <div className="text-slate-600 text-sm mb-1">Avg Progress</div>
           <div className="text-slate-900 text-2xl">
             {matches.length > 0 
-              ? Math.round(matches.reduce((acc, m) => acc + (m.enrollment?.overallProgressPercentage || 0), 0) / matches.length)
+              ? Math.round(matches.reduce((acc, m) => acc + (parseFloat(m.enrollment?.overallProgressPercentage) || 0), 0) / matches.length)
               : 0}%
           </div>
         </div>
@@ -157,7 +157,7 @@ export default function MyMentees() {
             {filteredMatches.map((match) => {
               const mentee = match.mentee;
               const enrollment = match.enrollment;
-              const progress = enrollment?.overallProgressPercentage || 0;
+              const progress = parseFloat(enrollment?.overallProgressPercentage) || 0;
 
               return (
                 <Link

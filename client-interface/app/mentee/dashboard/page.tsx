@@ -155,12 +155,12 @@ export default function MenteeDashboard() {
                     <div className="mb-4">
                       <div className="flex items-center justify-between text-sm mb-2">
                         <span className="text-slate-600">Overall Progress</span>
-                        <span className="text-slate-900">{activeEnrollment.overallProgressPercentage || 0}%</span>
+                        <span className="text-slate-900">{parseFloat(activeEnrollment.overallProgressPercentage) || 0}%</span>
                       </div>
                       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-linear-to-r from-indigo-600 to-purple-600 rounded-full"
-                          style={{ width: `${activeEnrollment.overallProgressPercentage || 0}%` }}
+                          style={{ width: `${parseFloat(activeEnrollment.overallProgressPercentage) || 0}%` }}
                         />
                       </div>
                     </div>
