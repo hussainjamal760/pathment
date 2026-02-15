@@ -1,7 +1,9 @@
 const adminService = require('../services/adminService');
+const matchingService = require('../services/matchingService');
 const { successResponse } = require('../utils/responses');
 const { USER_MESSAGES } = require('../utils/responses/messages');
 const { catchAsync } = require('../middlewares/errorHandler');
+const { models } = require('../db');
 
 class AdminController {
   /**
@@ -38,6 +40,40 @@ class AdminController {
       successResponse(
         'Admin permissions updated successfully',
         { adminProfile }
+      )
+    );
+  });
+
+  /**
+   * Recalculate all mentor mentee counts
+   * POST /api/admin/recalculate-mentor-counts
+   */
+  recalculateMentorCounts = catchAsync(async (req, res) => {
+    // Get all mentors
+    const mentors = await models.User.findAll({
+      where: { role: 'mentor' },
+      include: [{ model: models.MentorProfile, as: 'mentorProfile' }]
+    });
+
+    let updated = 0;
+    const results = [];
+
+    for (const mentor of mentors) {
+      if (mentor.mentorProfile) {
+        const count = await matchingService.updateMentorMenteeCount(mentor.id);
+        results.push({
+          mentorId: mentor.id,
+          name: `${mentor.firstName} ${mentor.lastName}`,
+          currentMenteeCount: count
+        });
+        updated++;
+      }
+    }
+
+    res.status(200).json(
+      successResponse(
+        `Successfully recalculated counts for ${updated} mentors`,
+        { mentors: results, totalUpdated: updated }
       )
     );
   });

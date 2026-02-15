@@ -3,6 +3,33 @@ const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = requir
 const { Op } = require('sequelize');
 
 class MatchingService {
+  /**
+   * Update mentor's current mentee count based on unique active mentees
+   * This should be called whenever a match is created, updated, or deleted
+   */
+  async updateMentorMenteeCount(mentorId) {
+    // Count unique active mentees for this mentor
+    const uniqueMentees = await models.MentorMenteeMatch.findAll({
+      where: { 
+        mentorId, 
+        status: 'active' 
+      },
+      attributes: ['menteeId'],
+      group: ['menteeId'],
+      raw: true
+    });
+
+    const currentMenteeCount = uniqueMentees.length;
+
+    // Update mentor profile
+    await models.MentorProfile.update(
+      { currentMenteeCount },
+      { where: { userId: mentorId } }
+    );
+
+    return currentMenteeCount;
+  }
+
   async createMatch(enrollmentId, mentorId, levelId, matchedBy) {
     // Validate enrollment
     const enrollment = await models.Enrollment.findByPk(enrollmentId, {
@@ -26,13 +53,23 @@ class MatchingService {
       throw new NotFoundError('Mentor not found');
     }
 
-    // Check mentor capacity
-    const currentMatches = await models.MentorMenteeMatch.count({
-      where: { mentorId, status: 'active' }
+    // Check mentor capacity - count unique active mentees, not total matches
+    const uniqueActiveMentees = await models.MentorMenteeMatch.findAll({
+      where: { 
+        mentorId, 
+        status: 'active' 
+      },
+      attributes: ['menteeId'],
+      group: ['menteeId'],
+      raw: true
     });
 
-    if (mentor.mentorProfile && currentMatches >= mentor.mentorProfile.maxMentees) {
-      throw new ValidationError('Mentor has reached maximum capacity');
+    const currentMenteeCount = uniqueActiveMentees.length;
+
+    if (mentor.mentorProfile && currentMenteeCount >= mentor.mentorProfile.maxMentees) {
+      throw new ValidationError(
+        `Mentor has reached maximum capacity (${mentor.mentorProfile.maxMentees} mentees). Currently mentoring ${currentMenteeCount} unique mentees.`
+      );
     }
 
     // Create match
@@ -48,6 +85,9 @@ class MatchingService {
 
     // Update enrollment status
     await enrollment.update({ status: 'matched' });
+
+    // Update mentor's current mentee count
+    await this.updateMentorMenteeCount(mentorId);
 
     return models.MentorMenteeMatch.findByPk(match.id, {
       include: [
@@ -138,19 +178,11 @@ class MatchingService {
       ]
     });
 
-    const mentors = await Promise.all(assignments.map(async (assignment) => {
-      const currentMentees = await models.MentorMenteeMatch.count({
-        where: { 
-          mentorId: assignment.mentor.id, 
-          status: 'active' 
-        }
-      });
-
-      return {
-        ...assignment.mentor.toJSON(),
-        currentMentees,
-        assignmentId: assignment.id
-      };
+    // Use the currentMenteeCount from the database (already calculated)
+    const mentors = assignments.map(assignment => ({
+      ...assignment.mentor.toJSON(),
+      currentMentees: assignment.mentor.mentorProfile?.currentMenteeCount || 0,
+      assignmentId: assignment.id
     }));
 
     return mentors;
@@ -203,7 +235,14 @@ class MatchingService {
       throw new ValidationError('Invalid status');
     }
 
+    const oldStatus = match.status;
     await match.update({ status });
+
+    // Update mentor's mentee count if status changed to/from active
+    if (oldStatus !== status && (status === 'active' || oldStatus === 'active')) {
+      await this.updateMentorMenteeCount(match.mentorId);
+    }
+
     return match;
   }
 

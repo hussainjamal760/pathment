@@ -16,11 +16,40 @@ const assignMentorToLevel = async (programId, levelId, mentorId, assignedBy) => 
 
   // Verify mentor exists and has mentor role
   const mentor = await models.User.findOne({
-    where: { id: mentorId, role: 'mentor', status: 'active' }
+    where: { id: mentorId, role: 'mentor', status: 'active' },
+    include: [{
+      model: models.MentorProfile,
+      as: 'mentorProfile',
+      required: true
+    }]
   });
 
   if (!mentor) {
     throw new NotFoundError('Active mentor not found');
+  }
+
+  // Check if mentor is accepting mentees
+  if (!mentor.mentorProfile.isAcceptingMentees) {
+    throw new BadRequestError('Mentor is not currently accepting new mentees');
+  }
+
+  // Check if mentor has reached maximum capacity (count unique mentees)
+  const uniqueActiveMentees = await models.MentorMenteeMatch.findAll({
+    where: {
+      mentorId,
+      status: 'active'
+    },
+    attributes: ['menteeId'],
+    group: ['menteeId'],
+    raw: true
+  });
+
+  const currentMenteeCount = uniqueActiveMentees.length;
+
+  if (currentMenteeCount >= mentor.mentorProfile.maxMentees) {
+    throw new BadRequestError(
+      `Mentor has reached maximum capacity (${mentor.mentorProfile.maxMentees} mentees). Currently mentoring ${currentMenteeCount} unique mentees.`
+    );
   }
 
   // Check if assignment already exists

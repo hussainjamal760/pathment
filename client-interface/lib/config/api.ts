@@ -13,6 +13,9 @@ export const apiConfig = {
     logout: '/auth/logout',
     me: '/auth/me',
     
+    // Profile
+    profile: '/profile',
+    
     // Programs
     programs: '/programs',
     programById: (id: string) => `/programs/${id}`,
