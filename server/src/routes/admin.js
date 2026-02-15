@@ -27,4 +27,12 @@ router.put(
   adminController.updatePermissions
 );
 
+// Recalculate mentor mentee counts (utility endpoint)
+router.post(
+  '/recalculate-mentor-counts',
+  authenticate,
+  authorize('admin'),
+  adminController.recalculateMentorCounts
+);
+
 module.exports = router;

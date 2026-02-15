@@ -48,4 +48,11 @@ router.post('/add-skills', profileController.addUserSkills);
  */
 router.post('/skip-skills', profileController.skipSkills);
 
+/**
+ * @route   PATCH /api/profile/mentor/availability
+ * @desc    Update mentor availability settings (isAcceptingMentees, maxMentees)
+ * @access  Private (Mentor only)
+ */
+router.patch('/mentor/availability', profileController.updateMentorAvailability);
+
 module.exports = router;

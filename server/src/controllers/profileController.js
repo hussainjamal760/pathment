@@ -103,6 +103,7 @@ class ProfileController {
       portfolioUrl,
       maxMentees,
       preferredMenteeLevel,
+      isAcceptingMentees,
       bio
     } = req.body;
 
@@ -118,7 +119,7 @@ class ProfileController {
       throw new NotFoundError('Mentor profile not found');
     }
 
-    await mentorProfile.update({
+    const updateData = {
       title,
       organization,
       yearsOfExperience: yearsOfExperience || 0,
@@ -128,7 +129,14 @@ class ProfileController {
       portfolioUrl,
       maxMentees: maxMentees || 5,
       preferredMenteeLevel: Array.isArray(preferredMenteeLevel) ? preferredMenteeLevel : [preferredMenteeLevel]
-    });
+    };
+
+    // Only update isAcceptingMentees if explicitly provided
+    if (typeof isAcceptingMentees === 'boolean') {
+      updateData.isAcceptingMentees = isAcceptingMentees;
+    }
+
+    await mentorProfile.update(updateData);
 
     // Update user bio if provided
     if (bio) {
@@ -236,6 +244,47 @@ class ProfileController {
     });
 
     res.json(successResponse(PROFILE_MESSAGES.PROFILE_UPDATED, user));
+  });
+
+  /**
+   * Update mentor availability settings
+   * PATCH /api/profile/mentor/availability
+   */
+  updateMentorAvailability = catchAsync(async (req, res) => {
+    const userId = req.user.id;
+    const { isAcceptingMentees, maxMentees } = req.body;
+
+    // Verify user is a mentor
+    const user = await models.User.findByPk(userId);
+    if (user.role !== 'mentor') {
+      throw new ForbiddenError('Only mentors can update availability settings');
+    }
+
+    const mentorProfile = await models.MentorProfile.findOne({ where: { userId } });
+    if (!mentorProfile) {
+      throw new NotFoundError('Mentor profile not found');
+    }
+
+    const updateData = {};
+    
+    if (typeof isAcceptingMentees === 'boolean') {
+      updateData.isAcceptingMentees = isAcceptingMentees;
+    }
+    
+    if (maxMentees !== undefined && maxMentees > 0) {
+      updateData.maxMentees = maxMentees;
+    }
+
+    await mentorProfile.update(updateData);
+
+    res.json(successResponse(
+      'Availability settings updated successfully',
+      { 
+        isAcceptingMentees: mentorProfile.isAcceptingMentees,
+        maxMentees: mentorProfile.maxMentees,
+        currentMenteeCount: mentorProfile.currentMenteeCount
+      }
+    ));
   });
 }
 
