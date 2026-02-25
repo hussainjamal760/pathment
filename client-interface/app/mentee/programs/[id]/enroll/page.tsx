@@ -144,10 +144,10 @@ export default function ProgramEnrollment() {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-slate-900 text-2xl mb-1">{program.difficultyLevel || 'N/A'}</div>
+            <div className="text-slate-900 text-2xl mb-1">{levels.length}</div>
             <div className="text-slate-600 text-sm flex items-center justify-center gap-1">
               <Target className="w-4 h-4" />
-              Level
+              Levels
             </div>
           </div>
           <div className="text-center">
@@ -176,8 +176,8 @@ export default function ProgramEnrollment() {
                 <Target className="w-5 h-5 text-purple-600" />
               </div>
               <div>
-                <div className="text-slate-600 text-sm">Level</div>
-                <div className="text-slate-900">{program.difficultyLevel || 'Not specified'}</div>
+                <div className="text-slate-600 text-sm">Type</div>
+                <div className="text-slate-900 capitalize">{program.type || 'Not specified'}</div>
               </div>
             </div>
             <div className="flex items-center gap-3">
