@@ -7,10 +7,10 @@ const { catchAsync } = require('../middlewares/errorHandler');
  * GET /api/enrollments
  */
 exports.getEnrollments = catchAsync(async (req, res) => {
-  const { status, programId, menteeId, page, limit } = req.query;
+  const { status, programId, menteeId, search, page, limit } = req.query;
   
   // If user is a mentee, restrict to their own enrollments
-  let filters = { status, programId, menteeId };
+  let filters = { status, programId, menteeId, search };
   if (req.user.role === 'mentee') {
     filters.menteeId = req.user.id;
   }

@@ -1,9 +1,10 @@
+const { Op } = require('sequelize');
 const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
 
 class EnrollmentService {
   async getEnrollments(filters, pagination) {
-    const { status, programId, menteeId } = filters;
+    const { status, programId, menteeId, search } = filters;
     const { page, limit } = pagination;
     const offset = (page - 1) * limit;
 
@@ -11,6 +12,19 @@ class EnrollmentService {
     if (status) where.status = status;
     if (programId) where.programId = programId;
     if (menteeId) where.menteeId = menteeId;
+
+    // Server-side search across mentee name, email and program name.
+    // Uses $association.column$ syntax so Sequelize can push the filter
+    // to the JOIN — requires subQuery: false + distinct: true below.
+    if (search && search.trim()) {
+      const like = `%${search.trim()}%`;
+      where[Op.or] = [
+        { '$mentee.first_name$': { [Op.iLike]: like } },
+        { '$mentee.last_name$': { [Op.iLike]: like } },
+        { '$mentee.email$':     { [Op.iLike]: like } },
+        { '$program.name$':     { [Op.iLike]: like } },
+      ];
+    }
 
     const { rows, count } = await models.Enrollment.findAndCountAll({
       where,
@@ -49,7 +63,13 @@ class EnrollmentService {
       ],
       limit,
       offset,
-      order: [['enrolledAt', 'DESC']]
+      order: [['enrolledAt', 'DESC']],
+      // distinct: true ensures the count reflects unique Enrollment rows
+      // even when matches (hasMany) produces duplicate rows in the JOIN.
+      // subQuery: false is required so Sequelize can filter on included
+      // model columns ($mentee.first_name$, $program.name$, etc.).
+      distinct: true,
+      subQuery: false,
     });
 
     return {

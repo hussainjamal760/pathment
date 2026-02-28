@@ -3,13 +3,14 @@ import { apiConfig } from '../config/api';
 
 export const enrollmentApi = {
   // Get all enrollments with filters
-  getAll: (filters?: { status?: string; programId?: string; menteeId?: string; page?: number; limit?: number }) => {
+  getAll: (filters?: { status?: string; programId?: string; menteeId?: string; search?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();
-    if (filters?.status) params.append('status', filters.status);
+    if (filters?.status)    params.append('status',    filters.status);
     if (filters?.programId) params.append('programId', filters.programId);
-    if (filters?.menteeId) params.append('menteeId', filters.menteeId);
-    if (filters?.page) params.append('page', filters.page.toString());
-    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.menteeId)  params.append('menteeId',  filters.menteeId);
+    if (filters?.search)    params.append('search',    filters.search);
+    if (filters?.page)      params.append('page',      filters.page.toString());
+    if (filters?.limit)     params.append('limit',     filters.limit.toString());
     
     const queryString = params.toString();
     return apiClient.get(`${apiConfig.endpoints.enrollments}${queryString ? `?${queryString}` : ''}`);
