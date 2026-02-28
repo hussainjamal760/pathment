@@ -20,7 +20,7 @@ export default function MenteeProgramsPage() {
     try {
       setLoading(true);
       const response = await programManagementApi.programs.getAll({ status: 'published' });
-      const programsList = response || response?.programs || [];
+      const programsList = Array.isArray(response?.data) ? response.data : [];
       setPrograms(programsList);
     } catch (error: any) {
       console.error('Failed to fetch programs:', error);
