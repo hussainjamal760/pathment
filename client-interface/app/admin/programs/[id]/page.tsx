@@ -114,16 +114,23 @@ export default function ProgramDetails() {
       const response = await levelMentorApi.getProgramMentorAssignments(id);
       const assignments = response?.data?.assignments || response?.assignments || [];
       
-      // Flatten mentors from all levels
-      const mentorsFlat = assignments.flatMap((assignment: any) => 
-        assignment.mentors.map((mentor: any) => ({
-          id: mentor.id,
-          name: `${mentor.firstName} ${mentor.lastName}`,
-          mentees: mentor.mentorProfile?.currentMenteeCount || 0,
-          expertise: mentor.mentorProfile?.specialization?.[0] || 'General',
-          title: mentor.mentorProfile?.title || 'Mentor'
-        }))
+      // Flatten mentors from all levels, deduplicate by id (same mentor can be
+      // assigned to multiple levels and would otherwise appear with duplicate keys)
+      const mentorsMap = new Map<string, any>();
+      assignments.forEach((assignment: any) =>
+        assignment.mentors.forEach((mentor: any) => {
+          if (!mentorsMap.has(mentor.id)) {
+            mentorsMap.set(mentor.id, {
+              id: mentor.id,
+              name: `${mentor.firstName} ${mentor.lastName}`,
+              mentees: mentor.mentorProfile?.currentMenteeCount || 0,
+              expertise: mentor.mentorProfile?.specialization?.[0] || 'General',
+              title: mentor.mentorProfile?.title || 'Mentor'
+            });
+          }
+        })
       );
+      const mentorsFlat = Array.from(mentorsMap.values());
       
       setAssignedMentors(mentorsFlat);
     } catch (error: any) {
