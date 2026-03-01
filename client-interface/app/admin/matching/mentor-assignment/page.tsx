@@ -2,16 +2,31 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ArrowLeft, Search, Sparkles, Star, Users, Loader2, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Search, Sparkles, Star, Users, Loader2, ExternalLink, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { useMentorAssignment } from '@/lib/hooks/admin';
 
 export default function MentorAssignment() {
   const [showAISuggestions, setShowAISuggestions] = useState(true);
 
+  // ── per-enrollment manual override state ────────────────────────────────
+  const [overrides, setOverrides] = useState<Record<string, {
+    open: boolean;
+    levelId: string;
+    mentorId: string;
+  }>>({});
+
+  const patchOverride = (enrollmentId: string, patch: Partial<{ open: boolean; levelId: string; mentorId: string }>) => {
+    setOverrides(prev => {
+      const existing = prev[enrollmentId] ?? { open: false, levelId: '', mentorId: '' };
+      return { ...prev, [enrollmentId]: { ...existing, ...patch } };
+    });
+  };
+
   const {
     programs,
     selectedProgram,
     setSelectedProgram,
+    programLevels,
     enrollments,
     suggestions,
     loading,
@@ -27,6 +42,8 @@ export default function MentorAssignment() {
     autoMatching,
     handleCreateMatch,
     handleAutoMatch,
+    overrideLevelMentors,
+    fetchOverrideLevelMentors,
   } = useMentorAssignment();
 
   if (loading && programs.length === 0) {
@@ -201,6 +218,85 @@ export default function MentorAssignment() {
                           <p className="text-slate-600 text-sm">No mentor suggestions available</p>
                         </div>
                       )}
+
+                      {/* ── Manual Override ─────────────────────────────── */}
+                      <div className="mt-3 border border-slate-200 rounded-xl overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const opening = !overrides[enrollment.id]?.open;
+                            patchOverride(enrollment.id, { open: opening });
+                            // Pre-load mentors for the current level when opening
+                            if (opening && currentLevel?.id) fetchOverrideLevelMentors(currentLevel.id);
+                          }}
+                          className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-sm transition-colors"
+                        >
+                          <span>Assign manually (override level or mentor)</span>
+                          {overrides[enrollment.id]?.open
+                            ? <ChevronUp className="w-4 h-4 text-slate-500" />
+                            : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                        </button>
+
+                        {overrides[enrollment.id]?.open && (
+                          <div className="p-4 bg-white border-t border-slate-200 space-y-3">
+                            {/* Level picker */}
+                            <div>
+                              <label className="block text-slate-600 text-xs mb-1.5">Level</label>
+                              <select
+                                value={overrides[enrollment.id]?.levelId || currentLevel?.id || ''}
+                                onChange={(e) => {
+                                  const lvl = e.target.value;
+                                  patchOverride(enrollment.id, { levelId: lvl, mentorId: '' });
+                                  fetchOverrideLevelMentors(lvl);
+                                }}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                              >
+                                <option value="">Select level…</option>
+                                {programLevels.map((lvl: any) => (
+                                  <option key={lvl.id} value={lvl.id}>{lvl.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Mentor picker */}
+                            <div>
+                              <label className="block text-slate-600 text-xs mb-1.5">Mentor</label>
+                              <select
+                                value={overrides[enrollment.id]?.mentorId || ''}
+                                onChange={(e) => patchOverride(enrollment.id, { mentorId: e.target.value })}
+                                disabled={!overrides[enrollment.id]?.levelId && !currentLevel?.id}
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:bg-slate-50 disabled:cursor-not-allowed"
+                              >
+                                <option value="">Select mentor…</option>
+                                {(overrideLevelMentors[overrides[enrollment.id]?.levelId || currentLevel?.id || ''] || []).map((m: any) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.firstName} {m.lastName}{m.mentorProfile?.title ? ` — ${m.mentorProfile.title}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={
+                                matching === enrollment.id ||
+                                !overrides[enrollment.id]?.mentorId ||
+                                !(overrides[enrollment.id]?.levelId || currentLevel?.id)
+                              }
+                              onClick={() => {
+                                const lvl = overrides[enrollment.id]?.levelId || currentLevel?.id || '';
+                                const mntr = overrides[enrollment.id]?.mentorId;
+                                if (lvl && mntr) handleCreateMatch(enrollment.id, mntr, lvl);
+                              }}
+                              className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                              {matching === enrollment.id
+                                ? <><Loader2 className="w-4 h-4 animate-spin" /> Assigning…</>
+                                : 'Assign Manually'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

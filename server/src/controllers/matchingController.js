@@ -76,4 +76,10 @@ exports.updateMatchStatus = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Match status updated', { match }));
 });
 
+exports.getMentorAssignedLevels = catchAsync(async (req, res) => {
+  const mentorId = req.user.id;
+  const programs = await matchingService.getMentorAssignedLevels(mentorId);
+  res.status(200).json(successResponse('Mentor level assignments retrieved', { programs }));
+});
+
 module.exports = exports;

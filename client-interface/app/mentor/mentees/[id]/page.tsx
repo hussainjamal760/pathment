@@ -200,7 +200,7 @@ export default function MenteeDetail() {
               </div>
               <div>
                 <div className="text-sm text-slate-600 mb-1">Level</div>
-                <div className="text-slate-900">{enrollment?.currentLevel?.name || 'Level 1'}</div>
+                <div className="text-slate-900">{match?.level?.name || enrollment?.currentLevel?.name || 'Level 1'}</div>
               </div>
               <div>
                 <div className="text-sm text-slate-600 mb-1">Enrolled Date</div>

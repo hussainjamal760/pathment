@@ -230,6 +230,61 @@ class MatchingService {
     });
   }
 
+  /**
+   * Get all levels a mentor is assigned to teach (via LevelMentorAssignment).
+   * Groups by program so the frontend can build cascading Program → Level → Mentee dropdowns.
+   * This is the authoritative source — it is independent of whether the mentor has
+   * active mentee matches in those levels yet.
+   */
+  async getMentorAssignedLevels(mentorId) {
+    const assignments = await models.LevelMentorAssignment.findAll({
+      where: { mentorId, isActive: true },
+      include: [
+        {
+          model: models.ProgramLevel,
+          as: 'level',
+          include: [
+            {
+              model: models.Program,
+              as: 'program',
+              attributes: ['id', 'name', 'type', 'status']
+            }
+          ]
+        }
+      ],
+      order: [
+        [{ model: models.ProgramLevel, as: 'level' }, { model: models.Program, as: 'program' }, 'name', 'ASC'],
+        [{ model: models.ProgramLevel, as: 'level' }, 'levelOrder', 'ASC']
+      ]
+    });
+
+    // Group by program for easy consumption
+    const programMap = new Map();
+    for (const a of assignments) {
+      const level = a.level;
+      const program = level?.program;
+      if (!program || !level) continue;
+
+      if (!programMap.has(program.id)) {
+        programMap.set(program.id, {
+          id: program.id,
+          name: program.name,
+          type: program.type,
+          status: program.status,
+          levels: []
+        });
+      }
+      programMap.get(program.id).levels.push({
+        id: level.id,
+        name: level.name,
+        levelOrder: level.levelOrder,
+        durationWeeks: level.durationWeeks
+      });
+    }
+
+    return Array.from(programMap.values());
+  }
+
   async updateMatchStatus(matchId, status, userId, userRole) {
     const match = await models.MentorMenteeMatch.findByPk(matchId);
 

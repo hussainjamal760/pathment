@@ -659,12 +659,56 @@ class TaskService {
     const nextLevel = levels[currentLevelIdx + 1];
 
     if (nextLevel) {
-      // Advance to next level, reset week to 1
+      // Advance the enrollment record to the next level
       await models.Enrollment.update(
         { currentLevelId: nextLevel.id, currentWeek: 1, status: 'active' },
         { where: { id: enrollment.id } }
       );
-      await this.autoAssignWeekTasks(enrollment.id, 1);
+
+      // ── Smart re-match ───────────────────────────────────────────────────
+      // Find the most-recently-created active match for this enrollment.
+      const currentMatch = await models.MentorMenteeMatch.findOne({
+        where: { enrollmentId: enrollment.id, status: 'active' },
+        order: [['matchedAt', 'DESC']]
+      });
+
+      if (currentMatch) {
+        // Is that mentor assigned to teach the next level?
+        const mentorCanTeachNextLevel = await models.LevelMentorAssignment.findOne({
+          where: {
+            mentorId: currentMatch.mentorId,
+            levelId: nextLevel.id,
+            isActive: true
+          }
+        });
+
+        if (mentorCanTeachNextLevel) {
+          // Same mentor continues — create a match for the next level and begin week 1
+          await models.MentorMenteeMatch.create({
+            mentorId: currentMatch.mentorId,
+            menteeId: enrollment.menteeId,
+            enrollmentId: enrollment.id,
+            levelId: nextLevel.id,
+            matchedBy: currentMatch.matchedBy,
+            status: 'active',
+            matchedAt: new Date()
+          });
+          await this.autoAssignWeekTasks(enrollment.id, 1);
+        } else {
+          // Mentor is not qualified for the next level — re-queue for admin assignment.
+          // Week 1 tasks will be assigned once admin creates the new match.
+          await models.Enrollment.update(
+            { status: 'pending_match' },
+            { where: { id: enrollment.id } }
+          );
+        }
+      } else {
+        // No active match found (edge case) — re-queue for admin assignment
+        await models.Enrollment.update(
+          { status: 'pending_match' },
+          { where: { id: enrollment.id } }
+        );
+      }
     }
     // If no next level, all work in the program is done — program_completed
     // is already handled by the caller (allProgramTasksDone check above)

@@ -1,34 +1,58 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Filter, ClipboardList, Clock, CheckCircle2, AlertCircle, Plus, Loader2, FileText, Star, XCircle, Trash2, AlertTriangle, BookOpen, CalendarClock } from 'lucide-react';
+import {
+  Search, ClipboardList, Clock, CheckCircle2, AlertCircle, Plus,
+  Loader2, FileText, Star, XCircle, AlertTriangle, BookOpen, CalendarClock
+} from 'lucide-react';
 import { taskApi } from '@/lib/services/task-api';
 import { matchingApi } from '@/lib/services/enrollment-api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { toast } from 'sonner';
 
+type TabType = 'pending' | 'extensions' | 'all' | 'roadmap' | 'create';
+
 export default function MentorTasks() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'pending' | 'extensions' | 'all' | 'roadmap' | 'create'>('pending');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [pendingTasks, setPendingTasks] = useState<any[]>([]);
-  const [allTasks, setAllTasks] = useState<any[]>([]);
+
+  // --- Tab state ---
+  const [activeTab, setActiveTab] = useState<TabType>('pending');
+
+  // --- Stats (always loaded on mount) ---
   const [stats, setStats] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // --- Pending tab ---
+  const [pendingTasks, setPendingTasks] = useState<any[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+
+  // --- All Tasks + Extensions tab (shared data) ---
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [allTasksLoading, setAllTasksLoading] = useState(false);
+  const [allTasksLoaded, setAllTasksLoaded] = useState(false);
+
+  // --- Mentees (active matches — used only for Mentee dropdown step 3) ---
   const [mentees, setMentees] = useState<any[]>([]);
-  const [cancellingTask, setCancellingTask] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
+  const [menteesLoading, setMenteesLoading] = useState(false);
+  const [menteesLoaded, setMenteesLoaded] = useState(false);
+
+  // --- LevelMentorAssignment — programs+levels the mentor is assigned to teach ---
+  const [mentorLevelAssignments, setMentorLevelAssignments] = useState<any[]>([]);
+  const [mentorLevelsLoaded, setMentorLevelsLoaded] = useState(false);
+  const [mentorLevelsLoading, setMentorLevelsLoading] = useState(false);
+
+  // --- Roadmap tab ---
   const [roadmapData, setRoadmapData] = useState<any>(null);
-  const [selectedProgram, setSelectedProgram] = useState<string>('');
-  const [selectedLevel, setSelectedLevel] = useState<string>('');
-  const [selectedMenteeForAssign, setSelectedMenteeForAssign] = useState<string>('');
+  const [selectedProgram, setSelectedProgram] = useState('');
+  const [selectedLevel, setSelectedLevel] = useState('');
+  const [selectedMenteeForAssign, setSelectedMenteeForAssign] = useState('');
   const [assigningTask, setAssigningTask] = useState<string | null>(null);
-  
-  // Form state for custom task
+
+  // --- Create task form ---
   const [formData, setFormData] = useState({
     menteeId: '',
     enrollmentId: '',
@@ -42,147 +66,212 @@ export default function MentorTasks() {
     acceptanceCriteria: [] as string[]
   });
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchData();
-    }
-  }, [user]);
+  // --- Cancel dialog ---
+  const [cancellingTask, setCancellingTask] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
-  const fetchData = async () => {
+  // --- Search ---
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // ─── Fetchers ────────────────────────────────────────────────────────────
+
+  const fetchStats = useCallback(async () => {
+    if (!user?.id) return;
     try {
-      setLoading(true);
-      
-      // Fetch stats
-      const statsRes = await taskApi.getMentorTaskStats(user!.id);
-      setStats(statsRes?.data?.stats);
-      
-      // Fetch pending review tasks
-      const pendingRes = await taskApi.getMentorTasks(user!.id, { pendingReview: true });
-      setPendingTasks(pendingRes?.data?.tasks || []);
-      
-      // Fetch all tasks
-      const allRes = await taskApi.getMentorTasks(user!.id);
-      setAllTasks(allRes?.data?.tasks || []);
-      
-      // Fetch mentees for custom task form
-      const menteesRes = await matchingApi.getMatches({ mentorId: user!.id, status: 'active' });
-      const matchesList = menteesRes?.data?.matches || menteesRes?.matches || [];
-      setMentees(matchesList);
-      
-      // Apply URL pre-selection params (from mentee detail page "Assign Task" button)
-      const paramMenteeId = searchParams.get('menteeId');
-      const paramProgramId = searchParams.get('programId');
-      const paramTab = searchParams.get('tab') as 'pending' | 'extensions' | 'all' | 'roadmap' | 'create' | null;
+      setStatsLoading(true);
+      const res = await taskApi.getMentorTaskStats(user.id);
+      setStats(res?.data?.stats);
+    } catch {
+      // stats failure is non-critical
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [user?.id]);
 
-      if (paramMenteeId && matchesList.length > 0) {
-        const match = matchesList.find((m: any) => m.menteeId === paramMenteeId);
-        if (match) {
-          const programId = paramProgramId || match.enrollment?.programId || '';
-          const levelId = match.enrollment?.currentLevelId || '';
+  const fetchPendingTasks = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setPendingLoading(true);
+      const res = await taskApi.getMentorTasks(user.id, { pendingReview: true });
+      setPendingTasks(res?.data?.tasks || []);
+    } catch {
+      toast.error('Failed to load pending tasks');
+    } finally {
+      setPendingLoading(false);
+    }
+  }, [user?.id]);
 
-          setFormData(prev => ({
-            ...prev,
-            menteeId: paramMenteeId,
-            enrollmentId: match.enrollmentId || ''
-          }));
-          setSelectedMenteeForAssign(paramMenteeId);
-          if (programId) setSelectedProgram(programId);
-          if (levelId) setSelectedLevel(levelId);
-          if (programId && levelId) fetchRoadmap(programId, levelId, paramMenteeId);
-          if (paramTab) setActiveTab(paramTab);
-          else setActiveTab('create');
-          return;
-        }
-      }
-
-      // Auto-select first mentee's program if available
-      if (matchesList.length > 0 && !selectedProgram) {
-        const firstMatch = matchesList[0];
-        if (firstMatch.enrollment?.programId && firstMatch.enrollment?.currentLevelId) {
-          setSelectedProgram(firstMatch.enrollment.programId);
-          setSelectedLevel(firstMatch.enrollment.currentLevelId);
-          fetchRoadmap(firstMatch.enrollment.programId, firstMatch.enrollment.currentLevelId);
-        }
-      }
-      
-    } catch (error: any) {
-      console.error('Failed to fetch data:', error);
+  const fetchAllTasks = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      setAllTasksLoading(true);
+      const res = await taskApi.getMentorTasks(user.id);
+      setAllTasks(res?.data?.tasks || []);
+      setAllTasksLoaded(true);
+    } catch {
       toast.error('Failed to load tasks');
     } finally {
-      setLoading(false);
+      setAllTasksLoading(false);
+    }
+  }, [user?.id]);
+
+  const fetchMentees = useCallback(async (): Promise<any[]> => {
+    if (!user?.id) return [];
+    try {
+      setMenteesLoading(true);
+      const res = await matchingApi.getMatches({ mentorId: user.id, status: 'active' });
+      const list = res?.data?.matches || res?.matches || [];
+      setMentees(list);
+      setMenteesLoaded(true);
+      return list;
+    } catch {
+      toast.error('Failed to load mentees');
+      return [];
+    } finally {
+      setMenteesLoading(false);
+    }
+  }, [user?.id]);
+
+  const fetchMentorLevelAssignments = useCallback(async (): Promise<any[]> => {
+    try {
+      setMentorLevelsLoading(true);
+      const res = await matchingApi.getMentorAssignedLevels();
+      const list = res?.data?.programs || [];
+      setMentorLevelAssignments(list);
+      setMentorLevelsLoaded(true);
+      return list;
+    } catch {
+      toast.error('Failed to load assigned levels');
+      return [];
+    } finally {
+      setMentorLevelsLoading(false);
+    }
+  }, []);
+
+  const fetchRoadmap = useCallback(async (programId: string, levelId: string, menteeId?: string) => {
+    try {
+      const res = await taskApi.getRoadmapTasks(programId, levelId, menteeId);
+      setRoadmapData(res.data.roadmap);
+    } catch {
+      toast.error('Failed to load roadmap');
+    }
+  }, []);
+
+  // ─── Initial load ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const paramTab = searchParams.get('tab') as TabType | null;
+    const paramMenteeId = searchParams.get('menteeId');
+    const paramProgramId = searchParams.get('programId');
+
+    const needsMentees = paramTab === 'create' || paramTab === 'roadmap' || !!paramMenteeId;
+    const needsAllTasks = paramTab === 'all' || paramTab === 'extensions';
+
+    // Always: stats + pending (default tab)
+    fetchStats();
+    fetchPendingTasks();
+
+    if (needsMentees) {
+      fetchMentorLevelAssignments();
+      fetchMentees().then((list) => {
+        if (paramMenteeId && list.length > 0) {
+          const match = list.find((m: any) => m.menteeId === paramMenteeId);
+          if (match) {
+            const programId = paramProgramId || match.enrollment?.programId || '';
+            const levelId = match.levelId || '';
+            setFormData((prev) => ({
+              ...prev,
+              menteeId: paramMenteeId,
+              enrollmentId: match.enrollmentId || ''
+            }));
+            setSelectedMenteeForAssign(paramMenteeId);
+            if (programId) setSelectedProgram(programId);
+            if (levelId) setSelectedLevel(levelId);
+            if (programId && levelId) fetchRoadmap(programId, levelId, paramMenteeId);
+          }
+        }
+        if (paramTab) setActiveTab(paramTab);
+        else if (paramMenteeId) setActiveTab('create');
+      });
+    }
+
+    if (needsAllTasks) {
+      fetchAllTasks();
+      if (paramTab) setActiveTab(paramTab);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // ─── Tab switch handler ───────────────────────────────────────────────────
+
+  const handleTabSwitch = (tab: TabType) => {
+    setActiveTab(tab);
+    if ((tab === 'all' || tab === 'extensions') && !allTasksLoaded && !allTasksLoading) {
+      fetchAllTasks();
+    }
+    if ((tab === 'roadmap' || tab === 'create') && !menteesLoaded && !menteesLoading) {
+      fetchMentees();
+    }
+    if ((tab === 'roadmap' || tab === 'create') && !mentorLevelsLoaded && !mentorLevelsLoading) {
+      fetchMentorLevelAssignments();
     }
   };
 
-  const fetchRoadmap = async (programId: string, levelId: string, menteeId?: string) => {
-    try {
-      const response = await taskApi.getRoadmapTasks(programId, levelId, menteeId);
-      setRoadmapData(response.data.roadmap);
-    } catch (error: any) {
-      console.error('Failed to fetch roadmap:', error);
-      toast.error('Failed to load roadmap');
-    }
-  };
+  // ─── Derived data ─────────────────────────────────────────────────────────
+
+  const extensionTasks = allTasks.filter((task) =>
+    task.submissions?.some((s: any) => s.extensionRequested && s.extensionStatus === 'pending')
+  );
+
+  const filteredAllTasks = allTasks.filter((task) => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      task.roadmapTask?.title?.toLowerCase().includes(q) ||
+      task.mentee?.firstName?.toLowerCase().includes(q) ||
+      task.mentee?.lastName?.toLowerCase().includes(q)
+    );
+  });
+
+  // ─── Mutations ────────────────────────────────────────────────────────────
 
   const handleAssignRoadmapTask = async (taskId: string, weekNumber: number) => {
     if (!selectedMenteeForAssign) {
       toast.error('Please select a mentee first');
       return;
     }
-
     try {
-      const selectedMatch = mentees.find(m => m.menteeId === selectedMenteeForAssign);
-      if (!selectedMatch) return;
-
+      const match = mentees.find((m) => m.menteeId === selectedMenteeForAssign);
+      if (!match) return;
       await taskApi.createCustomTask({
         menteeId: selectedMenteeForAssign,
-        enrollmentId: selectedMatch.enrollmentId,
+        enrollmentId: match.enrollmentId,
         title: `Week ${weekNumber} - Roadmap Task`,
         description: 'Assigned from roadmap',
         roadmapTaskId: taskId
       } as any);
-
       toast.success('Roadmap task assigned successfully!');
       setAssigningTask(null);
-      // Re-fetch roadmap so assignmentStatus updates immediately (no refresh needed)
-      if (selectedProgram && selectedLevel) {
+      if (selectedProgram && selectedLevel)
         fetchRoadmap(selectedProgram, selectedLevel, selectedMenteeForAssign);
-      }
-      fetchData();
+      // Invalidate allTasks so they refresh on next visit to those tabs
+      setAllTasksLoaded(false);
     } catch (error: any) {
-      console.error('Failed to assign task:', error);
       toast.error(error.response?.data?.message || 'Failed to assign task');
-    }
-  };
-
-  const handleProgramLevelChange = (programId: string, levelId: string) => {
-    setSelectedProgram(programId);
-    setSelectedLevel(levelId);
-    if (programId && levelId) {
-      fetchRoadmap(programId, levelId, selectedMenteeForAssign);
-    }
-  };
-
-  // Re-fetch roadmap when mentee selection changes
-  const handleMenteeForAssignChange = (menteeId: string) => {
-    setSelectedMenteeForAssign(menteeId);
-    if (selectedProgram && selectedLevel) {
-      fetchRoadmap(selectedProgram, selectedLevel, menteeId);
     }
   };
 
   const handleCreateCustomTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.menteeId || !formData.title || !formData.description) {
       toast.error('Please fill in all required fields');
       return;
     }
-
     try {
       await taskApi.createCustomTask(formData);
       toast.success('Custom task created successfully!');
-      
-      // Reset form
       setFormData({
         menteeId: '',
         enrollmentId: '',
@@ -195,27 +284,15 @@ export default function MentorTasks() {
         deliverable: '',
         acceptanceCriteria: []
       });
-      
-      // Refresh data
-      fetchData();
+      fetchStats();
+      fetchPendingTasks();
+      // Switch to all tasks and load fresh data
+      setAllTasksLoaded(false);
       setActiveTab('all');
+      fetchAllTasks();
     } catch (error: any) {
-      console.error('Failed to create task:', error);
       toast.error(error.response?.data?.message || 'Failed to create custom task');
     }
-  };
-
-  const handleMenteeChange = (menteeId: string) => {
-    const selectedMatch = mentees.find(m => m.menteeId === menteeId);
-    setFormData({
-      ...formData,
-      menteeId,
-      enrollmentId: selectedMatch?.enrollmentId || ''
-    });
-  };
-
-  const handleReviewClick = (taskId: string) => {
-    router.push(`/mentor/tasks/${taskId}/feedback`);
   };
 
   const handleCancelTask = async (taskId: string) => {
@@ -223,18 +300,43 @@ export default function MentorTasks() {
       toast.error('Please provide a reason for cancellation');
       return;
     }
-
     try {
       await taskApi.cancelTask(taskId, cancelReason);
       toast.success('Task cancelled successfully');
       setCancellingTask(null);
       setCancelReason('');
-      fetchData(); // Refresh data
+      fetchStats();
+      fetchPendingTasks();
+      if (allTasksLoaded) fetchAllTasks();
     } catch (error: any) {
-      console.error('Failed to cancel task:', error);
       toast.error(error.response?.data?.message || 'Failed to cancel task');
     }
   };
+
+  const handleMenteeChange = (menteeId: string) => {
+    const match = mentees.find((m) => m.menteeId === menteeId);
+    setFormData({ ...formData, menteeId, enrollmentId: match?.enrollmentId || '' });
+  };
+
+  const handleProgramChange = (programId: string) => {
+    setSelectedProgram(programId);
+    setSelectedLevel('');
+    setSelectedMenteeForAssign('');
+    setRoadmapData(null);
+  };
+
+  const handleLevelChange = (levelId: string) => {
+    setSelectedLevel(levelId);
+    setSelectedMenteeForAssign('');
+    setRoadmapData(null);
+  };
+
+  const handleMenteeForAssignChange = (menteeId: string) => {
+    setSelectedMenteeForAssign(menteeId);
+    if (selectedProgram && selectedLevel) fetchRoadmap(selectedProgram, selectedLevel, menteeId);
+  };
+
+  // ─── UI helpers ──────────────────────────────────────────────────────────
 
   const getStatusBadge = (status: string) => {
     const badges: any = {
@@ -246,33 +348,29 @@ export default function MentorTasks() {
       cancelled: { bg: 'bg-red-100', text: 'text-red-700', label: 'Cancelled' }
     };
     const badge = badges[status] || badges.assigned;
-    return <span className={`px-3 py-1 ${badge.bg} ${badge.text} rounded-lg text-sm font-medium`}>{badge.label}</span>;
+    return (
+      <span className={`px-3 py-1 ${badge.bg} ${badge.text} rounded-lg text-sm font-medium`}>
+        {badge.label}
+      </span>
+    );
   };
 
-  const getTaskSourceBadge = (isCustomTask: boolean) => {
-    return isCustomTask ? (
+  const getTaskSourceBadge = (isCustomTask: boolean) =>
+    isCustomTask ? (
       <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">Custom</span>
     ) : (
       <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">Roadmap</span>
     );
-  };
 
   const getTaskAssignmentButton = (task: any, weekNumber: number) => {
-    const assignmentStatus = task.assignmentStatus;
-    
-    if (!selectedMenteeForAssign) {
+    const as = task.assignmentStatus;
+    if (!selectedMenteeForAssign)
       return (
-        <button
-          disabled
-          className="px-4 py-2 bg-slate-200 text-slate-400 cursor-not-allowed rounded-lg text-sm font-medium transition-colors"
-        >
+        <button disabled className="px-4 py-2 bg-slate-200 text-slate-400 cursor-not-allowed rounded-lg text-sm font-medium">
           Select a mentee first
         </button>
       );
-    }
-
-    if (!assignmentStatus || !assignmentStatus.isAssigned) {
-      // Task not assigned - show assign button
+    if (!as || !as.isAssigned)
       return (
         <button
           onClick={() => handleAssignRoadmapTask(task.id, weekNumber)}
@@ -281,78 +379,45 @@ export default function MentorTasks() {
           Assign to Mentee
         </button>
       );
-    }
-
-    // Task is assigned - show status-based button/badge
-    const { status, taskId } = assignmentStatus;
-    
-    if (status === 'completed') {
+    const { status, taskId } = as;
+    if (status === 'completed')
       return (
-        <Link
-          href={`/mentor/tasks/${taskId}/feedback`}
-          className="px-4 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
-        >
-          <CheckCircle2 className="w-4 h-4" />
-          Completed - View
+        <Link href={`/mentor/tasks/${taskId}/feedback`} className="px-4 py-2 bg-green-100 text-green-700 hover:bg-green-200 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />Completed - View
         </Link>
       );
-    }
-
-    if (status === 'submitted') {
+    if (status === 'submitted')
       return (
-        <Link
-          href={`/mentor/tasks/${taskId}/feedback`}
-          className="px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4" />
-          Awaiting Review
+        <Link href={`/mentor/tasks/${taskId}/feedback`} className="px-4 py-2 bg-purple-600 text-white hover:bg-purple-700 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />Awaiting Review
         </Link>
       );
-    }
-
-    if (status === 'revision_needed') {
+    if (status === 'revision_needed')
       return (
-        <Link
-          href={`/mentor/tasks/${taskId}/feedback`}
-          className="px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2"
-        >
-          <AlertCircle className="w-4 h-4" />
-          Needs Revision
+        <Link href={`/mentor/tasks/${taskId}/feedback`} className="px-4 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-medium transition-colors inline-flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />Needs Revision
         </Link>
       );
-    }
-
-    if (status === 'in_progress') {
+    if (status === 'in_progress')
       return (
         <div className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm font-medium inline-flex items-center gap-2">
-          <Clock className="w-4 h-4" />
-          In Progress
+          <Clock className="w-4 h-4" />In Progress
         </div>
       );
-    }
-
-    // Default: assigned but not started
     return (
       <div className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium inline-flex items-center gap-2">
-        <CheckCircle2 className="w-4 h-4" />
-        Already Assigned
+        <CheckCircle2 className="w-4 h-4" />Already Assigned
       </div>
     );
   };
 
-  const extensionTasks = allTasks.filter((task) =>
-    task.submissions?.some((s: any) => s.extensionRequested && s.extensionStatus === 'pending')
+  const TabLoader = () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+    </div>
   );
 
-  const filteredAllTasks = allTasks.filter(task => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      task.roadmapTask?.title?.toLowerCase().includes(searchLower) ||
-      task.mentee?.firstName?.toLowerCase().includes(searchLower) ||
-      task.mentee?.lastName?.toLowerCase().includes(searchLower)
-    );
-  });
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -371,9 +436,8 @@ export default function MentorTasks() {
             </div>
           </div>
           <div className="text-slate-600 text-sm mb-1">Pending Review</div>
-          <div className="text-slate-900 text-2xl">{stats?.pendingReview || 0}</div>
+          <div className="text-slate-900 text-2xl">{statsLoading ? '—' : stats?.pendingReview || 0}</div>
         </div>
-
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
@@ -381,9 +445,8 @@ export default function MentorTasks() {
             </div>
           </div>
           <div className="text-slate-600 text-sm mb-1">Reviewed Today</div>
-          <div className="text-slate-900 text-2xl">{stats?.reviewedToday || 0}</div>
+          <div className="text-slate-900 text-2xl">{statsLoading ? '—' : stats?.reviewedToday || 0}</div>
         </div>
-
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
@@ -391,7 +454,7 @@ export default function MentorTasks() {
             </div>
           </div>
           <div className="text-slate-600 text-sm mb-1">Total Tasks</div>
-          <div className="text-slate-900 text-2xl">{stats?.total || 0}</div>
+          <div className="text-slate-900 text-2xl">{statsLoading ? '—' : stats?.total || 0}</div>
         </div>
       </div>
 
@@ -400,12 +463,8 @@ export default function MentorTasks() {
         <div className="border-b border-slate-200">
           <div className="flex gap-6 px-6">
             <button
-              onClick={() => setActiveTab('pending')}
-              className={`py-4 px-2 border-b-2 transition-colors ${
-                activeTab === 'pending'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleTabSwitch('pending')}
+              className={`py-4 px-2 border-b-2 transition-colors ${activeTab === 'pending' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
@@ -417,57 +476,45 @@ export default function MentorTasks() {
                 )}
               </div>
             </button>
+
             <button
-              onClick={() => setActiveTab('extensions')}
-              className={`py-4 px-2 border-b-2 transition-colors ${
-                activeTab === 'extensions'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleTabSwitch('extensions')}
+              className={`py-4 px-2 border-b-2 transition-colors ${activeTab === 'extensions' ? 'border-orange-500 text-orange-600' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               <div className="flex items-center gap-2">
                 <CalendarClock className="w-5 h-5" />
                 Extensions
-                {extensionTasks.length > 0 && (
+                {allTasksLoaded && extensionTasks.length > 0 && (
                   <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs font-medium">
                     {extensionTasks.length}
                   </span>
                 )}
               </div>
             </button>
+
             <button
-              onClick={() => setActiveTab('all')}
-              className={`py-4 px-2 border-b-2 transition-colors ${
-                activeTab === 'all'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleTabSwitch('all')}
+              className={`py-4 px-2 border-b-2 transition-colors ${activeTab === 'all' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-5 h-5" />
                 All Tasks
               </div>
             </button>
+
             <button
-              onClick={() => setActiveTab('roadmap')}
-              className={`py-4 px-2 border-b-2 transition-colors ${
-                activeTab === 'roadmap'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleTabSwitch('roadmap')}
+              className={`py-4 px-2 border-b-2 transition-colors ${activeTab === 'roadmap' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5" />
                 Program Roadmap
               </div>
             </button>
+
             <button
-              onClick={() => setActiveTab('create')}
-              className={`py-4 px-2 border-b-2 transition-colors ${
-                activeTab === 'create'
-                  ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-900'
-              }`}
+              onClick={() => handleTabSwitch('create')}
+              className={`py-4 px-2 border-b-2 transition-colors ${activeTab === 'create' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-600 hover:text-slate-900'}`}
             >
               <div className="flex items-center gap-2">
                 <Plus className="w-5 h-5" />
@@ -479,22 +526,17 @@ export default function MentorTasks() {
 
         {/* Tab Content */}
         <div className="p-6">
-          {loading && (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-            </div>
-          )}
 
-          {/* Pending Review Tab */}
-          {!loading && activeTab === 'pending' && (
+          {/* ── Pending Review Tab ── */}
+          {activeTab === 'pending' && (
             <div>
-              {pendingTasks.length === 0 ? (
+              {pendingLoading ? (
+                <TabLoader />
+              ) : pendingTasks.length === 0 ? (
                 <div className="text-center py-12">
                   <CheckCircle2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-600 mb-2">No pending reviews</p>
-                  <p className="text-slate-500 text-sm">
-                    You're all caught up! Task submissions will appear here.
-                  </p>
+                  <p className="text-slate-500 text-sm">You're all caught up! Task submissions will appear here.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -517,14 +559,12 @@ export default function MentorTasks() {
                             <span>Submitted {task.submittedAt ? new Date(task.submittedAt).toLocaleDateString() : 'recently'}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(task.status)}
-                        </div>
+                        <div className="flex items-center gap-2">{getStatusBadge(task.status)}</div>
                       </div>
 
                       {task.submissions?.[0] && (
                         <div className="mb-4 p-4 bg-white rounded-lg">
-                          <div 
+                          <div
                             className="prose prose-sm max-w-none text-slate-700 line-clamp-3"
                             dangerouslySetInnerHTML={{ __html: task.submissions[0].submissionText }}
                           />
@@ -532,13 +572,7 @@ export default function MentorTasks() {
                             <div className="mt-2">
                               <p className="text-slate-600 text-xs mb-1">Attachments:</p>
                               {task.submissions[0].submissionUrls.map((url: string, idx: number) => (
-                                <a
-                                  key={idx}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-indigo-600 hover:underline text-sm block"
-                                >
+                                <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm block">
                                   {url}
                                 </a>
                               ))}
@@ -549,7 +583,7 @@ export default function MentorTasks() {
 
                       <div className="flex gap-2">
                         <button
-                          onClick={() => handleReviewClick(task.id)}
+                          onClick={() => router.push(`/mentor/tasks/${task.id}/feedback`)}
                           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
                         >
                           Review Submission
@@ -562,16 +596,13 @@ export default function MentorTasks() {
                         </button>
                       </div>
 
-                      {/* Cancel confirmation dialog */}
                       {cancellingTask === task.id && (
                         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                           <div className="flex items-start gap-3 mb-3">
                             <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
                             <div className="flex-1">
                               <p className="text-red-900 font-medium mb-1">Cancel this task?</p>
-                              <p className="text-red-700 text-sm mb-3">
-                                This will mark the task as cancelled. The mentee will be notified.
-                              </p>
+                              <p className="text-red-700 text-sm mb-3">This will mark the task as cancelled. The mentee will be notified.</p>
                               <textarea
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
@@ -580,17 +611,11 @@ export default function MentorTasks() {
                                 rows={3}
                               />
                               <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleCancelTask(task.id)}
-                                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                                >
+                                <button onClick={() => handleCancelTask(task.id)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
                                   Confirm Cancel
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    setCancellingTask(null);
-                                    setCancelReason('');
-                                  }}
+                                  onClick={() => { setCancellingTask(null); setCancelReason(''); }}
                                   className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg transition-colors border border-slate-200"
                                 >
                                   Keep Task
@@ -607,10 +632,12 @@ export default function MentorTasks() {
             </div>
           )}
 
-          {/* Extensions Tab */}
-          {!loading && activeTab === 'extensions' && (
+          {/* ── Extensions Tab ── */}
+          {activeTab === 'extensions' && (
             <div>
-              {extensionTasks.length === 0 ? (
+              {allTasksLoading ? (
+                <TabLoader />
+              ) : extensionTasks.length === 0 ? (
                 <div className="text-center py-12">
                   <CalendarClock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-600 mb-2">No pending extension requests</p>
@@ -641,12 +668,10 @@ export default function MentorTasks() {
                             </div>
                           </div>
                           <span className="px-3 py-1 bg-orange-100 text-orange-700 border border-orange-300 rounded-lg text-sm font-medium flex items-center gap-1.5 whitespace-nowrap">
-                            <CalendarClock className="w-4 h-4" />
-                            Extension Pending
+                            <CalendarClock className="w-4 h-4" />Extension Pending
                           </span>
                         </div>
 
-                        {/* Extension details */}
                         <div className="grid sm:grid-cols-3 gap-4 mb-4 p-4 bg-white rounded-xl border border-orange-100">
                           <div>
                             <p className="text-xs text-slate-500 mb-1">Days Requested</p>
@@ -654,15 +679,11 @@ export default function MentorTasks() {
                           </div>
                           <div>
                             <p className="text-xs text-slate-500 mb-1">Current Due Date</p>
-                            <p className="text-sm font-medium text-slate-900">
-                              {currentDue ? currentDue.toLocaleDateString() : '—'}
-                            </p>
+                            <p className="text-sm font-medium text-slate-900">{currentDue ? currentDue.toLocaleDateString() : '—'}</p>
                           </div>
                           <div>
                             <p className="text-xs text-slate-500 mb-1">New Due Date if Approved</p>
-                            <p className="text-sm font-medium text-green-700">
-                              {newDue ? newDue.toLocaleDateString() : '—'}
-                            </p>
+                            <p className="text-sm font-medium text-green-700">{newDue ? newDue.toLocaleDateString() : '—'}</p>
                           </div>
                           <div className="sm:col-span-3">
                             <p className="text-xs text-slate-500 mb-1">Reason</p>
@@ -684,454 +705,469 @@ export default function MentorTasks() {
             </div>
           )}
 
-          {/* All Tasks Tab */}
-          {!loading && activeTab === 'all' && (
+          {/* ── All Tasks Tab ── */}
+          {activeTab === 'all' && (
             <div>
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search tasks..."
-                    className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {filteredAllTasks.length === 0 ? (
-                <div className="text-center py-12">
-                  <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-600 mb-2">No tasks found</p>
-                  <p className="text-slate-500 text-sm">
-                    {searchTerm ? 'Try a different search term' : 'Tasks will appear here when mentees are assigned'}
-                  </p>
-                </div>
+              {allTasksLoading ? (
+                <TabLoader />
               ) : (
-                <div className="space-y-3">
-                  {filteredAllTasks.map((task) => {
-                    const pendingExtension = task.submissions?.find((s: any) => s.extensionRequested && s.extensionStatus === 'pending');
-                    return (
-                    <div key={task.id} className={`p-4 bg-white rounded-xl border transition-colors ${
-                      pendingExtension ? 'border-orange-300 bg-orange-50/30 hover:border-orange-400' : 'border-slate-200 hover:border-indigo-200'
-                    }`}>
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <h4 className="text-slate-900">{task.roadmapTask?.title}</h4>
-                            {getTaskSourceBadge(task.isCustomTask)}
-                            {pendingExtension && (
-                              <span className="px-2 py-0.5 bg-orange-100 text-orange-700 border border-orange-200 rounded text-xs font-medium flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                Extension Pending
-                              </span>
+                <>
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search tasks..."
+                        className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {filteredAllTasks.length === 0 ? (
+                    <div className="text-center py-12">
+                      <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600 mb-2">No tasks found</p>
+                      <p className="text-slate-500 text-sm">
+                        {searchTerm ? 'Try a different search term' : 'Tasks will appear here when mentees are assigned'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredAllTasks.map((task) => {
+                        const pendingExtension = task.submissions?.find((s: any) => s.extensionRequested && s.extensionStatus === 'pending');
+                        return (
+                          <div
+                            key={task.id}
+                            className={`p-4 bg-white rounded-xl border transition-colors ${pendingExtension ? 'border-orange-300 bg-orange-50/30 hover:border-orange-400' : 'border-slate-200 hover:border-indigo-200'}`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="text-slate-900">{task.roadmapTask?.title}</h4>
+                                  {getTaskSourceBadge(task.isCustomTask)}
+                                  {pendingExtension && (
+                                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 border border-orange-200 rounded text-xs font-medium flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />Extension Pending
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-slate-600 flex-wrap">
+                                  <span>{task.mentee?.firstName} {task.mentee?.lastName}</span>
+                                  <span>•</span>
+                                  <span>{task.enrollment?.currentLevel?.name}</span>
+                                  <span>•</span>
+                                  <span>Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No deadline'}</span>
+                                  {task.finalRating && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="flex items-center gap-1">
+                                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                        {task.finalRating}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                                {pendingExtension && (
+                                  <p className="text-xs text-orange-700 mt-1">
+                                    Requesting <strong>{pendingExtension.extensionDays} day{pendingExtension.extensionDays !== 1 ? 's' : ''}</strong>: &quot;{pendingExtension.extensionReason}&quot;
+                                  </p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {getStatusBadge(task.status)}
+                                {pendingExtension ? (
+                                  <button onClick={() => router.push(`/mentor/tasks/${task.id}`)} className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors">
+                                    Handle Extension
+                                  </button>
+                                ) : (task.status === 'submitted' || task.status === 'revision_needed') ? (
+                                  <button onClick={() => router.push(`/mentor/tasks/${task.id}/feedback`)} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors">
+                                    Review
+                                  </button>
+                                ) : (
+                                  <button onClick={() => router.push(`/mentor/tasks/${task.id}`)} className="px-3 py-1.5 text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors cursor-pointer">
+                                    View Details
+                                  </button>
+                                )}
+                                {task.status !== 'completed' && task.status !== 'cancelled' && (
+                                  <button
+                                    onClick={() => setCancellingTask(task.id)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Cancel task"
+                                  >
+                                    <XCircle className="w-5 h-5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {cancellingTask === task.id && (
+                              <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                  <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-red-900 font-medium mb-1">Cancel this task?</p>
+                                    <p className="text-red-700 text-sm mb-3">This will mark the task as cancelled. The mentee will be notified.</p>
+                                    <textarea
+                                      value={cancelReason}
+                                      onChange={(e) => setCancelReason(e.target.value)}
+                                      placeholder="Provide a reason for cancellation..."
+                                      className="w-full p-2 border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-2 text-sm"
+                                      rows={2}
+                                    />
+                                    <div className="flex gap-2">
+                                      <button onClick={() => handleCancelTask(task.id)} className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm">
+                                        Confirm
+                                      </button>
+                                      <button
+                                        onClick={() => { setCancellingTask(null); setCancelReason(''); }}
+                                        className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg transition-colors border border-slate-200 text-sm"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 text-sm text-slate-600 flex-wrap">
-                            <span>{task.mentee?.firstName} {task.mentee?.lastName}</span>
-                            <span>•</span>
-                            <span>{task.enrollment?.currentLevel?.name}</span>
-                            <span>•</span>
-                            <span>Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No deadline'}</span>
-                            {task.finalRating && (
-                              <>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                  {task.finalRating}
-                                </span>
-                              </>
-                            )}
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── Program Roadmap Tab ── */}
+          {activeTab === 'roadmap' && (
+            <div>
+              <h3 className="text-slate-900 mb-6">Program Roadmap & Task Assignment</h3>
+
+              {menteesLoading ? (
+                <TabLoader />
+              ) : (
+                <>
+                  {/* ── 3-step cascading selectors ── */}
+                  <div className="grid md:grid-cols-3 gap-4 mb-6">
+                    {/* Step 1 – Program */}
+                    <div>
+                      <label className="block text-slate-700 text-sm font-medium mb-2">
+                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold mr-1.5">1</span>
+                        Program
+                      </label>
+                      <select
+                        value={selectedProgram}
+                        onChange={(e) => handleProgramChange(e.target.value)}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">Select a program…</option>
+                        {mentorLevelAssignments.map((prog: any) => (
+                          <option key={prog.id} value={prog.id}>
+                            {prog.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Step 2 – Level (filtered by selected program) */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        selectedProgram ? 'text-slate-700' : 'text-slate-400'
+                      }`}>
+                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-1.5 ${
+                          selectedProgram ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                        }`}>2</span>
+                        Level
+                      </label>
+                      <select
+                        value={selectedLevel}
+                        onChange={(e) => handleLevelChange(e.target.value)}
+                        disabled={!selectedProgram}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                      >
+                        <option value="">{selectedProgram ? 'Select a level…' : 'Select program first'}</option>
+                        {(mentorLevelAssignments.find((p: any) => p.id === selectedProgram)?.levels || []).map((level: any) => (
+                          <option key={level.id} value={level.id}>
+                            {level.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Step 3 – Mentee (filtered by program + level) */}
+                    <div>
+                      <label className={`block text-sm font-medium mb-2 ${
+                        selectedLevel ? 'text-slate-700' : 'text-slate-400'
+                      }`}>
+                        <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-1.5 ${
+                          selectedLevel ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-400'
+                        }`}>3</span>
+                        Mentee to Assign
+                      </label>
+                      <select
+                        value={selectedMenteeForAssign}
+                        onChange={(e) => handleMenteeForAssignChange(e.target.value)}
+                        disabled={!selectedLevel}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                      >
+                        <option value="">{selectedLevel ? 'Choose a mentee…' : 'Select level first'}</option>
+                        {Array.from(
+                          new Map(
+                            mentees
+                              .filter((m) =>
+                                m.enrollment?.programId === selectedProgram &&
+                                m.levelId === selectedLevel
+                              )
+                              .map((m) => [m.menteeId, m])
+                          ).values()
+                        ).map((match: any) => (
+                          <option key={match.menteeId} value={match.menteeId}>
+                            {match.mentee?.firstName} {match.mentee?.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Progress hint bar */}
+                  {!selectedProgram && (
+                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                      <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600 mb-2">Start by selecting a program</p>
+                      <p className="text-slate-500 text-sm">Then pick a level and a mentee to view and assign roadmap tasks</p>
+                    </div>
+                  )}
+
+                  {selectedProgram && !selectedLevel && (
+                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                      <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600 mb-2">Now select a level</p>
+                      <p className="text-slate-500 text-sm">Choose the program level whose roadmap you want to view</p>
+                    </div>
+                  )}
+
+                  {selectedProgram && selectedLevel && !selectedMenteeForAssign && (
+                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                      <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600 mb-2">Select a mentee to load the roadmap</p>
+                      <p className="text-slate-500 text-sm">The roadmap will show each task's assignment status for that mentee</p>
+                    </div>
+                  )}
+
+                  {selectedProgram && selectedLevel && selectedMenteeForAssign && !roadmapData && (
+                    <div className="text-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
+                      <p className="text-slate-600">Loading roadmap…</p>
+                    </div>
+                  )}
+
+                  {roadmapData && (
+                    <div className="space-y-6">
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <BookOpen className="w-5 h-5 text-indigo-600 mt-0.5" />
+                          <div>
+                            <h4 className="text-indigo-900 font-medium mb-1">{roadmapData.title}</h4>
+                            {roadmapData.description && <p className="text-indigo-700 text-sm">{roadmapData.description}</p>}
                           </div>
-                          {pendingExtension && (
-                            <p className="text-xs text-orange-700 mt-1">
-                              Requesting <strong>{pendingExtension.extensionDays} day{pendingExtension.extensionDays !== 1 ? 's' : ''}</strong>: &quot;{pendingExtension.extensionReason}&quot;
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(task.status)}
-                          {pendingExtension ? (
-                            <button
-                              onClick={() => router.push(`/mentor/tasks/${task.id}`)}
-                              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Handle Extension
-                            </button>
-                          ) : (task.status === 'submitted' || task.status === 'revision_needed') ? (
-                            <button
-                              onClick={() => router.push(`/mentor/tasks/${task.id}/feedback`)}
-                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors"
-                            >
-                              Review
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => router.push(`/mentor/tasks/${task.id}`)}
-                              className="px-3 py-1.5 text-indigo-600 hover:text-indigo-800 text-sm font-medium transition-colors cursor-pointer"
-                            >
-                              View Details
-                            </button>
-                          )}
-                          {task.status !== 'completed' && task.status !== 'cancelled' && (
-                            <button
-                              onClick={() => setCancellingTask(task.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Cancel task"
-                            >
-                              <XCircle className="w-5 h-5" />
-                            </button>
-                          )}
                         </div>
                       </div>
 
-                      {/* Cancel confirmation dialog */}
-                      {cancellingTask === task.id && (
-                        <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
-                            <div className="flex-1">
-                              <p className="text-red-900 font-medium mb-1">Cancel this task?</p>
-                              <p className="text-red-700 text-sm mb-3">
-                                This will mark the task as cancelled. The mentee will be notified.
-                              </p>
-                              <textarea
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                placeholder="Provide a reason for cancellation..."
-                                className="w-full p-2 border border-red-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 mb-2 text-sm"
-                                rows={2}
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={() => handleCancelTask(task.id)}
-                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setCancellingTask(null);
-                                    setCancelReason('');
-                                  }}
-                                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg transition-colors border border-slate-200 text-sm"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
+                      {roadmapData.weeks?.map((week: any) => (
+                        <div key={week.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                          <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
+                            <h4 className="text-slate-900 font-medium">Week {week.weekNumber}: {week.title}</h4>
+                            {week.description && <p className="text-slate-600 text-sm mt-1">{week.description}</p>}
                           </div>
+                          <div className="p-6 space-y-4">
+                            {week.tasks?.length > 0 ? (
+                              week.tasks.map((task: any) => (
+                                <div key={task.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h5 className="text-slate-900 font-medium">{task.title}</h5>
+                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${task.difficulty === 'easy' ? 'bg-green-100 text-green-700' : task.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' : task.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'}`}>
+                                          {task.difficulty}
+                                        </span>
+                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">{task.type}</span>
+                                      </div>
+                                      <p className="text-slate-600 text-sm mb-2">{task.description}</p>
+                                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                                        <span>⏱️ {task.estimatedHours}h</span>
+                                        <span>⭐ {task.pointsBase} points</span>
+                                        {task.isMandatory && <span className="text-red-600">● Mandatory</span>}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {task.deliverable && (
+                                    <div className="mb-2">
+                                      <p className="text-slate-700 text-sm font-medium mb-1">Deliverable:</p>
+                                      <p className="text-slate-600 text-sm">{task.deliverable}</p>
+                                    </div>
+                                  )}
+                                  {task.acceptanceCriteria?.length > 0 && (
+                                    <div className="mb-3">
+                                      <p className="text-slate-700 text-sm font-medium mb-1">Acceptance Criteria:</p>
+                                      <ul className="text-slate-600 text-sm space-y-1">
+                                        {task.acceptanceCriteria.map((criteria: string, idx: number) => (
+                                          <li key={idx} className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
+                                            <span>{criteria}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {getTaskAssignmentButton(task, week.weekNumber)}
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-slate-500 text-sm text-center py-4">No tasks for this week</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+
+                      {(!roadmapData.weeks || roadmapData.weeks.length === 0) && (
+                        <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
+                          <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                          <p className="text-slate-600">No weeks found in this roadmap</p>
                         </div>
                       )}
                     </div>
-                  );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Program Roadmap Tab */}
-          {!loading && activeTab === 'roadmap' && (
-            <div>
-              <h3 className="text-slate-900 mb-6">Program Roadmap & Task Assignment</h3>
-              
-              {/* Program/Level Selector */}
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="block text-slate-700 text-sm mb-2">Program & Level</label>
-                  <select
-                    value={selectedProgram ? `${selectedProgram}:${selectedLevel}` : ''}
-                    onChange={(e) => {
-                      const [programId, levelId] = e.target.value.split(':');
-                      handleProgramLevelChange(programId, levelId);
-                    }}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Select program & level...</option>
-                    {mentees.map((match) => (
-                      <option 
-                        key={match.id} 
-                        value={`${match.enrollment?.programId}:${match.enrollment?.currentLevelId}`}
-                      >
-                        {match.enrollment?.program?.name} - {match.enrollment?.currentLevel?.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 text-sm mb-2">Select Mentee to Assign</label>
-                  <select
-                    value={selectedMenteeForAssign}
-                    onChange={(e) => handleMenteeForAssignChange(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  >
-                    <option value="">Choose mentee...</option>
-                    {Array.from(
-                      new Map(
-                        mentees
-                          .filter(m =>
-                            m.enrollment?.programId === selectedProgram &&
-                            m.enrollment?.currentLevelId === selectedLevel
-                          )
-                          .map(m => [m.menteeId, m])
-                      ).values()
-                    ).map((match) => (
-                      <option key={match.menteeId} value={match.menteeId}>
-                        {match.mentee?.firstName} {match.mentee?.lastName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Roadmap Display */}
-              {!roadmapData && selectedProgram && selectedLevel && (
-                <div className="text-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-3" />
-                  <p className="text-slate-600">Loading roadmap...</p>
-                </div>
-              )}
-
-              {!roadmapData && !selectedProgram && (
-                <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
-                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-600 mb-2">Select a program to view roadmap</p>
-                  <p className="text-slate-500 text-sm">
-                    Choose a program and level from the dropdown above
-                  </p>
-                </div>
-              )}
-
-              {roadmapData && (
-                <div className="space-y-6">
-                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-                    <div className="flex items-start gap-3">
-                      <BookOpen className="w-5 h-5 text-indigo-600 mt-0.5" />
-                      <div>
-                        <h4 className="text-indigo-900 font-medium mb-1">{roadmapData.title}</h4>
-                        {roadmapData.description && (
-                          <p className="text-indigo-700 text-sm">{roadmapData.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Weeks */}
-                  {roadmapData.weeks?.map((week: any) => (
-                    <div key={week.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                      <div className="bg-slate-50 px-6 py-4 border-b border-slate-200">
-                        <h4 className="text-slate-900 font-medium">Week {week.weekNumber}: {week.title}</h4>
-                        {week.description && (
-                          <p className="text-slate-600 text-sm mt-1">{week.description}</p>
-                        )}
-                      </div>
-
-                      <div className="p-6 space-y-4">
-                        {week.tasks && week.tasks.length > 0 ? (
-                          week.tasks.map((task: any) => (
-                            <div key={task.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                              <div className="flex items-start justify-between mb-3">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h5 className="text-slate-900 font-medium">{task.title}</h5>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                      task.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                                      task.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                      task.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
-                                      'bg-red-100 text-red-700'
-                                    }`}>
-                                      {task.difficulty}
-                                    </span>
-                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                                      {task.type}
-                                    </span>
-                                  </div>
-                                  <p className="text-slate-600 text-sm mb-2">{task.description}</p>
-                                  <div className="flex items-center gap-4 text-xs text-slate-500">
-                                    <span>⏱️ {task.estimatedHours}h</span>
-                                    <span>⭐ {task.pointsBase} points</span>
-                                    {task.isMandatory && <span className="text-red-600">● Mandatory</span>}
-                                  </div>
-                                </div>
-                              </div>
-
-                              {task.deliverable && (
-                                <div className="mb-2">
-                                  <p className="text-slate-700 text-sm font-medium mb-1">Deliverable:</p>
-                                  <p className="text-slate-600 text-sm">{task.deliverable}</p>
-                                </div>
-                              )}
-
-                              {task.acceptanceCriteria && task.acceptanceCriteria.length > 0 && (
-                                <div className="mb-3">
-                                  <p className="text-slate-700 text-sm font-medium mb-1">Acceptance Criteria:</p>
-                                  <ul className="text-slate-600 text-sm space-y-1">
-                                    {task.acceptanceCriteria.map((criteria: string, idx: number) => (
-                                      <li key={idx} className="flex items-start gap-2">
-                                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
-                                        <span>{criteria}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-
-                              {getTaskAssignmentButton(task, week.weekNumber)}
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-slate-500 text-sm text-center py-4">No tasks for this week</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {(!roadmapData.weeks || roadmapData.weeks.length === 0) && (
-                    <div className="text-center py-12 bg-slate-50 rounded-xl border border-slate-200">
-                      <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                      <p className="text-slate-600">No weeks found in this roadmap</p>
-                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           )}
 
-          {/* Create Custom Task Tab */}
-          {!loading && activeTab === 'create' && (
+          {/* ── Create Custom Task Tab ── */}
+          {activeTab === 'create' && (
             <div className="max-w-2xl">
               <h3 className="text-slate-900 mb-4">Assign Custom Task</h3>
-              
-              <form onSubmit={handleCreateCustomTask} className="space-y-6">
-                <div>
-                  <label className="block text-slate-700 text-sm mb-2">
-                    Select Mentee <span className="text-red-500">*</span>
-                  </label>
-                  <select 
-                    value={formData.menteeId}
-                    onChange={(e) => handleMenteeChange(e.target.value)}
-                    required
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="">Choose a mentee...</option>
-                    {mentees.map((match) => (
-                      <option key={`${match.menteeId}-${match.enrollment?.programId ?? match.enrollment?.program?.name}`} value={match.menteeId}>
-                        {match.mentee?.firstName} {match.mentee?.lastName} - {match.enrollment?.program?.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
 
-                <div>
-                  <label className="block text-slate-700 text-sm mb-2">
-                    Task Title <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Build a REST API with authentication"
-                    required
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-700 text-sm mb-2">
-                    Description <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    rows={6}
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Provide detailed instructions for the task..."
-                    required
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
+              {menteesLoading ? (
+                <TabLoader />
+              ) : (
+                <form onSubmit={handleCreateCustomTask} className="space-y-6">
                   <div>
                     <label className="block text-slate-700 text-sm mb-2">
-                      Task Type
+                      Select Mentee <span className="text-red-500">*</span>
                     </label>
-                    <select 
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    <select
+                      value={formData.menteeId}
+                      onChange={(e) => handleMenteeChange(e.target.value)}
+                      required
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     >
-                      <option value="custom">Custom</option>
-                      <option value="exercise">Extra Practice</option>
-                      <option value="project">Project</option>
-                      <option value="practical">Practical</option>
+                      <option value="">Choose a mentee...</option>
+                      {mentees.map((match) => (
+                        <option key={`${match.menteeId}-${match.enrollment?.programId ?? match.enrollment?.program?.name}`} value={match.menteeId}>
+                          {match.mentee?.firstName} {match.mentee?.lastName} - {match.enrollment?.program?.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-slate-700 text-sm mb-2">
-                      Difficulty
-                    </label>
-                    <select 
-                      value={formData.difficulty}
-                      onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="easy">Easy</option>
-                      <option value="medium">Medium</option>
-                      <option value="hard">Hard</option>
-                      <option value="expert">Expert</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-slate-700 text-sm mb-2">
-                      Due Date
+                      Task Title <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="date"
-                      value={formData.dueDate}
-                      onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                      min={new Date().toISOString().split('T')[0]}
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g., Build a REST API with authentication"
+                      required
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
 
                   <div>
                     <label className="block text-slate-700 text-sm mb-2">
-                      Points
+                      Description <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="number"
-                      value={formData.pointsBase}
-                      onChange={(e) => setFormData({ ...formData, pointsBase: parseInt(e.target.value) || 0 })}
-                      placeholder="e.g., 100"
-                      min="0"
+                    <textarea
+                      rows={6}
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Provide detailed instructions for the task..."
+                      required
                       className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
-                </div>
 
-                <div className="flex gap-4">
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
-                  >
-                    Assign Task
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('all')}
-                    className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </form>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-slate-700 text-sm mb-2">Task Type</label>
+                      <select
+                        value={formData.type}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="custom">Custom</option>
+                        <option value="exercise">Extra Practice</option>
+                        <option value="project">Project</option>
+                        <option value="practical">Practical</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 text-sm mb-2">Difficulty</label>
+                      <select
+                        value={formData.difficulty}
+                        onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="easy">Easy</option>
+                        <option value="medium">Medium</option>
+                        <option value="hard">Hard</option>
+                        <option value="expert">Expert</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-slate-700 text-sm mb-2">Due Date</label>
+                      <input
+                        type="date"
+                        value={formData.dueDate}
+                        onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 text-sm mb-2">Points</label>
+                      <input
+                        type="number"
+                        value={formData.pointsBase}
+                        onChange={(e) => setFormData({ ...formData, pointsBase: parseInt(e.target.value) || 0 })}
+                        placeholder="e.g., 100"
+                        min="0"
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button type="submit" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors">
+                      Assign Task
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTabSwitch('all')}
+                      className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
 
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
                 <div className="flex gap-3">
@@ -1150,6 +1186,7 @@ export default function MentorTasks() {
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

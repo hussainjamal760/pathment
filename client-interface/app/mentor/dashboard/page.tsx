@@ -125,7 +125,7 @@ export default function MentorDashboard() {
                             <div className="flex items-center gap-4 text-sm text-slate-600">
                               <span>Week {enrollment?.currentWeek || 1}</span>
                               <span>•</span>
-                              <span>{enrollment?.currentLevel?.name || 'Level 1'}</span>
+                              <span>{match?.level?.name || enrollment?.currentLevel?.name || 'Level 1'}</span>
                             </div>
                           </div>
                         </div>

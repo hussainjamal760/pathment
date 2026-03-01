@@ -194,7 +194,7 @@ export default function MyMentees() {
                           </span>
                           <span className="text-slate-400">•</span>
                           <span className="text-slate-600 text-sm">
-                            {enrollment?.currentLevel?.name || 'Level 1'}
+                            {match?.level?.name || enrollment?.currentLevel?.name || 'Level 1'}
                           </span>
                           <span className="text-slate-400">•</span>
                           <span className="text-slate-600 text-sm">

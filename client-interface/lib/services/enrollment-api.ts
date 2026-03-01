@@ -79,6 +79,11 @@ export const matchingApi = {
   updateMatchStatus: (id: string, status: string) => {
     return apiClient.patch(apiConfig.endpoints.matchStatus(id), { status });
   },
+
+  // Get all programs+levels this mentor is assigned to teach (via LevelMentorAssignment)
+  getMentorAssignedLevels: () => {
+    return apiClient.get(`${apiConfig.endpoints.matches}/mentor-levels`);
+  },
 };
 
 // ─── Mentor API ───────────────────────────────────────────────────────────────
