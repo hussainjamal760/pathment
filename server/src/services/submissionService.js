@@ -253,6 +253,10 @@ class SubmissionService {
 
     await task.update(updateData);
 
+    // Update enrollment task stats so tasksCompleted/tasksTotal/overallProgressPercentage stay current
+    const taskService = require('./taskService');
+    await taskService.updateEnrollmentTaskStats(task.enrollmentId);
+
     // Update mentor stats
     await this.updateMentorReviewStats(mentorId);
 

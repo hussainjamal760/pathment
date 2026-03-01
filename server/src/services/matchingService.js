@@ -89,6 +89,17 @@ class MatchingService {
     // Update mentor's current mentee count
     await this.updateMentorMenteeCount(mentorId);
 
+    // Initialize enrollment task stats so tasksTotal reflects the full program
+    // scope from day 1, then auto-assign week 1 tasks for the current level.
+    const taskService = require('./taskService');
+    await taskService.updateEnrollmentTaskStats(enrollmentId);
+    try {
+      await taskService.autoAssignWeekTasks(enrollmentId, enrollment.currentWeek || 1);
+    } catch (err) {
+      // Don't fail match creation if task assignment fails (e.g. roadmap not set up yet)
+      console.warn('Could not auto-assign week 1 tasks on match creation:', err.message);
+    }
+
     return models.MentorMenteeMatch.findByPk(match.id, {
       include: [
         { model: models.User, as: 'mentor', attributes: ['id', 'firstName', 'lastName', 'email'] },

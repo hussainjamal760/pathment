@@ -522,37 +522,55 @@ class TaskService {
   }
 
   /**
-   * Update enrollment task statistics
+   * Update enrollment task statistics.
+   * tasksTotal is the FULL program roadmap task count (not just assigned tasks)
+   * so the percentage reflects true progress through the whole program from day 1.
+   * Also auto-advances week/level and marks program_completed when all done.
    */
   async updateEnrollmentTaskStats(enrollmentId) {
-    const tasks = await models.AssignedTask.findAll({
-      where: { enrollmentId },
-      include: [
-        {
-          model: models.RoadmapTask,
-          as: 'roadmapTask'
-        }
-      ]
+    // Load enrollment to know which program we're in
+    const enrollment = await models.Enrollment.findByPk(enrollmentId);
+    if (!enrollment) return null;
+
+    // Assigned tasks for stats (completed count, points, ratings)
+    const assignedTasks = await models.AssignedTask.findAll({
+      where: { enrollmentId }
     });
 
-    const tasksCompleted = tasks.filter(t => t.status === 'completed').length;
-    const tasksTotal = tasks.length;
-    const totalPointsEarned = tasks
+    const tasksCompleted = assignedTasks.filter(t => t.status === 'completed').length;
+
+    const totalPointsEarned = assignedTasks
       .filter(t => t.status === 'completed')
       .reduce((sum, t) => sum + (t.pointsAwarded || 0), 0);
 
-    const ratings = tasks
+    const ratings = assignedTasks
       .filter(t => t.finalRating !== null)
       .map(t => parseFloat(t.finalRating));
-    
+
     const avgTaskRating = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
       : null;
 
-    // Calculate progress percentage
+    // Total tasks = SUM of totalTasks across every base roadmap in the program.
+    // This gives the full program scope (all levels), not just what's been assigned.
+    const { fn, col } = require('sequelize');
+    const roadmapAgg = await models.Roadmap.findOne({
+      where: { programId: enrollment.programId, isBaseRoadmap: true },
+      attributes: [[fn('SUM', col('total_tasks')), 'programTotal']],
+      raw: true
+    });
+    const tasksTotal = parseInt(roadmapAgg?.programTotal || 0, 10);
+
+    // Percentage against the full program — grows steadily as work is done
     const overallProgressPercentage = tasksTotal > 0
       ? Math.round((tasksCompleted / tasksTotal) * 100)
       : 0;
+
+    // If every task in the program is completed, mark the enrollment done
+    const allProgramTasksDone = tasksTotal > 0 && tasksCompleted >= tasksTotal;
+    const statusUpdate = allProgramTasksDone
+      ? { status: 'program_completed', completedAt: new Date() }
+      : {};
 
     await models.Enrollment.update(
       {
@@ -560,10 +578,16 @@ class TaskService {
         tasksTotal,
         totalPointsEarned,
         avgTaskRating,
-        overallProgressPercentage
+        overallProgressPercentage,
+        ...statusUpdate
       },
       { where: { id: enrollmentId } }
     );
+
+    // Auto-advance week / level when the current week's tasks are all done
+    if (!allProgramTasksDone) {
+      await this._checkAndAdvanceProgress(enrollment, assignedTasks);
+    }
 
     return {
       tasksCompleted,
@@ -572,6 +596,78 @@ class TaskService {
       avgTaskRating,
       overallProgressPercentage
     };
+  }
+
+  /**
+   * After every task review, check whether the mentee has finished the current
+   * week and should move on to the next week or level.
+   */
+  async _checkAndAdvanceProgress(enrollment, assignedTasks) {
+    const currentWeek = enrollment.currentWeek || 1;
+
+    // Load the base roadmap for the current level including all weeks/tasks
+    const currentRoadmap = await models.Roadmap.findOne({
+      where: {
+        programId: enrollment.programId,
+        levelId: enrollment.currentLevelId,
+        isBaseRoadmap: true
+      },
+      include: [{
+        model: models.RoadmapWeek,
+        as: 'weeks',
+        order: [['weekNumber', 'ASC']],
+        include: [{ model: models.RoadmapTask, as: 'tasks', attributes: ['id'] }]
+      }]
+    });
+
+    if (!currentRoadmap || !currentRoadmap.weeks || currentRoadmap.weeks.length === 0) return;
+
+    const currentRoadmapWeek = currentRoadmap.weeks.find(w => w.weekNumber === currentWeek);
+    if (!currentRoadmapWeek || !currentRoadmapWeek.tasks || currentRoadmapWeek.tasks.length === 0) return;
+
+    const currentWeekTaskIds = new Set(currentRoadmapWeek.tasks.map(t => t.id));
+
+    // Only consider non-cancelled assigned tasks that belong to the current week
+    const currentWeekAssigned = assignedTasks.filter(t =>
+      currentWeekTaskIds.has(t.roadmapTaskId) && t.status !== 'cancelled'
+    );
+
+    // All current-week tasks must be completed before advancing
+    if (currentWeekAssigned.length === 0) return;
+    const allCurrentWeekDone = currentWeekAssigned.every(t => t.status === 'completed');
+    if (!allCurrentWeekDone) return;
+
+    // Is there a next week in the same level?
+    const nextRoadmapWeek = currentRoadmap.weeks.find(w => w.weekNumber === currentWeek + 1);
+    if (nextRoadmapWeek) {
+      // Advance week within the same level
+      await models.Enrollment.update(
+        { currentWeek: currentWeek + 1, status: 'active' },
+        { where: { id: enrollment.id } }
+      );
+      await this.autoAssignWeekTasks(enrollment.id, currentWeek + 1);
+      return;
+    }
+
+    // No next week — check for a next level
+    const program = await models.Program.findByPk(enrollment.programId, {
+      include: [{ model: models.ProgramLevel, as: 'levels', order: [['orderIndex', 'ASC']] }]
+    });
+
+    const levels = program?.levels || [];
+    const currentLevelIdx = levels.findIndex(l => l.id === enrollment.currentLevelId);
+    const nextLevel = levels[currentLevelIdx + 1];
+
+    if (nextLevel) {
+      // Advance to next level, reset week to 1
+      await models.Enrollment.update(
+        { currentLevelId: nextLevel.id, currentWeek: 1, status: 'active' },
+        { where: { id: enrollment.id } }
+      );
+      await this.autoAssignWeekTasks(enrollment.id, 1);
+    }
+    // If no next level, all work in the program is done — program_completed
+    // is already handled by the caller (allProgramTasksDone check above)
   }
 
   /**

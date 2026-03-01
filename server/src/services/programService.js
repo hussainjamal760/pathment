@@ -153,22 +153,36 @@ class ProgramService {
       const programJSON = program.toJSON();
       
       // Count unique mentors assigned to any level of this program
-      const mentorCount = await models.LevelMentorAssignment.count({
-        distinct: true,
-        col: 'mentor_id',
-        where: { isActive: true },
-        include: [{
-          model: models.ProgramLevel,
-          as: 'level',
-          where: { programId: program.id },
-          attributes: [],
-          required: true
-        }]
-      });
-      
+      const [mentorCount, completionResult] = await Promise.all([
+        models.LevelMentorAssignment.count({
+          distinct: true,
+          col: 'mentor_id',
+          where: { isActive: true },
+          include: [{
+            model: models.ProgramLevel,
+            as: 'level',
+            where: { programId: program.id },
+            attributes: [],
+            required: true
+          }]
+        }),
+        models.Enrollment.findOne({
+          where: {
+            programId: program.id,
+            status: { [Op.in]: ['matched', 'active', 'in_progress', 'program_completed'] }
+          },
+          attributes: [
+            [sequelize.fn('AVG', sequelize.col('overall_progress_percentage')), 'avgProgress']
+          ],
+          raw: true
+        })
+      ]);
+
+      const completion = Math.round(parseFloat(completionResult?.avgProgress) || 0);
+
       return {
         ...programJSON,
-        completion: 0, // TODO: Calculate actual completion based on roadmap progress
+        completion,
         _count: {
           enrollments: program.enrollments?.length || 0,
           mentors: mentorCount
@@ -221,25 +235,39 @@ class ProgramService {
       throw new ForbiddenError('You do not have permission to view this program');
     }
 
-    // Count unique mentors assigned to any level of this program
-    const mentorCount = await models.LevelMentorAssignment.count({
-      distinct: true,
-      col: 'mentor_id',
-      where: { isActive: true },
-      include: [{
-        model: models.ProgramLevel,
-        as: 'level',
-        where: { programId: program.id },
-        attributes: [],
-        required: true
-      }]
-    });
-    
+    // Count unique mentors and compute average completion in parallel
+    const [mentorCount, completionResult] = await Promise.all([
+      models.LevelMentorAssignment.count({
+        distinct: true,
+        col: 'mentor_id',
+        where: { isActive: true },
+        include: [{
+          model: models.ProgramLevel,
+          as: 'level',
+          where: { programId: program.id },
+          attributes: [],
+          required: true
+        }]
+      }),
+      models.Enrollment.findOne({
+        where: {
+          programId: program.id,
+          status: { [Op.in]: ['matched', 'active', 'in_progress', 'program_completed'] }
+        },
+        attributes: [
+          [sequelize.fn('AVG', sequelize.col('overall_progress_percentage')), 'avgProgress']
+        ],
+        raw: true
+      })
+    ]);
+
+    const completion = Math.round(parseFloat(completionResult?.avgProgress) || 0);
+
     // Add completion and counts
     const programJSON = program.toJSON();
     return {
       ...programJSON,
-      completion: 0, // TODO: Calculate actual completion based on roadmap progress
+      completion,
       _count: {
         enrollments: program.enrollments?.length || 0,
         mentors: mentorCount

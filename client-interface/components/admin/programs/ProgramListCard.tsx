@@ -69,10 +69,10 @@ export function ProgramListCard({ programs = [] }: ProgramListCardProps) {
                   <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-indigo-600 rounded-full"
-                      style={{ width: `${program.completion}%` }}
+                      style={{ width: `${program.completion || 0}%` }}
                     />
                   </div>
-                  <span className="text-sm text-slate-600">{program.completion}%</span>
+                  <span className="text-sm text-slate-600">{program.completion || 0}%</span>
                 </div>
               </Link>
             ))}

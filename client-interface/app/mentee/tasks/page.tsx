@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Clock, CheckCircle2, AlertCircle, FileText, Loader2, Star, Calendar, XCircle, BookOpen, Sparkles } from 'lucide-react';
+import { Search, Clock, CheckCircle2, AlertCircle, FileText, Loader2, Star, Calendar, XCircle, BookOpen, Sparkles, GraduationCap } from 'lucide-react';
 import { taskApi } from '@/lib/services/task-api';
+import { enrollmentApi } from '@/lib/services/enrollment-api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { toast } from 'sonner';
 
@@ -15,25 +16,54 @@ export default function MenteeTasks() {
   const [stats, setStats] = useState<any>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
+
+  // Fetch mentee's enrolled programs once on mount
+  useEffect(() => {
+    if (user?.id) {
+      fetchEnrollments();
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user?.id) {
       fetchTasks();
     }
-  }, [user, filterStatus]);
+  }, [user, filterStatus, selectedEnrollmentId]);
+
+  const fetchEnrollments = async () => {
+    try {
+      const res = await enrollmentApi.getAll({ menteeId: user!.id });
+      const list: any[] = res?.data?.enrollments || [];
+      setEnrollments(list);
+      // Auto-select the first active/in_progress enrollment by default
+      const active = list.find((e: any) =>
+        ['active', 'in_progress'].includes(e.status)
+      ) || list[0];
+      if (active) {
+        setSelectedEnrollmentId(active.id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch enrollments:', error);
+    }
+  };
 
   const fetchTasks = async () => {
     try {
       setLoading(true);
       
-      // Fetch stats
-      const statsRes = await taskApi.getMenteeTaskStats(user!.id);
+      // Fetch stats (scoped to selected program if any)
+      const statsRes = await taskApi.getMenteeTaskStats(user!.id, selectedEnrollmentId ?? undefined);
       setStats(statsRes?.data?.stats);
       
       // Fetch tasks
       const params: any = {};
       if (filterStatus !== 'all') {
         params.status = filterStatus;
+      }
+      if (selectedEnrollmentId) {
+        params.enrollmentId = selectedEnrollmentId;
       }
       
       const tasksRes = await taskApi.getMenteeTasks(user!.id, params);
@@ -127,6 +157,49 @@ export default function MenteeTasks() {
         <h1 className="text-slate-900 mb-2">My Tasks</h1>
         <p className="text-slate-600">Track your learning progress and submit your work</p>
       </div>
+
+      {/* Program Selector */}
+      {enrollments.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <GraduationCap className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-slate-600">Program</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {enrollments.map((enrollment: any) => {
+              const isSelected = enrollment.id === selectedEnrollmentId;
+              return (
+                <button
+                  key={enrollment.id}
+                  onClick={() => setSelectedEnrollmentId(enrollment.id)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600'
+                  }`}
+                >
+                  {enrollment.program?.name || 'Program'}
+                  {enrollment.status === 'completed' && (
+                    <span className="ml-2 text-xs opacity-75">(Completed)</span>
+                  )}
+                </button>
+              );
+            })}
+            {enrollments.length > 1 && (
+              <button
+                onClick={() => setSelectedEnrollmentId(null)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors border ${
+                  selectedEnrollmentId === null
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600'
+                }`}
+              >
+                All Programs
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
