@@ -1,4 +1,5 @@
 const bcrypt = require('bcrypt');
+const { Op } = require('sequelize');
 const { sequelize, models } = require('../db');
 const { ConflictError, NotFoundError } = require('../utils/errors/errorTypes');
 const { AUTH_MESSAGES, USER_MESSAGES } = require('../utils/responses/messages');
@@ -158,7 +159,7 @@ class AdminService {
       limit: 4
     });
 
-    // Format programs with mentor counts
+    // Format programs with mentor counts and average completion
     const programsWithStats = await Promise.all(
       recentPrograms.map(async (program) => {
         const mentorCount = await models.LevelMentorAssignment.count({
@@ -174,13 +175,29 @@ class AdminService {
           }]
         });
 
+        // Average overallProgressPercentage across all non-dropped/rejected enrollments
+        const avgResult = await models.Enrollment.findOne({
+          attributes: [
+            [sequelize.fn('AVG', sequelize.col('overall_progress_percentage')), 'avg']
+          ],
+          where: {
+            programId: program.id,
+            status: { [Op.notIn]: ['rejected', 'dropped'] }
+          },
+          raw: true
+        });
+
+        const completion = avgResult?.avg
+          ? Math.round(parseFloat(avgResult.avg))
+          : 0;
+
         return {
           id: program.id,
           name: program.name,
           status: program.status,
           enrollments: program.enrollments?.length || 0,
           mentors: mentorCount,
-          completion: 0, // TODO: Calculate per program
+          completion,
           startDate: program.startDate || program.createdAt
         };
       })

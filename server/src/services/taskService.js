@@ -551,9 +551,10 @@ class TaskService {
       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
       : null;
 
-    // Total tasks = live COUNT of RoadmapTask rows for every base roadmap in the program.
-    // (The Roadmap.total_tasks column is never updated when tasks are added, so we count directly.)
-    const tasksTotal = await models.RoadmapTask.count({
+    // Total tasks = live COUNT of RoadmapTask rows for every base roadmap in the program
+    // (the Roadmap.total_tasks column is never updated when tasks are added, so we count directly)
+    // PLUS any non-cancelled custom tasks assigned to this specific enrollment.
+    const roadmapTasksTotal = await models.RoadmapTask.count({
       include: [{
         model: models.RoadmapWeek,
         as: 'week',
@@ -567,16 +568,37 @@ class TaskService {
       }]
     });
 
+    // Count non-cancelled custom tasks assigned to this enrollment so that
+    // assigning a custom task immediately reduces the progress percentage.
+    const customTasksTotal = await models.AssignedTask.count({
+      where: {
+        enrollmentId,
+        isCustomTask: true,
+        status: { [Op.notIn]: ['cancelled'] }
+      }
+    });
+
+    const tasksTotal = roadmapTasksTotal + customTasksTotal;
+
     // Percentage against the full program — grows steadily as work is done
     const overallProgressPercentage = tasksTotal > 0
       ? Math.round((tasksCompleted / tasksTotal) * 100)
       : 0;
 
-    // If every task in the program is completed, mark the enrollment done
+    // If every task in the program (roadmap + custom) is completed, mark the enrollment done
     const allProgramTasksDone = tasksTotal > 0 && tasksCompleted >= tasksTotal;
+
+    // If there are now uncompleted tasks and the enrollment was previously auto-marked
+    // as program_completed (e.g. a custom task was just assigned), revert to active.
+    const currentEnrollment = await models.Enrollment.findByPk(enrollmentId);
+    const revertStatus =
+      !allProgramTasksDone && currentEnrollment?.status === 'program_completed'
+        ? { status: 'active', completedAt: null }
+        : {};
+
     const statusUpdate = allProgramTasksDone
       ? { status: 'program_completed', completedAt: new Date() }
-      : {};
+      : revertStatus;
 
     await models.Enrollment.update(
       {
