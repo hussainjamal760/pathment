@@ -152,7 +152,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
         await submissionService.reviewSubmission(submission.id, {
           rating,
           feedbackText,
-          decision,
+          isApproved: decision === 'approve',
           revisionNotes: decision === 'revision' ? revisionNotes : undefined,
           pointsAwarded: decision === 'approve' ? pointsAwarded : 0,
           inlineFeedback: validInlineFeedback,
