@@ -5,7 +5,7 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
-  Target,
+  ListTodo,
   Loader2,
   Plus,
   TrendingUp,
@@ -205,7 +205,7 @@ export default function MenteeDashboard() {
                             {total > 0 && (
                               <>
                                 <span className="flex items-center gap-1.5">
-                                  <Target className="w-4 h-4 text-indigo-600" />
+                                  <ListTodo className="w-4 h-4 text-indigo-600" />
                                   {remaining} remaining
                                 </span>
                                 <span className="text-slate-400 ml-auto">{total} total</span>
