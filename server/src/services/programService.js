@@ -6,6 +6,8 @@ const {
   ForbiddenError,
   ValidationError 
 } = require('../utils/errors/errorTypes');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 // Helper function for audit logging (non-blocking)
 async function createAuditLog(logData) {
@@ -76,6 +78,32 @@ class ProgramService {
         status: program.status
       }
     });
+
+    if (program.status === 'published') {
+      const mentees = await models.User.findAll({
+        where: { role: 'mentee', status: 'active' },
+        attributes: ['id'],
+        limit: 5000
+      });
+
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.PROGRAM_UPDATED,
+        recipients: mentees.map((m) => ({ userId: m.id })),
+        payload: {
+          title: 'New program available',
+          message: `"${program.name}" is now available for enrollment.`,
+          actionUrl: `/mentee/programs`,
+          actionLabel: 'Browse Programs',
+          relatedEntityType: 'program',
+          relatedEntityId: program.id,
+          emailSubject: 'Pathment: New program available'
+        },
+        dedupe: {
+          relatedEntityType: 'program_created',
+          relatedEntityId: program.id
+        }
+      });
+    }
 
     return program;
   }
@@ -344,6 +372,32 @@ class ProgramService {
         type: program.type
       }
     });
+
+    if (program.status === 'published') {
+      const mentees = await models.User.findAll({
+        where: { role: 'mentee', status: 'active' },
+        attributes: ['id'],
+        limit: 5000
+      });
+
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.PROGRAM_UPDATED,
+        recipients: mentees.map((m) => ({ userId: m.id })),
+        payload: {
+          title: 'Program updated',
+          message: `"${program.name}" has been updated.`,
+          actionUrl: `/mentee/programs`,
+          actionLabel: 'View Program',
+          relatedEntityType: 'program',
+          relatedEntityId: program.id,
+          emailSubject: 'Pathment: Program update'
+        },
+        dedupe: {
+          relatedEntityType: 'program_updated',
+          relatedEntityId: `${program.id}:${new Date(program.updatedAt).getTime()}`
+        }
+      });
+    }
 
     return program;
   }

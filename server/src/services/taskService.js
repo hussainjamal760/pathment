@@ -1,6 +1,8 @@
 const { models } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../utils/errors/errorTypes');
 const { Op } = require('sequelize');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 class TaskService {
   /**
@@ -91,7 +93,26 @@ class TaskService {
           isCustomTask: false
         });
 
-        assignedTasks.push(await this.getAssignedTaskById(assignedTask.id));
+        const fullTask = await this.getAssignedTaskById(assignedTask.id);
+        assignedTasks.push(fullTask);
+
+        await notificationOrchestrator.dispatch({
+          eventKey: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+          recipients: [{ userId: fullTask.menteeId }],
+          payload: {
+            title: 'New task assigned',
+            message: `A new task "${fullTask.roadmapTask?.title || 'Task'}" has been assigned to you.`,
+            actionUrl: `/mentee/tasks/${fullTask.id}`,
+            actionLabel: 'Open Task',
+            relatedEntityType: 'assigned_task',
+            relatedEntityId: fullTask.id,
+            emailSubject: 'Pathment: New task assigned'
+          },
+          dedupe: {
+            relatedEntityType: 'task_assigned',
+            relatedEntityId: fullTask.id
+          }
+        });
       }
     }
 
@@ -172,7 +193,27 @@ class TaskService {
 
     await this.updateEnrollmentTaskStats(enrollmentId);
 
-    return this.getAssignedTaskById(assignedTask.id);
+    const fullTask = await this.getAssignedTaskById(assignedTask.id);
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.TASK_ASSIGNED,
+      recipients: [{ userId: fullTask.menteeId }],
+      payload: {
+        title: 'New task assigned',
+        message: `Mentor assigned "${fullTask.roadmapTask?.title || 'Task'}" to you.`,
+        actionUrl: `/mentee/tasks/${fullTask.id}`,
+        actionLabel: 'Open Task',
+        relatedEntityType: 'assigned_task',
+        relatedEntityId: fullTask.id,
+        emailSubject: 'Pathment: New task assigned'
+      },
+      dedupe: {
+        relatedEntityType: 'task_assigned',
+        relatedEntityId: fullTask.id
+      }
+    });
+
+    return fullTask;
   }
 
   /**

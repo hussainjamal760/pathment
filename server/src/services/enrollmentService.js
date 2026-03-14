@@ -1,6 +1,8 @@
 const { Op } = require('sequelize');
 const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 class EnrollmentService {
   async getEnrollments(filters, pagination) {
@@ -155,6 +157,47 @@ class EnrollmentService {
       currentLevelId: firstLevel?.id,
       status: 'pending_match',
       enrolledAt: new Date()
+    });
+
+    const admins = await models.User.findAll({
+      where: { role: 'admin', status: 'active' },
+      attributes: ['id']
+    });
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.MENTEE_ENROLLED,
+      recipients: [{ userId: menteeId }],
+      payload: {
+        title: 'Program enrollment created',
+        message: `A new enrollment was created for "${program.name}".`,
+        actionUrl: `/mentee/programs`,
+        actionLabel: 'View Programs',
+        relatedEntityType: 'enrollment',
+        relatedEntityId: enrollment.id,
+        emailSubject: 'Pathment: Enrollment confirmed'
+      },
+      dedupe: {
+        relatedEntityType: 'enrollment_created',
+        relatedEntityId: enrollment.id
+      }
+    });
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.MENTEE_ENROLLED,
+      recipients: admins.map((admin) => ({ userId: admin.id })),
+      payload: {
+        title: 'Program enrollment created',
+        message: `A new enrollment was created for "${program.name}".`,
+        actionUrl: `/admin/enrollment/overview`,
+        actionLabel: 'View Enrollment',
+        relatedEntityType: 'enrollment',
+        relatedEntityId: enrollment.id,
+        emailSubject: 'Pathment: New program enrollment'
+      },
+      dedupe: {
+        relatedEntityType: 'enrollment_created',
+        relatedEntityId: enrollment.id
+      }
     });
 
     return this.getEnrollmentById(enrollment.id);

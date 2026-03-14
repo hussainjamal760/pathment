@@ -1,6 +1,8 @@
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUpload');
 const { models } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../utils/errors/errorTypes');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 class SubmissionService {
   /**
@@ -86,7 +88,27 @@ class SubmissionService {
     });
 
     // Return complete submission with files
-    return this.getSubmissionById(submission.id);
+    const fullSubmission = await this.getSubmissionById(submission.id);
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.TASK_SUBMITTED,
+      recipients: [{ userId: task.mentorId }],
+      payload: {
+        title: 'Task submitted for review',
+        message: `A mentee submitted "${fullSubmission.assignedTask?.roadmapTask?.title || 'a task'}" for review.`,
+        actionUrl: `/mentor/tasks/${task.id}/feedback`,
+        actionLabel: 'Review Submission',
+        relatedEntityType: 'task_submission',
+        relatedEntityId: submission.id,
+        emailSubject: 'Pathment: Task submitted for review'
+      },
+      dedupe: {
+        relatedEntityType: 'task_submitted',
+        relatedEntityId: submission.id
+      }
+    });
+
+    return fullSubmission;
   }
 
   /**
@@ -173,7 +195,49 @@ class SubmissionService {
       });
     }
 
-    return this.getSubmissionById(submissionId);
+    const reviewedSubmission = await this.getSubmissionById(submissionId);
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.SUBMISSION_REVIEWED,
+      recipients: [{ userId: task.menteeId }],
+      payload: {
+        title: isApproved ? 'Submission approved' : 'Submission needs revision',
+        message: isApproved
+          ? `Great work! Your submission for "${reviewedSubmission.assignedTask?.roadmapTask?.title || 'task'}" was approved.`
+          : `Your submission for "${reviewedSubmission.assignedTask?.roadmapTask?.title || 'task'}" needs revision.`,
+        actionUrl: `/mentee/tasks/${task.id}`,
+        actionLabel: 'View Feedback',
+        relatedEntityType: 'task_submission',
+        relatedEntityId: submission.id,
+        emailSubject: 'Pathment: Submission review update'
+      },
+      dedupe: {
+        relatedEntityType: 'submission_reviewed',
+        relatedEntityId: submission.id
+      }
+    });
+
+    if (feedbackText && String(feedbackText).trim()) {
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.FEEDBACK_SENT,
+        recipients: [{ userId: task.menteeId }],
+        payload: {
+          title: 'New mentor feedback',
+          message: `Your mentor left new feedback on "${reviewedSubmission.assignedTask?.roadmapTask?.title || 'task'}".`,
+          actionUrl: `/mentee/tasks/${task.id}`,
+          actionLabel: 'Read Feedback',
+          relatedEntityType: 'task_feedback',
+          relatedEntityId: submission.id,
+          emailSubject: 'Pathment: New mentor feedback'
+        },
+        dedupe: {
+          relatedEntityType: 'feedback_sent',
+          relatedEntityId: submission.id
+        }
+      });
+    }
+
+    return reviewedSubmission;
   }
 
   /**

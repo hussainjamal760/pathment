@@ -1,6 +1,8 @@
 const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
 const { Op } = require('sequelize');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 class MatchingService {
   /**
@@ -100,7 +102,7 @@ class MatchingService {
       console.warn('Could not auto-assign week 1 tasks on match creation:', err.message);
     }
 
-    return models.MentorMenteeMatch.findByPk(match.id, {
+    const hydratedMatch = await models.MentorMenteeMatch.findByPk(match.id, {
       include: [
         { model: models.User, as: 'mentor', attributes: ['id', 'firstName', 'lastName', 'email'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email'] },
@@ -108,6 +110,44 @@ class MatchingService {
         { model: models.ProgramLevel, as: 'level' }
       ]
     });
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.MENTOR_ASSIGNED,
+      recipients: [{ userId: hydratedMatch.mentorId }],
+      payload: {
+        title: 'New mentee assigned',
+        message: `You have been matched for level "${hydratedMatch.level?.name || 'current level'}".`,
+        actionUrl: `/mentor/mentees`,
+        actionLabel: 'Open Mentees',
+        relatedEntityType: 'mentor_match',
+        relatedEntityId: hydratedMatch.id,
+        emailSubject: 'Pathment: New mentee assignment'
+      },
+      dedupe: {
+        relatedEntityType: 'mentor_assigned',
+        relatedEntityId: hydratedMatch.id
+      }
+    });
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.MENTOR_ASSIGNED,
+      recipients: [{ userId: hydratedMatch.menteeId }],
+      payload: {
+        title: 'Mentor assigned',
+        message: `A mentor has been assigned for level "${hydratedMatch.level?.name || 'current level'}".`,
+        actionUrl: `/mentee/programs`,
+        actionLabel: 'View Program',
+        relatedEntityType: 'mentor_match',
+        relatedEntityId: hydratedMatch.id,
+        emailSubject: 'Pathment: Mentor assigned to your enrollment'
+      },
+      dedupe: {
+        relatedEntityType: 'mentor_assigned',
+        relatedEntityId: hydratedMatch.id
+      }
+    });
+
+    return hydratedMatch;
   }
 
   async getAISuggestions(enrollmentId) {
