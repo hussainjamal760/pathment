@@ -54,12 +54,12 @@ const isNonMessageNotification = (notification: { type?: string }): boolean => {
   return notification.type !== 'message';
 };
 
-const getRoleMessagesPath = (pathname: string): string => {
+const getRoleNotificationsPath = (pathname: string): string => {
   const role = pathname.split('/')[1];
   if (role === 'admin' || role === 'mentor' || role === 'mentee') {
-    return `/${role}/messages`;
+    return `/${role}/notifications`;
   }
-  return '/messages';
+  return '/notifications';
 };
 
 export default function NotificationDrawer({
@@ -75,7 +75,7 @@ export default function NotificationDrawer({
   const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const messagesPath = getRoleMessagesPath(pathname || '');
+  const notificationsPath = getRoleNotificationsPath(pathname || '');
 
   // Load notifications on mount and when drawer opens
   const loadNotifications = useCallback(async () => {
@@ -414,7 +414,7 @@ export default function NotificationDrawer({
                 </button>
                 <button
                   onClick={() => {
-                    router.push(messagesPath);
+                    router.push(notificationsPath);
                     setIsOpen(false);
                   }}
                   className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
