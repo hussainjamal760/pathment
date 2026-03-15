@@ -1,0 +1,107 @@
+import { apiClient } from './api-client';
+
+export interface GamificationStats {
+  totalPoints: number;
+  currentLevel: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalBadges: number;
+  totalTasksCompleted: number;
+  totalProgramsCompleted: number;
+  avgTaskRating: number;
+  leaderboardRank: number | null;
+}
+
+export interface Badge {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  pointsReward: number;
+  isSecret: boolean;
+  unlockedAt?: string;
+}
+
+interface UserBadgeApiItem {
+  id: string;
+  unlockedAt?: string;
+  badge?: Badge;
+  Badge?: Badge;
+}
+
+export interface PointsHistoryEntry {
+  id: string;
+  pointsChange: number;
+  pointsBefore: number;
+  pointsAfter: number;
+  sourceType: string;
+  reason?: string;
+  createdAt: string;
+}
+
+export interface LeaderboardEntry {
+  id: string;
+  userId: string;
+  rank: number;
+  points: number;
+  user?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    email: string;
+  };
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  statusCode: number;
+  data: T;
+}
+
+export const gamificationApi = {
+  async getUserStats(userId: string): Promise<GamificationStats> {
+    const response = await apiClient.get<ApiResponse<{ stats: GamificationStats }>>(
+      `/gamification/user/${userId}/stats`
+    );
+    return response.data.stats;
+  },
+
+  async getUserBadges(userId: string): Promise<Badge[]> {
+    const response = await apiClient.get<ApiResponse<{ badges: UserBadgeApiItem[] }>>(
+      `/gamification/user/${userId}/badges`
+    );
+
+    const mapped: Badge[] = [];
+
+    for (const item of response.data.badges || []) {
+      const nested = item.badge || item.Badge;
+      if (!nested) continue;
+
+      mapped.push({
+        ...nested,
+        unlockedAt: item.unlockedAt
+      });
+    }
+
+    return mapped;
+  },
+
+  async getUserPointsHistory(userId: string, limit = 20): Promise<PointsHistoryEntry[]> {
+    const response = await apiClient.get<ApiResponse<{ history: PointsHistoryEntry[] }>>(
+      `/gamification/user/${userId}/points-history`,
+      { params: { limit } }
+    );
+    return response.data.history;
+  },
+
+  async getLeaderboard(periodType: 'daily' | 'weekly' | 'monthly' | 'all_time' = 'all_time', limit = 10): Promise<LeaderboardEntry[]> {
+    const response = await apiClient.get<ApiResponse<{ leaderboard: LeaderboardEntry[] }>>(
+      '/gamification/leaderboard',
+      { params: { periodType, limit } }
+    );
+    return response.data.leaderboard;
+  }
+};
+
+export default gamificationApi;

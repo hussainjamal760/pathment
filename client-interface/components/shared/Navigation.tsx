@@ -11,6 +11,7 @@ import {
   Users, 
   UserCheck, 
   ClipboardList,
+  Trophy,
   MessageSquare,
   Settings,
   LogOut,
@@ -61,6 +62,7 @@ export default function Navigation({ role }: NavigationProps) {
     { path: '/mentee/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/mentee/programs', icon: BookOpen, label: 'Browse Programs' },
     { path: '/mentee/tasks', icon: ClipboardList, label: 'My Tasks' },
+    { path: '/mentee/gamification', icon: Trophy, label: 'Gamification' },
     { path: '/mentee/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
   ];
 

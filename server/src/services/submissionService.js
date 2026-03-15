@@ -279,6 +279,41 @@ class SubmissionService {
     const taskService = require('./taskService');
     await taskService.updateEnrollmentTaskStats(task.enrollmentId);
 
+    // Keep gamification and mentee-profile progress in sync when a task is approved.
+    if (isApproved) {
+      await this.updateMenteeGamificationProgress(task.menteeId);
+
+      const gamificationService = require('./gamificationService');
+      const pointsToAward = Number.isFinite(Number(pointsAwarded))
+        ? Math.max(0, Number(pointsAwarded))
+        : 10;
+
+      try {
+        if (pointsToAward > 0) {
+          await gamificationService.awardPoints(
+            task.menteeId,
+            pointsToAward,
+            'task_completed',
+            task.id,
+            `Task completed: "${task.title || task.id}"`
+          );
+        }
+
+        await gamificationService.updateStreak(task.menteeId);
+
+        // Re-check task-based badges after profile counters are refreshed.
+        await gamificationService.checkAndAwardBadges(task.menteeId);
+      } catch (gamificationError) {
+        // Do not fail review flow if gamification side-effects fail.
+        console.error('[Gamification] reviewSubmission side-effect failed:', {
+          submissionId,
+          taskId: task.id,
+          menteeId: task.menteeId,
+          error: gamificationError.message
+        });
+      }
+    }
+
     // Update mentor stats
     await this.updateMentorReviewStats(mentorId);
 
@@ -479,6 +514,42 @@ class SubmissionService {
 
     await mentor.update({
       totalTasksReviewed: reviewedTasks
+    });
+  }
+
+  /**
+   * Recalculate mentee profile counters derived from assigned tasks.
+   */
+  async updateMenteeGamificationProgress(menteeId) {
+    const menteeProfile = await models.MenteeProfile.findOne({
+      where: { userId: menteeId }
+    });
+
+    if (!menteeProfile) return;
+
+    const completedTasks = await models.AssignedTask.findAll({
+      where: {
+        menteeId,
+        status: 'completed'
+      },
+      attributes: ['finalRating']
+    });
+
+    const totalTasksCompleted = completedTasks.length;
+
+    const ratings = completedTasks
+      .map((item) => item.finalRating)
+      .filter((rating) => rating !== null && rating !== undefined)
+      .map((rating) => parseFloat(rating))
+      .filter((rating) => Number.isFinite(rating));
+
+    const avgTaskRating = ratings.length > 0
+      ? parseFloat((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length).toFixed(2))
+      : 0;
+
+    await menteeProfile.update({
+      totalTasksCompleted,
+      avgTaskRating
     });
   }
 }
