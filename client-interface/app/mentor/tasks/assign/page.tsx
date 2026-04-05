@@ -1,7 +1,5 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Plus,
   BookOpen,
@@ -10,77 +8,59 @@ import {
   Flag,
   Link as LinkIcon,
   X,
-  Send
+  Send,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { PageHeader } from '@/components/admin/ui';
+import { LoadingSpinner, ErrorState } from '@/components/shared';
+import { useMenteeList } from '@/lib/hooks/mentor/useMenteeList';
+import { useTaskAssignment } from '@/lib/hooks/mentor/useTaskAssignment';
+import { useRoadmapTasks } from '@/lib/hooks/mentor/useRoadmapTasks';
 
 export default function TaskAssignment() {
-  const router = useRouter();
-  const [taskType, setTaskType] = useState<'roadmap' | 'custom'>('roadmap');
-  const [selectedMentee, setSelectedMentee] = useState('');
-  const [selectedRoadmapTask, setSelectedRoadmapTask] = useState('');
-  const [customTask, setCustomTask] = useState({
-    title: '',
-    description: '',
-    dueDate: '',
-    priority: 'medium',
-    resources: ['']
+  // Custom hooks for data and form logic
+  const { mentees, isLoading: menteesLoading, error: menteesError } = useMenteeList();
+  const {
+    formData,
+    isSubmitting,
+    updateFormData,
+    updateCustomTask,
+    addResource,
+    updateResource,
+    removeResource,
+    handleSubmit,
+  } = useTaskAssignment();
+
+  // Get selected mentee details
+  const selectedMentee = mentees.find(m => m.id === formData.selectedMentee);
+
+  // Fetch roadmap tasks for selected mentee's program/level
+  const {
+    tasks: roadmapTasks,
+    isLoading: tasksLoading,
+    error: tasksError,
+  } = useRoadmapTasks({
+    programId: selectedMentee?.programId,
+    levelId: selectedMentee?.currentLevelId,
+    enabled: formData.taskType === 'roadmap' && !!formData.selectedMentee,
   });
 
-  const mentees = [
-    { id: '1', name: 'Alex Thompson', program: 'Full Stack Development' },
-    { id: '2', name: 'Maria Garcia', program: 'Full Stack Development' },
-    { id: '3', name: 'James Wilson', program: 'Full Stack Development' }
-  ];
+  // Show loading state while fetching mentees
+  if (menteesLoading) {
+    return <LoadingSpinner variant="page" message="Loading mentees..." />;
+  }
 
-  const roadmapTasks = [
-    {
-      id: '1',
-      week: 3,
-      title: 'Build a React component library',
-      description: 'Create reusable React components with TypeScript',
-      estimatedHours: 8
-    },
-    {
-      id: '2',
-      week: 3,
-      title: 'Implement user authentication',
-      description: 'Add JWT-based authentication to your application',
-      estimatedHours: 6
-    },
-    {
-      id: '3',
-      week: 4,
-      title: 'Create REST API endpoints',
-      description: 'Build CRUD operations for your application',
-      estimatedHours: 10
-    },
-    {
-      id: '4',
-      week: 4,
-      title: 'Database design and schema',
-      description: 'Design and implement PostgreSQL database schema',
-      estimatedHours: 8
-    }
-  ];
+  // Show error state if mentees failed to load
+  if (menteesError) {
+    return <ErrorState variant="page" message={menteesError} />;
+  }
 
-  const addResource = () => {
-    setCustomTask({ ...customTask, resources: [...customTask.resources, ''] });
-  };
-
-  const updateResource = (index: number, value: string) => {
-    const newResources = [...customTask.resources];
-    newResources[index] = value;
-    setCustomTask({ ...customTask, resources: newResources });
-  };
-
-  const removeResource = (index: number) => {
-    setCustomTask({ ...customTask, resources: customTask.resources.filter((_, i) => i !== index) });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push('/mentor/dashboard');
+    handleSubmit();
   };
 
   return (
@@ -93,7 +73,7 @@ export default function TaskAssignment() {
         backLabel="Back to Dashboard"
       />
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={onSubmit}>
         {/* Select Mentee */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
           <label className="block text-slate-900 mb-3">
@@ -102,15 +82,16 @@ export default function TaskAssignment() {
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <select
-              value={selectedMentee}
-              onChange={(e) => setSelectedMentee(e.target.value)}
+              value={formData.selectedMentee}
+              onChange={(e) => updateFormData({ selectedMentee: e.target.value })}
               className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
               required
+              disabled={isSubmitting}
             >
               <option value="">Choose a mentee...</option>
               {mentees.map((mentee) => (
                 <option key={mentee.id} value={mentee.id}>
-                  {mentee.name} - {mentee.program}
+                  {mentee.firstName} {mentee.lastName} {mentee.programName ? `- ${mentee.programName}` : ''}
                 </option>
               ))}
             </select>
@@ -123,36 +104,38 @@ export default function TaskAssignment() {
           <div className="grid sm:grid-cols-2 gap-4">
             <button
               type="button"
-              onClick={() => setTaskType('roadmap')}
+              onClick={() => updateFormData({ taskType: 'roadmap' })}
+              disabled={isSubmitting}
               className={`p-4 border-2 rounded-xl transition-all text-left ${
-                taskType === 'roadmap'
+                formData.taskType === 'roadmap'
                   ? 'border-indigo-600 bg-indigo-50'
                   : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <BookOpen className={`w-6 h-6 mb-2 ${taskType === 'roadmap' ? 'text-indigo-600' : 'text-slate-600'}`} />
-              <div className={`mb-1 ${taskType === 'roadmap' ? 'text-indigo-900' : 'text-slate-900'}`}>
+              <BookOpen className={`w-6 h-6 mb-2 ${formData.taskType === 'roadmap' ? 'text-indigo-600' : 'text-slate-600'}`} />
+              <div className={`mb-1 ${formData.taskType === 'roadmap' ? 'text-indigo-900' : 'text-slate-900'}`}>
                 From Roadmap
               </div>
-              <div className={`text-sm ${taskType === 'roadmap' ? 'text-indigo-700' : 'text-slate-600'}`}>
+              <div className={`text-sm ${formData.taskType === 'roadmap' ? 'text-indigo-700' : 'text-slate-600'}`}>
                 Choose from program curriculum
               </div>
             </button>
 
             <button
               type="button"
-              onClick={() => setTaskType('custom')}
+              onClick={() => updateFormData({ taskType: 'custom' })}
+              disabled={isSubmitting}
               className={`p-4 border-2 rounded-xl transition-all text-left ${
-                taskType === 'custom'
+                formData.taskType === 'custom'
                   ? 'border-indigo-600 bg-indigo-50'
                   : 'border-slate-200 hover:border-slate-300'
               }`}
             >
-              <Plus className={`w-6 h-6 mb-2 ${taskType === 'custom' ? 'text-indigo-600' : 'text-slate-600'}`} />
-              <div className={`mb-1 ${taskType === 'custom' ? 'text-indigo-900' : 'text-slate-900'}`}>
+              <Plus className={`w-6 h-6 mb-2 ${formData.taskType === 'custom' ? 'text-indigo-600' : 'text-slate-600'}`} />
+              <div className={`mb-1 ${formData.taskType === 'custom' ? 'text-indigo-900' : 'text-slate-900'}`}>
                 Custom Task
               </div>
-              <div className={`text-sm ${taskType === 'custom' ? 'text-indigo-700' : 'text-slate-600'}`}>
+              <div className={`text-sm ${formData.taskType === 'custom' ? 'text-indigo-700' : 'text-slate-600'}`}>
                 Create your own assignment
               </div>
             </button>
@@ -160,50 +143,94 @@ export default function TaskAssignment() {
         </div>
 
         {/* Roadmap Tasks */}
-        {taskType === 'roadmap' && (
+        {formData.taskType === 'roadmap' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6">
             <label className="block text-slate-900 mb-3">
               Select Task from Roadmap <span className="text-red-600">*</span>
             </label>
-            <div className="space-y-3">
-              {roadmapTasks.map((task) => (
-                <label
-                  key={task.id}
-                  className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
-                    selectedRoadmapTask === task.id
-                      ? 'border-indigo-600 bg-indigo-50'
-                      : 'border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="roadmapTask"
-                    value={task.id}
-                    checked={selectedRoadmapTask === task.id}
-                    onChange={(e) => setSelectedRoadmapTask(e.target.value)}
-                    className="sr-only"
-                  />
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs`}>
-                          Week {task.week}
-                        </span>
-                        <h3 className={selectedRoadmapTask === task.id ? 'text-indigo-900' : 'text-slate-900'}>
-                          {task.title}
-                        </h3>
+
+            {/* Loading state */}
+            {tasksLoading && (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <span className="ml-2 text-slate-600">Loading roadmap tasks...</span>
+              </div>
+            )}
+
+            {/* Error state */}
+            {tasksError && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                <p className="text-red-900 text-sm">{tasksError}</p>
+              </div>
+            )}
+
+            {/* Empty state - no mentee selected */}
+            {!formData.selectedMentee && !tasksLoading && (
+              <div className="p-8 bg-slate-50 rounded-xl text-center">
+                <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-600">Please select a mentee first to view their roadmap tasks</p>
+              </div>
+            )}
+
+            {/* Empty state - no tasks available */}
+            {formData.selectedMentee && !tasksLoading && !tasksError && roadmapTasks.length === 0 && (
+              <div className="p-8 bg-slate-50 rounded-xl text-center">
+                <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-600 mb-2">No roadmap tasks available</p>
+                <p className="text-slate-500 text-sm">
+                  This program may not have a roadmap configured yet
+                </p>
+              </div>
+            )}
+
+            {/* Tasks list */}
+            {!tasksLoading && !tasksError && roadmapTasks.length > 0 && (
+              <div className="space-y-3">
+                {roadmapTasks.map((task) => (
+                  <label
+                    key={task.id}
+                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      formData.selectedRoadmapTask === task.id
+                        ? 'border-indigo-600 bg-indigo-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    } ${isSubmitting ? 'opacity-50 pointer-events-none' : ''}`}
+                  >
+                    <input
+                      type="radio"
+                      name="roadmapTask"
+                      value={task.id}
+                      checked={formData.selectedRoadmapTask === task.id}
+                      onChange={(e) => updateFormData({ selectedRoadmapTask: e.target.value })}
+                      disabled={isSubmitting}
+                      className="sr-only"
+                    />
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          {task.week && (
+                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs">
+                              Week {task.week.weekNumber}
+                            </span>
+                          )}
+                          <h3 className={formData.selectedRoadmapTask === task.id ? 'text-indigo-900' : 'text-slate-900'}>
+                            {task.title}
+                          </h3>
+                        </div>
+                        <p className={`text-sm mb-2 ${formData.selectedRoadmapTask === task.id ? 'text-indigo-700' : 'text-slate-600'}`}>
+                          {task.description}
+                        </p>
+                        {task.estimatedHours && (
+                          <span className={`text-xs ${formData.selectedRoadmapTask === task.id ? 'text-indigo-600' : 'text-slate-500'}`}>
+                            Estimated: {task.estimatedHours} hours
+                          </span>
+                        )}
                       </div>
-                      <p className={`text-sm mb-2 ${selectedRoadmapTask === task.id ? 'text-indigo-700' : 'text-slate-600'}`}>
-                        {task.description}
-                      </p>
-                      <span className={`text-xs ${selectedRoadmapTask === task.id ? 'text-indigo-600' : 'text-slate-500'}`}>
-                        Estimated: {task.estimatedHours} hours
-                      </span>
                     </div>
-                  </div>
-                </label>
-              ))}
-            </div>
+                  </label>
+                ))}
+              </div>
+            )}
 
             {/* Due Date */}
             <div className="mt-6">
@@ -223,7 +250,7 @@ export default function TaskAssignment() {
         )}
 
         {/* Custom Task */}
-        {taskType === 'custom' && (
+        {formData.taskType === 'custom' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6 space-y-6">
             {/* Task Title */}
             <div>
@@ -232,10 +259,11 @@ export default function TaskAssignment() {
               </label>
               <input
                 type="text"
-                value={customTask.title}
-                onChange={(e) => setCustomTask({ ...customTask, title: e.target.value })}
+                value={formData.customTask.title}
+                onChange={(e) => updateCustomTask({ title: e.target.value })}
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="e.g., Build a weather dashboard"
+                disabled={isSubmitting}
                 required
               />
             </div>
@@ -246,11 +274,12 @@ export default function TaskAssignment() {
                 Description <span className="text-red-600">*</span>
               </label>
               <textarea
-                value={customTask.description}
-                onChange={(e) => setCustomTask({ ...customTask, description: e.target.value })}
+                value={formData.customTask.description}
+                onChange={(e) => updateCustomTask({ description: e.target.value })}
                 rows={5}
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                 placeholder="Describe the task, requirements, and expectations..."
+                disabled={isSubmitting}
                 required
               />
             </div>
@@ -265,9 +294,10 @@ export default function TaskAssignment() {
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="date"
-                    value={customTask.dueDate}
-                    onChange={(e) => setCustomTask({ ...customTask, dueDate: e.target.value })}
+                    value={formData.customTask.dueDate}
+                    onChange={(e) => updateCustomTask({ dueDate: e.target.value })}
                     className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    disabled={isSubmitting}
                     required
                   />
                 </div>
@@ -278,9 +308,10 @@ export default function TaskAssignment() {
                 <div className="relative">
                   <Flag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <select
-                    value={customTask.priority}
-                    onChange={(e) => setCustomTask({ ...customTask, priority: e.target.value })}
+                    value={formData.customTask.priority}
+                    onChange={(e) => updateCustomTask({ priority: e.target.value as 'low' | 'medium' | 'high' })}
                     className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none"
+                    disabled={isSubmitting}
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -294,7 +325,7 @@ export default function TaskAssignment() {
             <div>
               <label className="block text-slate-900 mb-2">Learning Resources</label>
               <div className="space-y-3">
-                {customTask.resources.map((resource, index) => (
+                {formData.customTask.resources.map((resource, index) => (
                   <div key={index} className="flex gap-2">
                     <div className="relative flex-1">
                       <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -304,12 +335,14 @@ export default function TaskAssignment() {
                         onChange={(e) => updateResource(index, e.target.value)}
                         className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         placeholder="https://..."
+                        disabled={isSubmitting}
                       />
-                      {customTask.resources.length > 1 && (
+                      {formData.customTask.resources.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeResource(index)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-600"
+                          disabled={isSubmitting}
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -320,7 +353,8 @@ export default function TaskAssignment() {
                 <button
                   type="button"
                   onClick={addResource}
-                  className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-2"
+                  className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-2 disabled:opacity-50"
+                  disabled={isSubmitting}
                 >
                   <Plus className="w-4 h-4" />
                   Add resource link
@@ -334,15 +368,26 @@ export default function TaskAssignment() {
         <div className="flex gap-4">
           <button
             type="submit"
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
+            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex items-center gap-2"
+            disabled={isSubmitting}
           >
-            <Send className="w-5 h-5" />
-            Assign Task
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Assigning...
+              </>
+            ) : (
+              <>
+                <Send className="w-5 h-5" />
+                Assign Task
+              </>
+            )}
           </button>
           <button
             type="button"
-            onClick={() => router.push('/mentor/dashboard')}
-            className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
+            onClick={() => window.history.back()}
+            className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors disabled:opacity-50"
+            disabled={isSubmitting}
           >
             Cancel
           </button>

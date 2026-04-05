@@ -6,19 +6,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { UserRole } from '@/lib/types';
 import { 
-  LayoutDashboard, 
-  BookOpen, 
-  Users, 
-  UserCheck, 
-  ClipboardList,
-  Trophy,
-  MessageSquare,
-  Settings,
   LogOut,
   Menu,
   X,
-  LucideIcon
+  Settings,
 } from 'lucide-react';
+import { getNavigationLinks } from '@/lib/config/navigation';
 import { NotificationDrawer } from './NotificationDrawer';
 import { UserProfileCard } from './UserProfileCard';
 import { messagingApi } from '@/lib/services/messaging-api';
@@ -26,13 +19,6 @@ import { io } from 'socket.io-client';
 
 interface NavigationProps {
   role: UserRole;
-}
-
-interface NavLink {
-  path: string;
-  icon: LucideIcon;
-  label: string;
-  hasBadge?: boolean;
 }
 
 export default function Navigation({ role }: NavigationProps) {
@@ -43,31 +29,7 @@ export default function Navigation({ role }: NavigationProps) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-  const adminLinks: NavLink[] = [
-    { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/admin/programs/list', icon: BookOpen, label: 'Programs' },
-    { path: '/admin/matching/mentor-assignment', icon: UserCheck, label: 'Mentors' },
-    { path: '/admin/enrollment/overview', icon: Users, label: 'Enrollments' },
-    { path: '/admin/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
-  ];
-
-  const mentorLinks: NavLink[] = [
-    { path: '/mentor/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/mentor/programs', icon: BookOpen, label: 'My Programs' },
-    { path: '/mentor/mentees', icon: Users, label: 'My Mentees' },
-    { path: '/mentor/tasks', icon: ClipboardList, label: 'Tasks' },
-    { path: '/mentor/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
-  ];
-
-  const menteeLinks: NavLink[] = [
-    { path: '/mentee/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/mentee/programs', icon: BookOpen, label: 'Browse Programs' },
-    { path: '/mentee/tasks', icon: ClipboardList, label: 'My Tasks' },
-    { path: '/mentee/gamification', icon: Trophy, label: 'Gamification' },
-    { path: '/mentee/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
-  ];
-
-  const links = role === 'admin' ? adminLinks : role === 'mentor' ? mentorLinks : menteeLinks;
+  const links = getNavigationLinks(role);
 
   // Fetch unread message count from conversation list (initial load + on route change).
   useEffect(() => {
