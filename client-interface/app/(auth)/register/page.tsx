@@ -14,7 +14,7 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'mentee' as 'admin' | 'mentor' | 'mentee',
+    role: 'mentee' as 'mentor' | 'mentee',
     firstName: '',
     lastName: ''
   });
@@ -208,8 +208,8 @@ export default function RegisterPage() {
           {/* Role Selection */}
           <div>
             <label className="block text-slate-700 text-sm mb-3">I want to join as</label>
-            <div className="grid grid-cols-3 gap-3">
-              {(['mentee', 'mentor', 'admin'] as const).map((role) => (
+            <div className="grid grid-cols-2 gap-3">
+              {(['mentee', 'mentor'] as const).map((role) => (
                 <button
                   key={role}
                   type="button"
