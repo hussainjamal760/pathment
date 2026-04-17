@@ -1,8 +1,20 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { apiConfig } from '../config/api';
+import { normalizeAxiosError } from '../utils/api-error';
 
 class ApiClient {
   private client: AxiosInstance;
+  private readonly publicAuthPaths = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/refresh',
+    '/auth/verify-2fa-login',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/verify-email',
+    '/auth/resend-verification',
+    '/auth/validate-invite',
+  ];
 
   constructor() {
     this.client = axios.create({
@@ -29,10 +41,14 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
+        normalizeAxiosError(error);
         const originalRequest = error.config;
+        const requestUrl = String(originalRequest?.url || '').toLowerCase();
+        const hasAccessToken = Boolean(this.getToken());
+        const isPublicAuthRequest = this.publicAuthPaths.some((path) => requestUrl.includes(path));
 
         // Handle 401 Unauthorized - try to refresh token
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (error.response?.status === 401 && !originalRequest._retry && hasAccessToken && !isPublicAuthRequest) {
           originalRequest._retry = true;
 
           try {

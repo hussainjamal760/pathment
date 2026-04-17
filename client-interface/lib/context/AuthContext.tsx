@@ -21,6 +21,10 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getHttpStatus = (error: unknown): number | undefined => {
+  return (error as { response?: { status?: number } })?.response?.status;
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -117,7 +121,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTemporaryToken(null);
       return { requiresTwoFactor: false };
     } catch (error) {
-      console.error('Login error:', error);
+      const status = getHttpStatus(error);
+      // Invalid credentials are expected user input errors; keep console clean.
+      if (status !== 400 && status !== 401) {
+        console.error('Login error:', error);
+      }
       throw error;
     }
   };
@@ -157,7 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRequiresTwoFactor(false);
       setTemporaryToken(null);
     } catch (error) {
-      console.error('2FA verification error:', error);
+      const status = getHttpStatus(error);
+      if (status !== 400 && status !== 401) {
+        console.error('2FA verification error:', error);
+      }
       throw error;
     }
   };
