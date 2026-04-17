@@ -8,6 +8,7 @@ import { Mail, Lock, User, ArrowRight, CheckCircle2, AlertCircle, Loader2 } from
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 type InviteDetails = {
   id: string;
@@ -67,7 +68,7 @@ export default function RegisterPage() {
         setInviteDetails(invite);
         setFormData((prev) => ({ ...prev, email: invite.email }));
       } catch (error: any) {
-        const message = error?.response?.data?.message || 'This invite is invalid or expired.';
+        const message = extractApiErrorMessage(error, 'This invite is invalid or expired.');
         setInviteError(message);
       } finally {
         setInviteLoading(false);
@@ -132,8 +133,9 @@ export default function RegisterPage() {
       toast.success('Account created! Please verify your email.');
       setTimeout(() => router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`), 1500);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Registration failed');
-      setErrors({ general: err.response?.data?.message || 'Registration failed' });
+      const message = extractApiErrorMessage(err, 'Registration failed');
+      toast.error(message);
+      setErrors({ general: message });
     } finally {
       setLoading(false);
     }

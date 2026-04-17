@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { programManagementApi } from '@/lib/services/program-api';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -78,7 +79,7 @@ export function useProgramEnroll(programId: string): UseProgramEnrollReturn {
       setShowConfirmDialog(false);
       setTimeout(() => router.push('/mentee/dashboard'), 1500);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to submit enrollment request');
+      toast.error(extractApiErrorMessage(err, 'Failed to submit enrollment request'));
       setShowConfirmDialog(false);
     } finally {
       setEnrolling(false);

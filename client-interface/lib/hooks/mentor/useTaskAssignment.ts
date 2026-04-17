@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 export interface RoadmapTask {
   id: string;
@@ -136,7 +137,7 @@ export function useTaskAssignment() {
       resetForm();
       router.push('/mentor/tasks');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to assign task');
+      toast.error(extractApiErrorMessage(err, 'Failed to assign task'));
     } finally {
       setIsSubmitting(false);
     }

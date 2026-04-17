@@ -15,6 +15,7 @@ import FileUploader from '@/components/shared/FileUploader';
 import { submissionService } from '@/lib/services/submissionService';
 import { useTaskDetail } from '@/lib/hooks/mentee';
 import { PageHeader } from '@/components/admin/ui';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -89,8 +90,7 @@ export default function TaskSubmission({ params }: PageProps) {
       setShowSuccess(true);
       setTimeout(() => router.push('/mentee/tasks'), 2000);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Failed to submit task');
+      setError(extractApiErrorMessage(err, 'Failed to submit task'));
     } finally {
       setIsSubmitting(false);
     }
@@ -114,8 +114,7 @@ export default function TaskSubmission({ params }: PageProps) {
       setShowSuccess(true);
       setTimeout(() => router.push('/mentee/tasks'), 2000);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      setError(error.response?.data?.message || 'Failed to request extension');
+      setError(extractApiErrorMessage(err, 'Failed to request extension'));
     } finally {
       setIsSubmitting(false);
     }

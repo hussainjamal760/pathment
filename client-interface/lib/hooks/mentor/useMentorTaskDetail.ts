@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface UseMentorTaskDetailReturn {
@@ -42,8 +43,7 @@ export function useMentorTaskDetail(taskId: string): UseMentorTaskDetailReturn {
       const response = await taskApi.getTaskById(taskId);
       setTask(response.data.task);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      setError(e.response?.data?.message || 'Failed to load task');
+      setError(extractApiErrorMessage(err, 'Failed to load task'));
     } finally {
       setLoading(false);
     }
@@ -69,8 +69,7 @@ export function useMentorTaskDetail(taskId: string): UseMentorTaskDetailReturn {
         setNewDueDate('');
         await fetchTask();
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
-        toast.error(e.response?.data?.message || 'Failed to handle extension request');
+        toast.error(extractApiErrorMessage(err, 'Failed to handle extension request'));
       } finally {
         setIsHandlingExtension(false);
       }
@@ -91,8 +90,7 @@ export function useMentorTaskDetail(taskId: string): UseMentorTaskDetailReturn {
       setCancelReason('');
       await fetchTask();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      toast.error(e.response?.data?.message || 'Failed to cancel task');
+      toast.error(extractApiErrorMessage(err, 'Failed to cancel task'));
     } finally {
       setIsCancelling(false);
     }

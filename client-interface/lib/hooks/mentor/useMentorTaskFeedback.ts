@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 export interface InlineFeedbackItem {
   id: number;
@@ -83,8 +84,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
           setPointsAwarded(taskData.pointsBase);
         }
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
-        setError(e.response?.data?.message || 'Failed to load task');
+        setError(extractApiErrorMessage(err, 'Failed to load task'));
       } finally {
         setLoading(false);
       }
@@ -161,8 +161,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
         setShowSuccess(true);
         setTimeout(() => router.push('/mentor/tasks'), 2000);
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
-        setError(e.response?.data?.message || 'Failed to submit feedback');
+        setError(extractApiErrorMessage(err, 'Failed to submit feedback'));
       } finally {
         setIsSubmitting(false);
       }

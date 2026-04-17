@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { matchingApi, enrollmentApi } from '@/lib/services/enrollment-api';
 import { taskApi } from '@/lib/services/task-api';
 import { useAuth } from '@/lib/context/AuthContext';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface UseMenteeDetailPageReturn {
@@ -83,7 +84,7 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
       setShowCompleteConfirm(false);
       fetchMenteeDetails();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to approve completion');
+      toast.error(extractApiErrorMessage(err, 'Failed to approve completion'));
     } finally {
       setCompletionLoading(false);
     }
@@ -99,7 +100,7 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
       setRejectReason('');
       fetchMenteeDetails();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to reject completion');
+      toast.error(extractApiErrorMessage(err, 'Failed to reject completion'));
     } finally {
       setCompletionLoading(false);
     }

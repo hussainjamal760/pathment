@@ -6,6 +6,7 @@ import { Mail, CheckCircle2, XCircle, RotateCw, ArrowRight } from 'lucide-react'
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -47,7 +48,7 @@ export default function VerifyEmailPage() {
         setTimeout(() => router.push('/login'), 1800);
       } catch (error: any) {
         setStatus('failed');
-        setErrorMessage(error?.response?.data?.message || 'Verification link is invalid or expired');
+        setErrorMessage(extractApiErrorMessage(error, 'Verification link is invalid or expired'));
       }
     };
 
@@ -68,7 +69,7 @@ export default function VerifyEmailPage() {
       setErrorMessage('');
       toast.success('Verification email sent');
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to resend verification email');
+      toast.error(extractApiErrorMessage(error, 'Failed to resend verification email'));
     } finally {
       setResending(false);
     }

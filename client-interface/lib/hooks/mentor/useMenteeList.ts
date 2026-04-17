@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { matchingApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface AssignedMentee {
@@ -49,7 +50,7 @@ export function useMenteeList() {
       
       setMentees(menteeList);
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to load mentees';
+      const msg = extractApiErrorMessage(err, 'Failed to load mentees');
       setError(msg);
       toast.error(msg);
     } finally {

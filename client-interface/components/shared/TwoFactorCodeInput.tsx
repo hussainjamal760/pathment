@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { AlertCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import * as Dialog from '@radix-ui/react-dialog';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 interface TwoFactorCodeInputProps {
   isOpen: boolean;
@@ -61,7 +62,7 @@ export function TwoFactorCodeInput({
       toast.success('Two-factor authentication verified!');
       setCode('');
     } catch (err: any) {
-      const errorMsg = err.response?.data?.message || 'Failed to verify code. Please try again.';
+      const errorMsg = extractApiErrorMessage(err, 'Failed to verify code. Please try again.');
       setError(errorMsg);
       toast.error('Verification failed');
       setCode('');

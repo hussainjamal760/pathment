@@ -21,7 +21,9 @@ const validate = (schema, property = 'body') => {
         message: detail.message.replace(/["']/g, '')
       }));
 
-      return res.status(400).json(errorResponse('Validation failed', 400, errors));
+      const primaryMessage = errors[0]?.message || 'Validation failed';
+
+      return res.status(400).json(errorResponse(primaryMessage, 400, errors));
     }
 
     // Replace request property with validated and sanitized value

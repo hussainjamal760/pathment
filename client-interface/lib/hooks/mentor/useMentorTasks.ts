@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { taskApi } from '@/lib/services/task-api';
 import { matchingApi } from '@/lib/services/enrollment-api';
 import { useAuth } from '@/lib/context/AuthContext';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export type MentorTaskTab = 'pending' | 'extensions' | 'all' | 'roadmap' | 'create';
@@ -327,7 +328,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
           fetchRoadmap(selectedProgram, selectedLevel, selectedMenteeForAssign);
         setAllTasksLoaded(false);
       } catch (error: any) {
-        toast.error(error.response?.data?.message || 'Failed to assign task');
+        toast.error(extractApiErrorMessage(error, 'Failed to assign task'));
       }
     },
     [selectedMenteeForAssign, mentees, selectedProgram, selectedLevel, fetchRoadmap]
@@ -350,7 +351,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
         setActiveTab('all');
         fetchAllTasks();
       } catch (error: any) {
-        toast.error(error.response?.data?.message || 'Failed to create custom task');
+        toast.error(extractApiErrorMessage(error, 'Failed to create custom task'));
       }
     },
     [formData, fetchStats, fetchPendingTasks, fetchAllTasks]
@@ -371,7 +372,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
         fetchPendingTasks();
         if (allTasksLoaded) fetchAllTasks();
       } catch (error: any) {
-        toast.error(error.response?.data?.message || 'Failed to cancel task');
+        toast.error(extractApiErrorMessage(error, 'Failed to cancel task'));
       }
     },
     [cancelReason, fetchStats, fetchPendingTasks, allTasksLoaded, fetchAllTasks]

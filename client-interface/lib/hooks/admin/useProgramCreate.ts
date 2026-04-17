@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import programManagementApi from '@/lib/services/program-api';
-import { getValidationErrors } from '@/lib/utils/validation';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface ProgramFormData {
@@ -247,10 +247,7 @@ export function useProgramCreate(): UseProgramCreateReturn {
       toast.success('Program created successfully');
       setCurrentStep(2);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e?.response?.data?.message || 'Failed to create program');
-      const validationMsg = getValidationErrors(e);
-      if (validationMsg) toast.error(validationMsg);
+      toast.error(extractApiErrorMessage(err, 'Failed to create program'));
     } finally {
       setLoading(false);
     }
@@ -302,9 +299,8 @@ export function useProgramCreate(): UseProgramCreateReturn {
       }
       resetLevelForm();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Level save error:', e);
-      toast.error(e.response?.data?.message || 'Failed to save level');
+      console.error('Level save error:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to save level'));
     } finally {
       setLoading(false);
     }
@@ -318,8 +314,7 @@ export function useProgramCreate(): UseProgramCreateReturn {
         setCreatedLevels((prev) => prev.filter((l) => l.id !== levelId));
         toast.success('Level deleted successfully');
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
-        toast.error(e.response?.data?.message || 'Failed to delete level');
+        toast.error(extractApiErrorMessage(err, 'Failed to delete level'));
       } finally {
         setLoading(false);
       }
@@ -362,8 +357,7 @@ export function useProgramCreate(): UseProgramCreateReturn {
         setCreatedLevels((prev) => [...prev, ...saved]);
         setLevels([]);
       } catch (err: unknown) {
-        const e = err as { response?: { data?: { message?: string } } };
-        toast.error(e.response?.data?.message || 'Failed to save levels');
+        toast.error(extractApiErrorMessage(err, 'Failed to save levels'));
         setLoading(false);
         return;
       } finally {
@@ -386,8 +380,7 @@ export function useProgramCreate(): UseProgramCreateReturn {
       setRoadmapInstructions('');
       setSelectedLevelForRoadmap(null);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } }; message?: string };
-      toast.error(e.response?.data?.message || e.message || 'Failed to generate roadmap');
+      toast.error(extractApiErrorMessage(err, 'Failed to generate roadmap'));
     } finally {
       setGeneratingRoadmap(false);
     }

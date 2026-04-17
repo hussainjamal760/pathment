@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { mentorApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface MentorProfileData {
@@ -81,8 +82,7 @@ export function useMentorProfile(): UseMentorProfileReturn {
       setMentor(response?.data?.mentor ?? response?.mentor ?? null);
       setActiveMatches(response?.data?.activeMatches ?? response?.activeMatches ?? []);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      const msg = e?.response?.data?.message || 'Failed to load mentor profile';
+      const msg = extractApiErrorMessage(err, 'Failed to load mentor profile');
       setError(msg);
       toast.error(msg);
     } finally {

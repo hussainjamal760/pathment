@@ -20,6 +20,7 @@ import {
   Key
 } from 'lucide-react';
 import securityService, { Session, TwoFactorStatus, AuditLog } from '@/lib/services/security-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { BackupCodesModal } from './BackupCodesModal';
 
 const formatDate = (dateString: string) => {
@@ -43,21 +44,7 @@ const getDeviceIcon = (deviceType?: string) => {
   }
 };
 
-const getApiErrorMessage = (err: any, fallback: string) => {
-  const responseData = err?.response?.data;
-  const validationErrors = responseData?.errors;
-
-  if (Array.isArray(validationErrors) && validationErrors.length > 0) {
-    return validationErrors
-      .map((item: any) => {
-        const field = item?.field ? `${item.field}: ` : '';
-        return `${field}${item?.message || 'Invalid value'}`;
-      })
-      .join(' | ');
-  }
-
-  return responseData?.message || fallback;
-};
+const getApiErrorMessage = (err: any, fallback: string) => extractApiErrorMessage(err, fallback);
 
 interface PasswordChangeFormProps {
   onClose: () => void;
@@ -227,7 +214,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
       onSetupComplete();
       onClose();
     } catch (err) {
-      setError((err as any).response?.data?.message || 'Invalid code');
+      setError(getApiErrorMessage(err, 'Invalid code'));
     } finally {
       setLoading(false);
     }
@@ -492,7 +479,7 @@ export default function SecurityTab({ userRole = 'mentee', showAuditLogs = false
 
           {twoFactorStatus?.enabled && (
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <div>
                 <p className="font-medium">Backup Codes:</p>
                 <p>{twoFactorStatus.remainingBackupCodes} backup codes remaining</p>

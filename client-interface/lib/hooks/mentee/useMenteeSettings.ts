@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -143,7 +144,7 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
       await refreshUser();
       toast.success('Profile updated successfully');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update profile');
+      toast.error(extractApiErrorMessage(err, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
@@ -156,7 +157,7 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
       toast.success('Mentee profile updated successfully');
       await fetchSettings();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to update mentee profile');
+      toast.error(extractApiErrorMessage(err, 'Failed to update mentee profile'));
     } finally {
       setSaving(false);
     }

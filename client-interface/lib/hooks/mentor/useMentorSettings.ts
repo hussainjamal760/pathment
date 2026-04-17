@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
 import { useAuth } from '@/lib/context/AuthContext';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface MentorProfileData {
@@ -145,7 +146,7 @@ export function useMentorSettings(): UseMentorSettingsReturn {
       toast.success('Profile updated successfully');
     } catch (error: any) {
       console.error('Failed to update profile:', error);
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+      toast.error(extractApiErrorMessage(error, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
@@ -159,7 +160,7 @@ export function useMentorSettings(): UseMentorSettingsReturn {
       await fetchSettings();
     } catch (error: any) {
       console.error('Failed to update mentor profile:', error);
-      toast.error(error.response?.data?.message || 'Failed to update mentor profile');
+      toast.error(extractApiErrorMessage(error, 'Failed to update mentor profile'));
     } finally {
       setSaving(false);
     }
@@ -176,7 +177,7 @@ export function useMentorSettings(): UseMentorSettingsReturn {
       await fetchSettings();
     } catch (error: any) {
       console.error('Failed to update availability:', error);
-      toast.error(error.response?.data?.message || 'Failed to update availability settings');
+      toast.error(extractApiErrorMessage(error, 'Failed to update availability settings'));
     } finally {
       setSaving(false);
     }

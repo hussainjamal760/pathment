@@ -23,6 +23,7 @@ import {
 } from '@/components/admin/ui';
 import { useEnrollmentList, Enrollment } from '@/lib/hooks/admin/useEnrollmentList';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -274,7 +275,7 @@ export default function EnrollmentOverviewPage() {
       toast.success(`Successfully exported ${allEnrollments.length} enrollment(s) with 24 data columns`);
     } catch (err: any) {
       console.error('Export error:', err);
-      toast.error(err?.response?.data?.message || 'Failed to export CSV');
+      toast.error(extractApiErrorMessage(err, 'Failed to export CSV'));
     } finally {
       setExportLoading(false);
     }
@@ -294,7 +295,7 @@ export default function EnrollmentOverviewPage() {
       }
       refetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to approve completion');
+      toast.error(extractApiErrorMessage(err, 'Failed to approve completion'));
     } finally {
       setActionLoading(null);
     }
@@ -307,7 +308,7 @@ export default function EnrollmentOverviewPage() {
       toast.success((res as any)?.data?.message || (res as any)?.message || 'Mentee promoted to next level!');
       refetch();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to promote to next level');
+      toast.error(extractApiErrorMessage(err, 'Failed to promote to next level'));
     } finally {
       setActionLoading(null);
     }

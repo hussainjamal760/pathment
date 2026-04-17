@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '@/lib/services/task-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface UseTaskDetailReturn {
@@ -25,7 +26,7 @@ export function useTaskDetail(taskId: string): UseTaskDetailReturn {
       const response = await taskApi.getTaskById(taskId);
       setTask(response.data.task);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Failed to load task';
+      const msg = extractApiErrorMessage(err, 'Failed to load task');
       setError(msg);
       toast.error(msg);
     } finally {

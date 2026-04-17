@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
 import { usePagination } from '@/lib/hooks/shared/usePagination';
 import { useDebounce } from '@/lib/hooks/shared/useDebounce';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export type EnrollmentStatus =
@@ -90,7 +91,7 @@ export function useEnrollmentList() {
         pagination.setTotal(meta.total);
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? err?.message ?? 'Failed to load enrollments';
+      const msg = extractApiErrorMessage(err, 'Failed to load enrollments');
       setError(msg);
       toast.error(msg);
     } finally {

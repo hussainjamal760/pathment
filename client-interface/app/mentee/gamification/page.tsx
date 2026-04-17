@@ -12,6 +12,7 @@ import {
   Users
 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import {
   gamificationApi,
   type Badge,
@@ -58,15 +59,7 @@ export default function MenteeGamificationPage() {
       } catch (e: unknown) {
         if (!mounted) return;
 
-        const message =
-          typeof e === 'object' &&
-          e !== null &&
-          'response' in e &&
-          typeof (e as { response?: { data?: { message?: string } } }).response?.data?.message === 'string'
-            ? (e as { response?: { data?: { message?: string } } }).response?.data?.message
-            : 'Failed to load gamification data';
-
-        setError(message ?? 'Failed to load gamification data');
+        setError(extractApiErrorMessage(e, 'Failed to load gamification data'));
       } finally {
         if (mounted) setLoading(false);
       }

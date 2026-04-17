@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { messagingApi } from '@/lib/services/messaging-api';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/services/socket-client';
 import { useAuth } from '@/lib/context/AuthContext';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import type { ChatMessage, ConversationSummary, SearchableUser } from '@/lib/types/messaging';
 import UserSearchCombobox from './UserSearchCombobox';
 
@@ -16,18 +17,7 @@ interface MessageCenterProps {
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    typeof (error as { response?: unknown }).response === 'object'
-  ) {
-    const response = (error as { response?: { data?: { message?: string } } }).response;
-    if (response?.data?.message) {
-      return response.data.message;
-    }
-  }
-  return fallback;
+  return extractApiErrorMessage(error, fallback);
 }
 
 export default function MessageCenter({ role }: MessageCenterProps) {

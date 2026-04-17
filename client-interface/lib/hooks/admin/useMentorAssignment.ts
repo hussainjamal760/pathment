@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { enrollmentApi, matchingApi, mentorApi } from '@/lib/services/enrollment-api';
 import { programManagementApi } from '@/lib/services/program-api';
 import { useDebounce } from '@/lib/hooks/shared/useDebounce';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 const MENTOR_LIMIT = 10;
 
@@ -205,8 +206,7 @@ export function useMentorAssignment(): UseMentorAssignmentReturn {
       toast.success('Match created successfully!');
       await fetchEnrollments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || 'Failed to create match');
+      toast.error(extractApiErrorMessage(err, 'Failed to create match'));
     } finally {
       setMatching(null);
     }
@@ -225,8 +225,7 @@ export function useMentorAssignment(): UseMentorAssignmentReturn {
       );
       if ((summary?.matched ?? 0) > 0) await fetchEnrollments();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      toast.error(msg || 'Auto-match failed');
+      toast.error(extractApiErrorMessage(err, 'Auto-match failed'));
     } finally {
       setAutoMatching(false);
     }

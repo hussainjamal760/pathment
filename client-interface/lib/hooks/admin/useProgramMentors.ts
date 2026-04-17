@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { levelMentorApi } from '@/lib/services/level-mentor-api';
 import { programManagementApi } from '@/lib/services/program-api';
 import { mentorApi } from '@/lib/services/mentor-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface ProgramMentorLevel {
@@ -142,9 +143,8 @@ export function useProgramMentors(): UseProgramMentorsReturn {
       setSearchQueryRaw('');
       await fetchData();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to add mentor:', e);
-      toast.error(e.response?.data?.message || 'Failed to assign mentor');
+      console.error('Failed to add mentor:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to assign mentor'));
     } finally {
       setAdding(false);
     }
@@ -158,9 +158,8 @@ export function useProgramMentors(): UseProgramMentorsReturn {
       toast.success('Mentor removed successfully');
       await fetchData();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to remove mentor:', e);
-      toast.error(e.response?.data?.message || 'Failed to remove mentor');
+      console.error('Failed to remove mentor:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to remove mentor'));
     } finally {
       setRemoving(null);
     }

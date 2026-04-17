@@ -5,6 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Download, Copy, Check, AlertCircle, X, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import securityService from '@/lib/services/security-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 interface BackupCodesModalProps {
   isOpen: boolean;
@@ -50,7 +51,7 @@ export function BackupCodesModal({
       }
       toast.success(response.message);
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to regenerate backup codes');
+      toast.error(extractApiErrorMessage(err, 'Failed to regenerate backup codes'));
     } finally {
       setRegenerating(false);
     }

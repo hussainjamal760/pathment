@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { adminApi } from '@/lib/services/admin-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 interface DashboardStats {
@@ -51,9 +52,8 @@ export function useDashboard(): UseDashboardReturn {
       const response = await adminApi.dashboard.getStats();
       setDashboardData(response as DashboardData);
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to fetch dashboard data:', error);
-      toast.error(error.response?.data?.message || 'Failed to load dashboard data');
+      console.error('Failed to fetch dashboard data:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to load dashboard data'));
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { programsApi } from '@/lib/services/program-api';
 import { usePagination } from '@/lib/hooks/shared/usePagination';
 import { useDebounce } from '@/lib/hooks/shared/useDebounce';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import type { Program } from '@/lib/types';
 
 export type ProgramStatus = 'all' | 'draft' | 'published' | 'completed' | 'archived';
@@ -84,7 +85,7 @@ export function useProgramList(): UseProgramListReturn {
       const total = response?.pagination?.totalItems ?? response?.pagination?.total ?? (response?.pagination?.totalPages ? response.pagination.totalPages * pagination.limit : 0);
       pagination.setTotal(total);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Failed to load programs';
+      const msg = extractApiErrorMessage(err, 'Failed to load programs');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -104,7 +105,7 @@ export function useProgramList(): UseProgramListReturn {
       toast.success('Program deleted successfully');
       fetchPrograms();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to delete program');
+      toast.error(extractApiErrorMessage(err, 'Failed to delete program'));
     }
   }, [fetchPrograms]);
 

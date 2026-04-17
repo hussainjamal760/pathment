@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { programManagementApi } from '@/lib/services/program-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface RoadmapWeekTask {
@@ -216,9 +217,8 @@ export function useProgramRoadmap(): UseProgramRoadmapReturn {
         toast.success('Roadmap generated successfully!');
       }
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to generate roadmap:', e);
-      toast.error(e.response?.data?.message || 'Failed to generate roadmap');
+      console.error('Failed to generate roadmap:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to generate roadmap'));
     } finally {
       setIsGenerating(false);
     }
@@ -250,8 +250,7 @@ export function useProgramRoadmap(): UseProgramRoadmapReturn {
       setWeekModal(null);
       await fetchRoadmap(selectedLevelId);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      toast.error(e.response?.data?.message || 'Failed to save week');
+      toast.error(extractApiErrorMessage(err, 'Failed to save week'));
     } finally {
       setSavingWeek(false);
     }
@@ -293,8 +292,7 @@ export function useProgramRoadmap(): UseProgramRoadmapReturn {
       setTaskModal(null);
       await fetchRoadmap(selectedLevelId);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      toast.error(e.response?.data?.message || 'Failed to save task');
+      toast.error(extractApiErrorMessage(err, 'Failed to save task'));
     } finally {
       setSavingTask(false);
     }
@@ -307,9 +305,8 @@ export function useProgramRoadmap(): UseProgramRoadmapReturn {
       toast.success('Task deleted successfully');
       await fetchRoadmap(selectedLevelId);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to delete task:', e);
-      toast.error(e.response?.data?.message || 'Failed to delete task');
+      console.error('Failed to delete task:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to delete task'));
     }
   }, [fetchRoadmap, selectedLevelId]);
 
@@ -320,9 +317,8 @@ export function useProgramRoadmap(): UseProgramRoadmapReturn {
       toast.success('Week deleted successfully');
       await fetchRoadmap(selectedLevelId);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to delete week:', e);
-      toast.error(e.response?.data?.message || 'Failed to delete week');
+      console.error('Failed to delete week:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to delete week'));
     }
   }, [fetchRoadmap, selectedLevelId]);
 

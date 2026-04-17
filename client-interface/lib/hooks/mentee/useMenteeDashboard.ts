@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -59,7 +60,7 @@ export function useMenteeDashboard(): UseMenteeDashboardReturn {
       toast.success('Completion request sent to your mentor for approval!');
       fetchEnrollments();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to request completion');
+      toast.error(extractApiErrorMessage(err, 'Failed to request completion'));
     } finally {
       setCompletionLoading(null);
     }

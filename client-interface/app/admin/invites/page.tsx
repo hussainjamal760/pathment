@@ -5,6 +5,7 @@ import { Copy, Loader2, RefreshCw, ShieldAlert, UserPlus, XCircle } from 'lucide
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 type InviteStatusFilter = 'all' | 'active' | 'used' | 'expired' | 'revoked';
 
@@ -56,7 +57,7 @@ export default function AdminInvitesPage() {
       const rows = response?.data?.invites || response?.invites || [];
       setInvites(rows);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to load invites');
+      toast.error(extractApiErrorMessage(error, 'Failed to load invites'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -88,7 +89,7 @@ export default function AdminInvitesPage() {
       setForm((prev) => ({ ...prev, email: '' }));
       await fetchInvites(true);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to create invite');
+      toast.error(extractApiErrorMessage(error, 'Failed to create invite'));
     } finally {
       setCreating(false);
     }
@@ -109,7 +110,7 @@ export default function AdminInvitesPage() {
       toast.success('Invite revoked');
       await fetchInvites(true);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Failed to revoke invite');
+      toast.error(extractApiErrorMessage(error, 'Failed to revoke invite'));
     }
   };
 

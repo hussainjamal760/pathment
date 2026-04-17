@@ -1,4 +1,5 @@
 // Validation utilities for forms
+import { extractApiErrorMessage } from './api-error';
 
 export const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const urlRegex = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
@@ -62,7 +63,7 @@ export const getValidationErrors = (error: any): string => {
   if (Array.isArray(errors) && errors.length > 0) {
     return errors.map((e: { field: string; message: string }) => `\u2022 ${e.message}`).join('\n');
   }
-  return error?.response?.data?.message || 'Something went wrong';
+  return extractApiErrorMessage(error, 'Something went wrong');
 };
 
 export const validateMaxLength = (value: string, maxLength: number): boolean => {

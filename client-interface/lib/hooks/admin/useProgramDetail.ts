@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { programManagementApi } from '@/lib/services/program-api';
 import { levelMentorApi } from '@/lib/services/level-mentor-api';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export type ProgramDetailTab = 'overview' | 'levels' | 'mentors' | 'enrollments';
@@ -118,9 +119,8 @@ export function useProgramDetail(): UseProgramDetailReturn {
       };
       setProgram(response?.data?.program ?? response?.program ?? null);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to fetch program:', e);
-      toast.error(e.response?.data?.message || 'Failed to load program');
+      console.error('Failed to fetch program:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to load program'));
     } finally {
       setLoading(false);
     }
@@ -243,9 +243,8 @@ export function useProgramDetail(): UseProgramDetailReturn {
       setRoadmap(response?.data?.roadmap ?? response?.roadmap ?? null);
       toast.success('Roadmap generated successfully!');
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to generate roadmap:', e);
-      toast.error(e.response?.data?.message || 'Failed to generate roadmap');
+      console.error('Failed to generate roadmap:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to generate roadmap'));
     } finally {
       setGeneratingRoadmap(false);
     }
@@ -257,9 +256,8 @@ export function useProgramDetail(): UseProgramDetailReturn {
       toast.success('Enrollment approved successfully');
       await fetchEnrollments();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to approve enrollment:', e);
-      toast.error(e.response?.data?.message || 'Failed to approve enrollment');
+      console.error('Failed to approve enrollment:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to approve enrollment'));
     }
   }, [fetchEnrollments]);
 
@@ -270,9 +268,8 @@ export function useProgramDetail(): UseProgramDetailReturn {
       toast.success('Enrollment rejected');
       await fetchEnrollments();
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to reject enrollment:', e);
-      toast.error(e.response?.data?.message || 'Failed to reject enrollment');
+      console.error('Failed to reject enrollment:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to reject enrollment'));
     }
   }, [fetchEnrollments]);
 
@@ -294,8 +291,7 @@ export function useProgramDetail(): UseProgramDetailReturn {
     } catch (err: unknown) {
       // Roll back optimistic update on failure
       setProgram((prev) => (prev ? { ...prev, status: prevStatus } : prev));
-      const e = err as { response?: { data?: { message?: string } } };
-      toast.error(e.response?.data?.message || 'Failed to update program status');
+      toast.error(extractApiErrorMessage(err, 'Failed to update program status'));
     } finally {
       setUpdatingStatus(false);
     }

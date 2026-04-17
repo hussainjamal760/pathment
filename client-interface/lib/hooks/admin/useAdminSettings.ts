@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
 export interface ProfileData {
@@ -120,9 +121,8 @@ export function useAdminSettings(): UseAdminSettingsReturn {
       await refreshUser();
       toast.success('Profile updated successfully');
     } catch (err: unknown) {
-      const error = err as { response?: { data?: { message?: string } } };
-      console.error('Failed to update profile:', error);
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+      console.error('Failed to update profile:', err);
+      toast.error(extractApiErrorMessage(err, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
