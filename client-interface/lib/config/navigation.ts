@@ -23,7 +23,7 @@ export const navigationConfig = {
   admin: [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/programs/list', icon: BookOpen, label: 'Programs' },
-    { path: '/admin/matching/mentor-assignment', icon: UserCheck, label: 'Mentors' },
+    { path: '/admin/matching/mentor-assignment', icon: UserCheck, label: 'Mentor Matching' },
     { path: '/admin/enrollment/overview', icon: Users, label: 'Enrollments' },
     { path: '/admin/invites', icon: UserPlus, label: 'Invites' },
     { path: '/admin/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
