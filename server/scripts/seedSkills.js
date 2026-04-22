@@ -1,9 +1,15 @@
 /**
  * Seed initial skills into the database
  * Run this script: node scripts/seedSkills.js
+ * In production:   NODE_ENV=production node scripts/seedSkills.js
  */
 
-require('dotenv').config();
+const path = require('path');
+const env = process.env.NODE_ENV || 'development';
+// Load environment-specific .env file first, then fall back to .env
+require('dotenv').config({ path: path.resolve(__dirname, `../.env.${env}`) });
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
 const { models, sequelize } = require('../src/db');
 
 const skillsData = [

@@ -104,7 +104,9 @@ class AuthService {
         role,
         phoneNumber,
         dateOfBirth,
-        emailVerified: false,
+        // Email is already proven valid — invite was sent to this exact address
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
         status: 'active'
       }, { transaction });
 
@@ -128,41 +130,21 @@ class AuthService {
 
       await models.UserSettings.create({ userId: user.id }, { transaction });
 
-      const verificationToken = generateRandomToken();
-      const hashedToken = hashToken(verificationToken);
-      const verificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-      await models.EmailVerificationToken.create({
-        userId: user.id,
-        token: hashedToken,
-        expiresAt: verificationExpiresAt
-      }, { transaction });
-
       invite.usedAt = new Date();
       invite.usedBy = user.id;
       await invite.save({ transaction });
 
-      return {
-        user,
-        verificationToken
-      };
+      return { user };
     });
 
     notificationOrchestrator.sendWelcomeEmail(result.user).catch((error) => {
       console.warn('welcome email failed:', error.message);
     });
 
-    notificationOrchestrator.sendEmailVerificationEmail(result.user, result.verificationToken).catch((error) => {
-      console.warn('verification email failed:', error.message);
-    });
-
     const userResponse = result.user.toJSON();
     delete userResponse.passwordHash;
 
-    return {
-      user: userResponse,
-      verificationToken: result.verificationToken
-    };
+    return { user: userResponse };
   }
 
   /**
