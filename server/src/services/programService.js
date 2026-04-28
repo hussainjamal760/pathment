@@ -391,10 +391,6 @@ class ProgramService {
           relatedEntityType: 'program',
           relatedEntityId: program.id,
           emailSubject: 'Pathment: Program update'
-        },
-        dedupe: {
-          relatedEntityType: 'program_updated',
-          relatedEntityId: `${program.id}:${new Date(program.updatedAt).getTime()}`
         }
       });
     }
