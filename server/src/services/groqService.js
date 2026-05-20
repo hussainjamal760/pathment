@@ -435,6 +435,114 @@ Output as JSON:
   }
 
   /**
+   * Ask Groq AI to select the most appropriate starting level for a mentee.
+   * Falls back to keyword scoring if AI is unavailable.
+   *
+   * @param {Array}  levels        - ProgramLevel records sorted by levelOrder ASC
+   * @param {Object} menteeProfile - MenteeProfile record
+   * @param {Array}  menteeSkills  - User.skills array (each has .name and .UserSkill.proficiencyLevel)
+   * @returns {Object} The chosen level record
+   */
+  async determineBestLevel(levels, menteeProfile, menteeSkills) {
+    if (!levels || levels.length === 0) return null;
+    if (levels.length === 1) return levels[0];
+
+    const sorted = [...levels].sort((a, b) => a.levelOrder - b.levelOrder);
+
+    if (this.enabled) {
+      try {
+        const skillsSummary = (menteeSkills || [])
+          .map(s => `${s.name} (${s.UserSkill?.proficiencyLevel || 'beginner'})`)
+          .join(', ') || 'none listed';
+
+        const levelDescriptions = sorted
+          .map(l => ({
+            id: l.id,
+            name: l.name,
+            levelOrder: l.levelOrder,
+            description: l.description || '',
+            targetAudience: l.targetAudience || '',
+            prerequisites: (l.prerequisites || []).join(', '),
+            learningOutcomes: (l.learningOutcomes || []).join(', ')
+          }));
+
+        const prompt = `You are a mentorship program coordinator. Given a mentee's profile and a list of program levels, select the single most appropriate STARTING level for this mentee.
+
+**Mentee Profile:**
+- Skills: ${skillsSummary}
+- Prior Experience: ${menteeProfile?.priorExperience || 'none'}
+- Current Education: ${menteeProfile?.currentEducation || 'not provided'}
+- Interests: ${(menteeProfile?.interests || []).join(', ') || 'none'}
+- Learning Goals: ${(menteeProfile?.learningGoals || []).join(', ') || 'none'}
+
+**Available Program Levels (ordered from lowest to highest):**
+${JSON.stringify(levelDescriptions, null, 2)}
+
+Rules:
+- Choose the highest level the mentee is genuinely ready for based on their skills and experience.
+- If the mentee has no relevant background, choose the lowest level.
+- Return ONLY the id of the chosen level.
+
+Output as JSON: { "levelId": "<uuid>" }`;
+
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: 'system', content: 'You are an expert educational program coordinator. Always respond with valid JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 100,
+          response_format: { type: 'json_object' }
+        });
+
+        const result = JSON.parse(response.choices[0].message.content);
+        const chosen = sorted.find(l => l.id === result.levelId);
+        if (chosen) return chosen;
+      } catch (err) {
+        console.error('Groq determineBestLevel error, falling back to keyword scoring:', err.message);
+      }
+    }
+
+    // --- Keyword fallback ---
+    const skillNames = (menteeSkills || []).map(s => s.name.toLowerCase().trim());
+    const profileTokens = new Set();
+    const tokenize = (text) => {
+      if (!text) return;
+      text.toLowerCase().split(/\W+/).filter(w => w.length > 1).forEach(w => profileTokens.add(w));
+    };
+    tokenize(menteeProfile?.priorExperience);
+    tokenize(menteeProfile?.currentEducation);
+    tokenize(menteeProfile?.currentOccupation);
+    for (const arr of [menteeProfile?.interests, menteeProfile?.learningGoals]) {
+      for (const item of (arr || [])) tokenize(item);
+    }
+
+    const scored = sorted.map(level => {
+      const levelText = [
+        level.name, level.description, level.targetAudience,
+        ...(level.learningOutcomes || []),
+        ...(level.prerequisites || [])
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      const skillScore = skillNames.filter(name => levelText.includes(name)).length * 3;
+      let tokenScore = 0;
+      for (const token of profileTokens) {
+        if (levelText.includes(token)) tokenScore++;
+      }
+      return { level, score: skillScore + tokenScore };
+    });
+
+    const best = scored.reduce((best, curr) => {
+      if (curr.score > best.score) return curr;
+      if (curr.score === best.score && curr.level.levelOrder < best.level.levelOrder) return curr;
+      return best;
+    }, scored[0]);
+
+    return best.score > 0 ? best.level : sorted[0];
+  }
+
+  /**
    * Fallback basic matching score calculation
    */
   calculateBasicMatchScore(mentorProfile, menteeProfile) {

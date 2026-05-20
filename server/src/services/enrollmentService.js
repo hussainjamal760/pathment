@@ -3,6 +3,7 @@ const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
 const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
+const groqService = require('./groqService');
 
 class EnrollmentService {
   async getEnrollments(filters, pagination) {
@@ -121,6 +122,10 @@ class EnrollmentService {
     return enrollment;
   }
 
+  async _determineBestLevel(levels, menteeProfile, menteeSkills) {
+    return groqService.determineBestLevel(levels, menteeProfile, menteeSkills);
+  }
+
   async createEnrollment(programId, menteeId) {
     // Check if program exists and is active
     const program = await models.Program.findByPk(programId, {
@@ -149,14 +154,34 @@ class EnrollmentService {
       throw new ConflictError('Already enrolled in this program');
     }
 
-    // Get first level
-    const firstLevel = program.levels && program.levels.length > 0 ? program.levels[0] : null;
+    // Fetch mentee's profile and skills to determine the best starting level
+    const mentee = await models.User.findByPk(menteeId, {
+      include: [
+        {
+          model: models.MenteeProfile,
+          as: 'menteeProfile',
+          attributes: ['priorExperience', 'currentEducation', 'currentOccupation', 'interests', 'learningGoals']
+        },
+        {
+          model: models.Skill,
+          as: 'skills',
+          attributes: ['id', 'name'],
+          through: { attributes: ['proficiencyLevel'] }
+        }
+      ]
+    });
+
+    const startingLevel = await this._determineBestLevel(
+      program.levels,
+      mentee?.menteeProfile,
+      mentee?.skills
+    );
 
     // Create enrollment
     const enrollment = await models.Enrollment.create({
       menteeId,
       programId,
-      currentLevelId: firstLevel?.id,
+      currentLevelId: startingLevel?.id,
       status: 'pending_match',
       enrolledAt: new Date()
     });
