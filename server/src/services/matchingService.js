@@ -3,6 +3,7 @@ const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = requir
 const { Op, col } = require('sequelize');
 const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
+const groqService = require('./groqService');
 
 class MatchingService {
   /**
@@ -156,12 +157,16 @@ class MatchingService {
         {
           model: models.User,
           as: 'mentee',
-          include: [{ model: models.MenteeProfile, as: 'menteeProfile' }]
+          include: [
+            { model: models.MenteeProfile, as: 'menteeProfile' },
+            {
+              model: models.Skill,
+              as: 'skills',
+              through: { attributes: ['proficiencyLevel', 'yearsOfExperience'] }
+            }
+          ]
         },
-        {
-          model: models.ProgramLevel,
-          as: 'currentLevel'
-        }
+        { model: models.ProgramLevel, as: 'currentLevel' }
       ]
     });
 
@@ -169,51 +174,78 @@ class MatchingService {
       throw new NotFoundError('Enrollment not found');
     }
 
-    // Get mentors assigned to this level
-    const levelMentors = await this.getLevelMentors(enrollment.currentLevelId);
+    // Get mentors assigned to this level, including their skills
+    const levelMentorIds = (await this.getLevelMentors(enrollment.currentLevelId)).map(m => m.id);
+    if (levelMentorIds.length === 0) return [];
 
-    // Simple scoring algorithm - use learningGoals instead of skills
-    const menteeLearningGoals = enrollment.mentee.menteeProfile?.learningGoals || [];
-    const menteeInterests = enrollment.mentee.menteeProfile?.interests || [];
-    const menteeSkills = [...menteeLearningGoals, ...menteeInterests];
-    
-    const suggestions = levelMentors.map(mentorData => {
-      const mentorSpecialization = mentorData.mentorProfile?.specialization || [];
-      
-      // Calculate skill match score
-      const matchingSkills = menteeSkills.filter(skill => 
-        mentorSpecialization.some(spec => spec.toLowerCase().includes(skill.toLowerCase()))
-      );
-      
-      const skillScore = menteeSkills.length > 0 
-        ? (matchingSkills.length / menteeSkills.length) * 100 
-        : 50;
+    const mentorUsers = await models.User.findAll({
+      where: { id: levelMentorIds },
+      include: [
+        { model: models.MentorProfile, as: 'mentorProfile' },
+        {
+          model: models.Skill,
+          as: 'skills',
+          through: { attributes: ['proficiencyLevel', 'yearsOfExperience'] }
+        }
+      ]
+    });
 
-      // Calculate capacity score (prefer mentors with more availability)
-      const capacityScore = mentorData.mentorProfile 
-        ? ((mentorData.mentorProfile.maxMentees - mentorData.currentMentees) / mentorData.mentorProfile.maxMentees) * 100
-        : 50;
+    const menteeProfileData = enrollment.mentee.menteeProfile;
+    const menteeSkillNames = (enrollment.mentee.skills || []).map(s => s.name);
 
-      // Overall match score (70% skills, 30% capacity)
-      const matchScore = (skillScore * 0.7) + (capacityScore * 0.3);
+    // Build the mentee payload once
+    const menteePayload = {
+      learningGoals: menteeProfileData?.learningGoals || [],
+      interests: menteeProfileData?.interests || [],
+      skills: menteeSkillNames,
+      learningStyle: menteeProfileData?.preferredLearningStyle || 'Not specified',
+      priorExperience: menteeProfileData?.priorExperience || ''
+    };
 
+    const programRequirements = {
+      skills: (enrollment.currentLevel?.learningOutcomes || []),
+      level: enrollment.currentLevel?.name || 'Not specified'
+    };
+
+    // Build mentor payloads and fire a single batch AI call
+    const mentorPayloads = mentorUsers.map(mentor => ({
+      id: mentor.id,
+      skills: (mentor.skills || []).map(s => s.name),
+      yearsExperience: mentor.mentorProfile?.yearsOfExperience || 0,
+      specialization: (mentor.mentorProfile?.specialization || []).join(', '),
+      currentMentees: mentor.mentorProfile?.currentMenteeCount || 0,
+      maxMentees: mentor.mentorProfile?.maxMentees || 5,
+      successRate: mentor.mentorProfile?.successRate || 0
+    }));
+
+    const aiResults = await groqService.batchGenerateMatchingScores(
+      mentorPayloads,
+      menteePayload,
+      programRequirements
+    );
+
+    const scoreMap = new Map(aiResults.map(r => [r.mentorId, r]));
+
+    const suggestions = mentorUsers.map(mentor => {
+      const aiResult = scoreMap.get(mentor.id) || { score: 0, reasoning: '', strengths: [], concerns: [], breakdown: {} };
       return {
         mentor: {
-          id: mentorData.id,
-          firstName: mentorData.firstName,
-          lastName: mentorData.lastName,
-          email: mentorData.email,
-          mentorProfile: mentorData.mentorProfile
+          id: mentor.id,
+          firstName: mentor.firstName,
+          lastName: mentor.lastName,
+          email: mentor.email,
+          mentorProfile: mentor.mentorProfile
         },
         level: enrollment.currentLevel,
-        currentMentees: mentorData.currentMentees,
-        assignmentId: mentorData.assignmentId,
-        matchScore: Math.round(matchScore),
-        matchReason: `${matchingSkills.length} skill matches, ${mentorData.mentorProfile?.maxMentees - mentorData.currentMentees || 0} slots available`
+        currentMentees: mentor.mentorProfile?.currentMenteeCount || 0,
+        matchScore: aiResult.score,
+        matchReason: aiResult.reasoning || '',
+        strengths: aiResult.strengths || [],
+        concerns: aiResult.concerns || [],
+        breakdown: aiResult.breakdown || {}
       };
     });
 
-    // Sort by match score
     return suggestions.sort((a, b) => b.matchScore - a.matchScore);
   }
 

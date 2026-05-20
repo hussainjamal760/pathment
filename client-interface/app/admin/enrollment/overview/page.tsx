@@ -376,9 +376,9 @@ export default function EnrollmentOverviewPage() {
 
   const statCards = [
     { label: 'Total Enrollments', value: pagination.total,      icon: Users,     color: 'text-indigo-600 bg-indigo-50' },
-    { label: 'Active / Matched',  value: stats.active,          icon: UserCheck, color: 'text-green-600 bg-green-50'   },
-    { label: 'Pending Approval',  value: stats.pendingApproval, icon: Hourglass, color: 'text-amber-600 bg-amber-50'   },
-    { label: 'Pending Match',     value: stats.pendingMatch,     icon: Clock,     color: 'text-blue-600 bg-blue-50'     },
+    { label: 'Active / Matched',      value: stats.active,            icon: UserCheck, color: 'text-green-600 bg-green-50'   },
+    { label: 'Pending Completion',     value: stats.pendingCompletion, icon: Hourglass, color: 'text-amber-600 bg-amber-50'   },
+    { label: 'Pending Match',          value: stats.pendingMatch,      icon: Clock,     color: 'text-blue-600 bg-blue-50'     },
   ];
 
   return (

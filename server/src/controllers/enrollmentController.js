@@ -3,6 +3,15 @@ const { successResponse } = require('../utils/responses');
 const { catchAsync } = require('../middlewares/errorHandler');
 
 /**
+ * Get enrollment stats (overall counts, not paginated)
+ * GET /api/enrollments/stats
+ */
+exports.getEnrollmentStats = catchAsync(async (req, res) => {
+  const stats = await enrollmentService.getEnrollmentStats();
+  res.status(200).json(successResponse('Enrollment stats retrieved successfully', { stats }));
+});
+
+/**
  * Get all enrollments with filters
  * GET /api/enrollments
  */

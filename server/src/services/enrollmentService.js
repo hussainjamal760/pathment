@@ -6,6 +6,23 @@ const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const groqService = require('./groqService');
 
 class EnrollmentService {
+  /**
+   * Return overall enrollment counts by status group.
+   * Runs COUNT queries across the full table — never paginated.
+   */
+  async getEnrollmentStats() {
+    const [total, active, pendingMatch, pendingCompletion, completed, dropped] = await Promise.all([
+      models.Enrollment.count(),
+      models.Enrollment.count({ where: { status: ['active', 'matched'] } }),
+      models.Enrollment.count({ where: { status: ['pending_match', 'approved'] } }),
+      models.Enrollment.count({ where: { status: 'pending_completion' } }),
+      models.Enrollment.count({ where: { status: ['program_completed', 'level_completed'] } }),
+      models.Enrollment.count({ where: { status: ['dropped', 'rejected'] } }),
+    ]);
+
+    return { total, active, pendingMatch, pendingCompletion, completed, dropped };
+  }
+
   async getEnrollments(filters, pagination) {
     const { status, programId, menteeId, search } = filters;
     const { page, limit } = pagination;
