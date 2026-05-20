@@ -3,6 +3,7 @@ const { models } = require('../db');
 const { NotFoundError, ValidationError, ConflictError, ForbiddenError } = require('../utils/errors/errorTypes');
 const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
+const groqService = require('./groqService');
 
 class EnrollmentService {
   async getEnrollments(filters, pagination) {
@@ -121,65 +122,8 @@ class EnrollmentService {
     return enrollment;
   }
 
-  /**
-   * Determine the best starting level for a mentee by matching their skills and
-   * prior experience against each level's prerequisites.
-   *
-   * Strategy: iterate levels from highest to lowest order. The first level whose
-   * prerequisites are at least 50 % covered by the mentee's knowledge tokens is
-   * selected. If nothing matches, the lowest level (level 1) is returned.
-   */
-  _determineBestLevel(levels, menteeProfile, menteeSkills) {
-    if (!levels || levels.length === 0) return null;
-    if (levels.length === 1) return levels[0];
-
-    // Build a flat set of lowercase knowledge tokens from skills + free-text fields
-    const knowledge = new Set();
-
-    for (const skill of (menteeSkills || [])) {
-      knowledge.add(skill.name.toLowerCase());
-      skill.name.toLowerCase().split(/\s+/).forEach(w => knowledge.add(w));
-    }
-
-    const textFields = [
-      menteeProfile?.priorExperience,
-      menteeProfile?.currentEducation,
-      menteeProfile?.currentOccupation,
-    ];
-    for (const text of textFields) {
-      if (text) {
-        text.toLowerCase().split(/\W+/).filter(w => w.length > 3).forEach(w => knowledge.add(w));
-      }
-    }
-
-    // Interests and learning goals add weaker signals
-    for (const arr of [menteeProfile?.interests, menteeProfile?.learningGoals]) {
-      for (const item of (arr || [])) {
-        item.toLowerCase().split(/\W+/).filter(w => w.length > 3).forEach(w => knowledge.add(w));
-      }
-    }
-
-    // Evaluate from highest level down; pick first level with ≥50 % prereq coverage
-    const sorted = [...levels].sort((a, b) => b.levelOrder - a.levelOrder);
-
-    for (const level of sorted) {
-      const prereqs = level.prerequisites;
-      if (!prereqs || prereqs.length === 0) {
-        // Prerequisite-free level — skip unless it is the very first level
-        if (level.levelOrder === sorted[sorted.length - 1].levelOrder) return level;
-        continue;
-      }
-
-      const matched = prereqs.filter(prereq => {
-        const tokens = prereq.toLowerCase().split(/\W+/).filter(w => w.length > 2);
-        return tokens.some(t => knowledge.has(t));
-      }).length;
-
-      if (matched / prereqs.length >= 0.5) return level;
-    }
-
-    // Fallback: lowest level (first in ascending order)
-    return sorted[sorted.length - 1];
+  async _determineBestLevel(levels, menteeProfile, menteeSkills) {
+    return groqService.determineBestLevel(levels, menteeProfile, menteeSkills);
   }
 
   async createEnrollment(programId, menteeId) {
@@ -227,7 +171,7 @@ class EnrollmentService {
       ]
     });
 
-    const startingLevel = this._determineBestLevel(
+    const startingLevel = await this._determineBestLevel(
       program.levels,
       mentee?.menteeProfile,
       mentee?.skills
