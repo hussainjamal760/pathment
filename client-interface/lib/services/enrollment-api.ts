@@ -2,6 +2,11 @@ import { apiClient } from './api-client';
 import { apiConfig } from '../config/api';
 
 export const enrollmentApi = {
+  // Get overall stats (not paginated — always full counts)
+  getStats: () => {
+    return apiClient.get(`${apiConfig.endpoints.enrollments}/stats`);
+  },
+
   // Get all enrollments with filters
   getAll: (filters?: { status?: string; programId?: string; menteeId?: string; search?: string; page?: number; limit?: number }) => {
     const params = new URLSearchParams();

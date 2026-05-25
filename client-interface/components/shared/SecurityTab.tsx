@@ -94,7 +94,7 @@ function PasswordChangeForm({ onClose, onSubmit }: PasswordChangeFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[70] p-4">
       <div className="bg-white rounded-2xl max-w-md w-full mx-4 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900">Change Password</h3>
@@ -231,8 +231,8 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl max-w-md w-full mx-4 p-6 space-y-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-60 p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-900">Enable Two-Factor Authentication</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
@@ -241,22 +241,23 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
         </div>
 
         {step === 'setup' && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <p className="text-sm text-slate-600">
               Scan this QR code with your authenticator app (Google Authenticator, Authy, Microsoft Authenticator)
             </p>
 
-            {qrCode && <img src={qrCode} alt="2FA QR Code" className="w-full" />}
+            {qrCode && <img src={qrCode} alt="2FA QR Code" className="w-full max-w-xs mx-auto" />}
 
-            <div>
-              <p className="text-sm text-slate-600 mb-2">Or enter this key manually:</p>
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600">Or enter this key manually:</p>
               <div className="flex gap-2 items-center">
-                <code className="flex-1 p-3 bg-slate-50 rounded-lg text-sm font-mono">
+                <code className="flex-1 p-3 bg-slate-50 rounded-lg text-xs sm:text-sm font-mono overflow-x-auto">
                   {manualKey}
                 </code>
                 <button
                   onClick={copyToClipboard}
-                  className="p-2 hover:bg-slate-100 rounded-lg"
+                  className="p-2 hover:bg-slate-100 rounded-lg flex-shrink-0"
+                  title="Copy to clipboard"
                 >
                   {copied ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5" />}
                 </button>
@@ -265,7 +266,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
 
             <button
               onClick={() => setStep('verify')}
-              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
             >
               I&apos;ve Scanned the Code
             </button>
@@ -273,7 +274,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
         )}
 
         {step === 'verify' && (
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
                 {error}
@@ -296,14 +297,14 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => setStep('setup')}
-                className="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50"
+                className="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleVerify}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition-colors"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Enable'}
               </button>

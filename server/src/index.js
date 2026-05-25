@@ -17,8 +17,31 @@ const server = http.createServer(app);
  */
 
 // CORS configuration
+const allowedOrigins = (process.env.CLIENT_URL || 'http://localhost:3003')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+function isOriginAllowed(origin) {
+  return allowedOrigins.some((allowed) => {
+    if (allowed.includes('*')) {
+      // Convert wildcard pattern to regex, e.g. https://*.vercel.app
+      const escaped = allowed.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace('*', '[^.]+');
+      return new RegExp('^' + escaped + '$').test(origin);
+    }
+    return allowed === origin;
+  });
+}
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3003',
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g. server-to-server, curl)
+    if (!origin || isOriginAllowed(origin)) {
+      return callback(null, true);
+    }
+    console.warn(`[CORS] Blocked origin: "${origin}" | Allowed patterns: ${JSON.stringify(allowedOrigins)}`);
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true
 }));
 
@@ -118,4 +141,8 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = app;

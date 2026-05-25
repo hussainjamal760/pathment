@@ -3,6 +3,7 @@ const router = express.Router();
 const enrollmentController = require('../controllers/enrollmentController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
+router.get('/stats', authenticate, authorize(['admin']), enrollmentController.getEnrollmentStats);
 router.get('/', authenticate, authorize(['admin', 'mentor', 'mentee']), enrollmentController.getEnrollments);
 router.get('/:id', authenticate, enrollmentController.getEnrollmentById);
 router.post('/', authenticate, authorize(['mentee']), enrollmentController.createEnrollment);

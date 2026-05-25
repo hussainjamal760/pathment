@@ -435,6 +435,93 @@ Output as JSON:
   }
 
   /**
+   * Score ALL mentors against a single mentee in ONE API call.
+   * Returns an array of { mentorId, score, breakdown, reasoning, strengths, concerns }.
+   * Falls back to calculateBasicMatchScore per mentor when AI is unavailable.
+   */
+  async batchGenerateMatchingScores(mentors, menteeProfile, programRequirements) {
+    if (!this.enabled || mentors.length === 0) {
+      return mentors.map(m => ({
+        mentorId: m.id,
+        ...this.calculateBasicMatchScore(m, menteeProfile)
+      }));
+    }
+
+    // Each mentor entry uses the same field names as generateMatchingScore's mentorProfile,
+    // with an added `id` so results can be mapped back.
+    const mentorList = mentors.map(m => ({
+      id: m.id,
+      skills: m.skills?.join(', ') || 'Not specified',
+      yearsExperience: m.yearsExperience || 'Not specified',
+      specialization: m.specialization || 'Not specified',
+      currentMentees: m.currentMentees || 0,
+      maxMentees: m.maxMentees || 5,
+      successRate: m.successRate || 'N/A'
+    }));
+
+    const prompt = `You are an expert in mentor-mentee matching for professional development programs.
+
+Score each mentor's compatibility with the given mentee. Return one entry per mentor.
+
+**Mentee Profile:**
+- Learning Goals: ${menteeProfile.learningGoals?.join(', ') || 'Not specified'}
+- Current Skills: ${menteeProfile.skills?.join(', ') || 'Beginner'}
+- Learning Style: ${menteeProfile.learningStyle || 'Not specified'}
+- Prior Experience: ${menteeProfile.priorExperience || 'None'}
+
+**Program Requirements:**
+- Required Skills: ${programRequirements.skills?.join(', ') || 'Not specified'}
+- Level: ${programRequirements.level || 'Not specified'}
+
+**Mentors to evaluate:**
+${mentorList.map(m => `
+Mentor ID: ${m.id}
+- Skills: ${m.skills}
+- Experience: ${m.yearsExperience} years
+- Specialization: ${m.specialization}
+- Current Load: ${m.currentMentees}/${m.maxMentees}
+- Success Rate: ${m.successRate}%`).join('\n')}
+
+For each mentor provide a compatibility score 0-100.
+
+Output as JSON:
+{
+  "results": [
+    {
+      "mentorId": "<id>",
+      "score": 85,
+      "breakdown": { "skillMatch": 90, "availabilityMatch": 85, "experienceMatch": 80, "styleMatch": 85 },
+      "reasoning": "Brief explanation of the score",
+      "strengths": ["strength 1", "strength 2"],
+      "concerns": []
+    }
+  ]
+}`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          { role: 'system', content: 'You are an expert in mentor-mentee matching. Always respond with valid JSON only.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 1200,
+        response_format: { type: 'json_object' }
+      });
+
+      const parsed = JSON.parse(response.choices[0].message.content);
+      return parsed.results || [];
+    } catch (error) {
+      console.error('Groq batchGenerateMatchingScores error, falling back to basic scoring:', error.message);
+      return mentors.map(m => ({
+        mentorId: m.id,
+        ...this.calculateBasicMatchScore(m, menteeProfile)
+      }));
+    }
+  }
+
+  /**
    * Ask Groq AI to select the most appropriate starting level for a mentee.
    * Falls back to keyword scoring if AI is unavailable.
    *

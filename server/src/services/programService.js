@@ -532,7 +532,7 @@ class ProgramService {
             {
               model: models.MenteeProfile,
               as: 'menteeProfile',
-              attributes: ['bio', 'currentLevel', 'totalPoints']
+              attributes: ['currentLevel', 'totalPoints']
             }
           ]
         }

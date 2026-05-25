@@ -72,6 +72,25 @@ export function useEnrollmentList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    pendingMatch: 0,
+    pendingCompletion: 0,
+    completed: 0,
+    dropped: 0,
+  });
+
+  // Fetch overall stats once on mount (independent of pagination/filters)
+  useEffect(() => {
+    enrollmentApi.getStats()
+      .then((res: any) => {
+        const s = res?.data?.stats;
+        if (s) setStats(s);
+      })
+      .catch(() => {/* non-critical, silently ignore */});
+  }, []);
+
   const fetchEnrollments = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -110,22 +129,6 @@ export function useEnrollmentList() {
     pagination.reset();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, status]);
-
-  // ── Derived stats — computed from the FULL dataset the server returns ──
-  // These are approximate counts from the current page; for accurate totals
-  // across all pages you would need a separate stats endpoint.
-  const stats = {
-    total: pagination.total,
-    active: enrollments.filter(
-      (e) => e.status === 'active' || e.status === 'matched'
-    ).length,
-    pendingApproval: enrollments.filter(
-      (e) => e.status === 'pending_approval'
-    ).length,
-    pendingMatch: enrollments.filter(
-      (e) => e.status === 'pending_match' || e.status === 'approved'
-    ).length,
-  };
 
   const hasActiveFilters = !!(debouncedSearch || status !== 'all');
 

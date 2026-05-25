@@ -112,7 +112,7 @@ module.exports = (sequelize, DataTypes) => {
     underscored: true,
     timestamps: false,
     indexes: [
-      { unique: true, fields: ['mentee_id', 'enrollment_id', 'period_start', 'period_end'] },
+      { unique: true, fields: ['mentee_id', 'enrollment_id', 'period_start', 'period_end'], name: 'mentee_analytics_unique_period' },
       { fields: ['mentee_id'] },
       { fields: ['enrollment_id'] },
       { fields: ['period_start', 'period_end'] }
