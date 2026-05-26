@@ -13,7 +13,7 @@ class AdminService {
   async createRegistrationInvite(inviteData, createdBy) {
     const { email, role, expiresInHours = 72 } = inviteData;
     const normalizedEmail = email.trim().toLowerCase();
-    const defaultInviteTtl = Number(process.env.REGISTRATION_INVITE_EXPIRY_HOURS) || 72;
+    const defaultInviteTtl = 72;
     const ttlHours = Math.max(1, Math.min(24 * 30, Number(expiresInHours) || defaultInviteTtl));
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
