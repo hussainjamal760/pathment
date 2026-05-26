@@ -45,14 +45,17 @@ class ProfileController {
    */
   completeMenteeProfile = catchAsync(async (req, res) => {
     const userId = req.user.id;
-    const { 
-      currentEducation,
-      currentOccupation,
-      learningGoals,
-      interests,
-      priorExperience,
-      preferredLearningStyle
-    } = req.body;
+   const { 
+  currentEducation,
+  currentOccupation,
+  learningGoals,
+  interests,
+  priorExperience,
+  preferredLearningStyle,
+  linkedinUrl,
+  githubUrl,
+  portfolioUrl
+} = req.body;
 
     // Verify user is a mentee
     const user = await models.User.findByPk(userId);
@@ -78,14 +81,17 @@ if (!menteeProfile) {
   });
 }
 
-    await menteeProfile.update({
-      currentEducation,
-      currentOccupation,
-      learningGoals: Array.isArray(learningGoals) ? learningGoals : [learningGoals],
-      interests: Array.isArray(interests) ? interests : [interests],
-      priorExperience,
-      preferredLearningStyle
-    });
+   await menteeProfile.update({
+  currentEducation,
+  currentOccupation,
+  learningGoals: Array.isArray(learningGoals) ? learningGoals : [learningGoals],
+  interests: Array.isArray(interests) ? interests : [interests],
+  priorExperience,
+  preferredLearningStyle,
+  linkedinUrl,
+  githubUrl,
+  portfolioUrl
+});
 
     // Update user onboarding status
     await user.update({
