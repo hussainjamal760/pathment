@@ -148,16 +148,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // apiClient.post returns response.data directly
       const responseData = response.data;
+      const currentUser = responseData?.user;
       const accessToken = responseData?.tokens?.accessToken;
       const refreshToken = responseData?.tokens?.refreshToken;
 
-      if (!user || !accessToken || !refreshToken) {
+      if (!currentUser || !accessToken || !refreshToken) {
         throw new Error('Invalid 2FA verification response');
       }
 
       localStorage.setItem('token', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('user', JSON.stringify(currentUser));
       
       console.log('2FA verified, tokens stored');
       
