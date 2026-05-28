@@ -343,3 +343,13 @@ input[type="number"].points-input-disabled {
 input[type="number"].points-input-enabled {
   -moz-appearance: auto;
 }
+
+/* Disable browser-native password reveal/clear controls */
+input::-ms-reveal,
+input::-ms-clear,
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
