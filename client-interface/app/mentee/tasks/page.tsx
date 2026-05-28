@@ -158,9 +158,9 @@ export default function MenteeTasks() {
               
               return (
                 <div key={task.id} className="p-6 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
                         <h3 className="text-slate-900">{task.roadmapTask?.title}</h3>
                         {getTaskSourceBadge(task.isCustomTask)}
                         {getDifficultyBadge(task.roadmapTask?.difficulty)}
@@ -183,7 +183,7 @@ export default function MenteeTasks() {
                         {task.roadmapTask?.description}
                       </p>
                       
-                      <div className="flex items-center gap-4 text-sm text-slate-600">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
                         {task.roadmapTask?.week && (
                           <>
                             <span>Week {task.roadmapTask.week.weekNumber}</span>
@@ -230,7 +230,7 @@ export default function MenteeTasks() {
                       )}
                     </div>
 
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
                       <StatusBadge status={task.status} />
                       
                       {task.status === 'assigned' && (
