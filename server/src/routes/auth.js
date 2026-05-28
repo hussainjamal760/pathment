@@ -4,6 +4,14 @@ const authController = require('../controllers/authController');
 const { validateBody } = require('../middlewares/validate');
 const { authSchemas } = require('../validations/authValidation');
 const { authenticate } = require('../middlewares/auth');
+const {
+  loginLimiter,
+  passwordResetLimiter,
+  registerLimiter,
+  verifyEmailLimiter,
+  resendVerificationLimiter,
+  refreshTokenLimiter
+} = require('../middlewares/rateLimiter');
 
 /**
  * Public routes (no authentication required)
@@ -12,6 +20,7 @@ const { authenticate } = require('../middlewares/auth');
 // Register new user
 router.post(
   '/register',
+  registerLimiter,
   validateBody(authSchemas.register),
   authController.register
 );
@@ -25,6 +34,7 @@ router.get(
 // Login
 router.post(
   '/login',
+  loginLimiter,
   validateBody(authSchemas.login),
   authController.login
 );
@@ -32,6 +42,7 @@ router.post(
 // Refresh access token
 router.post(
   '/refresh',
+  refreshTokenLimiter,
   validateBody(authSchemas.refreshToken),
   authController.refreshToken
 );
@@ -39,6 +50,7 @@ router.post(
 // Verify email
 router.post(
   '/verify-email',
+  verifyEmailLimiter,
   validateBody(authSchemas.verifyEmail),
   authController.verifyEmail
 );
@@ -46,6 +58,7 @@ router.post(
 // Request password reset
 router.post(
   '/forgot-password',
+  passwordResetLimiter,
   validateBody(authSchemas.forgotPassword),
   authController.forgotPassword
 );
@@ -53,6 +66,7 @@ router.post(
 // Resend verification email
 router.post(
   '/resend-verification',
+  resendVerificationLimiter,
   validateBody(authSchemas.resendVerification),
   authController.resendVerification
 );
@@ -60,6 +74,7 @@ router.post(
 // Reset password
 router.post(
   '/reset-password',
+  passwordResetLimiter,
   validateBody(authSchemas.resetPassword),
   authController.resetPassword
 );
