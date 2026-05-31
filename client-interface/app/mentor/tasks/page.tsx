@@ -2,13 +2,27 @@
 
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useState } from 'react';
 import {
   Search, ClipboardList, Clock, CheckCircle2, AlertCircle, Plus,
-  Loader2, FileText, Star, XCircle, AlertTriangle, BookOpen, CalendarClock
+  Loader2, FileText, Star, XCircle, AlertTriangle, BookOpen, CalendarClock,
+  Copy, Pencil, Trash2, Send, X, Clock1,
+  StarIcon
 } from 'lucide-react';
 import { useMentorTasks } from '@/lib/hooks/mentor';
 import { StatsCard, TabBar, StatusBadge } from '@/components/admin/ui';
 import type { Tab } from '@/components/admin/ui';
+import { MultiSelectMentee } from '@/components/ui/MultiSelectMentee';
+
+function TabLoader() {
+  return (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+    </div>
+  );
+}
+
+
 
 export default function MentorTasks() {
   const router = useRouter();
@@ -47,7 +61,23 @@ export default function MentorTasks() {
     setCancellingTask,
     setCancelReason,
     handleCancelTask,
+    templates,
+    templatesLoading,
+    handleCreateTemplate,
+    handleUpdateTemplate,
+    handleDeleteTemplate,
+    handleAssignTemplate,
+    handleSaveAndAssign,
+    handleSaveTemplateOnly,
+    mentees: hookMentees,
   } = useMentorTasks();
+
+  const [assigningTemplateId, setAssigningTemplateId] = useState<string | null>(null);
+  const [assignMenteeIds, setAssignMenteeIds] = useState<string[]>([]);
+  const [assignDueDate, setAssignDueDate] = useState('');
+  const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({ title: '', description: '', type: 'custom', difficulty: 'medium', deliverable: '', pointsBase: 10, estimatedHours: 2 });
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
 
   // ─── UI helpers ──────────────────────────────────────────────────────────
 
@@ -107,12 +137,6 @@ export default function MentorTasks() {
     );
   };
 
-  const TabLoader = () => (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-    </div>
-  );
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -139,6 +163,7 @@ export default function MentorTasks() {
             { id: 'all',        label: 'All Tasks',          icon: ClipboardList },
             { id: 'roadmap',    label: 'Program Roadmap',    icon: FileText },
             { id: 'create',     label: 'Create Custom Task', icon: Plus },
+            { id: 'templates',  label: 'Templates',          icon: Copy,         count: templates.length > 0 ? templates.length : undefined },
           ] as Tab[]}
           activeTab={activeTab}
           onChange={(id) => handleTabSwitch(id as any)}
@@ -617,8 +642,8 @@ export default function MentorTasks() {
                                       </div>
                                       <p className="text-slate-600 text-sm mb-2">{task.description}</p>
                                       <div className="flex items-center gap-4 text-xs text-slate-500">
-                                        <span>⏱️ {task.estimatedHours}h</span>
-                                        <span>⭐ {task.pointsBase} points</span>
+                                        <span><Clock1 className="w-3.5 h-3.5 inline mr-1" />{task.estimatedHours}h</span>
+                                        <span><Star className="w-3.5 h-3.5 inline mr-1" />{task.pointsBase} points</span>
                                         {task.isMandatory && <span className="text-red-600">● Mandatory</span>}
                                       </div>
                                     </div>
@@ -678,19 +703,15 @@ export default function MentorTasks() {
                     <label className="block text-slate-700 text-sm mb-2">
                       Select Mentee <span className="text-red-500">*</span>
                     </label>
-                    <select
-                      value={formData.menteeId}
-                      onChange={(e) => handleMenteeChange(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    >
-                      <option value="">Choose a mentee...</option>
-                      {mentees.map((match) => (
-                        <option key={`${match.menteeId}-${match.enrollment?.programId ?? match.enrollment?.program?.name}`} value={match.menteeId}>
-                          {match.mentee?.firstName} {match.mentee?.lastName} - {match.enrollment?.program?.name}
-                        </option>
-                      ))}
-                    </select>
+                    <MultiSelectMentee
+                      options={mentees.map(match => ({
+                        value: match.menteeId,
+                        label: `${match.mentee?.firstName} ${match.mentee?.lastName} - ${match.enrollment?.program?.name}`
+                      }))}
+                      selectedIds={formData.mentees.map(m => m.menteeId)}
+                      onChange={handleMenteeChange}
+                      placeholder="Choose assignees..."
+                    />
                   </div>
 
                   <div>
@@ -774,16 +795,45 @@ export default function MentorTasks() {
                     </div>
                   </div>
 
-                  <div className="flex gap-4">
-                    <button type="submit" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors">
-                      Assign Task
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-slate-700 text-sm mb-2">Estimated Hours</label>
+                      <input
+                        type="number"
+                        value={formData.estimatedHours}
+                        onChange={(e) => setFormData({ ...formData, estimatedHours: parseInt(e.target.value) || 0 })}
+                        placeholder="e.g., 2"
+                        min="1"
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100">
+                    <button type="submit" className="w-full flex justify-center items-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-all shadow-sm shadow-indigo-200 hover:shadow-md">
+                      <Send className="w-4 h-4" />Assign Task
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveAndAssign}
+                      className="w-full flex justify-center items-center gap-2 px-6 py-3.5  bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-xl transition-all shadow-sm shadow-purple-200 hover:shadow-md"
+                    >
+                      <Copy className="w-4 h-4" />Save & Assign
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={handleSaveTemplateOnly}
+                      className="w-full flex justify-center items-center gap-2 px-6 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-medium rounded-xl transition-colors"
+                    >
+                      <BookOpen className="w-4 h-4" />Save as Template Only
                     </button>
                     <button
                       type="button"
                       onClick={() => handleTabSwitch('all')}
-                      className="px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors"
+                      className="w-full flex justify-center items-center gap-2 px-6 py-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-medium rounded-xl transition-colors"
                     >
-                      Cancel
+                      <X className="w-4 h-4" />Cancel
                     </button>
                   </div>
                 </form>
@@ -804,6 +854,262 @@ export default function MentorTasks() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'templates' && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-slate-900">Saved Templates</h3>
+                <button
+                  onClick={() => handleTabSwitch('create')}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />Create Task
+                </button>
+              </div>
+
+              {templatesLoading ? (
+                <TabLoader />
+              ) : templates.length === 0 ? (
+                <div className="text-center py-12">
+                  <Copy className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-600 mb-2">No templates yet</p>
+                  <p className="text-slate-500 text-sm">When you create a custom task, use &quot;Save as Template &amp; Assign&quot; to save it here for reuse.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {templates.map((tpl: any) => (
+                    <div key={tpl.id} className="p-5 bg-white rounded-xl border border-slate-200 hover:border-indigo-200 transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="text-slate-900 font-medium">{tpl.title}</h4>
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                              tpl.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
+                              tpl.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              tpl.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>{tpl.difficulty}</span>
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">{tpl.type}</span>
+                          </div>
+                          <p className="text-slate-600 text-sm line-clamp-2">{tpl.description}</p>
+                          <div className="flex items-center gap-4 text-xs text-slate-500 mt-2">
+                            <span><StarIcon className="w-3.5 h-3.5 inline mr-1" />{tpl.pointsBase} points</span>
+                            {tpl.estimatedHours && <span><Clock1 className="w-3.5 h-3.5 inline mr-1" />{tpl.estimatedHours}h</span>}
+                            <span>Created {new Date(tpl.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setAssigningTemplateId(tpl.id)}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+                          >
+                            <Send className="w-3.5 h-3.5" />Assign
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingTemplate(tpl);
+                              setEditForm({
+                                title: tpl.title,
+                                description: tpl.description,
+                                type: tpl.type,
+                                difficulty: tpl.difficulty,
+                                deliverable: tpl.deliverable || '',
+                                pointsBase: tpl.pointsBase,
+                                estimatedHours: tpl.estimatedHours || 2,
+                              });
+                            }}
+                            className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                            title="Edit template"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setDeletingTemplateId(tpl.id)}
+                            className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete template"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {assigningTemplateId === tpl.id && (
+                        <div className="mt-3 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+                          <p className="text-indigo-900 font-medium text-sm mb-3">Assign this template to a mentee</p>
+                          <div className="grid sm:grid-cols-2 gap-3 mb-3">
+                            <MultiSelectMentee
+                              options={hookMentees.map((match: any) => ({
+                                value: `${match.menteeId}::${match.enrollmentId}`,
+                                label: `${match.mentee?.firstName} ${match.mentee?.lastName} - ${match.enrollment?.program?.name}`
+                              }))}
+                              selectedIds={assignMenteeIds}
+                              onChange={setAssignMenteeIds}
+                              placeholder="Choose assignees..."
+                            />
+                            <input
+                              type="date"
+                              value={assignDueDate}
+                              onChange={(e) => setAssignDueDate(e.target.value)}
+                              min={new Date().toISOString().split('T')[0]}
+                              className="w-full px-3 py-2 border border-indigo-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm bg-white"
+                              placeholder="Due date (optional)"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={async () => {
+                                if (assignMenteeIds.length === 0) return;
+                                const menteesData = assignMenteeIds.map(idStr => {
+                                  const [mId, eId] = idStr.split('::');
+                                  return { menteeId: mId, enrollmentId: eId };
+                                });
+                                await handleAssignTemplate(tpl.id, menteesData, assignDueDate || undefined);
+                                setAssigningTemplateId(null);
+                                setAssignMenteeIds([]);
+                                setAssignDueDate('');
+                              }}
+                              disabled={assignMenteeIds.length === 0}
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors"
+                            >
+                              Assign
+                            </button>
+                            <button
+                              onClick={() => { setAssigningTemplateId(null); setAssignMenteeIds([]); setAssignDueDate(''); }}
+                              className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-sm transition-colors border border-slate-200"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {editingTemplate?.id === tpl.id && (
+                        <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-slate-900 font-medium text-sm">Edit Template</p>
+                            <button onClick={() => setEditingTemplate(null)} className="text-slate-400 hover:text-slate-600">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-slate-700 text-xs font-medium mb-1.5">Title <span className="text-red-500">*</span></label>
+                              <input
+                                value={editForm.title}
+                                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                placeholder="Template Title"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-700 text-xs font-medium mb-1.5">Description <span className="text-red-500">*</span></label>
+                              <textarea
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                rows={3}
+                                placeholder="Detailed description..."
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-slate-700 text-xs font-medium mb-1.5">Task Type</label>
+                                <select value={editForm.type} onChange={(e) => setEditForm({ ...editForm, type: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                                  <option value="custom">Custom</option>
+                                  <option value="exercise">Exercise</option>
+                                  <option value="project">Project</option>
+                                  <option value="practical">Practical</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-slate-700 text-xs font-medium mb-1.5">Difficulty</label>
+                                <select value={editForm.difficulty} onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })} className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                                  <option value="easy">Easy</option>
+                                  <option value="medium">Medium</option>
+                                  <option value="hard">Hard</option>
+                                  <option value="expert">Expert</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-slate-700 text-xs font-medium mb-1.5">Points Base</label>
+                                <input
+                                  type="number"
+                                  value={editForm.pointsBase}
+                                  onChange={(e) => setEditForm({ ...editForm, pointsBase: parseInt(e.target.value) || 0 })}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                  placeholder="e.g., 100"
+                                  min="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-slate-700 text-xs font-medium mb-1.5">Estimated Hours</label>
+                                <input
+                                  type="number"
+                                  value={editForm.estimatedHours}
+                                  onChange={(e) => setEditForm({ ...editForm, estimatedHours: parseInt(e.target.value) || 0 })}
+                                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                                  placeholder="e.g., 2"
+                                  min="0"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  await handleUpdateTemplate(tpl.id, editForm);
+                                  setEditingTemplate(null);
+                                }}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+                              >
+                                Save Changes
+                              </button>
+                              <button
+                                onClick={() => setEditingTemplate(null)}
+                                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-sm transition-colors border border-slate-200"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {deletingTemplateId === tpl.id && (
+                        <div className="mt-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-red-900 font-medium mb-1">Delete this template?</p>
+                              <p className="text-red-700 text-sm mb-3">This won't affect tasks already assigned from this template.</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={async () => {
+                                    await handleDeleteTemplate(tpl.id);
+                                    setDeletingTemplateId(null);
+                                  }}
+                                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
+                                >
+                                  Delete
+                                </button>
+                                <button
+                                  onClick={() => setDeletingTemplateId(null)}
+                                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-sm transition-colors border border-slate-200"
+                                >
+                                  Keep
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

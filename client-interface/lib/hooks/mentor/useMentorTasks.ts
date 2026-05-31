@@ -9,30 +9,30 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
 
-export type MentorTaskTab = 'pending' | 'extensions' | 'all' | 'roadmap' | 'create';
+export type MentorTaskTab = 'pending' | 'extensions' | 'all' | 'roadmap' | 'create' | 'templates';
 
 export interface CustomTaskFormData {
-  menteeId: string;
-  enrollmentId: string;
+  mentees: { menteeId: string; enrollmentId: string }[];
   title: string;
   description: string;
   type: string;
   difficulty: string;
   dueDate: string;
   pointsBase: number;
+  estimatedHours: number;
   deliverable: string;
   acceptanceCriteria: string[];
 }
 
 const EMPTY_FORM: CustomTaskFormData = {
-  menteeId: '',
-  enrollmentId: '',
+  mentees: [],
   title: '',
   description: '',
   type: 'custom',
   difficulty: 'medium',
   dueDate: '',
   pointsBase: 10,
+  estimatedHours: 2,
   deliverable: '',
   acceptanceCriteria: [],
 };
@@ -79,19 +79,31 @@ export interface UseMentorTasksReturn {
   // create form
   formData: CustomTaskFormData;
   setFormData: React.Dispatch<React.SetStateAction<CustomTaskFormData>>;
-  handleMenteeChange: (menteeId: string) => void;
+  handleMenteeChange: (menteeIds: string[]) => void;
   handleCreateCustomTask: (e: React.FormEvent) => Promise<void>;
+  handleSaveAndAssign: (e: React.FormEvent) => Promise<void>;
+  handleSaveTemplateOnly: (e: React.FormEvent) => Promise<void>;
 
   // cancel
   cancellingTask: string | null;
   cancelReason: string;
   setCancellingTask: (id: string | null) => void;
   setCancelReason: (v: string) => void;
+
+  // templates
+  templates: any[];
+  templatesLoading: boolean;
+  fetchTemplates: () => Promise<void>;
+  handleCreateTemplate: (data: any) => Promise<void>;
+  handleUpdateTemplate: (id: string, data: any) => Promise<void>;
+  handleDeleteTemplate: (id: string) => Promise<void>;
+  handleAssignTemplate: (templateId: string, menteesData: { menteeId: string; enrollmentId: string }[], dueDate?: string) => Promise<void>;
   handleCancelTask: (taskId: string) => Promise<void>;
 }
 
 export function useMentorTasks(): UseMentorTasksReturn {
   const { user } = useAuth();
+  const userId = user?.id;
   const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState<MentorTaskTab>('pending');
@@ -125,39 +137,43 @@ export function useMentorTasks(): UseMentorTasksReturn {
   const [cancelReason, setCancelReason] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
 
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesLoaded, setTemplatesLoaded] = useState(false);
+
   // ─── Fetchers ─────────────────────────────────────────────────────────────
 
   const fetchStats = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
     try {
       setStatsLoading(true);
-      const res = await taskApi.getMentorTaskStats(user.id);
+      const res = await taskApi.getMentorTaskStats(userId);
       setStats(res?.data?.stats);
     } catch {
       // non-critical
     } finally {
       setStatsLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const fetchPendingTasks = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
     try {
       setPendingLoading(true);
-      const res = await taskApi.getMentorTasks(user.id, { pendingReview: true });
+      const res = await taskApi.getMentorTasks(userId, { pendingReview: true });
       setPendingTasks(res?.data?.tasks || []);
     } catch {
       toast.error('Failed to load pending tasks');
     } finally {
       setPendingLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const fetchAllTasks = useCallback(async () => {
-    if (!user?.id) return;
+    if (!userId) return;
     try {
       setAllTasksLoading(true);
-      const res = await taskApi.getMentorTasks(user.id);
+      const res = await taskApi.getMentorTasks(userId);
       setAllTasks(res?.data?.tasks || []);
       setAllTasksLoaded(true);
     } catch {
@@ -165,13 +181,13 @@ export function useMentorTasks(): UseMentorTasksReturn {
     } finally {
       setAllTasksLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const fetchMentees = useCallback(async (): Promise<any[]> => {
-    if (!user?.id) return [];
+    if (!userId) return [];
     try {
       setMenteesLoading(true);
-      const res = await matchingApi.getMatches({ mentorId: user.id, status: 'active' });
+      const res = await matchingApi.getMatches({ mentorId: userId, status: 'active' });
       const list = res?.data?.matches || res?.matches || [];
       setMentees(list);
       setMenteesLoaded(true);
@@ -182,7 +198,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
     } finally {
       setMenteesLoading(false);
     }
-  }, [user?.id]);
+  }, [userId]);
 
   const fetchMentorLevelAssignments = useCallback(async (): Promise<any[]> => {
     try {
@@ -209,10 +225,23 @@ export function useMentorTasks(): UseMentorTasksReturn {
     }
   }, []);
 
+  const fetchTemplates = useCallback(async () => {
+    try {
+      setTemplatesLoading(true);
+      const res = await taskApi.getTemplates();
+      setTemplates(res?.data?.templates || []);
+      setTemplatesLoaded(true);
+    } catch {
+      toast.error('Failed to load templates');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
   // ─── Initial boot ─────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!userId) return;
 
     const paramTab = searchParams.get('tab') as MentorTaskTab | null;
     const paramMenteeId = searchParams.get('menteeId');
@@ -234,8 +263,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
             const levelId = match.levelId || '';
             setFormData((prev) => ({
               ...prev,
-              menteeId: paramMenteeId,
-              enrollmentId: match.enrollmentId || '',
+              mentees: [{ menteeId: paramMenteeId, enrollmentId: match.enrollmentId || '' }],
             }));
             setSelectedMenteeForAssign(paramMenteeId);
             if (programId) setSelectedProgram(programId);
@@ -253,7 +281,7 @@ export function useMentorTasks(): UseMentorTasksReturn {
       if (paramTab) setActiveTab(paramTab);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [userId]);
 
   // ─── Tab switch ───────────────────────────────────────────────────────────
 
@@ -269,6 +297,10 @@ export function useMentorTasks(): UseMentorTasksReturn {
       if ((tab === 'roadmap' || tab === 'create') && !mentorLevelsLoaded && !mentorLevelsLoading) {
         fetchMentorLevelAssignments();
       }
+      if (tab === 'templates' && !templatesLoaded && !templatesLoading) {
+        fetchTemplates();
+        if (!menteesLoaded && !menteesLoading) fetchMentees();
+      }
     },
     [
       allTasksLoaded,
@@ -280,6 +312,9 @@ export function useMentorTasks(): UseMentorTasksReturn {
       mentorLevelsLoaded,
       mentorLevelsLoading,
       fetchMentorLevelAssignments,
+      templatesLoaded,
+      templatesLoading,
+      fetchTemplates,
     ]
   );
 
@@ -337,8 +372,8 @@ export function useMentorTasks(): UseMentorTasksReturn {
   const handleCreateCustomTask = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!formData.menteeId || !formData.title || !formData.description) {
-        toast.error('Please fill in all required fields');
+      if (formData.mentees.length === 0 || !formData.title || !formData.description) {
+        toast.error('Please fill in all required fields and select at least one mentee');
         return;
       }
       try {
@@ -378,10 +413,127 @@ export function useMentorTasks(): UseMentorTasksReturn {
     [cancelReason, fetchStats, fetchPendingTasks, allTasksLoaded, fetchAllTasks]
   );
 
+  const handleCreateTemplate = useCallback(async (data: any) => {
+    try {
+      await taskApi.createTemplate(data);
+      toast.success('Template saved');
+      fetchTemplates();
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, 'Failed to save template'));
+    }
+  }, [fetchTemplates]);
+
+  const handleUpdateTemplate = useCallback(async (id: string, data: any) => {
+    try {
+      await taskApi.updateTemplate(id, data);
+      toast.success('Template updated');
+      fetchTemplates();
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, 'Failed to update template'));
+    }
+  }, [fetchTemplates]);
+
+  const handleDeleteTemplate = useCallback(async (id: string) => {
+    try {
+      await taskApi.deleteTemplate(id);
+      toast.success('Template deleted');
+      fetchTemplates();
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, 'Failed to delete template'));
+    }
+  }, [fetchTemplates]);
+
+  const handleAssignTemplate = useCallback(async (templateId: string, menteesData: { menteeId: string, enrollmentId: string }[], dueDate?: string) => {
+    try {
+      await taskApi.assignTemplate(templateId, { mentees: menteesData, dueDate });
+      toast.success('Template assigned to mentees');
+      fetchStats();
+      setAllTasksLoaded(false);
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, 'Failed to assign template'));
+    }
+  }, [fetchStats]);
+
+  const handleSaveAndAssign = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (formData.mentees.length === 0 || !formData.title || !formData.description) {
+        toast.error('Please fill in all required fields and select at least one mentee');
+        return;
+      }
+      try {
+        const templatePayload = {
+          title: formData.title,
+          description: formData.description,
+          type: formData.type,
+          difficulty: formData.difficulty,
+          deliverable: formData.deliverable,
+          acceptanceCriteria: formData.acceptanceCriteria,
+          pointsBase: formData.pointsBase,
+          estimatedHours: formData.estimatedHours,
+        };
+        await taskApi.createTemplate(templatePayload);
+
+        await taskApi.createCustomTask(formData);
+        toast.success('Task assigned and saved as template');
+        setFormData(EMPTY_FORM);
+        fetchStats();
+        fetchPendingTasks();
+        setAllTasksLoaded(false);
+        setTemplatesLoaded(false);
+        setActiveTab('all');
+        fetchAllTasks();
+      } catch (error: any) {
+        toast.error(extractApiErrorMessage(error, 'Failed to save and assign'));
+      }
+    },
+    [formData, fetchStats, fetchPendingTasks, fetchAllTasks]
+  );
+
+  const handleSaveTemplateOnly = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formData.title || !formData.description) {
+        toast.error('Please provide a title and description to save as a template');
+        return;
+      }
+      
+      const templatePayload = {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        difficulty: formData.difficulty,
+        deliverable: formData.deliverable,
+        acceptanceCriteria: formData.acceptanceCriteria,
+        pointsBase: formData.pointsBase,
+        estimatedHours: formData.estimatedHours,
+      };
+
+      try {
+        await taskApi.createTemplate(templatePayload);
+
+
+        toast.success('Template saved successfully');
+        setFormData(EMPTY_FORM);
+        setTemplatesLoaded(false);
+        setActiveTab('templates');
+      } catch (error: any) {
+        toast.error(extractApiErrorMessage(error, 'Failed to save template'));
+      }
+    },
+    [formData]
+  );
+
   const handleMenteeChange = useCallback(
-    (menteeId: string) => {
-      const match = mentees.find((m) => m.menteeId === menteeId);
-      setFormData((prev) => ({ ...prev, menteeId, enrollmentId: match?.enrollmentId || '' }));
+    (menteeIds: string[]) => {
+      const selectedMentees = menteeIds.map(id => {
+        const match = mentees.find((m) => m.menteeId === id);
+        return {
+          menteeId: id,
+          enrollmentId: match?.enrollmentId || ''
+        };
+      });
+      setFormData((prev) => ({ ...prev, mentees: selectedMentees }));
     },
     [mentees]
   );
@@ -438,10 +590,19 @@ export function useMentorTasks(): UseMentorTasksReturn {
     setFormData,
     handleMenteeChange,
     handleCreateCustomTask,
+    handleSaveAndAssign,
+    handleSaveTemplateOnly,
     cancellingTask,
     cancelReason,
     setCancellingTask,
     setCancelReason,
     handleCancelTask,
+    templates,
+    templatesLoading,
+    fetchTemplates,
+    handleCreateTemplate,
+    handleUpdateTemplate,
+    handleDeleteTemplate,
+    handleAssignTemplate,
   };
 }
