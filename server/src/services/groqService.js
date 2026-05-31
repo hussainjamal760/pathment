@@ -536,6 +536,74 @@ Output as JSON:
   }
 
   /**
+   * Match multiple mentees to mentors in a single API call.
+   * This optimizes API requests and handles global assignment.
+   */
+  async globalAutoMatch(enrollmentsData, mentorsData) {
+    if (!this.enabled || enrollmentsData.length === 0 || mentorsData.length === 0) {
+      throw new Error('AI matching is disabled or no data available for matching.');
+    }
+
+    const prompt = `You are an expert mentor-mentee matching coordinator.
+    
+You must optimally match a list of mentees to available mentors.
+
+**Mentees (Enrollments):**
+${enrollmentsData.map(e => `
+- Enrollment ID: ${e.enrollmentId}
+  Required Skills: ${e.programRequirements.skills.join(', ')}
+  Goals: ${e.menteePayload.learningGoals.join(', ')}
+  Mentee Skills: ${e.menteePayload.skills.join(', ')}
+  Allowed Mentor IDs: ${e.allowedMentorIds.join(', ')}`).join('\n')}
+
+**Available Mentors:**
+${mentorsData.map(m => `
+- Mentor ID: ${m.id}
+  Skills: ${m.skills.join(', ')}
+  Specialization: ${m.specialization}
+  Available Capacity: ${m.maxMentees - m.currentMentees} slots`).join('\n')}
+
+**Rules:**
+1. Each mentee MUST be matched to exactly ONE mentor from their 'Allowed Mentor IDs' list.
+2. A mentor CANNOT be assigned more mentees than their 'Available Capacity'.
+3. Maximize overall compatibility across all mentees.
+4. If no mentor is suitable or has capacity for a mentee, omit that mentee from the results.
+
+Output ONLY valid JSON in this exact format:
+{
+  "matches": [
+    {
+      "enrollmentId": "<id>",
+      "mentorId": "<id>",
+      "score": 85,
+      "reasoning": "Brief explanation"
+    }
+  ]
+}`;
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          { role: 'system', content: 'You are an AI matching engine. You must output valid JSON only.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 2000,
+        response_format: { type: 'json_object' }
+      });
+
+      const content = response.choices[0].message.content.trim();
+      const cleanedJSON = this.sanitizeJSON(content);
+      const parsed = JSON.parse(cleanedJSON);
+      return parsed.matches || [];
+    } catch (error) {
+      console.error('Groq globalAutoMatch error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
    * Ask Groq AI to select the most appropriate starting level for a mentee.
    * Falls back to keyword scoring if AI is unavailable.
    *
