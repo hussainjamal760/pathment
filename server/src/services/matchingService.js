@@ -247,6 +247,131 @@ class MatchingService {
     return suggestions.sort((a, b) => b.matchScore - a.matchScore);
   }
 
+  /**
+   * Fetch AI suggestions for multiple enrollments in a single batch.
+   * Returns an object mapping enrollmentId -> array of suggestions.
+   */
+  async getBatchAISuggestions(enrollmentIds) {
+    if (!enrollmentIds || enrollmentIds.length === 0) return {};
+
+    const enrollments = await models.Enrollment.findAll({
+      where: { id: { [Op.in]: enrollmentIds } },
+      include: [
+        {
+          model: models.User,
+          as: 'mentee',
+          include: [
+            { model: models.MenteeProfile, as: 'menteeProfile' },
+            {
+              model: models.Skill,
+              as: 'skills',
+              through: { attributes: ['proficiencyLevel', 'yearsOfExperience'] }
+            }
+          ]
+        },
+        { model: models.ProgramLevel, as: 'currentLevel' }
+      ]
+    });
+
+    if (enrollments.length === 0) return {};
+
+    const enrollmentsData = [];
+    const uniqueLevelIds = new Set();
+    const enrollmentMap = new Map(enrollments.map(e => [e.id, e]));
+
+    for (const enrollment of enrollments) {
+      if (!enrollment.currentLevelId) continue;
+      uniqueLevelIds.add(enrollment.currentLevelId);
+      
+      const menteeProfileData = enrollment.mentee?.menteeProfile;
+      const menteeSkillNames = (enrollment.mentee?.skills || []).map(s => s.name);
+
+      enrollmentsData.push({
+        enrollmentId: enrollment.id,
+        levelId: enrollment.currentLevelId,
+        programRequirements: {
+          skills: (enrollment.currentLevel?.learningOutcomes || []),
+          level: enrollment.currentLevel?.name || 'Not specified'
+        },
+        menteePayload: {
+          learningGoals: menteeProfileData?.learningGoals || [],
+          interests: menteeProfileData?.interests || [],
+          skills: menteeSkillNames,
+          learningStyle: menteeProfileData?.preferredLearningStyle || 'Not specified',
+          priorExperience: menteeProfileData?.priorExperience || ''
+        }
+      });
+    }
+
+    const levelMentorsMap = new Map();
+    for (const levelId of uniqueLevelIds) {
+      const levelMentors = await this.getLevelMentors(levelId);
+      levelMentorsMap.set(levelId, levelMentors.map(m => m.id));
+    }
+
+    const allMentorIds = new Set(Array.from(levelMentorsMap.values()).flat());
+    if (allMentorIds.size === 0) return {};
+
+    const mentorUsers = await models.User.findAll({
+      where: { id: Array.from(allMentorIds) },
+      include: [
+        { model: models.MentorProfile, as: 'mentorProfile' },
+        {
+          model: models.Skill,
+          as: 'skills',
+          through: { attributes: ['proficiencyLevel', 'yearsOfExperience'] }
+        }
+      ]
+    });
+
+    const mentorUserMap = new Map(mentorUsers.map(m => [m.id, m]));
+
+    const mentorsData = mentorUsers.map(mentor => ({
+      id: mentor.id,
+      skills: (mentor.skills || []).map(s => s.name),
+      specialization: (mentor.mentorProfile?.specialization || []).join(', '),
+      currentMentees: mentor.mentorProfile?.currentMenteeCount || 0,
+      maxMentees: mentor.mentorProfile?.maxMentees || 5
+    }));
+
+    for (const e of enrollmentsData) {
+      e.allowedMentorIds = levelMentorsMap.get(e.levelId) || [];
+    }
+
+    const aiResultsMap = await groqService.getMultipleMenteesSuggestions(enrollmentsData, mentorsData);
+    const finalMap = {};
+
+    for (const enrollment of enrollments) {
+      const suggestions = aiResultsMap[enrollment.id] || [];
+      
+      const hydratedSuggestions = suggestions.map(aiResult => {
+        const mentor = mentorUserMap.get(aiResult.mentorId);
+        if (!mentor) return null;
+        
+        return {
+          mentor: {
+            id: mentor.id,
+            firstName: mentor.firstName,
+            lastName: mentor.lastName,
+            email: mentor.email,
+            mentorProfile: mentor.mentorProfile
+          },
+          level: enrollment.currentLevel,
+          currentMentees: mentor.mentorProfile?.currentMenteeCount || 0,
+          matchScore: aiResult.score,
+          matchReason: aiResult.reasoning || '',
+          strengths: aiResult.strengths || [],
+          concerns: aiResult.concerns || [],
+          breakdown: aiResult.breakdown || {}
+        };
+      }).filter(Boolean).sort((a, b) => b.matchScore - a.matchScore);
+
+      finalMap[enrollment.id] = hydratedSuggestions;
+    }
+
+    return finalMap;
+  }
+
   async getLevelMentors(levelId) {
     const assignments = await models.LevelMentorAssignment.findAll({
       where: { levelId, isActive: true },
@@ -720,12 +845,14 @@ class MatchingService {
     try {
       globalMatches = await groqService.globalAutoMatch(enrollmentsData, mentorsData);
     } catch (err) {
-      console.warn('Global AI match failed, falling back to sequential processing:', err.message);
-      
-      // Fallback: If the batch API call fails, process them one by one
-      for (const e of enrollmentsData) {
-        try {
-          const suggestions = await this.getAISuggestions(e.enrollmentId);
+      // Fallback: If the global batch API call fails (e.g. prompt too big),
+      // fall back to the chunked suggestions method.
+      try {
+        const enrollmentIds = enrollmentsData.map(e => e.enrollmentId);
+        const batchMap = await this.getBatchAISuggestions(enrollmentIds);
+        
+        for (const e of enrollmentsData) {
+          const suggestions = batchMap[e.enrollmentId];
           if (suggestions && suggestions.length > 0) {
             globalMatches.push({
               enrollmentId: e.enrollmentId,
@@ -734,9 +861,9 @@ class MatchingService {
               reasoning: suggestions[0].matchReason
             });
           }
-        } catch (fallbackErr) {
-          console.error(`Fallback failed for ${e.enrollmentId}:`, fallbackErr.message);
         }
+      } catch (fallbackErr) {
+        console.error(`Fallback failed:`, fallbackErr.message);
       }
     }
 

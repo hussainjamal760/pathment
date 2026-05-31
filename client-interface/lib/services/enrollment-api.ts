@@ -90,6 +90,11 @@ export const matchingApi = {
     return apiClient.get(apiConfig.endpoints.matchSuggestions(enrollmentId));
   },
 
+  // Get AI match suggestions for multiple enrollments in one call
+  getBatchSuggestions: (enrollmentIds: string[]) => {
+    return apiClient.post(`${apiConfig.endpoints.matches}/suggestions/batch`, { enrollmentIds });
+  },
+
   // Get mentors assigned to a level
   getLevelMentors: (levelId: string) => {
     return apiClient.get(apiConfig.endpoints.levelMentors(levelId));

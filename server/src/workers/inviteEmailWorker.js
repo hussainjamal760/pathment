@@ -23,10 +23,10 @@ inviteEmailQueue.process(CONCURRENCY, async (job) => {
   }
 });
 
-inviteEmailQueue.on('failed', (job, err) => {
-  console.error(`[invite-email-queue] job ${job.id} failed for ${job.data.email}:`, err.message);
-});
+// inviteEmailQueue.on('failed', (job, err) => {
+//   console.error(`[invite-email-queue] job ${job.id} failed for ${job.data.email}:`, err.message);
+// });
 
-inviteEmailQueue.on('error', (err) => {
-  console.error('[invite-email-queue] queue error:', err.message);
-});
+// inviteEmailQueue.on('error', (err) => {
+//   console.error('[invite-email-queue] queue error:', err.message);
+// });

@@ -120,20 +120,24 @@ export function useMentorAssignment(): UseMentorAssignmentReturn {
       const list = response?.data?.enrollments || response?.enrollments || [];
       setEnrollments(list);
 
-      // Fetch level mentors + AI suggestions per enrollment
+      // Fetch level mentors per enrollment level
       for (const enrollment of list) {
         if (!enrollment.currentLevel?.id) continue;
-
         try {
+          // It's safe to loop these because they hit DB, not external API
           const mRes = await matchingApi.getLevelMentors(enrollment.currentLevel.id);
           const mentorsList = mRes?.data?.mentors || mRes?.mentors || [];
           setLevelMentors(prev => ({ ...prev, [enrollment.currentLevel.id]: mentorsList }));
         } catch { /* non-fatal */ }
+      }
 
+      // Fetch AI suggestions for ALL pending enrollments in ONE batch request
+      const pendingEnrollmentIds = list.map((e: any) => e.id);
+      if (pendingEnrollmentIds.length > 0) {
         try {
-          const sRes = await matchingApi.getSuggestions(enrollment.id);
-          const suggestionsList = sRes?.data?.suggestions || sRes?.suggestions || [];
-          setSuggestions(prev => ({ ...prev, [enrollment.id]: suggestionsList }));
+          const sRes = await matchingApi.getBatchSuggestions(pendingEnrollmentIds);
+          const suggestionsMap = sRes?.data?.suggestionsMap || sRes?.suggestionsMap || {};
+          setSuggestions(prev => ({ ...prev, ...suggestionsMap }));
         } catch { /* non-fatal */ }
       }
     } catch {

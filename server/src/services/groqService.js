@@ -71,10 +71,6 @@ class GroqService {
 
       let content = response.choices[0].message.content.trim();
       
-      console.log('📥 Raw Groq response length:', content.length);
-      console.log('📥 First 200 chars:', content.substring(0, 200));
-      console.log('📥 Last 200 chars:', content.substring(content.length - 200));
-      
       // Try multiple extraction methods
       let jsonContent = content;
       
@@ -601,6 +597,88 @@ Output ONLY valid JSON in this exact format:
       console.error('Groq globalAutoMatch error:', error.message);
       throw error;
     }
+  }
+
+  /**
+   * Fetch top suggestions for multiple mentees in a single API call.
+   * Useful for loading the UI grid without hitting the API per mentee.
+   */
+  async getMultipleMenteesSuggestions(enrollmentsData, mentorsData) {
+    if (!this.enabled || enrollmentsData.length === 0 || mentorsData.length === 0) {
+      return {};
+    }
+
+    // Chunk enrollments to avoid exceeding token limits (e.g. process 10 at a time max)
+    const MAX_CHUNK = 10;
+    let finalMap = {};
+
+    for (let i = 0; i < enrollmentsData.length; i += MAX_CHUNK) {
+      const chunk = enrollmentsData.slice(i, i + MAX_CHUNK);
+      
+      const prompt = `You are an expert mentor-mentee matching engine.
+For EACH mentee provided, evaluate the available mentors and return the top 3 most compatible mentors.
+
+**Mentees (Enrollments):**
+${chunk.map(e => `
+- Enrollment ID: ${e.enrollmentId}
+  Skills Needed: ${e.programRequirements.skills.join(', ')}
+  Mentee Goals: ${e.menteePayload.learningGoals.join(', ')}
+  Mentee Skills: ${e.menteePayload.skills.join(', ')}
+  Allowed Mentor IDs: ${e.allowedMentorIds.join(', ')}`).join('\n')}
+
+**Available Mentors:**
+${mentorsData.map(m => `
+- Mentor ID: ${m.id}
+  Skills: ${m.skills.join(', ')}
+  Specialization: ${m.specialization}
+  Available Capacity: ${m.maxMentees - m.currentMentees}`).join('\n')}
+
+**Rules:**
+1. For EACH Mentee, select up to 3 mentors ONLY from their 'Allowed Mentor IDs'.
+2. Provide a score (0-100) and a brief reasoning.
+
+Output ONLY valid JSON in this exact format:
+{
+  "suggestionsMap": {
+    "<enrollmentId>": [
+      {
+        "mentorId": "<id>",
+        "score": 85,
+        "reasoning": "Brief explanation",
+        "strengths": ["strength 1"],
+        "concerns": []
+      }
+    ]
+  }
+}`;
+
+      try {
+        const response = await this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            { role: 'system', content: 'You are an AI matching engine. You must output valid JSON only.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 2500,
+          response_format: { type: 'json_object' }
+        });
+
+        const content = response.choices[0].message.content.trim();
+        const cleanedJSON = this.sanitizeJSON(content);
+        const parsed = JSON.parse(cleanedJSON);
+        
+        if (parsed.suggestionsMap) {
+          finalMap = { ...finalMap, ...parsed.suggestionsMap };
+        }
+      } catch (error) {
+        console.error('Groq getMultipleMenteesSuggestions chunk error:', error.message);
+        // If a chunk fails, we just continue so we don't break everything, or we could throw.
+        // Returning what we have is safer for the UI.
+      }
+    }
+    
+    return finalMap;
   }
 
   /**

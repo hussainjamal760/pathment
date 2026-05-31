@@ -28,6 +28,20 @@ exports.getAISuggestions = catchAsync(async (req, res) => {
 });
 
 /**
+ * Get AI match suggestions for multiple enrollments
+ * POST /api/matches/suggestions/batch
+ */
+exports.getBatchAISuggestions = catchAsync(async (req, res) => {
+  const { enrollmentIds } = req.body;
+  if (!Array.isArray(enrollmentIds)) {
+    throw new ValidationError('enrollmentIds must be an array');
+  }
+
+  const suggestionsMap = await matchingService.getBatchAISuggestions(enrollmentIds);
+  res.status(200).json(successResponse('Batch AI suggestions retrieved', { suggestionsMap }));
+});
+
+/**
  * Get mentors assigned to a level
  * GET /api/matches/levels/:levelId/mentors
  */
