@@ -20,8 +20,28 @@ exports.autoAssignWeekTasks = catchAsync(async (req, res) => {
 exports.createCustomTask = catchAsync(async (req, res) => {
   const mentorId = req.user.id;
   
-  const task = await taskService.createCustomTask(req.body, mentorId);
-  res.status(201).json(successResponse('Custom task created successfully', { task }, 201));
+  if (req.body.mentees && Array.isArray(req.body.mentees) && req.body.mentees.length > 0) {
+    const results = {
+      successful: [],
+      failed: []
+    };
+    for (const mentee of req.body.mentees) {
+      try {
+        const task = await taskService.createCustomTask({
+          ...req.body,
+          menteeId: mentee.menteeId,
+          enrollmentId: mentee.enrollmentId
+        }, mentorId);
+        results.successful.push({ menteeId: mentee.menteeId, taskId: task.assignedTasks?.[0]?.id });
+      } catch (error) {
+        results.failed.push({ menteeId: mentee.menteeId, reason: error.message });
+      }
+    }
+    return res.status(201).json(successResponse('Custom tasks creation completed', results, 201));
+  } else {
+    const task = await taskService.createCustomTask(req.body, mentorId);
+    return res.status(201).json(successResponse('Custom task created successfully', { task }, 201));
+  }
 });
 
 /**

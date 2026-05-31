@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
+const taskTemplateController = require('../controllers/taskTemplateController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 /**
@@ -25,6 +26,41 @@ router.post(
   authenticate,
   authorize(['mentor']),
   taskController.createCustomTask
+);
+
+router.post(
+  '/templates',
+  authenticate,
+  authorize(['mentor']),
+  taskTemplateController.createTemplate
+);
+
+router.get(
+  '/templates',
+  authenticate,
+  authorize(['mentor']),
+  taskTemplateController.getTemplates
+);
+
+router.put(
+  '/templates/:id',
+  authenticate,
+  authorize(['mentor']),
+  taskTemplateController.updateTemplate
+);
+
+router.delete(
+  '/templates/:id',
+  authenticate,
+  authorize(['mentor']),
+  taskTemplateController.deleteTemplate
+);
+
+router.post(
+  '/templates/:id/assign',
+  authenticate,
+  authorize(['mentor']),
+  taskTemplateController.assignTemplate
 );
 
 /**

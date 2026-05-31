@@ -136,6 +136,7 @@ class TaskService {
       difficulty,
       dueDate,
       pointsBase,
+      estimatedHours,
       deliverable,
       acceptanceCriteria
     } = data;
@@ -173,7 +174,7 @@ class TaskService {
         taskOrder: 0,
         deliverable: deliverable || 'Complete the assigned task',
         acceptanceCriteria: acceptanceCriteria || [],
-        estimatedHours: 5,
+        estimatedHours: estimatedHours || 5,
         isMandatory: false,
         isCustomTask: true,
         pointsBase: pointsBase || 10
