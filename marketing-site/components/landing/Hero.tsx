@@ -182,13 +182,28 @@ export function Hero() {
                   </div>
                 </div>
 
-                <div className="flex items-start gap-2.5 rounded-lg border border-indigo-100 bg-indigo-50 p-3">
-                  <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-indigo-600" />
-                  <div className="text-xs text-indigo-950">
-                    <span className="font-semibold">Pathment AI recommendation:</span> 4 pairs on the
-                    Staff Track have completed &lsquo;Architecture Blueprint&rsquo; ahead of target.
-                    We suggest unlocking M2 (&lsquo;Cross-team Governance&rsquo;) templates
-                    automatically.
+                <div className="rounded-lg border border-zinc-200/80 bg-white p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-zinc-500">
+                      <Sparkles className="h-3.5 w-3.5 text-brand-600" />
+                      Suggested action
+                    </span>
+                    <span className="font-mono text-[10px] text-zinc-400">2m ago</span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-zinc-600">
+                    4 pairs finished{' '}
+                    <span className="font-medium text-zinc-900">Architecture Blueprint</span> ahead
+                    of schedule. Unlock{' '}
+                    <span className="font-medium text-zinc-900">M2 · Cross-team Governance</span> for
+                    them?
+                  </p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <span className="rounded-md bg-zinc-900 px-2.5 py-1 text-[11px] font-semibold text-white">
+                      Unlock M2
+                    </span>
+                    <span className="rounded-md border border-zinc-200 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
+                      Dismiss
+                    </span>
                   </div>
                 </div>
               </div>
