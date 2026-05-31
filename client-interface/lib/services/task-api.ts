@@ -66,7 +66,43 @@ export const taskApi = {
 
   // Admin APIs
   autoAssignWeekTasks: (enrollmentId: string, weekNumber: number) =>
-    apiClient.post('/tasks/auto-assign', { enrollmentId, weekNumber })
+    apiClient.post('/tasks/auto-assign', { enrollmentId, weekNumber }),
+
+  getTemplates: () =>
+    apiClient.get('/tasks/templates'),
+
+  createTemplate: (data: {
+    title: string;
+    description: string;
+    type?: string;
+    difficulty?: string;
+    deliverable?: string;
+    acceptanceCriteria?: string[];
+    estimatedHours?: number;
+    pointsBase?: number;
+  }) =>
+    apiClient.post('/tasks/templates', data),
+
+  updateTemplate: (templateId: string, data: {
+    title?: string;
+    description?: string;
+    type?: string;
+    difficulty?: string;
+    deliverable?: string;
+    acceptanceCriteria?: string[];
+    estimatedHours?: number;
+    pointsBase?: number;
+  }) =>
+    apiClient.put(`/tasks/templates/${templateId}`, data),
+
+  deleteTemplate: (templateId: string) =>
+    apiClient.delete(`/tasks/templates/${templateId}`),
+
+  assignTemplate: (templateId: string, data: {
+    mentees: { menteeId: string; enrollmentId: string }[];
+    dueDate?: string;
+  }) =>
+    apiClient.post(`/tasks/templates/${templateId}/assign`, data),
 };
 
 export default taskApi;
