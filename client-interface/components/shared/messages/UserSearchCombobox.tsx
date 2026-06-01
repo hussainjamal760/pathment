@@ -6,6 +6,7 @@ import Image from 'next/image';
 
 import { messagingApi } from '@/lib/services/messaging-api';
 import type { SearchableUser } from '@/lib/types/messaging';
+import { useAuth } from '@/lib/context/AuthContext';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -30,6 +31,7 @@ interface UserSearchComboboxProps {
 }
 
 export default function UserSearchCombobox({ onSelect }: UserSearchComboboxProps) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string | undefined>();
@@ -107,21 +109,23 @@ export default function UserSearchCombobox({ onSelect }: UserSearchComboboxProps
           />
 
           {/* Role filter tabs */}
-          <div className="flex items-center gap-1 px-2 py-2 border-b border-slate-100">
-            {roleOptions.map((option) => (
-              <button
-                key={option.label}
-                onClick={() => setRoleFilter(option.value)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  roleFilter === option.value
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          {user?.role !== 'mentee' && (
+            <div className="flex items-center gap-1 px-2 py-2 border-b border-slate-100">
+              {roleOptions.map((option) => (
+                <button
+                  key={option.label}
+                  onClick={() => setRoleFilter(option.value)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                    roleFilter === option.value
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           <CommandList>
             {isLoading ? (

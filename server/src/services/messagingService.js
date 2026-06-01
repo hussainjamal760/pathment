@@ -553,11 +553,27 @@ class MessagingService {
     const limit = Math.min(Math.max(Number(options.limit || 10), 1), 25);
     const roleFilter = options.role;
 
+    const currentUser = await models.User.findByPk(currentUserId, { attributes: ['id', 'role'] });
+    if (!currentUser) return [];
+
     const where = {
       id: { [Op.ne]: currentUserId },
       status: 'active',
       deletedAt: null
     };
+
+    if (currentUser.role === 'mentee') {
+      const matches = await models.MentorMenteeMatch.findAll({
+        where: { menteeId: currentUserId, status: 'active' },
+        attributes: ['mentorId']
+      });
+      const assignedMentorIds = matches.map((m) => m.mentorId);
+
+      if (assignedMentorIds.length === 0) {
+        return [];
+      }
+      where.id = { [Op.in]: assignedMentorIds };
+    }
 
     if (roleFilter && ['admin', 'mentor', 'mentee'].includes(roleFilter)) {
       where.role = roleFilter;
