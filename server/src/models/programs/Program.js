@@ -32,6 +32,16 @@ module.exports = (sequelize, DataTypes) => {
         isIn: [['draft', 'published', 'archived', 'completed']]
       }
     },
+    // Discoverability, separate from lifecycle status. Private programs never
+    // appear in any discovery surface — they're reached only by invite/assignment.
+    visibility: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'private',
+      validate: {
+        isIn: [['private', 'public']]
+      }
+    },
     totalDurationWeeks: {
       type: DataTypes.INTEGER,
       allowNull: false,
@@ -108,6 +118,7 @@ module.exports = (sequelize, DataTypes) => {
     paranoid: true,
     indexes: [
       { fields: ['status'] },
+      { fields: ['visibility'] },
       { fields: ['type'] },
       { fields: ['created_by'] },
       { fields: ['created_at'] },

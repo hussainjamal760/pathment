@@ -45,9 +45,9 @@ exports.getEnrollmentById = catchAsync(async (req, res) => {
  * POST /api/enrollments
  */
 exports.createEnrollment = catchAsync(async (req, res) => {
-  const { programId } = req.body;
-  const menteeId = req.user.id;
-  
+  // Admin-initiated enrollment: the target mentee is supplied explicitly.
+  const { programId, menteeId } = req.body;
+
   const enrollment = await enrollmentService.createEnrollment(programId, menteeId);
   res.status(201).json(successResponse('Enrolled successfully', { enrollment }, 201));
 });

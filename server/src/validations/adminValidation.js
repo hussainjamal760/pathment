@@ -7,7 +7,13 @@ const adminSchemas = {
   createInvite: Joi.object({
     email: Joi.string().email().required(),
     role: Joi.string().valid('mentor', 'mentee').required(),
-    expiresInHours: Joi.number().integer().min(1).max(24 * 30).optional()
+    expiresInHours: Joi.number().integer().min(1).max(24 * 30).optional(),
+    // Placement — id (UI) or name (CSV). Required-ness per role is enforced
+    // in the service (mentee → program; mentor → clan).
+    programId: Joi.string().optional().allow(null, ''),
+    program: Joi.string().optional().allow(null, ''),
+    clanId: Joi.string().optional().allow(null, ''),
+    clan: Joi.string().optional().allow(null, '')
   }),
 
   createAdmin: Joi.object({
@@ -56,7 +62,11 @@ const adminSchemas = {
     invites: Joi.array().items(
       Joi.object({
         email: Joi.string().email().required(),
-        role: Joi.string().valid('mentor', 'mentee').required()
+        role: Joi.string().valid('mentor', 'mentee').required(),
+        programId: Joi.string().optional().allow(null, ''),
+        program: Joi.string().optional().allow(null, ''),
+        clanId: Joi.string().optional().allow(null, ''),
+        clan: Joi.string().optional().allow(null, '')
       })
     ).min(1).max(1000).required()
   })

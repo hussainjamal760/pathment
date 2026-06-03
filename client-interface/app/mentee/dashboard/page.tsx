@@ -7,7 +7,6 @@ import {
   Clock,
   ListTodo,
   Loader2,
-  Plus,
   TrendingUp,
   Send,
   Star,
@@ -160,23 +159,17 @@ export default function MenteeDashboard() {
         </div>
       ) : (
         <>
-          {/* Quick Actions if no enrollments */}
+          {/* No enrollment yet — placement is admin/invite-driven now */}
           {enrollments.length === 0 && (
             <div className="bg-linear-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-8 text-center">
               <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <BookOpen className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-indigo-900 mb-3">Start Your Learning Journey</h2>
-              <p className="text-indigo-700 mb-6">
-                Browse available programs and request enrollment to get matched with a mentor
+              <h2 className="text-2xl font-bold text-indigo-900 mb-3">You're all set up</h2>
+              <p className="text-indigo-700">
+                You haven't been placed in a program yet. Your program team will enroll you and
+                connect you with a mentor — this page will fill in as soon as that happens.
               </p>
-              <Link
-                href="/mentee/programs"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Browse Programs
-              </Link>
             </div>
           )}
 
@@ -403,13 +396,6 @@ export default function MenteeDashboard() {
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-slate-900">My Enrollments</h2>
-                <Link
-                  href="/mentee/programs"
-                  className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Browse More Programs
-                </Link>
               </div>
               <div className="space-y-3">
                 {enrollments.map((enrollment) => (

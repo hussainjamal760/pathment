@@ -14,6 +14,7 @@ export interface ProgramDetailProgram {
   name: string;
   description?: string;
   status: string;
+  visibility?: string;
   type: string;
   tags?: string[];
   totalDurationWeeks?: number;
@@ -47,6 +48,7 @@ interface UseProgramDetailReturn {
   handleApproveEnrollment: (enrollmentId: string) => Promise<void>;
   handleRejectEnrollment: (enrollmentId: string) => Promise<void>;
   handleStatusUpdate: (newStatus: string) => Promise<void>;
+  handleVisibilityUpdate: (newVisibility: string) => Promise<void>;
   updatingStatus: boolean;
   fetchEnrollments: () => Promise<void>;
 }
@@ -159,6 +161,22 @@ export function useProgramDetail(): UseProgramDetailReturn {
     }
   }, [id, program]);
 
+  const handleVisibilityUpdate = useCallback(async (newVisibility: string) => {
+    if (!program) return;
+    const prev = (program as { visibility?: string }).visibility;
+    setProgram((p) => (p ? { ...p, visibility: newVisibility } : p));
+    setUpdatingStatus(true);
+    try {
+      await (programManagementApi.programs.update as (id: string, data: object) => Promise<unknown>)(id, { visibility: newVisibility });
+      toast.success(newVisibility === 'public' ? 'Program is now public' : 'Program is now private');
+    } catch (err: unknown) {
+      setProgram((p) => (p ? { ...p, visibility: prev } : p));
+      toast.error(extractApiErrorMessage(err, 'Failed to update visibility'));
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }, [id, program]);
+
   const copyToClipboard = useCallback((text: string, label: string) => {
     navigator.clipboard
       .writeText(text)
@@ -182,6 +200,7 @@ export function useProgramDetail(): UseProgramDetailReturn {
     handleApproveEnrollment,
     handleRejectEnrollment,
     handleStatusUpdate,
+    handleVisibilityUpdate,
     updatingStatus,
     fetchEnrollments,
   };

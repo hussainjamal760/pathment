@@ -39,7 +39,8 @@ class ProgramService {
       prerequisites,
       targetAudience,
       isTemplate,
-      status
+      status,
+      visibility
     } = programData;
 
     // Validate dates
@@ -53,6 +54,8 @@ class ProgramService {
       description,
       type,
       status: status || 'draft',
+      // Private by default — programs are invite-driven, never publicly browsed.
+      visibility: visibility === 'public' ? 'public' : 'private',
       totalDurationWeeks,
       estimatedHoursPerWeek,
       startDate,
@@ -79,7 +82,9 @@ class ProgramService {
       }
     });
 
-    if (program.status === 'published') {
+    // Only public programs are broadcast to mentees — private programs are
+    // invite-driven and never browsed, so no "new program available" blast.
+    if (program.status === 'published' && program.visibility === 'public') {
       const mentees = await models.User.findAll({
         where: { role: 'mentee', status: 'active' },
         attributes: ['id'],
@@ -127,11 +132,14 @@ class ProgramService {
 
     const where = {};
 
-    // Filter by status - admins and creators can see all, others only published
+    // Filter by status - admins and creators can see all, others only public+published.
+    // Privacy is enforced here at the API: a non-admin/non-creator can never list
+    // a private program, regardless of any query params they send.
     if (userRole === 'admin' || (createdBy && createdBy === userId)) {
       if (status) where.status = status;
     } else {
       where.status = 'published';
+      where.visibility = 'public';
     }
 
     if (type) where.type = type;
@@ -254,28 +262,48 @@ class ProgramService {
       throw new NotFoundError('Program not found');
     }
 
-    // Check visibility - only published programs visible to non-creators/non-admins
-    if (
-      program.status !== 'published' &&
-      userRole !== 'admin' &&
-      program.createdBy !== userId
-    ) {
-      // Also allow mentors who have an active match in this program.
-      if (userRole === 'mentor' && userId) {
-        const isMentorAssigned = await models.MentorMenteeMatch.count({
-          where: { mentorId: userId, status: 'active' },
-          include: [{
-            model: models.Enrollment,
-            as: 'enrollment',
-            where: { programId: program.id },
-            attributes: [],
-            required: true
-          }]
+    // Visibility check. Admins and the creator always see it. Everyone else
+    // may view it only if it's public+published OR they have a real relationship
+    // to it (mentee enrolled / mentor leading or co-mentoring a clan in it, or a
+    // legacy active 1:1 match). Private programs never leak via direct id.
+    const isPrivileged = userRole === 'admin' || program.createdBy === userId;
+    if (!isPrivileged) {
+      let allowed = program.status === 'published' && program.visibility === 'public';
+
+      if (!allowed && userId && userRole === 'mentee') {
+        const isEnrolled = await models.Enrollment.count({
+          where: { menteeId: userId, programId: program.id }
         });
-        if (!isMentorAssigned) {
-          throw new ForbiddenError('You do not have permission to view this program');
-        }
-      } else {
+        allowed = isEnrolled > 0;
+      }
+
+      if (!allowed && userId && userRole === 'mentor') {
+        const [clanAssigned, matchAssigned] = await Promise.all([
+          models.ClanMembership.count({
+            where: { userId, role: ['lead_mentor', 'co_mentor'], status: 'active' },
+            include: [{
+              model: models.Clan,
+              as: 'clan',
+              where: { programId: program.id },
+              attributes: [],
+              required: true
+            }]
+          }),
+          models.MentorMenteeMatch.count({
+            where: { mentorId: userId, status: 'active' },
+            include: [{
+              model: models.Enrollment,
+              as: 'enrollment',
+              where: { programId: program.id },
+              attributes: [],
+              required: true
+            }]
+          })
+        ]);
+        allowed = clanAssigned > 0 || matchAssigned > 0;
+      }
+
+      if (!allowed) {
         throw new ForbiddenError('You do not have permission to view this program');
       }
     }
@@ -373,7 +401,7 @@ class ProgramService {
       }
     });
 
-    if (program.status === 'published') {
+    if (program.status === 'published' && program.visibility === 'public') {
       const mentees = await models.User.findAll({
         where: { role: 'mentee', status: 'active' },
         attributes: ['id'],

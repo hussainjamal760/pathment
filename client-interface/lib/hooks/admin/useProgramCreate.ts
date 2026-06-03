@@ -11,6 +11,7 @@ export interface ProgramFormData {
   description: string;
   type: string;
   status: string;
+  visibility: string;
   totalDurationWeeks: number;
   estimatedHoursPerWeek: number;
   startDate: string;
@@ -23,7 +24,7 @@ export interface ProgramFormData {
 }
 
 const DEFAULT_PROGRAM: ProgramFormData = {
-  name: '', description: '', type: '', status: 'draft',
+  name: '', description: '', type: '', status: 'draft', visibility: 'private',
   totalDurationWeeks: 12, estimatedHoursPerWeek: 10,
   startDate: '', endDate: '', maxEnrollments: '',
   tags: [], learningOutcomes: [], prerequisites: [], targetAudience: '',

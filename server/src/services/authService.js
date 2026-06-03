@@ -51,11 +51,20 @@ class AuthService {
 
     const invite = await this.getActiveInviteByToken(inviteToken);
 
+    // Surface the placement so the registration page can show (read-only)
+    // which program/clan the person is joining.
+    const [program, clan] = await Promise.all([
+      invite.programId ? models.Program.findByPk(invite.programId, { attributes: ['id', 'name'] }) : null,
+      invite.clanId ? models.Clan.findByPk(invite.clanId, { attributes: ['id', 'name'] }) : null
+    ]);
+
     return {
       id: invite.id,
       email: invite.email,
       role: invite.role,
-      expiresAt: invite.expiresAt
+      expiresAt: invite.expiresAt,
+      program: program ? { id: program.id, name: program.name } : null,
+      clan: clan ? { id: clan.id, name: clan.name } : null
     };
   }
 
@@ -133,6 +142,53 @@ class AuthService {
       }
 
       await models.UserSettings.create({ userId: user.id }, { transaction });
+
+      // The invite is the placement — enroll/place strictly from the token,
+      // never from anything the registrant sent. Stale placement (program/clan
+      // deleted after the invite was issued) degrades gracefully.
+      if (role === 'mentee' && invite.programId) {
+        const program = await models.Program.findByPk(invite.programId, { transaction });
+        if (program) {
+          await models.Enrollment.create({
+            menteeId: user.id,
+            programId: invite.programId,
+            // Trace the enrollment back to its intake cohort, when present.
+            cohortId: invite.cohortId || null,
+            // Placed into a clan on the same invite ⇒ already matched.
+            status: invite.clanId ? 'active' : 'pending_match',
+            enrolledAt: new Date()
+          }, { transaction });
+        }
+      }
+
+      if (invite.clanId) {
+        const clan = await models.Clan.findByPk(invite.clanId, { transaction });
+        if (clan) {
+          let membershipRole = 'mentee';
+          if (role === 'mentor') {
+            // First mentor on the clan becomes its lead; later ones co-mentor.
+            if (!clan.leadMentorId) {
+              membershipRole = 'lead_mentor';
+              clan.leadMentorId = user.id;
+              await clan.save({ transaction });
+            } else {
+              membershipRole = 'co_mentor';
+            }
+          }
+          await models.ClanMembership.create({
+            clanId: clan.id,
+            userId: user.id,
+            role: membershipRole,
+            status: 'active'
+          }, { transaction });
+        }
+      }
+
+      // Link the originating application (if this invite came from intake).
+      await models.Application.update(
+        { userId: user.id },
+        { where: { inviteId: invite.id }, transaction }
+      );
 
       invite.usedAt = new Date();
       invite.usedBy = user.id;

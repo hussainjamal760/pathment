@@ -15,6 +15,8 @@ type InviteDetails = {
   email: string;
   role: 'mentor' | 'mentee';
   expiresAt: string;
+  program?: { id: string; name: string } | null;
+  clan?: { id: string; name: string } | null;
 };
 
 export default function RegisterPage() {
@@ -172,6 +174,13 @@ export default function RegisterPage() {
               You are invited as <span className="font-semibold capitalize">{inviteDetails.role}</span>
             </p>
             <p className="text-indigo-700 text-sm mt-1">Invite email: {inviteDetails.email}</p>
+            {(inviteDetails.program || inviteDetails.clan) && (
+              <p className="text-indigo-700 text-sm mt-1">
+                {inviteDetails.role === 'mentor' ? 'Mentoring' : 'Joining'}
+                {inviteDetails.program ? <> <span className="font-semibold">{inviteDetails.program.name}</span></> : ''}
+                {inviteDetails.clan ? <> · clan <span className="font-semibold">{inviteDetails.clan.name}</span></> : ''}
+              </p>
+            )}
           </div>
         )}
 

@@ -1,0 +1,107 @@
+module.exports = (sequelize, DataTypes) => {
+  const Application = sequelize.define('Application', {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
+    },
+    cohortId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: 'cohort_id'
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      validate: { isEmail: true }
+    },
+    firstName: {
+      type: DataTypes.STRING(120),
+      field: 'first_name'
+    },
+    lastName: {
+      type: DataTypes.STRING(120),
+      field: 'last_name'
+    },
+    phone: {
+      type: DataTypes.STRING(40)
+    },
+    // The program the applicant asked for (free text from intake) — used for
+    // triage. Actual placement comes from the cohort's program on accept.
+    programPreference: {
+      type: DataTypes.STRING(255),
+      field: 'program_preference'
+    },
+    // Where this record came from. Importer sets 'import'; manual add 'manual'.
+    source: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'import',
+      validate: {
+        isIn: [['google_form', 'manual', 'import', 'api']]
+      }
+    },
+    // Review pipeline stage.
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'pending',
+      validate: {
+        isIn: [['pending', 'assessment_sent', 'under_review', 'accepted', 'rejected', 'waitlisted']]
+      }
+    },
+    assessmentScore: {
+      type: DataTypes.DECIMAL(5, 2),
+      field: 'assessment_score'
+    },
+    reviewerNotes: {
+      type: DataTypes.TEXT,
+      field: 'reviewer_notes'
+    },
+    reviewedBy: {
+      type: DataTypes.UUID,
+      field: 'reviewed_by'
+    },
+    decidedAt: {
+      type: DataTypes.DATE,
+      field: 'decided_at'
+    },
+    // The invite issued when the application is accepted.
+    inviteId: {
+      type: DataTypes.UUID,
+      field: 'invite_id'
+    },
+    // The user account, once the applicant registers from their invite.
+    userId: {
+      type: DataTypes.UUID,
+      field: 'user_id'
+    },
+    // The full, schema-free intake answers — survives the form changing year to
+    // year. Operational fields are normalized onto MenteeProfile at accept time.
+    responses: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {}
+    }
+  }, {
+    tableName: 'applications',
+    underscored: true,
+    indexes: [
+      { fields: ['cohort_id'] },
+      { fields: ['email'] },
+      { fields: ['status'] },
+      { fields: ['cohort_id', 'email'], unique: true },
+      { fields: ['invite_id'] },
+      { fields: ['user_id'] }
+    ]
+  });
+
+  Application.associate = (models) => {
+    Application.belongsTo(models.Cohort, { foreignKey: 'cohort_id', as: 'cohort' });
+    Application.belongsTo(models.User, { foreignKey: 'reviewed_by', as: 'reviewer' });
+    Application.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+    Application.belongsTo(models.RegistrationInvite, { foreignKey: 'invite_id', as: 'invite' });
+  };
+
+  return Application;
+};

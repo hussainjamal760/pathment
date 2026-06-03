@@ -3,6 +3,8 @@ import { toast } from 'sonner';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { programsApi } from '@/lib/services/program-api';
+import { clanApi } from '@/lib/services/clan-api';
 
 export type InviteStatusFilter = 'all' | 'active' | 'used' | 'expired' | 'revoked';
 
@@ -16,6 +18,8 @@ export type InviteRecord = {
   createdAt: string;
   inviter?: { firstName: string; lastName: string; email: string };
   usedByUser?: { firstName: string; lastName: string; email: string };
+  program?: { id: string; name: string } | null;
+  clan?: { id: string; name: string } | null;
 };
 
 export type CreatedInvite = {
@@ -30,15 +34,22 @@ export type CreatedInvite = {
 export type CsvRow = {
   email: string;
   role: string;
+  /** Program name or id (required for mentees). */
+  program?: string;
+  /** Clan name or id (optional for mentees, required for mentors). */
+  clan?: string;
 };
 
 export type BulkReport = {
   successCount: number;
   skippedCount: number;
   totalProcessed: number;
-  successfulInvites: { email: string; role: string }[];
-  skippedInvites: { email: string; role: string; reason: string }[];
+  successfulInvites: { email: string; role: string; program?: string; clan?: string }[];
+  skippedInvites: { email: string; role: string; reason: string; program?: string; clan?: string }[];
 };
+
+export type PlacementOption = { id: string; name: string };
+export type ClanOption = { id: string; name: string; programId: string };
 
 export const MAX_CSV_SIZE = 5 * 1024 * 1024;
 
@@ -59,6 +70,8 @@ export function parseCsvText(text: string): CsvRow[] {
   const headerCols = lines[0].split(',').map((h) => h.trim().toLowerCase());
   const emailIdx = headerCols.indexOf('email');
   const roleIdx = headerCols.indexOf('role');
+  const programIdx = headerCols.indexOf('program');
+  const clanIdx = headerCols.indexOf('clan');
   if (emailIdx === -1 || roleIdx === -1) return [];
 
   const rows: CsvRow[] = [];
@@ -66,12 +79,18 @@ export function parseCsvText(text: string): CsvRow[] {
     const cols = lines[i].split(',').map((c) => c.trim());
     const email = cols[emailIdx]?.toLowerCase() || '';
     const role = cols[roleIdx]?.toLowerCase() || '';
+    const program = programIdx === -1 ? '' : (cols[programIdx] || '');
+    const clan = clanIdx === -1 ? '' : (cols[clanIdx] || '');
     if (email || role) {
-      rows.push({ email, role });
+      rows.push({ email, role, program, clan });
     }
   }
   return rows;
 }
+
+export const CSV_TEMPLATE = 'email,role,program,clan\n' +
+  'mentee@example.com,mentee,Data Engineering,Clan A\n' +
+  'mentor@example.com,mentor,,Clan A\n';
 
 export function useInvites() {
   const [loading, setLoading] = useState(true);
@@ -84,7 +103,29 @@ export function useInvites() {
     email: '',
     role: 'mentee' as 'mentor' | 'mentee',
     expiresInHours: 72,
+    programId: '',
+    clanId: '',
   });
+
+  const [programs, setPrograms] = useState<PlacementOption[]>([]);
+  const [clans, setClans] = useState<ClanOption[]>([]);
+
+  useEffect(() => {
+    programsApi
+      .getAll()
+      .then((r: any) => {
+        const list = Array.isArray(r?.data) ? r.data : (r?.data?.programs ?? []);
+        setPrograms(list.map((p: any) => ({ id: p.id, name: p.name })));
+      })
+      .catch(() => {});
+    clanApi
+      .list()
+      .then((r: any) => {
+        const list = r?.data?.clans ?? [];
+        setClans(list.map((c: any) => ({ id: c.id, name: c.name, programId: c.programId })));
+      })
+      .catch(() => {});
+  }, []);
 
   const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -124,10 +165,26 @@ export function useInvites() {
       toast.error('Email is required');
       return;
     }
+    // The invite is the placement: mentees need a program, mentors need a clan.
+    if (form.role === 'mentee' && !form.programId) {
+      toast.error('Select a program for this mentee');
+      return;
+    }
+    if (form.role === 'mentor' && !form.clanId) {
+      toast.error('Select a clan for this mentor to lead');
+      return;
+    }
 
     try {
       setCreating(true);
-      const response = await apiClient.post<any>(apiConfig.endpoints.adminInvites, form);
+      const payload = {
+        email: form.email,
+        role: form.role,
+        expiresInHours: form.expiresInHours,
+        programId: form.programId || undefined,
+        clanId: form.clanId || undefined,
+      };
+      const response = await apiClient.post<any>(apiConfig.endpoints.adminInvites, payload);
       const invite: CreatedInvite | undefined = response?.data?.invite || response?.invite;
 
       if (!invite?.inviteUrl) {
@@ -136,7 +193,7 @@ export function useInvites() {
 
       setCreatedInviteUrl(invite.inviteUrl);
       toast.success('Invite created successfully');
-      setForm((prev) => ({ ...prev, email: '' }));
+      setForm((prev) => ({ ...prev, email: '', programId: '', clanId: '' }));
       await fetchInvites(true);
     } catch (error: any) {
       toast.error(extractApiErrorMessage(error, 'Failed to create invite'));
@@ -252,7 +309,7 @@ export function useInvites() {
         if (!EMAIL_REGEX.test(r.email) && !VALID_ROLES.includes(r.role)) reason = 'Invalid email and role';
         else if (!EMAIL_REGEX.test(r.email)) reason = 'Invalid email';
         else if (!VALID_ROLES.includes(r.role)) reason = 'Invalid role';
-        return { email: r.email, role: r.role, reason };
+        return { email: r.email, role: r.role, program: r.program, clan: r.clan, reason };
       });
 
       if (clientSkippedRows.length > 0) {
@@ -282,6 +339,8 @@ export function useInvites() {
     createdInviteUrl,
     form,
     setForm,
+    programs,
+    clans,
     csvRows,
     setCsvRows,
     isDragging,

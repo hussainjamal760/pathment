@@ -6,6 +6,9 @@ const { authenticate, authorize } = require('../middlewares/auth');
 // Current user's clan memberships (any authenticated role).
 router.get('/me/memberships', authenticate, clanController.myMemberships);
 
+// Programs the current mentor runs (their clans + roster counts).
+router.get('/mentor/programs', authenticate, authorize(['mentor', 'admin']), clanController.mentorPrograms);
+
 // List clans (any authenticated user; filterable by program/status).
 router.get('/', authenticate, clanController.listClans);
 

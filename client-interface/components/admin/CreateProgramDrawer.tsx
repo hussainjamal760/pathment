@@ -95,6 +95,17 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
+          <div>
+            <label htmlFor="cp-visibility" className={labelCls}>Visibility</label>
+            <select id="cp-visibility" value={programData.visibility} onChange={(e) => setProgramData({ ...programData, visibility: e.target.value })} className={field}>
+              <option value="private">Private — invite-only, never browsed</option>
+              <option value="public">Public — discoverable by mentees</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-500">
+              Private programs are reached only through invites or admin placement. Keep private unless you want a public catalog.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="cp-weeks" className={labelCls}>Duration (weeks)</label>

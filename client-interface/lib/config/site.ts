@@ -59,11 +59,6 @@ export const navigationConfig = {
       icon: 'LayoutDashboard',
     },
     {
-      title: 'Programs',
-      href: '/mentee/programs/enroll',
-      icon: 'BookOpen',
-    },
-    {
       title: 'Tasks',
       href: '/mentee/tasks/list',
       icon: 'CheckSquare',

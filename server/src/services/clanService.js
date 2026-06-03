@@ -184,6 +184,58 @@ class ClanService {
       order: [['joinedAt', 'DESC']]
     });
   }
+
+  /**
+   * Programs a mentor is responsible for (leads or co-mentors), each with the
+   * clans they run inside it and roster counts. Powers the mentor "My Programs"
+   * view — mentors only ever see programs/clans they're actually assigned to.
+   */
+  async getMentorPrograms(userId) {
+    const memberships = await models.ClanMembership.findAll({
+      where: { userId, role: ['lead_mentor', 'co_mentor'], status: 'active' },
+      include: [{
+        model: models.Clan,
+        as: 'clan',
+        attributes: ['id', 'name', 'programId', 'status'],
+        include: [
+          { model: models.Program, as: 'program', attributes: ['id', 'name', 'status', 'visibility', 'description'] },
+          { model: models.ClanMembership, as: 'memberships', required: false, where: { status: 'active' }, attributes: ['id', 'role'] }
+        ]
+      }]
+    });
+
+    const programs = new Map();
+    for (const m of memberships) {
+      const clan = m.clan;
+      if (!clan) continue;
+      const program = clan.program;
+      const pid = program?.id || 'unassigned';
+      if (!programs.has(pid)) {
+        programs.set(pid, {
+          id: pid,
+          name: program?.name || 'Unassigned',
+          status: program?.status || null,
+          visibility: program?.visibility || null,
+          description: program?.description || null,
+          clans: []
+        });
+      }
+      const ms = clan.memberships || [];
+      programs.get(pid).clans.push({
+        id: clan.id,
+        name: clan.name,
+        myRole: m.role,
+        menteeCount: ms.filter((x) => x.role === 'mentee').length,
+        mentorCount: ms.filter((x) => ['lead_mentor', 'co_mentor'].includes(x.role)).length
+      });
+    }
+
+    return [...programs.values()].map((p) => ({
+      ...p,
+      clanCount: p.clans.length,
+      menteeCount: p.clans.reduce((s, c) => s + c.menteeCount, 0)
+    }));
+  }
 }
 
 module.exports = new ClanService();

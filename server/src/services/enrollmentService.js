@@ -132,8 +132,14 @@ class EnrollmentService {
       throw new NotFoundError('Program not found');
     }
 
-    if (program.status !== 'published') {
-      throw new ValidationError('Program is not available for enrollment');
+    // Programs are private/invite-driven now; admins may enroll into any
+    // program that isn't closed out. Only archived/completed are off-limits.
+    if (['archived', 'completed'].includes(program.status)) {
+      throw new ValidationError('Program is not open for enrollment');
+    }
+
+    if (!menteeId) {
+      throw new ValidationError('A mentee is required to create an enrollment');
     }
 
     // Check if already enrolled

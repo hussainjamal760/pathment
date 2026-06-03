@@ -29,6 +29,7 @@ const scheduleRoutes = require('./schedules');
 const trackRoutes = require('./tracks');
 const linearRoadmapRoutes = require('./linearRoadmaps');
 const mentorSpecRoutes = require('./mentorSpec');
+const intakeRoutes = require('./intake');
 
 /**
  * API Routes
@@ -120,6 +121,9 @@ router.use('/roadmaps', linearRoadmapRoutes);
 
 // Mentor handbook (admin-authored org doc, read by mentors)
 router.use('/mentor-spec', mentorSpecRoutes);
+
+// Registration intake — cohorts + applications (admin)
+router.use('/intake', intakeRoutes);
 
 
 

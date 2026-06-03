@@ -15,6 +15,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       field: 'program_id'
     },
+    // Intake batch this enrollment came from (stamped at registration when the
+    // invite carried a cohort). Nullable for direct/admin enrollments.
+    cohortId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'cohort_id'
+    },
     status: {
       type: DataTypes.STRING(25),
       defaultValue: 'pending_approval',
@@ -135,6 +142,7 @@ module.exports = (sequelize, DataTypes) => {
   Enrollment.associate = (models) => {
     Enrollment.belongsTo(models.User, { foreignKey: 'mentee_id', as: 'mentee' });
     Enrollment.belongsTo(models.Program, { foreignKey: 'program_id', as: 'program' });
+    Enrollment.belongsTo(models.Cohort, { foreignKey: 'cohort_id', as: 'cohort' });
     Enrollment.hasMany(models.MentorMenteeMatch, { foreignKey: 'enrollment_id', as: 'matches' });
   };
 

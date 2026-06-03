@@ -48,6 +48,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
   admin: [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/admin/programs/list', icon: BookOpen, label: 'Programs' },
+    { path: '/admin/cohorts', icon: CalendarRange, label: 'Intake' },
     { path: '/admin/roadmaps', icon: Route, label: 'Roadmaps' },
     { path: '/admin/rewards', icon: Gift, label: 'Rewards' },
     { path: '/admin/mentor-spec', icon: Compass, label: 'Mentor Spec' },
@@ -72,6 +73,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
   ],
   mentor: [
     { path: '/mentor/dashboard', icon: LayoutDashboard, label: 'Cockpit' },
+    { path: '/mentor/programs', icon: School, label: 'My Programs' },
     { path: '/mentor/review', icon: CalendarRange, label: 'Cohort Review' },
     { path: '/mentor/approvals', icon: ClipboardCheck, label: 'Approvals' },
     { path: '/mentor/at-risk', icon: AlertTriangle, label: 'At-risk' },
@@ -91,7 +93,6 @@ export const navigationConfig: Record<string, NavLink[]> = {
   mentee: [
     { path: '/mentee/dashboard', icon: LayoutDashboard, label: 'This Week' },
     { path: '/mentee/daily-log', icon: CalendarCheck, label: 'Daily Log' },
-    { path: '/mentee/programs', icon: BookOpen, label: 'Browse Programs' },
     { path: '/mentee/tasks', icon: ClipboardList, label: 'My Tasks' },
     { path: '/mentee/progress', icon: BarChart2, label: 'My Progress' },
     { path: '/mentee/meetings', icon: CalendarClock, label: 'My Mentor' },

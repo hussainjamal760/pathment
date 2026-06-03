@@ -47,6 +47,25 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       field: 'revoked_at'
     },
+    // Placement baked into the invite — the source of truth for enrollment.
+    // Mentee invites carry a program; mentor invites carry the clan they'll
+    // lead (program derived from it). clan_id is optional for mentees.
+    programId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'program_id'
+    },
+    clanId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'clan_id'
+    },
+    // Intake batch this invite belongs to (set when issued from an Application).
+    cohortId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'cohort_id'
+    },
     metadata: {
       type: DataTypes.JSONB,
       allowNull: false,
@@ -62,7 +81,10 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['invited_by'] },
       { fields: ['expires_at'] },
       { fields: ['used_at'] },
-      { fields: ['revoked_at'] }
+      { fields: ['revoked_at'] },
+      { fields: ['program_id'] },
+      { fields: ['clan_id'] },
+      { fields: ['cohort_id'] }
     ]
   });
 
@@ -75,6 +97,16 @@ module.exports = (sequelize, DataTypes) => {
     RegistrationInvite.belongsTo(models.User, {
       foreignKey: 'used_by',
       as: 'usedByUser',
+      onDelete: 'SET NULL'
+    });
+    RegistrationInvite.belongsTo(models.Program, {
+      foreignKey: 'program_id',
+      as: 'program',
+      onDelete: 'SET NULL'
+    });
+    RegistrationInvite.belongsTo(models.Clan, {
+      foreignKey: 'clan_id',
+      as: 'clan',
       onDelete: 'SET NULL'
     });
   };

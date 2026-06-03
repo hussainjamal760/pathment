@@ -114,7 +114,7 @@ export default function ProgramDetails() {
     id, program, loading, enrollments, loadingEnrollments,
     shareOpen, shareRef, setShareOpen, copyToClipboard,
     handleApproveEnrollment, handleRejectEnrollment,
-    handleStatusUpdate, updatingStatus,
+    handleStatusUpdate, handleVisibilityUpdate, updatingStatus,
     fetchEnrollments,
   } = useProgramDetail();
 
@@ -170,6 +170,20 @@ export default function ProgramDetails() {
                 onUpdate={handleStatusUpdate}
                 updating={updatingStatus}
               />
+              <button
+                type="button"
+                onClick={() => handleVisibilityUpdate(program.visibility === 'public' ? 'private' : 'public')}
+                disabled={updatingStatus}
+                title="Toggle whether mentees can discover this program"
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors disabled:opacity-50 ${
+                  program.visibility === 'public'
+                    ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                    : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${program.visibility === 'public' ? 'bg-sky-500' : 'bg-slate-400'}`} />
+                {program.visibility === 'public' ? 'Public' : 'Private'}
+              </button>
             </div>
             <p className="text-slate-600 mb-4">{program.description || 'No description available'}</p>
             {program.tags && program.tags.length > 0 && (
@@ -214,22 +228,6 @@ export default function ProgramDetails() {
                       <div>
                         <p className="text-sm font-medium text-slate-700">Mentor Program Link</p>
                         <p className="text-xs text-slate-500">Share with assigned mentors</p>
-                      </div>
-                    </button>
-
-                    <button
-                      onClick={() => copyToClipboard(
-                        `${window.location.origin}/mentee/programs/${id}/enroll`,
-                        'Enrollment link'
-                      )}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition-colors"
-                    >
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center shrink-0">
-                        <Copy className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-700">Enrollment Link</p>
-                        <p className="text-xs text-slate-500">Send to mentees to enroll</p>
                       </div>
                     </button>
                   </div>

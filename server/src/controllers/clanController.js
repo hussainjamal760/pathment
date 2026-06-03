@@ -32,6 +32,15 @@ const myMemberships = catchAsync(async (req, res) => {
 });
 
 /**
+ * GET /api/clans/mentor/programs
+ * Programs the current mentor runs, each with their clans + roster counts.
+ */
+const mentorPrograms = catchAsync(async (req, res) => {
+  const programs = await clanService.getMentorPrograms(req.user.id);
+  res.status(200).json(successResponse('Mentor programs retrieved', { programs }));
+});
+
+/**
  * GET /api/clans/:id
  */
 const getClan = catchAsync(async (req, res) => {
@@ -76,6 +85,7 @@ module.exports = {
   listClans,
   clanHealth,
   myMemberships,
+  mentorPrograms,
   getClan,
   createClan,
   updateClan,

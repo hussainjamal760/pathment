@@ -36,6 +36,13 @@ const programValidation = {
         'any.only': 'Status must be one of: draft, published, archived, completed'
       }),
 
+    visibility: Joi.string()
+      .valid('private', 'public')
+      .default('private')
+      .messages({
+        'any.only': 'Visibility must be one of: private, public'
+      }),
+
     totalDurationWeeks: Joi.number()
       .integer()
       .min(1)
@@ -153,6 +160,13 @@ const programValidation = {
       .optional()
       .messages({
         'any.only': 'Status must be one of: draft, published, archived, completed'
+      }),
+
+    visibility: Joi.string()
+      .valid('private', 'public')
+      .optional()
+      .messages({
+        'any.only': 'Visibility must be one of: private, public'
       }),
 
     totalDurationWeeks: Joi.number()

@@ -4,6 +4,12 @@ export type { Enrollment, EnrollmentStatus } from './useEnrollmentList';
 export { useAdminClans } from './useAdminClans';
 export type { UseAdminClansReturn, Clan, ClanMembershipRow } from './useAdminClans';
 
+export { useCohorts } from './useCohorts';
+export type { UseCohortsReturn, Cohort, CohortStatus } from './useCohorts';
+
+export { useCohortApplications } from './useCohortApplications';
+export type { Application, ApplicationStatus, ImportReport } from './useCohortApplications';
+
 export { useClanHealth } from './useClanHealth';
 export type {
   UseClanHealthReturn,
@@ -60,13 +66,15 @@ export type {
 export { useProgramCreate } from './useProgramCreate';
 export type { ProgramFormData } from './useProgramCreate';
 
-export { useInvites, isRowValid, EMAIL_REGEX, VALID_ROLES } from './useInvites';
+export { useInvites, isRowValid, EMAIL_REGEX, VALID_ROLES, CSV_TEMPLATE } from './useInvites';
 export type {
   InviteStatusFilter,
   InviteRecord,
   CreatedInvite,
   CsvRow,
   BulkReport,
+  PlacementOption,
+  ClanOption,
 } from './useInvites';
 
 export { useAdminActivity } from './useAdminActivity';
