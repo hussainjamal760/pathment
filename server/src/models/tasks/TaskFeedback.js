@@ -48,6 +48,22 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.JSONB,
       field: 'criteria_met'
     },
+    // The explicit review decision (4-decision model). isApproved is kept in
+    // sync (approved/approved_notes => true; changes/rejected => false) for
+    // backward compatibility with existing consumers.
+    decision: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      validate: {
+        isIn: [['approved', 'approved_notes', 'changes', 'rejected']]
+      }
+    },
+    // Labels of the acceptance criteria the mentor ticked during review.
+    checkedCriteria: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'checked_criteria'
+    },
     feedbackType: {
       type: DataTypes.STRING(20),
       defaultValue: 'general',

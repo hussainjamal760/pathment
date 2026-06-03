@@ -130,6 +130,7 @@ class TaskService {
       menteeId,
       enrollmentId,
       roadmapTaskId, // NEW: If provided, assign existing roadmap task
+      trackId, // Optional: personal lane this task belongs to
       title,
       description,
       type,
@@ -188,7 +189,8 @@ class TaskService {
       enrollmentId,
       status: 'assigned',
       dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      isCustomTask: roadmapTaskId ? false : true // Roadmap tasks are not custom
+      isCustomTask: roadmapTaskId ? false : true, // Roadmap tasks are not custom
+      trackId: trackId || null
     });
 
     await this.updateEnrollmentTaskStats(enrollmentId);
@@ -266,6 +268,11 @@ class TaskService {
           separate: true,
           order: [['version', 'DESC']],
           limit: 1
+        },
+        {
+          model: models.Track,
+          as: 'track',
+          attributes: ['id', 'name', 'color']
         }
       ],
       order: [

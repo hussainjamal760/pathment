@@ -32,7 +32,7 @@ function isLinkActive(link: NavLink, pathname: string): boolean {
 export default function Navigation({ role }: NavigationProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { logout, user, availableRoles, setActiveRole } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -100,6 +100,37 @@ export default function Navigation({ role }: NavigationProps) {
   const handleLogout = async () => {
     await logout();
     router.push('/login');
+  };
+
+  // ── Role switcher (multi-capability users) ────────────────────────────────
+  const switchRole = (target: UserRole) => {
+    if (target === role) return;
+    setActiveRole(target);
+    setMobileMenuOpen(false);
+    router.push(`/${target}/dashboard`);
+  };
+
+  const renderRoleSwitcher = () => {
+    if (!availableRoles || availableRoles.length <= 1) return null;
+    const order: UserRole[] = ['admin', 'mentor', 'mentee'];
+    const roles = order.filter((r) => availableRoles.includes(r));
+    return (
+      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
+        {roles.map((r) => (
+          <button
+            key={r}
+            onClick={() => switchRole(r)}
+            className={`flex-1 text-xs font-medium capitalize px-2 py-1.5 rounded-lg transition-all duration-150 ${
+              r === role
+                ? 'bg-white text-indigo-700 shadow-sm'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+    );
   };
 
   // ── Shared render helpers ─────────────────────────────────────────────────
@@ -208,6 +239,11 @@ export default function Navigation({ role }: NavigationProps) {
             </div>
           </div>
 
+          {/* Role switcher (only for users who hold more than one role view) */}
+          {availableRoles && availableRoles.length > 1 && (
+            <div className="px-3 pt-3">{renderRoleSwitcher()}</div>
+          )}
+
           {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-0.5">
             {renderNavItems()}
@@ -262,6 +298,9 @@ export default function Navigation({ role }: NavigationProps) {
         {mobileMenuOpen && (
           <div className="border-t border-slate-100 bg-white">
             <nav className="px-3 py-3 space-y-0.5">
+              {availableRoles && availableRoles.length > 1 && (
+                <div className="pb-2">{renderRoleSwitcher()}</div>
+              )}
               {renderNavItems(() => setMobileMenuOpen(false))}
               <button
                 onClick={handleLogout}

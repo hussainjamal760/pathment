@@ -15,6 +15,14 @@ export const menteeApi = {
     return apiClient.get(apiConfig.endpoints.menteeById(id));
   },
 
+  // The logged-in mentee's own fairness read (My Progress).
+  getMyProgress: () => apiClient.get('/mentee/progress'),
+
+  // Daily check-in log.
+  getDailyLog: () => apiClient.get('/mentee/daily-log'),
+  saveDailyLog: (data: { dateKey: string; tasksDone: string[]; slotsDone?: string[]; note?: string }) =>
+    apiClient.post('/mentee/daily-log', data),
+
   deleteUser: (id: string) => {
     return apiClient.delete(`/admin/users/${id}`);
   },

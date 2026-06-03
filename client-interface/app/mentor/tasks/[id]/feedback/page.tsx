@@ -161,7 +161,7 @@ export default function FeedbackProvision({ params }: PageProps) {
             <div className="mb-4">
               <h4 className="text-sm text-slate-700 mb-2">Acceptance Criteria</h4>
               <ul className="space-y-1">
-                {acceptanceCriteria.map((criterion, index) => (
+                {acceptanceCriteria.map((criterion: string, index: number) => (
                   <li key={index} className="flex items-start gap-2 text-sm text-slate-600">
                     <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0 mt-0.5" />
                     {criterion}
@@ -198,7 +198,7 @@ export default function FeedbackProvision({ params }: PageProps) {
           <div className="mb-6">
             <h4 className="text-sm text-slate-700 mb-3">Project Links</h4>
             <div className="space-y-2">
-              {submission.submissionUrls.map((url, index) => (
+              {submission.submissionUrls.map((url: string, index: number) => (
                 <a
                   key={index}
                   href={url}
@@ -219,7 +219,7 @@ export default function FeedbackProvision({ params }: PageProps) {
           <div>
             <h4 className="text-sm text-slate-700 mb-3">File Attachments</h4>
             <div className="space-y-2">
-              {submission.files.map((file) => (
+              {submission.files.map((file: any) => (
                 <div
                   key={file.id}
                   className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg"

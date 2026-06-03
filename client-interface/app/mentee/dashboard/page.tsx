@@ -11,9 +11,11 @@ import {
   TrendingUp,
   Send,
   Star,
+  ArrowRight,
+  Flag,
 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
-import { useMenteeDashboard, useMyActivity } from '@/lib/hooks/mentee';
+import { useMenteeDashboard, useMyActivity, useMenteeTasks } from '@/lib/hooks/mentee';
 import { ProgressBar, StatusBadge } from '@/components/admin/ui';
 import { RateMentorModal } from '@/components/mentee/dashboard';
 import { ActivityCard } from '@/components/shared/ActivityCard';
@@ -49,13 +51,89 @@ export default function MenteeDashboard() {
     refetch: refetchActivity,
   } = useMyActivity();
 
+  const { tasks: allTasks } = useMenteeTasks();
+
+  // This Week: surface the single most important next action.
+  const now = Date.now();
+  const taskTitle = (t: any) => t?.roadmapTask?.title || t?.title || 'Task';
+  const isLate = (t: any) =>
+    t.dueDate && new Date(t.dueDate).getTime() < now && !['completed', 'cancelled'].includes(t.status);
+  const activeTasks = (allTasks || []).filter((t: any) => !['completed', 'cancelled'].includes(t.status));
+  const heroTask =
+    activeTasks.find(isLate) ||
+    activeTasks.find((t: any) => t.status === 'in_progress') ||
+    activeTasks.find((t: any) => t.status === 'revision_needed') ||
+    activeTasks[0] ||
+    null;
+  const weekTasks = [...activeTasks]
+    .sort((a: any, b: any) => {
+      if (isLate(a) !== isLate(b)) return isLate(a) ? -1 : 1;
+      return new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime();
+    })
+    .slice(0, 8);
+  const firstName = user?.profile?.firstName || user?.firstName || '';
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-slate-900 mb-2">Welcome back{user?.profile?.firstName ? `, ${user.profile.firstName}` : ''}!</h1>
-        <p className="text-slate-600">Keep up the great work on your learning journey</p>
+        <h1 className="text-slate-900 mb-2">This week{firstName ? `, ${firstName}` : ''}</h1>
+        <p className="text-slate-600">Here&apos;s the one thing worth doing next.</p>
       </div>
+
+      {/* Hero: the single most important next action */}
+      {heroTask && (
+        <Link
+          href={`/mentee/tasks/${heroTask.id}`}
+          className="block rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 hover:border-indigo-400 transition-colors"
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Next up</span>
+            {isLate(heroTask) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs">
+                <Clock className="w-3 h-3" />overdue
+              </span>
+            )}
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900">{taskTitle(heroTask)}</h2>
+          <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+            {heroTask.roadmapTask?.type && <span className="capitalize">{heroTask.roadmapTask.type}</span>}
+            {heroTask.dueDate && (<><span className="text-slate-300">·</span><span>Due {new Date(heroTask.dueDate).toLocaleDateString()}</span></>)}
+          </div>
+          <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700">
+            Open task <ArrowRight className="w-4 h-4" />
+          </span>
+        </Link>
+      )}
+
+      {/* This week's tasks */}
+      {weekTasks.length > 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200">
+          <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+            <h2 className="text-slate-900">This week</h2>
+            <Link href="/mentee/tasks" className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-1">
+              All tasks <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {weekTasks.map((t: any) => (
+              <Link key={t.id} href={`/mentee/tasks/${t.id}`}
+                className="flex items-center gap-3 px-6 py-3.5 hover:bg-slate-50 transition-colors">
+                {t.status === 'revision_needed'
+                  ? <Flag className="w-4 h-4 text-orange-500 shrink-0" />
+                  : <Clock className={`w-4 h-4 shrink-0 ${isLate(t) ? 'text-red-500' : 'text-slate-300'}`} />}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900 truncate">{taskTitle(t)}</p>
+                  {t.roadmapTask?.type && <p className="text-xs text-slate-500 capitalize">{t.roadmapTask.type}</p>}
+                </div>
+                <span className="text-xs text-slate-400 shrink-0">
+                  {t.dueDate ? new Date(t.dueDate).toLocaleDateString() : ''}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Activity self-view */}
       <ActivityCard

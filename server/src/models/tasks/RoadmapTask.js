@@ -10,6 +10,14 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true, // Nullable for custom tasks
       field: 'roadmap_week_id'
     },
+    // Direct link to the roadmap this task is a step of (linear model). For
+    // legacy week-based tasks this is backfilled from the week; new authored
+    // roadmaps set it directly and may have no week.
+    roadmapId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'roadmap_id'
+    },
     title: {
       type: DataTypes.STRING(255),
       allowNull: false
@@ -22,7 +30,9 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        isIn: [['reading', 'video', 'exercise', 'project', 'quiz', 'discussion', 'practical', 'assessment', 'custom']]
+        // 'assignment' added to match the new-design TaskType
+        // (assignment/project/quiz/reading/video/discussion).
+        isIn: [['reading', 'video', 'exercise', 'project', 'quiz', 'discussion', 'practical', 'assessment', 'custom', 'assignment']]
       }
     },
     difficulty: {
@@ -48,6 +58,18 @@ module.exports = (sequelize, DataTypes) => {
     estimatedHours: {
       type: DataTypes.INTEGER,
       field: 'estimated_hours'
+    },
+    // Linear-roadmap step fields (new design): relative effort + how many days
+    // after assignment the step is due.
+    effort: {
+      type: DataTypes.STRING(2),
+      allowNull: true,
+      validate: { isIn: [['xs', 's', 'm', 'l']] }
+    },
+    dueOffsetDays: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: 'due_offset_days'
     },
     isMandatory: {
       type: DataTypes.BOOLEAN,
@@ -77,6 +99,7 @@ module.exports = (sequelize, DataTypes) => {
 
   RoadmapTask.associate = (models) => {
     RoadmapTask.belongsTo(models.RoadmapWeek, { foreignKey: 'roadmap_week_id', as: 'week' });
+    RoadmapTask.belongsTo(models.Roadmap, { foreignKey: 'roadmap_id', as: 'roadmap' });
     RoadmapTask.hasMany(models.TaskResource, { foreignKey: 'roadmap_task_id', as: 'resources' });
     RoadmapTask.hasMany(models.TaskSkill, { foreignKey: 'roadmap_task_id', as: 'taskSkills' });
     RoadmapTask.hasMany(models.AssignedTask, { foreignKey: 'roadmap_task_id', as: 'assignments' });

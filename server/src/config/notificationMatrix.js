@@ -13,7 +13,8 @@ const NOTIFICATION_EVENTS = {
   PASSWORD_RESET: 'password_reset',
   WEEKLY_PROGRESS_REPORT: 'weekly_progress_report',
   EXTENSION_REQUESTED: 'extension_requested',
-EXTENSION_HANDLED: 'extension_handled'
+EXTENSION_HANDLED: 'extension_handled',
+  MENTOR_NUDGE: 'mentor_nudge'
 };
 
 const NOTIFICATION_MATRIX = {
@@ -91,7 +92,12 @@ const NOTIFICATION_MATRIX = {
   type: 'task',
   preferenceKey: 'extension_handled',
   channels: { inApp: true, email: true, chat: false }
-}
+},
+  [NOTIFICATION_EVENTS.MENTOR_NUDGE]: {
+    type: 'system',
+    preferenceKey: 'mentor_nudge',
+    channels: { inApp: true, email: false, chat: false }
+  }
 };
 
 module.exports = {

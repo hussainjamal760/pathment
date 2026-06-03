@@ -55,6 +55,35 @@ module.exports = (sequelize, DataTypes) => {
     estimatedTotalHours: {
       type: DataTypes.INTEGER,
       field: 'estimated_total_hours'
+    },
+    // Linear-roadmap template fields. Existing program-curriculum roadmaps are
+    // 'org' + published; mentors author 'local' ones and may import an org one.
+    source: {
+      type: DataTypes.STRING(10),
+      allowNull: false,
+      defaultValue: 'org',
+      validate: { isIn: [['org', 'local']] }
+    },
+    published: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true
+    },
+    importedFrom: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'imported_from'
+    },
+    ownerMentorId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'owner_mentor_id'
+    },
+    skillTags: {
+      type: DataTypes.ARRAY(DataTypes.STRING(40)),
+      allowNull: false,
+      defaultValue: [],
+      field: 'skill_tags'
     }
   }, {
     tableName: 'roadmaps',
@@ -72,6 +101,11 @@ module.exports = (sequelize, DataTypes) => {
     Roadmap.belongsTo(models.Roadmap, { foreignKey: 'adapted_from', as: 'parentRoadmap' });
     Roadmap.hasMany(models.RoadmapWeek, { foreignKey: 'roadmap_id', as: 'weeks' });
     Roadmap.hasMany(models.AdaptiveRecommendation, { foreignKey: 'current_roadmap_id', as: 'recommendations' });
+    // Linear steps: RoadmapTasks linked directly to the roadmap (ordered by
+    // task_order). Coexists with the legacy week grouping.
+    Roadmap.hasMany(models.RoadmapTask, { foreignKey: 'roadmap_id', as: 'steps' });
+    Roadmap.belongsTo(models.User, { foreignKey: 'owner_mentor_id', as: 'owner' });
+    Roadmap.hasMany(models.RoadmapProgress, { foreignKey: 'roadmap_id', as: 'progress' });
   };
 
   return Roadmap;

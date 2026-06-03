@@ -48,13 +48,21 @@ const authenticate = catchAsync(async (req, res, next) => {
 const authorize = (roles) => {
   const allowedRoles = Array.isArray(roles) ? roles : [roles];
   return (req, res, next) => {
-    console.log('Authorize middleware - Roles allowed:', allowedRoles, 'User role:', req.user?.role);
-    
     if (!req.user) {
       throw new AuthenticationError('You must be logged in to access this resource');
     }
-    console.log('User is authenticated with role:', req.user.role);
-    if (!allowedRoles.includes(req.user.role)) {
+
+    // Capability-aware authorization: a user passes if any of their platform
+    // capabilities matches an allowed role. `capabilities` always includes the
+    // primary `role` (enforced by the User model hook + migration backfill),
+    // so single-role users behave exactly as before, while a user who is e.g.
+    // both admin and mentee can reach role-scoped resources for either view.
+    const capabilities = Array.isArray(req.user.capabilities) && req.user.capabilities.length
+      ? req.user.capabilities
+      : [req.user.role];
+
+    const permitted = allowedRoles.some((r) => capabilities.includes(r));
+    if (!permitted) {
       throw new AuthorizationError(`This resource is only accessible to ${allowedRoles.join(', ')} users`);
     }
 

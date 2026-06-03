@@ -22,6 +22,7 @@ import {
 import { useTaskDetail } from '@/lib/hooks/mentee';
 import { PageHeader, StatusBadge } from '@/components/admin/ui';
 import { useActivityTracker } from '@/lib/hooks/shared/useActivityTracker';
+import { FrictionPanel } from '@/components/mentee/FrictionPanel';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -343,6 +344,11 @@ export default function TaskDetailsPage({ params }: PageProps) {
             </div>
           ))}
         </div>
+      )}
+
+      {/* What's getting in the way — log blocker / delay / request extension */}
+      {!['completed', 'cancelled'].includes(task.status) && (
+        <FrictionPanel taskId={task.id} />
       )}
 
       {/* Action: go to submit page if task still needs work */}

@@ -1,9 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthResponse, LoginCredentials, RegisterData, TwoFactorLoginResponse } from '../types';
+import { User, AuthResponse, LoginCredentials, RegisterData, TwoFactorLoginResponse, UserRole } from '../types';
 import { apiClient } from '../services/api-client';
 import { apiConfig } from '../config/api';
+
+/** Capabilities a user holds, always falling back to their primary role. */
+function getCapabilities(user: User | null): UserRole[] {
+  if (!user) return [];
+  return user.capabilities && user.capabilities.length ? user.capabilities : [user.role];
+}
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +17,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   requiresTwoFactor: boolean;
   temporaryToken: string | null;
+  /** The role view the user is currently in (one of their capabilities). */
+  activeRole: UserRole | null;
+  /** All role views the user may switch into. */
+  availableRoles: UserRole[];
+  /** Switch the active role view (no-op if not one of the user's capabilities). */
+  setActiveRole: (role: UserRole) => void;
   login: (credentials: LoginCredentials) => Promise<{ requiresTwoFactor: boolean }>;
   verify2FA: (code: string) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
@@ -30,10 +42,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [temporaryToken, setTemporaryToken] = useState<string | null>(null);
+  const [activeRole, setActiveRoleState] = useState<UserRole | null>(null);
 
   useEffect(() => {
     checkAuth();
   }, []);
+
+  // Keep activeRole valid as the user changes: prefer a persisted choice if it
+  // is still one of the user's capabilities, otherwise fall back to the
+  // primary role. Single-role users always resolve to their one role.
+  useEffect(() => {
+    if (!user) {
+      setActiveRoleState(null);
+      return;
+    }
+    const caps = getCapabilities(user);
+    const stored = (typeof window !== 'undefined'
+      ? (localStorage.getItem('activeRole') as UserRole | null)
+      : null);
+    const next = stored && caps.includes(stored)
+      ? stored
+      : (caps.includes(user.role) ? user.role : caps[0]);
+    setActiveRoleState(next);
+    if (typeof window !== 'undefined' && next) {
+      localStorage.setItem('activeRole', next);
+    }
+  }, [user]);
+
+  const setActiveRole = (role: UserRole) => {
+    if (!getCapabilities(user).includes(role)) return;
+    setActiveRoleState(role);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('activeRole', role);
+    }
+  };
 
   const checkAuth = async () => {
     try {
@@ -195,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('activeRole');
       setUser(null);
     }
   };
@@ -217,6 +260,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user && !requiresTwoFactor,
     requiresTwoFactor,
     temporaryToken,
+    activeRole,
+    availableRoles: getCapabilities(user),
+    setActiveRole,
     login,
     verify2FA,
     register,

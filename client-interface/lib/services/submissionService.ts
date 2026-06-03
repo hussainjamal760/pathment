@@ -89,6 +89,10 @@ export const submissionService = {
     revisionNotes?: string;
     criteriaMet?: Record<string, boolean>;
     pointsAwarded?: number;
+    /** 4-decision model: approved | approved_notes | changes | rejected */
+    decision?: 'approved' | 'approved_notes' | 'changes' | 'rejected';
+    /** Labels of the acceptance criteria the mentor ticked. */
+    checkedCriteria?: string[];
   }) {
     const response = await axiosInstance.post(`/submissions/${submissionId}/review`, data);
     return response.data;

@@ -1,6 +1,15 @@
 export { useEnrollmentList } from './useEnrollmentList';
 export type { Enrollment, EnrollmentStatus } from './useEnrollmentList';
 
+export { useAdminClans } from './useAdminClans';
+export type { UseAdminClansReturn, Clan, ClanMembershipRow } from './useAdminClans';
+
+export { useAnnouncements } from './useAnnouncements';
+export type { UseAnnouncementsReturn, Announcement } from './useAnnouncements';
+
+export { useClanRequests } from './useClanRequests';
+export type { UseClanRequestsReturn, ChangeRequest, CrossClanItem, OrgPolicy } from './useClanRequests';
+
 export { useMentorsList } from './useMentorsList';
 export type { MentorListItem, AcceptingFilter } from './useMentorsList';
 

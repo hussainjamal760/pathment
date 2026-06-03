@@ -467,7 +467,14 @@ class AuthService {
       include: [
         { model: models.MentorProfile, as: 'mentorProfile' },
         { model: models.MenteeProfile, as: 'menteeProfile' },
-        { model: models.AdminProfile, as: 'adminProfile' }
+        { model: models.AdminProfile, as: 'adminProfile' },
+        {
+          model: models.ClanMembership,
+          as: 'clanMemberships',
+          required: false,
+          where: { status: 'active' },
+          include: [{ model: models.Clan, as: 'clan', attributes: ['id', 'name', 'programId', 'status'] }]
+        }
       ]
     });
 

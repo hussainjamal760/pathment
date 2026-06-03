@@ -100,6 +100,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'cancellation_reason'
+    },
+    trackId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'track_id'
     }
   }, {
     tableName: 'assigned_tasks',
@@ -110,7 +115,8 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['enrollment_id'] },
       { fields: ['status'] },
       { fields: ['due_date'] },
-      { fields: ['roadmap_task_id'] }
+      { fields: ['roadmap_task_id'] },
+      { fields: ['track_id'] }
     ]
   });
 
@@ -119,6 +125,7 @@ module.exports = (sequelize, DataTypes) => {
     AssignedTask.belongsTo(models.User, { foreignKey: 'mentee_id', as: 'mentee' });
     AssignedTask.belongsTo(models.User, { foreignKey: 'mentor_id', as: 'mentor' });
     AssignedTask.belongsTo(models.Enrollment, { foreignKey: 'enrollment_id', as: 'enrollment' });
+    AssignedTask.belongsTo(models.Track, { foreignKey: 'track_id', as: 'track' });
     AssignedTask.hasMany(models.TaskSubmission, { foreignKey: 'assigned_task_id', as: 'submissions' });
     AssignedTask.hasMany(models.TaskFeedback, { foreignKey: 'assigned_task_id', as: 'feedback' });
     AssignedTask.hasMany(models.Message, { foreignKey: 'related_task_id', as: 'messages' });

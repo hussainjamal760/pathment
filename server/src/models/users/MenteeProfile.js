@@ -11,6 +11,11 @@ module.exports = (sequelize, DataTypes) => {
       unique: true,
       field: 'user_id'
     },
+    // Working-style read (new design): 4 dims 0–100. Mentor-curated.
+    personality: {
+      type: DataTypes.JSONB,
+      allowNull: true
+    },
     currentEducation: {
       type: DataTypes.STRING(200),
       field: 'current_education'

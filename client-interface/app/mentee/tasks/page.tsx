@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Clock, CheckCircle2, AlertCircle, FileText, Loader2, Star, Calendar, XCircle, BookOpen, Sparkles, GraduationCap, ClipboardList } from 'lucide-react';
+import { Clock, CheckCircle2, AlertCircle, FileText, Loader2, Star, Calendar, XCircle, BookOpen, Sparkles, GraduationCap, ClipboardList, Layers } from 'lucide-react';
 import { useMenteeTasks } from '@/lib/hooks/mentee';
 import { StatsCard, SearchAndFilterBar, StatusBadge } from '@/components/admin/ui';
 
@@ -54,6 +54,14 @@ export default function MenteeTasks() {
     if (!dueDate) return false;
     return new Date(dueDate) < new Date();
   };
+
+  // Group tasks by their personal lane (track) for a calm, scannable list.
+  const trackGroups = (filteredTasks as any[]).reduce((acc: Record<string, any[]>, t: any) => {
+    const key = t.track?.name || 'General';
+    (acc[key] = acc[key] || []).push(t);
+    return acc;
+  }, {} as Record<string, any[]>);
+  const showTrackHeaders = Object.keys(trackGroups).some((k) => k !== 'General') || Object.keys(trackGroups).length > 1;
 
   return (
     <div className="space-y-6">
@@ -152,11 +160,21 @@ export default function MenteeTasks() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-200">
-            {filteredTasks.map((task) => {
-              const overdue = isOverdue(task.dueDate) && !['completed', 'submitted'].includes(task.status);
-              
-              return (
+          <div>
+            {Object.entries(trackGroups).map(([trackName, groupTasks]) => (
+              <div key={trackName}>
+                {showTrackHeaders && (
+                  <div className="px-6 pt-4 pb-1 flex items-center gap-2 border-t border-slate-100 first:border-t-0">
+                    <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{trackName}</span>
+                    <span className="text-xs text-slate-400 tabular-nums">{(groupTasks as any[]).length}</span>
+                  </div>
+                )}
+                <div className="divide-y divide-slate-100">
+                  {(groupTasks as any[]).map((task) => {
+                    const overdue = isOverdue(task.dueDate) && !['completed', 'submitted'].includes(task.status);
+
+                    return (
                 <div key={task.id} className="p-6 hover:bg-slate-50 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                     <div className="flex-1 min-w-0">
@@ -293,7 +311,10 @@ export default function MenteeTasks() {
                   )}
                 </div>
               );
-            })}
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

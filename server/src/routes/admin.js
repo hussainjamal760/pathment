@@ -102,4 +102,12 @@ router.put(
   adminController.unsuspendUser
 );
 
+// Update a user's platform capabilities (multi-role views)
+router.patch(
+  '/users/:id/capabilities',
+  authenticate,
+  authorize('admin'),
+  adminController.updateUserCapabilities
+);
+
 module.exports = router;

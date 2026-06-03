@@ -25,6 +25,19 @@ module.exports = (sequelize, DataTypes) => {
         isIn: [['admin', 'mentor', 'mentee']]
       }
     },
+    /**
+     * Platform-level capabilities a user holds. `role` remains the user's
+     * primary/default view (kept for backward compatibility); `capabilities`
+     * is the full set of role views they may switch into. A user can be e.g.
+     * an admin who is also a mentee, or a mentee later elevated to mentor.
+     * Always kept as a superset that includes `role` (see hooks below).
+     */
+    capabilities: {
+      type: DataTypes.ARRAY(DataTypes.STRING(20)),
+      allowNull: false,
+      defaultValue: [],
+      field: 'capabilities'
+    },
     status: {
       type: DataTypes.STRING(20),
       defaultValue: 'pending',
@@ -99,7 +112,19 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['role'] },
       { fields: ['status'] },
       { fields: ['created_at'] }
-    ]
+    ],
+    hooks: {
+      // Guarantee capabilities always includes the primary role, so any
+      // existing code path that creates/updates a user without explicitly
+      // setting capabilities still produces a valid, capability-aware user.
+      beforeSave: (user) => {
+        const role = user.role;
+        const caps = Array.isArray(user.capabilities) ? user.capabilities : [];
+        if (role && !caps.includes(role)) {
+          user.capabilities = [...caps, role];
+        }
+      }
+    }
   });
 
   User.associate = (models) => {

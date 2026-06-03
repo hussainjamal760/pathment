@@ -18,6 +18,18 @@ const skillRoutes = require('./skills');
 const messagingRoutes = require('./messaging');
 const gamificationRoutes = require('./gamification');
 const activityRoutes = require('./activity');
+const clanRoutes = require('./clans');
+const mentorAreaRoutes = require('./mentor');
+const menteeAreaRoutes = require('./mentee');
+const frictionRoutes = require('./friction');
+const meetingRoutes = require('./meetings');
+const announcementRoutes = require('./announcements');
+const communityRoutes = require('./community');
+const clanRequestRoutes = require('./clanRequests');
+const rewardsRoutes = require('./rewards');
+const libraryRoutes = require('./library');
+const scheduleRoutes = require('./schedules');
+const trackRoutes = require('./tracks');
 
 /**
  * API Routes
@@ -73,6 +85,42 @@ router.use('/gamification', gamificationRoutes);
 
 // Activity tracking routes
 router.use('/activity', activityRoutes);
+
+// Clan routes (mentor-led groups inside a program)
+router.use('/clans', clanRoutes);
+
+// Mentor-area routes (logged-in mentor's cohort, etc.)
+router.use('/mentor', mentorAreaRoutes);
+
+// Mentee-area routes (logged-in mentee's own progress, etc.)
+router.use('/mentee', menteeAreaRoutes);
+
+// Blockers & delay events (friction / fairness inputs)
+router.use('/', frictionRoutes);
+
+// 1:1 scheduling (availability + meetings)
+router.use('/meetings', meetingRoutes);
+
+// Org announcements
+router.use('/announcements', announcementRoutes);
+
+// Mentee cohort community feed
+router.use('/community', communityRoutes);
+
+// Admin clan operations (change requests, cross-clan, policies)
+router.use('/clan-requests', clanRequestRoutes);
+
+// Rewards (gifts + redemptions)
+router.use('/rewards', rewardsRoutes);
+
+// Mentor Library (org documents)
+router.use('/library', libraryRoutes);
+
+// Schedule engine (templates + per-mentee slot schedules)
+router.use('/schedules', scheduleRoutes);
+
+// Tracks (per-mentee personal lanes)
+router.use('/tracks', trackRoutes);
 
 // Level mentor assignment routes
 router.use('/', levelMentorRoutes);

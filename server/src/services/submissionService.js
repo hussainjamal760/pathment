@@ -301,8 +301,14 @@ class SubmissionService {
       isApproved,
       revisionNotes,
       criteriaMet,
-      pointsAwarded
+      pointsAwarded,
+      decision,
+      checkedCriteria
     } = reviewData;
+
+    // Derive the explicit decision when not provided (keeps the 4-decision
+    // model and the legacy isApproved boolean in sync).
+    const resolvedDecision = decision || (isApproved ? 'approved' : 'changes');
 
     // Validate rating
     if (rating < 0 || rating > 5) {
@@ -340,6 +346,8 @@ class SubmissionService {
       isApproved,
       revisionNotes: isApproved ? null : revisionNotes,
       criteriaMet: criteriaMet || null,
+      decision: resolvedDecision,
+      checkedCriteria: checkedCriteria || null,
       feedbackType
     });
 
@@ -405,6 +413,18 @@ class SubmissionService {
 
     // Update mentor stats
     await this.updateMentorReviewStats(mentorId);
+
+    // Linear-roadmap auto-advance: if this approved task is a tracked roadmap
+    // step, advance the mentee's progress and assign the next step. Guarded so
+    // a failure here never blocks the review itself.
+    if (isApproved) {
+      try {
+        const linearRoadmapService = require('./linearRoadmapService');
+        await linearRoadmapService.advanceOnApproval(task.menteeId, task.roadmapTaskId);
+      } catch (err) {
+        console.error('Roadmap auto-advance failed (non-fatal):', err.message);
+      }
+    }
 
     const reviewedSubmission = await this.getSubmissionById(submissionId);
 
@@ -648,6 +668,75 @@ class SubmissionService {
       totalTasksCompleted,
       avgTaskRating
     });
+  }
+
+  /**
+   * The mentor's approvals queue: pending submissions across their assigned
+   * tasks, shaped for the review UI (criteria checklist + submission content).
+   */
+  async getMentorApprovalsQueue(mentorId) {
+    const submissions = await models.TaskSubmission.findAll({
+      where: { status: 'pending' },
+      include: [{
+        model: models.AssignedTask,
+        as: 'assignedTask',
+        required: true,
+        where: { mentorId, status: 'submitted' },
+        include: [
+          { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase'] },
+          { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
+        ]
+      }],
+      order: [['submittedAt', 'ASC']]
+    });
+
+    return submissions.map((s) => {
+      const t = s.assignedTask;
+      const m = t.mentee;
+      return {
+        submissionId: s.id,
+        taskId: t.id,
+        version: s.version,
+        submissionText: s.submissionText,
+        submissionUrls: s.submissionUrls || [],
+        submittedAt: s.submittedAt,
+        isLate: t.isLate,
+        title: t.roadmapTask?.title || 'Task',
+        type: t.roadmapTask?.type || null,
+        brief: t.roadmapTask?.description || null,
+        deliverable: t.roadmapTask?.deliverable || null,
+        criteria: t.roadmapTask?.acceptanceCriteria || [],
+        maxPoints: t.roadmapTask?.pointsBase ?? 10,
+        mentee: m ? {
+          id: m.id,
+          name: `${m.firstName} ${m.lastName}`.trim(),
+          avatar: `${(m.firstName || '').charAt(0)}${(m.lastName || '').charAt(0)}`.toUpperCase()
+        } : null
+      };
+    });
+  }
+
+  /**
+   * Bulk-approve a set of submissions (used for on-time work). Each goes
+   * through the normal review path so points/notifications/stats all fire.
+   * Returns per-submission results so the caller can report partial failure.
+   */
+  async bulkApprove(mentorId, submissionIds = []) {
+    const results = [];
+    for (const submissionId of submissionIds) {
+      try {
+        await this.reviewSubmission(submissionId, mentorId, {
+          rating: 5,
+          feedbackText: 'Approved.',
+          isApproved: true,
+          decision: 'approved'
+        });
+        results.push({ submissionId, ok: true });
+      } catch (error) {
+        results.push({ submissionId, ok: false, error: error.message });
+      }
+    }
+    return results;
   }
 }
 

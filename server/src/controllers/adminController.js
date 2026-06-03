@@ -162,6 +162,39 @@ class AdminController {
   });
 
   /**
+   * Update a user's platform capabilities (role views they may switch into).
+   * The primary `role` is always preserved by the User model hook.
+   * PATCH /api/admin/users/:id/capabilities
+   * body: { capabilities: ['admin'|'mentor'|'mentee', ...] }
+   */
+  updateUserCapabilities = catchAsync(async (req, res) => {
+    const { id } = req.params;
+    const { capabilities } = req.body;
+    const valid = ['admin', 'mentor', 'mentee'];
+
+    if (!Array.isArray(capabilities) || capabilities.some((c) => !valid.includes(c))) {
+      return res.status(400).json({
+        success: false,
+        message: 'capabilities must be an array of admin/mentor/mentee',
+        statusCode: 400
+      });
+    }
+
+    const user = await models.User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found', statusCode: 404 });
+    }
+
+    // De-dupe; the beforeSave hook guarantees the primary role stays included.
+    user.capabilities = [...new Set(capabilities)];
+    await user.save();
+
+    res.status(200).json(successResponse('Capabilities updated', {
+      user: { id: user.id, role: user.role, capabilities: user.capabilities }
+    }));
+  });
+
+  /**
    * Bulk create registration invites from a JSON array
    * POST /api/admin/invites/bulk
    */
