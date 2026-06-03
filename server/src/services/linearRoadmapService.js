@@ -52,7 +52,6 @@ class LinearRoadmapService {
   _stepToTask(step, roadmapId, order) {
     return {
       roadmapId,
-      roadmapWeekId: null,
       title: step.title,
       description: step.description || step.brief || step.title,
       type: step.type || 'project',

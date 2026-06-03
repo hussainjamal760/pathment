@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { programManagementApi } from '@/lib/services/program-api';
-import { levelMentorApi } from '@/lib/services/level-mentor-api';
 import { enrollmentApi } from '@/lib/services/enrollment-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
@@ -147,33 +146,11 @@ export function useProgramDetail(): UseProgramDetailReturn {
     }
   }, [id]);
 
+  // Level-mentor assignment was removed; mentors are matched to mentees directly
+  // (clan/MentorMenteeMatch), not assigned to program levels.
   const fetchMentorAssignments = useCallback(async () => {
-    if (!id) return;
-    try {
-      const response = (await levelMentorApi.getProgramMentorAssignments(id)) as {
-        data?: { assignments?: Array<{ mentors: Array<{ id: string; firstName: string; lastName: string; mentorProfile?: { currentMenteeCount?: number; specialization?: string[]; title?: string } }> }> };
-        assignments?: Array<{ mentors: Array<{ id: string; firstName: string; lastName: string; mentorProfile?: { currentMenteeCount?: number; specialization?: string[]; title?: string } }> }>;
-      };
-      const assignments = response?.data?.assignments ?? response?.assignments ?? [];
-      const mentorsMap = new Map<string, AssignedMentor>();
-      assignments.forEach((a) =>
-        a.mentors.forEach((m) => {
-          if (!mentorsMap.has(m.id)) {
-            mentorsMap.set(m.id, {
-              id: m.id,
-              name: `${m.firstName} ${m.lastName}`,
-              mentees: m.mentorProfile?.currentMenteeCount ?? 0,
-              expertise: m.mentorProfile?.specialization?.[0] ?? 'General',
-              title: m.mentorProfile?.title ?? 'Mentor',
-            });
-          }
-        })
-      );
-      setAssignedMentors(Array.from(mentorsMap.values()));
-    } catch (err: unknown) {
-      console.error('Failed to fetch mentor assignments:', err);
-    }
-  }, [id]);
+    setAssignedMentors([]);
+  }, []);
 
   const fetchEnrollments = useCallback(async () => {
     if (!id) return;
@@ -193,26 +170,11 @@ export function useProgramDetail(): UseProgramDetailReturn {
     }
   }, [id]);
 
+  // Legacy week-based curriculum was removed. Linear roadmaps are authored by
+  // mentors/admins in the dedicated Roadmaps area, not per program level here.
   const fetchRoadmap = useCallback(async () => {
-    if (!selectedLevelId) return;
-    try {
-      setLoadingRoadmap(true);
-      const response = (await programManagementApi.roadmaps.getByLevel(id, selectedLevelId)) as {
-        data?: { roadmap?: ProgramRoadmap };
-        roadmap?: ProgramRoadmap;
-      };
-      setRoadmap(response?.data?.roadmap ?? response?.roadmap ?? null);
-    } catch (err: unknown) {
-      const e = err as { response?: { status?: number } };
-      if (e.response?.status === 404) {
-        setRoadmap(null);
-      } else {
-        console.error('Failed to fetch roadmap:', e);
-      }
-    } finally {
-      setLoadingRoadmap(false);
-    }
-  }, [id, selectedLevelId]);
+    setRoadmap(null);
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -222,33 +184,11 @@ export function useProgramDetail(): UseProgramDetailReturn {
     }
   }, [id, fetchProgram, fetchLevels, fetchMentorAssignments]);
 
+  // Legacy AI week-curriculum generation was removed. Roadmaps are authored as
+  // linear roadmaps in the Roadmaps area.
   const handleGenerateRoadmap = useCallback(async () => {
-    if (!selectedLevelId) {
-      toast.error('Please select a level first');
-      return;
-    }
-    const ok = confirm(
-      roadmap
-        ? 'This will replace the existing roadmap. Continue?'
-        : 'Generate AI roadmap for this level?'
-    );
-    if (!ok) return;
-    try {
-      setGeneratingRoadmap(true);
-      const response = (await programManagementApi.roadmaps.generate(
-        id,
-        selectedLevelId,
-        'Generate a comprehensive roadmap with practical tasks and learning objectives'
-      )) as { data?: { roadmap?: ProgramRoadmap }; roadmap?: ProgramRoadmap };
-      setRoadmap(response?.data?.roadmap ?? response?.roadmap ?? null);
-      toast.success('Roadmap generated successfully!');
-    } catch (err: unknown) {
-      console.error('Failed to generate roadmap:', err);
-      toast.error(extractApiErrorMessage(err, 'Failed to generate roadmap'));
-    } finally {
-      setGeneratingRoadmap(false);
-    }
-  }, [id, selectedLevelId, roadmap]);
+    toast('Curriculum is now authored as linear roadmaps in the Roadmaps area.');
+  }, []);
 
   const handleApproveEnrollment = useCallback(async (enrollmentId: string) => {
     try {

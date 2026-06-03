@@ -39,13 +39,7 @@ export const apiConfig = {
     matchStatus: (id: string) => `/matches/${id}/status`,
     matchSuggestions: (enrollmentId: string) => `/matches/suggestions/${enrollmentId}`,
     levelMentors: (levelId: string) => `/matches/levels/${levelId}/mentors`,
-    
-    // Level Mentor Assignments
-    programMentorAssignments: (programId: string) => `/programs/${programId}/mentor-assignments`,
-    assignMentorToLevel: (programId: string, levelId: string) => `/programs/${programId}/levels/${levelId}/mentors`,
-    getLevelMentorAssignments: (programId: string, levelId: string) => `/programs/${programId}/levels/${levelId}/mentors`,
-    removeMentorFromLevel: (programId: string, levelId: string, mentorId: string) => `/programs/${programId}/levels/${levelId}/mentors/${mentorId}`,
-    
+
     // Mentors
     mentors: '/mentors',
     mentorById: (id: string) => `/mentors/${id}`,

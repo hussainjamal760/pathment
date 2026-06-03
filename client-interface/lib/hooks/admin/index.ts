@@ -40,14 +40,6 @@ export type {
   MentorActiveMatch,
 } from './useMentorProfile';
 
-export { useProgramMentors } from './useProgramMentors';
-export type {
-  LevelAssignment,
-  ProgramMentorItem,
-  ProgramMentorLevel,
-  ProgramSummary,
-} from './useProgramMentors';
-
 export { useProgramDetail } from './useProgramDetail';
 export type {
   ProgramDetailProgram,
@@ -59,17 +51,6 @@ export type {
 
 export { useProgramCreate } from './useProgramCreate';
 export type { ProgramFormData, LevelFormData, SavedLevel } from './useProgramCreate';
-
-export { useProgramRoadmap } from './useProgramRoadmap';
-export type {
-  RoadmapWeek,
-  RoadmapWeekTask,
-  ProgramRoadmapLevel,
-  TaskForm,
-  WeekForm,
-  TaskModalState,
-  WeekModalState,
-} from './useProgramRoadmap';
 
 export { useInvites, isRowValid, EMAIL_REGEX, VALID_ROLES } from './useInvites';
 export type {

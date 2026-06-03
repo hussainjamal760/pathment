@@ -1,0 +1,292 @@
+'use client';
+
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { toast } from 'sonner';
+import { X, Loader2, Check, Plus, Trash2, Search } from 'lucide-react';
+import { taskApi } from '@/lib/services/task-api';
+import { tracksApi, type Track } from '@/lib/services/tracks-api';
+import { extractApiErrorMessage } from '@/lib/utils/api-error';
+
+const TYPES = ['assignment', 'project', 'quiz', 'reading', 'video', 'discussion'] as const;
+const TYPE_LABEL: Record<string, string> = {
+  assignment: 'Assignment', project: 'Project', quiz: 'Quiz', reading: 'Reading', video: 'Video', discussion: 'Discussion',
+};
+const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'] as const;
+const DUE_PRESETS: { label: string; days: number }[] = [
+  { label: 'Today', days: 0 }, { label: '+3 days', days: 3 }, { label: '+1 week', days: 7 }, { label: '+2 weeks', days: 14 },
+];
+
+export interface AssignDrawerMentee { id: string; name: string; level?: string; risk?: string }
+
+/**
+ * AssignTaskDrawer — accessible right-side drawer to assign a custom task to one
+ * mentee (single) or many (bulk). Replaces the old broken /mentor/tasks?tab=create
+ * navigation. Full fields + focus trap + Escape + ARIA, re-skinned indigo/slate.
+ */
+export function AssignTaskDrawer({
+  mode,
+  mentee,
+  cohort = [],
+  onClose,
+  onAssigned,
+}: {
+  mode: 'single' | 'bulk';
+  mentee?: AssignDrawerMentee;
+  cohort?: AssignDrawerMentee[];
+  onClose: () => void;
+  onAssigned?: () => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [type, setType] = useState<string>('assignment');
+  const [description, setDescription] = useState('');
+  const [difficulty, setDifficulty] = useState<string>('medium');
+  const [dueDays, setDueDays] = useState<number>(7);
+  const [points, setPoints] = useState<number>(10);
+  const [deliverable, setDeliverable] = useState('');
+  const [criteria, setCriteria] = useState<string[]>([]);
+  const [trackId, setTrackId] = useState<string>('');
+  const [tracks, setTracks] = useState<Track[]>([]);
+
+  // bulk targeting
+  const [selected, setSelected] = useState<Set<string>>(new Set(mentee ? [mentee.id] : []));
+  const [search, setSearch] = useState('');
+
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState<number | null>(null);
+
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const titleId = 'assign-task-title';
+
+  // Load this mentee's lanes for the track picker (single mode only).
+  useEffect(() => {
+    if (mode !== 'single' || !mentee?.id) return;
+    let active = true;
+    tracksApi.listForMentee(mentee.id).then((res: any) => {
+      if (active) setTracks(res?.data?.tracks ?? []);
+    }).catch(() => { /* lanes are optional */ });
+    return () => { active = false; };
+  }, [mode, mentee?.id]);
+
+  // Focus first field on open.
+  useEffect(() => { titleRef.current?.focus(); }, []);
+
+  // Escape to close + focus trap (keep Tab within the drawer).
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { e.stopPropagation(); onClose(); return; }
+    if (e.key !== 'Tab') return;
+    const root = drawerRef.current;
+    if (!root) return;
+    const focusable = root.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }, [onClose]);
+
+  const toggleMentee = (id: string) => setSelected((prev) => {
+    const next = new Set(prev);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+
+  const filteredCohort = cohort.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
+  const dueISO = () => { const d = new Date(); d.setDate(d.getDate() + dueDays); return d.toISOString(); };
+  const cleanCriteria = criteria.map((c) => c.trim()).filter(Boolean);
+
+  const targetCount = mode === 'bulk' ? selected.size : 1;
+  const canSubmit = !!title.trim() && targetCount > 0;
+
+  const submit = async () => {
+    if (!canSubmit || saving) return;
+    try {
+      setSaving(true);
+      const base = {
+        title: title.trim(),
+        description: description.trim() || title.trim(),
+        type,
+        difficulty,
+        dueDate: dueISO(),
+        pointsBase: points,
+        deliverable: deliverable.trim() || undefined,
+        acceptanceCriteria: cleanCriteria,
+      };
+      if (mode === 'bulk') {
+        const res: any = await taskApi.bulkCreateCustomTasks({ ...base, menteeIds: [...selected] });
+        setDone(res?.data?.assigned ?? selected.size);
+      } else {
+        await taskApi.createCustomTask({ ...base, menteeId: mentee!.id, trackId: trackId || undefined });
+        setDone(1);
+      }
+      onAssigned?.();
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, 'Could not assign the task'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const pill = (active: boolean) =>
+    `px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
+      active ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+    }`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end" onKeyDown={onKeyDown}>
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-lg h-full bg-white shadow-xl flex flex-col"
+      >
+        <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h2 id={titleId} className="font-semibold text-slate-900">Assign a task</h2>
+            <p className="text-sm text-slate-500">
+              {mode === 'bulk' ? `${selected.size} mentee${selected.size === 1 ? '' : 's'} selected` : `to ${mentee?.name ?? 'mentee'}`}
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Close" className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-5 h-5" /></button>
+        </div>
+
+        {done !== null ? (
+          <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <Check className="w-7 h-7 text-green-600" />
+            </div>
+            <p className="text-slate-900 font-semibold">Task assigned</p>
+            <p className="text-slate-500 text-sm mt-1">
+              {mode === 'bulk' ? `${done} mentee${done === 1 ? '' : 's'} notified.` : `${mentee?.name ?? 'Mentee'} has a new task.`}
+            </p>
+            <button onClick={onClose} className="mt-6 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm">Done</button>
+          </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              <div>
+                <label htmlFor="assign-task-title-input" className="block text-sm font-medium text-slate-700 mb-1">Title <span className="text-red-500">*</span></label>
+                <input id="assign-task-title-input" ref={titleRef} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Build a responsive navbar" className={field} />
+              </div>
+
+              <div>
+                <span className="block text-sm font-medium text-slate-700 mb-1.5">Type</span>
+                <div className="flex flex-wrap gap-2">
+                  {TYPES.map((t) => (
+                    <button key={t} type="button" onClick={() => setType(t)} className={pill(type === t)} aria-pressed={type === t}>{TYPE_LABEL[t]}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="assign-task-brief" className="block text-sm font-medium text-slate-700 mb-1">Brief</label>
+                <textarea id="assign-task-brief" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="What should they do? (defaults to the title)" className={`${field} resize-none`} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="block text-sm font-medium text-slate-700 mb-1.5">Due</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DUE_PRESETS.map((d) => (
+                      <button key={d.label} type="button" onClick={() => setDueDays(d.days)} className={pill(dueDays === d.days)} aria-pressed={dueDays === d.days}>{d.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <span className="block text-sm font-medium text-slate-700 mb-1.5">Difficulty</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DIFFICULTIES.map((d) => (
+                      <button key={d} type="button" onClick={() => setDifficulty(d)} className={`${pill(difficulty === d)} capitalize`} aria-pressed={difficulty === d}>{d}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="assign-task-points" className="block text-sm font-medium text-slate-700 mb-1">Points</label>
+                  <input id="assign-task-points" type="number" min={0} value={points} onChange={(e) => setPoints(Number(e.target.value) || 0)} className={field} />
+                </div>
+                {mode === 'single' && tracks.length > 0 && (
+                  <div>
+                    <label htmlFor="assign-task-track" className="block text-sm font-medium text-slate-700 mb-1">Track</label>
+                    <select id="assign-task-track" value={trackId} onChange={(e) => setTrackId(e.target.value)} className={field}>
+                      <option value="">No track</option>
+                      {tracks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="assign-task-deliverable" className="block text-sm font-medium text-slate-700 mb-1">Deliverable</label>
+                <input id="assign-task-deliverable" value={deliverable} onChange={(e) => setDeliverable(e.target.value)} placeholder="What should they submit?" className={field} />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-medium text-slate-700">Acceptance criteria</span>
+                  <button type="button" onClick={() => setCriteria((c) => [...c, ''])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add check</button>
+                </div>
+                <div className="space-y-2">
+                  {criteria.length === 0 && <p className="text-xs text-slate-400">No criteria yet — add checks the mentee must meet.</p>}
+                  {criteria.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={c}
+                        onChange={(e) => setCriteria((prev) => prev.map((x, j) => (j === i ? e.target.value : x)))}
+                        placeholder={`Check ${i + 1}`}
+                        aria-label={`Acceptance criterion ${i + 1}`}
+                        className={field}
+                      />
+                      <button type="button" onClick={() => setCriteria((prev) => prev.filter((_, j) => j !== i))} aria-label="Remove criterion" className="p-2 text-slate-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {mode === 'bulk' && (
+                <div className="border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-slate-700">Assign to <span className="text-slate-400 font-normal">({selected.size})</span></span>
+                    <div className="flex gap-3 text-xs">
+                      <button type="button" onClick={() => setSelected(new Set(cohort.map((m) => m.id)))} className="text-indigo-600 hover:text-indigo-700">Select all</button>
+                      <button type="button" onClick={() => setSelected(new Set())} className="text-slate-500 hover:text-slate-700">Clear</button>
+                    </div>
+                  </div>
+                  <div className="relative mb-2">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search mentees…" aria-label="Search mentees" className={`${field} pl-9`} />
+                  </div>
+                  <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                    {filteredCohort.length === 0 && <p className="text-xs text-slate-400 px-3 py-3">No mentees match.</p>}
+                    {filteredCohort.map((m) => (
+                      <label key={m.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 cursor-pointer">
+                        <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggleMentee(m.id)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{m.name}</span>
+                        {m.level && <span className="text-xs text-slate-400">{m.level}</span>}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
+              <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
+              <button onClick={submit} disabled={!canSubmit || saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {mode === 'bulk' ? `Assign to ${selected.size}` : 'Assign task'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

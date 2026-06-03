@@ -19,6 +19,7 @@ import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
 import { PersonalityBars } from '@/components/mentor/PersonalityBars';
 import { InsightsPanel } from '@/components/mentor/InsightsPanel';
 import { OneOnOneDrawer } from '@/components/mentor/OneOnOneDrawer';
+import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
 
@@ -87,7 +88,7 @@ export default function MenteeDetail() {
     match, tasks, loading, completionLoading, rejectReason,
     showRejectModal, showCompleteConfirm, setRejectReason,
     setShowRejectModal, setShowCompleteConfirm,
-    handleApproveCompletion, handleRejectCompletion,
+    handleApproveCompletion, handleRejectCompletion, fetchMenteeDetails,
   } = useMenteeDetailPage(menteeId);
 
   const {
@@ -119,6 +120,7 @@ export default function MenteeDetail() {
   };
 
   const [loggingOneOnOne, setLoggingOneOnOne] = useState(false);
+  const [assigningTask, setAssigningTask] = useState(false);
 
   const onSavePersonality = async (dims: Record<string, number>) => {
     await mentorApi.updatePersonality(menteeId, dims);
@@ -227,7 +229,7 @@ export default function MenteeDetail() {
               <MessageSquare className="w-4 h-4" />Message
             </button>
             <button
-              onClick={() => router.push(`/mentor/tasks?tab=create&menteeId=${menteeId}&programId=${enrollment?.programId || ''}`)}
+              onClick={() => setAssigningTask(true)}
               className="px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-2"
             >
               <Plus className="w-4 h-4" />Assign task
@@ -306,7 +308,7 @@ export default function MenteeDetail() {
             {totalTasks > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{totalTasks}</span>}
           </div>
           <button
-            onClick={() => router.push(`/mentor/tasks?tab=create&menteeId=${menteeId}&programId=${enrollment?.programId || ''}`)}
+            onClick={() => setAssigningTask(true)}
             className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-1"
           >
             <Plus className="w-4 h-4" />Assign task
@@ -516,6 +518,15 @@ export default function MenteeDetail() {
           menteeName={insights.name}
           onClose={() => setLoggingOneOnOne(false)}
           onSave={onSaveNote}
+        />
+      )}
+
+      {assigningTask && (
+        <AssignTaskDrawer
+          mode="single"
+          mentee={{ id: menteeId, name: `${mentee?.firstName ?? ''} ${mentee?.lastName ?? ''}`.trim() || 'Mentee' }}
+          onClose={() => setAssigningTask(false)}
+          onAssigned={fetchMenteeDetails}
         />
       )}
 

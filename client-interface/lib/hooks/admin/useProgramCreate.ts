@@ -369,22 +369,11 @@ export function useProgramCreate(): UseProgramCreateReturn {
   }, [createdLevels, levels, createdProgramId, router]);
 
   // ── Step 3 ────────────────────────────────────────────────────────────────────
-  const handleGenerateRoadmap = useCallback(async (levelIndex: number) => {
-    try {
-      setGeneratingRoadmap(true);
-      setSelectedLevelForRoadmap(levelIndex);
-      const level = createdLevels[levelIndex];
-      if (!level?.id) throw new Error('Level ID is missing. Please refresh and try again.');
-      await programManagementApi.roadmaps.generate(createdProgramId!, level.id, roadmapInstructions);
-      toast.success(`AI Roadmap generated for "${level.name}"`);
-      setRoadmapInstructions('');
-      setSelectedLevelForRoadmap(null);
-    } catch (err: unknown) {
-      toast.error(extractApiErrorMessage(err, 'Failed to generate roadmap'));
-    } finally {
-      setGeneratingRoadmap(false);
-    }
-  }, [createdLevels, createdProgramId, roadmapInstructions]);
+  // Legacy week-curriculum AI generation was removed. Curriculum is authored as
+  // linear roadmaps in the Roadmaps area, so program creation skips this step.
+  const handleGenerateRoadmap = useCallback(async () => {
+    toast('Add curriculum later as a linear roadmap in the Roadmaps area.');
+  }, []);
 
   const handleFinish = useCallback(() => {
     toast.success('Program Created Successfully! 🎉');

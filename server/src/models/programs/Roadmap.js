@@ -99,10 +99,8 @@ module.exports = (sequelize, DataTypes) => {
     Roadmap.belongsTo(models.Program, { foreignKey: 'program_id', as: 'program' });
     Roadmap.belongsTo(models.ProgramLevel, { foreignKey: 'level_id', as: 'level' });
     Roadmap.belongsTo(models.Roadmap, { foreignKey: 'adapted_from', as: 'parentRoadmap' });
-    Roadmap.hasMany(models.RoadmapWeek, { foreignKey: 'roadmap_id', as: 'weeks' });
     Roadmap.hasMany(models.AdaptiveRecommendation, { foreignKey: 'current_roadmap_id', as: 'recommendations' });
-    // Linear steps: RoadmapTasks linked directly to the roadmap (ordered by
-    // task_order). Coexists with the legacy week grouping.
+    // Linear steps: RoadmapTasks linked directly to the roadmap, ordered by task_order.
     Roadmap.hasMany(models.RoadmapTask, { foreignKey: 'roadmap_id', as: 'steps' });
     Roadmap.belongsTo(models.User, { foreignKey: 'owner_mentor_id', as: 'owner' });
     Roadmap.hasMany(models.RoadmapProgress, { foreignKey: 'roadmap_id', as: 'progress' });

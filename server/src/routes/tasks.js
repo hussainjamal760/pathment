@@ -28,6 +28,18 @@ router.post(
 );
 
 /**
+ * @route   POST /api/tasks/custom/bulk
+ * @desc    Assign one custom task to many mentees
+ * @access  Mentor
+ */
+router.post(
+  '/custom/bulk',
+  authenticate,
+  authorize(['mentor']),
+  taskController.bulkCreateCustomTasks
+);
+
+/**
  * @route   GET /api/tasks/mentee/:menteeId/stats
  * @desc    Get task statistics for mentee
  * @access  Admin, Mentor, Mentee (own only)

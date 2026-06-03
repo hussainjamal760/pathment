@@ -66,20 +66,12 @@ export function useMentorProgramDetail(programId: string): UseMentorProgramDetai
     }
   }, [programId]);
 
+  // Legacy week-based per-level roadmap was removed; linear roadmaps live in the
+  // Roadmaps area. This view no longer loads a curriculum.
   const fetchRoadmap = useCallback(async () => {
-    if (!selectedLevelId || !programId) return;
     try {
       setLoadingRoadmap(true);
-      const response = await programManagementApi.roadmaps.getByLevel(programId, selectedLevelId);
-      const roadmapData = response?.data?.roadmap || response?.roadmap || response;
-      setRoadmap(roadmapData);
-    } catch (error: any) {
-      console.error('Failed to fetch roadmap:', error);
-      if (error?.response?.status !== 404) {
-        toast.error('Failed to load roadmap');
-      } else {
-        setRoadmap(null);
-      }
+      setRoadmap(null);
     } finally {
       setLoadingRoadmap(false);
     }

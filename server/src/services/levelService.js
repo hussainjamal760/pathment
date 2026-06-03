@@ -239,30 +239,6 @@ class LevelService {
   }
 
   /**
-   * Get mentors assigned to a level
-   */
-  async getLevelMentors(levelId) {
-    const assignments = await models.LevelMentorAssignment.findAll({
-      where: { levelId },
-      include: [
-        {
-          model: models.User,
-          as: 'mentor',
-          attributes: ['id', 'firstName', 'lastName', 'email'],
-          include: [
-            {
-              model: models.MentorProfile,
-              as: 'mentorProfile'
-            }
-          ]
-        }
-      ]
-    });
-
-    return assignments;
-  }
-
-  /**
    * Get level by ID
    */
   async getLevelById(levelId) {

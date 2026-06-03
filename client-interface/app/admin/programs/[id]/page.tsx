@@ -194,14 +194,6 @@ export default function ProgramDetails() {
           </div>
 
           <div className="flex gap-2 items-center">
-            <Link
-              href={`/admin/programs/${id}/roadmap`}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
-            >
-              <Edit className="w-4 h-4" />
-              Edit Roadmap
-            </Link>
-
             {/* Share Button */}
             <div className="relative" ref={shareRef}>
               <button
@@ -307,8 +299,7 @@ export default function ProgramDetails() {
           <div className="flex gap-6">
             {[
               { id: 'overview', label: 'Overview' },
-              { id: 'levels', label: 'Levels & Roadmaps' },
-              { id: 'mentors', label: 'Mentors' },
+              { id: 'levels', label: 'Levels' },
               { id: 'enrollments', label: 'Enrollments' }
             ].map((tab) => (
               <button
@@ -367,12 +358,6 @@ export default function ProgramDetails() {
                       >
                         + Add Level
                       </Link>
-                      <Link
-                        href={`/admin/programs/${id}/roadmap`}
-                        className="text-indigo-600 hover:text-indigo-700 text-sm"
-                      >
-                        Manage Roadmaps →
-                      </Link>
                     </>
                   )}
                 </div>
@@ -388,12 +373,6 @@ export default function ProgramDetails() {
                             {level.durationWeeks} weeks
                           </div>
                         </div>
-                        <Link
-                          href={`/admin/programs/${id}/roadmap?level=${level.id}`}
-                          className="text-indigo-600 hover:text-indigo-700 text-sm"
-                        >
-                          View Roadmap →
-                        </Link>
                       </div>
                     </div>
                   ))}
@@ -421,44 +400,12 @@ export default function ProgramDetails() {
 
           <div className="space-y-6">
             <div className="bg-white rounded-2xl p-6 border border-slate-200">
-              <h3 className="text-slate-900 mb-4">Assigned Mentors</h3>
-              <div className="space-y-3">
-                {assignedMentors.map((mentor) => (
-                  <div key={mentor.id} className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center shrink-0">
-                      <span className="text-slate-600 text-sm">
-                        {mentor.name.split(' ').map((n: string) => n[0]).join('')}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-slate-900 text-sm">{mentor.name}</div>
-                      <div className="text-slate-600 text-xs">{mentor.mentees} mentees</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Link
-                href={`/admin/programs/${id}/mentors`}
-                className="mt-4 text-indigo-600 hover:text-indigo-700 text-sm block text-center"
-              >
-                Manage Mentors
-              </Link>
-            </div>
-
-            <div className="bg-linear-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-6">
-              <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-4">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-indigo-900 mb-2">AI Roadmap</h3>
-              <p className="text-indigo-700 text-sm mb-4">
-                This program uses AI-generated learning paths tailored to each mentee&apos;s progress.
+              <h3 className="text-slate-900 mb-2">Curriculum & mentors</h3>
+              <p className="text-slate-600 text-sm">
+                Mentors are matched to mentees directly (via clans), and curriculum is
+                authored as linear roadmaps in the <span className="font-medium">Roadmaps</span> area —
+                not per program level here.
               </p>
-              <Link
-                href={`/admin/programs/${id}/roadmap`}
-                className="text-indigo-600 hover:text-indigo-700 text-sm"
-              >
-                Edit Roadmap →
-              </Link>
             </div>
           </div>
         </div>

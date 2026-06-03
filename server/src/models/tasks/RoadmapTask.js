@@ -5,14 +5,8 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
-    roadmapWeekId: {
-      type: DataTypes.UUID,
-      allowNull: true, // Nullable for custom tasks
-      field: 'roadmap_week_id'
-    },
-    // Direct link to the roadmap this task is a step of (linear model). For
-    // legacy week-based tasks this is backfilled from the week; new authored
-    // roadmaps set it directly and may have no week.
+    // Direct link to the roadmap this task is a step of (linear model), ordered
+    // by task_order. Null for one-off custom tasks created via the assign drawer.
     roadmapId: {
       type: DataTypes.UUID,
       allowNull: true,
@@ -90,15 +84,13 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'roadmap_tasks',
     underscored: true,
     indexes: [
-      { unique: true, fields: ['roadmap_week_id', 'task_order'] },
-      { fields: ['roadmap_week_id'] },
+      { fields: ['roadmap_id'] },
       { fields: ['type'] },
       { fields: ['difficulty'] }
     ]
   });
 
   RoadmapTask.associate = (models) => {
-    RoadmapTask.belongsTo(models.RoadmapWeek, { foreignKey: 'roadmap_week_id', as: 'week' });
     RoadmapTask.belongsTo(models.Roadmap, { foreignKey: 'roadmap_id', as: 'roadmap' });
     RoadmapTask.hasMany(models.TaskResource, { foreignKey: 'roadmap_task_id', as: 'resources' });
     RoadmapTask.hasMany(models.TaskSkill, { foreignKey: 'roadmap_task_id', as: 'taskSkills' });

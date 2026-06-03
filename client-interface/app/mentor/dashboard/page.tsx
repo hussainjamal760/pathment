@@ -4,12 +4,13 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users, ClipboardCheck, AlertTriangle, Flag, Clock,
-  TrendingUp, TrendingDown, Minus, Loader2, ArrowUpRight,
+  TrendingUp, TrendingDown, Minus, Loader2, ArrowUpRight, Plus,
 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useMentorCohort, type CohortMentee, type CohortRisk, type CohortMomentum } from '@/lib/hooks/mentor';
 import { StatsCard } from '@/components/admin/ui';
 import { DualProgress } from '@/components/mentor/DualProgress';
+import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 
 type Filter = 'all' | 'attention' | 'review' | 'risk' | 'going_well';
 
@@ -112,6 +113,7 @@ export default function MentorCockpit() {
   const { user } = useAuth();
   const { cohort, totals, loading, error, refetch } = useMentorCohort();
   const [filter, setFilter] = useState<Filter>('all');
+  const [bulkAssign, setBulkAssign] = useState(false);
 
   const list = useMemo(() => {
     const order: Record<CohortRisk, number> = { high: 0, watch: 1, low: 2 };
@@ -136,14 +138,33 @@ export default function MentorCockpit() {
             {totals ? `${totals.mentees} mentee${totals.mentees === 1 ? '' : 's'} in your cohort` : 'Your cohort at a glance'}
           </p>
         </div>
-        <button
-          onClick={() => router.push('/mentor/review')}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shrink-0"
-        >
-          <ClipboardCheck className="w-4 h-4" />
-          Start weekly review
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setBulkAssign(true)}
+            disabled={cohort.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            Assign task
+          </button>
+          <button
+            onClick={() => router.push('/mentor/review')}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Start weekly review
+          </button>
+        </div>
       </div>
+
+      {bulkAssign && (
+        <AssignTaskDrawer
+          mode="bulk"
+          cohort={cohort.map((m) => ({ id: m.id, name: m.name, level: m.level, risk: m.risk }))}
+          onClose={() => setBulkAssign(false)}
+          onAssigned={refetch}
+        />
+      )}
 
       {/* Stat chips */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">

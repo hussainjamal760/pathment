@@ -50,7 +50,6 @@ module.exports = (sequelize, DataTypes) => {
 
   ProgramLevel.associate = (models) => {
     ProgramLevel.belongsTo(models.Program, { foreignKey: 'program_id', as: 'program' });
-    ProgramLevel.hasMany(models.LevelMentorAssignment, { foreignKey: 'level_id', as: 'mentorAssignments' });
     ProgramLevel.hasMany(models.Roadmap, { foreignKey: 'level_id', as: 'roadmaps' });
     ProgramLevel.hasMany(models.Enrollment, { foreignKey: 'current_level_id', as: 'enrollments' });
     ProgramLevel.hasMany(models.MentorMenteeMatch, { foreignKey: 'level_id', as: 'matches' });

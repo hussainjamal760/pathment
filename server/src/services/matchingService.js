@@ -96,12 +96,9 @@ class MatchingService {
     // scope from day 1, then auto-assign week 1 tasks for the current level.
     const taskService = require('./taskService');
     await taskService.updateEnrollmentTaskStats(enrollmentId);
-    try {
-      await taskService.autoAssignWeekTasks(enrollmentId, enrollment.currentWeek || 1);
-    } catch (err) {
-      // Don't fail match creation if task assignment fails (e.g. roadmap not set up yet)
-      console.warn('Could not auto-assign week 1 tasks on match creation:', err.message);
-    }    const hydratedMatch = await models.MentorMenteeMatch.findByPk(match.id, {
+    // Onboarding is fully mentor-driven: the mentor assigns roadmaps/tasks
+    // after matching. (Legacy week-curriculum auto-assignment was removed.)
+    const hydratedMatch = await models.MentorMenteeMatch.findByPk(match.id, {
       include: [
         { model: models.User, as: 'mentor', attributes: ['id', 'firstName', 'lastName', 'email'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email'] },
@@ -247,26 +244,21 @@ class MatchingService {
     return suggestions.sort((a, b) => b.matchScore - a.matchScore);
   }
 
-  async getLevelMentors(levelId) {
-    const assignments = await models.LevelMentorAssignment.findAll({
-      where: { levelId, isActive: true },
-      include: [
-        {
-          model: models.User,
-          as: 'mentor',
-          include: [{ model: models.MentorProfile, as: 'mentorProfile' }]
-        }
-      ]
+  /**
+   * Candidate mentors for matching. Level-based gating was removed, so this now
+   * returns all active mentors (the admin picks any mentor for any enrollment).
+   * `levelId` is accepted for backward compatibility but no longer filters.
+   */
+  async getLevelMentors(_levelId) {
+    const mentors = await models.User.findAll({
+      where: { role: 'mentor' },
+      include: [{ model: models.MentorProfile, as: 'mentorProfile' }]
     });
 
-    // Use the currentMenteeCount from the database (already calculated)
-    const mentors = assignments.map(assignment => ({
-      ...assignment.mentor.toJSON(),
-      currentMentees: assignment.mentor.mentorProfile?.currentMenteeCount || 0,
-      assignmentId: assignment.id
+    return mentors.map((m) => ({
+      ...m.toJSON(),
+      currentMentees: m.mentorProfile?.currentMenteeCount || 0
     }));
-
-    return mentors;
   }
 
   async getMatches(filters) {
@@ -301,55 +293,38 @@ class MatchingService {
   }
 
   /**
-   * Get all levels a mentor is assigned to teach (via LevelMentorAssignment).
-   * Groups by program so the frontend can build cascading Program → Level → Mentee dropdowns.
-   * This is the authoritative source — it is independent of whether the mentor has
-   * active mentee matches in those levels yet.
+   * Programs + levels a mentor is working in, derived from their ACTIVE matches
+   * (level-mentor assignment was removed). Grouped by program so the frontend can
+   * build cascading Program → Level dropdowns. A mentor sees a program/level here
+   * once they have at least one active mentee match in it.
    */
   async getMentorAssignedLevels(mentorId) {
-    const assignments = await models.LevelMentorAssignment.findAll({
-      where: { mentorId, isActive: true },
+    const matches = await models.MentorMenteeMatch.findAll({
+      where: { mentorId, status: 'active' },
       include: [
         {
           model: models.ProgramLevel,
           as: 'level',
-          include: [
-            {
-              model: models.Program,
-              as: 'program',
-              attributes: ['id', 'name', 'type', 'status']
-            }
-          ]
+          include: [{ model: models.Program, as: 'program', attributes: ['id', 'name', 'type', 'status'] }]
         }
-      ],
-      order: [
-        [{ model: models.ProgramLevel, as: 'level' }, { model: models.Program, as: 'program' }, 'name', 'ASC'],
-        [{ model: models.ProgramLevel, as: 'level' }, 'levelOrder', 'ASC']
       ]
     });
 
-    // Group by program for easy consumption
     const programMap = new Map();
-    for (const a of assignments) {
-      const level = a.level;
+    for (const m of matches) {
+      const level = m.level;
       const program = level?.program;
       if (!program || !level) continue;
 
       if (!programMap.has(program.id)) {
         programMap.set(program.id, {
-          id: program.id,
-          name: program.name,
-          type: program.type,
-          status: program.status,
-          levels: []
+          id: program.id, name: program.name, type: program.type, status: program.status, levels: []
         });
       }
-      programMap.get(program.id).levels.push({
-        id: level.id,
-        name: level.name,
-        levelOrder: level.levelOrder,
-        durationWeeks: level.durationWeeks
-      });
+      const entry = programMap.get(program.id);
+      if (!entry.levels.some((l) => l.id === level.id)) {
+        entry.levels.push({ id: level.id, name: level.name, levelOrder: level.levelOrder, durationWeeks: level.durationWeeks });
+      }
     }
 
     return Array.from(programMap.values());

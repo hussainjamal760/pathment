@@ -31,8 +31,9 @@ export const taskApi = {
 
   createCustomTask: (data: {
     menteeId: string;
-    enrollmentId: string;
+    enrollmentId?: string; // Optional: server resolves active enrollment if omitted
     roadmapTaskId?: string; // Optional: assign existing roadmap task
+    trackId?: string; // Optional: personal lane
     title?: string;
     description?: string;
     type?: string;
@@ -43,6 +44,20 @@ export const taskApi = {
     acceptanceCriteria?: string[];
   }) =>
     apiClient.post('/tasks/custom', data),
+
+  bulkCreateCustomTasks: (data: {
+    menteeIds: string[];
+    trackId?: string;
+    title?: string;
+    description?: string;
+    type?: string;
+    difficulty?: string;
+    dueDate?: string;
+    pointsBase?: number;
+    deliverable?: string;
+    acceptanceCriteria?: string[];
+  }) =>
+    apiClient.post('/tasks/custom/bulk', data),
 
   reviewTask: (taskId: string, data: {
     rating: number;

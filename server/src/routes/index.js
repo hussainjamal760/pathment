@@ -5,10 +5,8 @@ const authRoutes = require('./auth');
 const adminRoutes = require('./admin');
 const programRoutes = require('./programs');
 const levelRoutes = require('./levels');
-const roadmapRoutes = require('./roadmaps');
 const enrollmentRoutes = require('./enrollments');
 const matchingRoutes = require('./matching');
-const levelMentorRoutes = require('./levelMentors');
 const mentorRoutes = require('./mentors');
 const menteeRoutes = require('./mentees');
 const taskRoutes = require('./tasks');
@@ -54,14 +52,12 @@ router.use('/skills', skillRoutes);
 // Admin routes (protected)
 router.use('/admin', adminRoutes);
 
-// Program routes (includes nested level and roadmap routes)
+// Program routes (includes nested level routes)
 router.use('/programs', programRoutes);
 router.use('/programs', levelRoutes);
-router.use('/programs', roadmapRoutes);
 
-// Standalone level and roadmap routes
+// Standalone level routes
 router.use('/', levelRoutes);
-router.use('/', roadmapRoutes);
 
 // Enrollment and matching routes
 router.use('/enrollments', enrollmentRoutes);
@@ -122,8 +118,6 @@ router.use('/schedules', scheduleRoutes);
 // Tracks (per-mentee personal lanes)
 router.use('/tracks', trackRoutes);
 
-// Level mentor assignment routes
-router.use('/', levelMentorRoutes);
 
 
 // TODO: Add more route modules here
