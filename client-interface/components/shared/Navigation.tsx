@@ -10,8 +10,14 @@ import {
   Menu,
   X,
   ChevronDown,
+  Pin,
+  ArrowUp,
+  ArrowDown,
+  SlidersHorizontal,
+  Check,
 } from 'lucide-react';
-import { getNavigationLinks, NavLink } from '@/lib/config/navigation';
+import { NavLink } from '@/lib/config/navigation';
+import { useNavPreferences } from '@/lib/hooks/shared';
 import { NotificationDrawer } from './NotificationDrawer';
 import { UserProfileCard } from './UserProfileCard';
 import { messagingApi } from '@/lib/services/messaging-api';
@@ -37,7 +43,7 @@ export default function Navigation({ role }: NavigationProps) {
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
-  const links = getNavigationLinks(role);
+  const { links, pinned, isEditing, toggleEdit, togglePin, moveUp, moveDown, reset } = useNavPreferences(role);
 
   // ── Collapsible group state ───────────────────────────────────────────────
   // Initialise with any group that contains the current path already open
@@ -215,12 +221,48 @@ export default function Navigation({ role }: NavigationProps) {
     );
   };
 
-  const renderNavItems = (onNavigate?: () => void) =>
-    links.map((link) =>
-      link.children
-        ? renderGroupLink(link, onNavigate)
-        : renderFlatLink(link, onNavigate)
+  // Reorder/pin row shown in edit mode (no navigation).
+  const renderEditRow = (link: NavLink) => {
+    const Icon = link.icon;
+    const isPinned = pinned.has(link.path);
+    return (
+      <div key={link.path} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-slate-50 border border-slate-100">
+        <Icon className="w-4 h-4 text-slate-400 shrink-0" />
+        <span className="text-sm font-medium text-slate-700 flex-1 truncate">{link.label}</span>
+        <button onClick={() => togglePin(link.path)} title={isPinned ? 'Unpin' : 'Pin to top'}
+          className={`p-1 rounded ${isPinned ? 'text-indigo-600' : 'text-slate-300 hover:text-slate-500'}`}>
+          <Pin className="w-3.5 h-3.5" fill={isPinned ? 'currentColor' : 'none'} />
+        </button>
+        <button onClick={() => moveUp(link.path)} title="Move up" className="p-1 text-slate-400 hover:text-slate-700"><ArrowUp className="w-3.5 h-3.5" /></button>
+        <button onClick={() => moveDown(link.path)} title="Move down" className="p-1 text-slate-400 hover:text-slate-700"><ArrowDown className="w-3.5 h-3.5" /></button>
+      </div>
     );
+  };
+
+  const renderNavItems = (onNavigate?: () => void) =>
+    isEditing
+      ? links.map((link) => renderEditRow(link))
+      : links.map((link) =>
+          link.children
+            ? renderGroupLink(link, onNavigate)
+            : renderFlatLink(link, onNavigate)
+        );
+
+  // Small header above the nav list to enter/exit customize mode + reset.
+  const renderNavHeader = () => (
+    <div className="flex items-center justify-between px-2 mb-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{isEditing ? 'Customize menu' : 'Menu'}</span>
+      <div className="flex items-center gap-1">
+        {isEditing && (
+          <button onClick={reset} className="text-[11px] text-slate-400 hover:text-slate-600">Reset</button>
+        )}
+        <button onClick={toggleEdit} title={isEditing ? 'Done' : 'Customize'}
+          className={`p-1 rounded-lg ${isEditing ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
+          {isEditing ? <Check className="w-3.5 h-3.5" /> : <SlidersHorizontal className="w-3.5 h-3.5" />}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -246,6 +288,7 @@ export default function Navigation({ role }: NavigationProps) {
 
           {/* Nav */}
           <nav className="flex-1 px-3 py-4 space-y-0.5">
+            {renderNavHeader()}
             {renderNavItems()}
           </nav>
 
