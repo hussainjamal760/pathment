@@ -14,6 +14,8 @@ const mentorOnly = [authenticate, authorize(['mentor', 'admin'])];
 
 // The mentor's cohort for the Cockpit.
 router.get('/cohort', authenticate, authorize(['mentor', 'admin']), cohortController.getCohort);
+// Period-scoped cohort throughput (week / month window).
+router.get('/cohort/activity', authenticate, authorize(['mentor', 'admin']), cohortController.getCohortActivity);
 // AI-drafted narrative summary of the cohort (uses the mentor's AI connection).
 router.post('/cohort/report-summary', authenticate, authorize(['mentor', 'admin']), cohortController.getCohortReportSummary);
 

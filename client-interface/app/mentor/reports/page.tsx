@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import {
@@ -11,6 +11,19 @@ import { useMentorCohort, type CohortMentee } from '@/lib/hooks/mentor';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { useAuth } from '@/lib/context/AuthContext';
+
+interface PeriodActivity {
+  period: 'week' | 'month';
+  days: number;
+  totalMentees: number;
+  tasksCompleted: number;
+  onTime: number;
+  onTimeRate: number;
+  pointsEarned: number;
+  blockersOpened: number;
+  blockersResolved: number;
+  activeMentees: number;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 const pct = (n: number) => `${Math.round(n)}%`;
@@ -62,6 +75,20 @@ export default function MentorReports() {
   const [copied, setCopied] = useState(false);
   const [aiDraft, setAiDraft] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [activity, setActivity] = useState<PeriodActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
+
+  // Period-scoped throughput — refetches when the week/month toggle changes.
+  useEffect(() => {
+    let cancelled = false;
+    setActivityLoading(true);
+    mentorApi
+      .getCohortActivity(period)
+      .then((res: any) => { if (!cancelled) setActivity(res?.data?.activity ?? res?.activity ?? null); })
+      .catch(() => { if (!cancelled) setActivity(null); })
+      .finally(() => { if (!cancelled) setActivityLoading(false); });
+    return () => { cancelled = true; };
+  }, [period]);
 
   const report = useMemo(() => {
     if (!cohort.length) return null;
@@ -121,6 +148,11 @@ export default function MentorReports() {
       '',
       report.overview,
       '',
+      ...(activity ? [
+        `THIS ${period.toUpperCase()} (last ${activity.days} days)`,
+        `  ${activity.tasksCompleted} tasks completed (${activity.onTimeRate}% on time) · ${activity.activeMentees}/${activity.totalMentees} active · ${activity.blockersOpened} new blockers, ${activity.blockersResolved} resolved`,
+        '',
+      ] : []),
       `Health score: ${report.health}/100 (${report.band.label})`,
       `Avg progress: ${report.avgProgress}%   On-time: ${report.avgOnTime}%${report.avgRating ? `   Quality: ${report.avgRating}★` : ''}`,
       `Momentum: ${report.rising} rising · ${report.steady} steady · ${report.slipping} slipping`,
@@ -298,20 +330,51 @@ export default function MentorReports() {
             </div>
           </div>
 
-          {/* Key metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { label: 'Avg progress', value: `${report.avgProgress}%`, sub: 'through their programs' },
-              { label: 'On-time delivery', value: `${report.avgOnTime}%`, sub: 'tasks met their due date' },
-              { label: 'Work quality', value: report.avgRating ? `${report.avgRating}★` : '—', sub: report.avgRating ? 'avg task rating' : 'no ratings yet' },
-              { label: 'Needs attention', value: String(report.atRisk.length), sub: `of ${report.size} mentees` },
-            ].map((c) => (
-              <div key={c.label} className="rounded-2xl bg-white border border-slate-200 px-4 py-4">
-                <div className="text-xs text-slate-500">{c.label}</div>
-                <div className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{c.value}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{c.sub}</div>
+          {/* Period-scoped throughput — driven by the week/month toggle */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h2 className="text-slate-900 flex items-center gap-2"><Activity className="w-4 h-4 text-indigo-500" />This {period}</h2>
+              <span className="text-xs text-slate-400">{activity ? `last ${activity.days} days` : ''}</span>
+            </div>
+            {activityLoading ? (
+              <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-indigo-400" /></div>
+            ) : !activity ? (
+              <p className="text-sm text-slate-400">Couldn’t load activity for this window.</p>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  { label: 'Tasks completed', value: String(activity.tasksCompleted), sub: `${activity.onTime} on time` },
+                  { label: 'On-time this period', value: activity.tasksCompleted ? `${activity.onTimeRate}%` : '—', sub: activity.tasksCompleted ? 'of completed tasks' : 'nothing completed yet' },
+                  { label: 'Active mentees', value: `${activity.activeMentees}/${activity.totalMentees}`, sub: 'submitted or finished work' },
+                  { label: 'Blockers', value: `${activity.blockersOpened} new`, sub: `${activity.blockersResolved} resolved` },
+                ].map((c) => (
+                  <div key={c.label} className="rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                    <div className="text-xs text-slate-500">{c.label}</div>
+                    <div className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{c.value}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{c.sub}</div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+          </div>
+
+          {/* Current standing (snapshot — not period-scoped) */}
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2 px-1">Current standing</p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { label: 'Avg progress', value: `${report.avgProgress}%`, sub: 'through their programs' },
+                { label: 'On-time delivery', value: `${report.avgOnTime}%`, sub: 'all-time, tasks on due date' },
+                { label: 'Work quality', value: report.avgRating ? `${report.avgRating}★` : '—', sub: report.avgRating ? 'avg task rating' : 'no ratings yet' },
+                { label: 'Needs attention', value: String(report.atRisk.length), sub: `of ${report.size} mentees` },
+              ].map((c) => (
+                <div key={c.label} className="rounded-2xl bg-white border border-slate-200 px-4 py-4">
+                  <div className="text-xs text-slate-500">{c.label}</div>
+                  <div className="mt-1 text-2xl font-semibold text-slate-900 tabular-nums">{c.value}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{c.sub}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Momentum + Open work */}

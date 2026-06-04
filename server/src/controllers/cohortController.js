@@ -13,6 +13,16 @@ const getCohort = catchAsync(async (req, res) => {
 });
 
 /**
+ * GET /api/mentor/cohort/activity?period=week|month
+ * Period-scoped throughput for the cohort over the last 7 / 30 days.
+ */
+const getCohortActivity = catchAsync(async (req, res) => {
+  const period = req.query?.period === 'month' ? 'month' : 'week';
+  const activity = await cohortService.getPeriodActivity(req.user.id, period);
+  res.status(200).json(successResponse('Cohort activity retrieved', { activity }));
+});
+
+/**
  * POST /api/mentor/cohort/report-summary  { period?: 'week' | 'month' }
  * AI-drafted narrative summary of the mentor's cohort (uses their AI connection).
  */
@@ -115,4 +125,4 @@ const removeCollaborator = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Collaborator removed', result));
 });
 
-module.exports = { getCohort, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator };
+module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator };

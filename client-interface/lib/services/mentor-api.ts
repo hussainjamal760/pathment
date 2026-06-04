@@ -11,6 +11,10 @@ export const mentorApi = {
   // The logged-in mentor's cohort for the Cockpit (computed fairness signals).
   getCohort: () => apiClient.get('/mentor/cohort'),
 
+  // Period-scoped cohort throughput (week / month window).
+  getCohortActivity: (period: 'week' | 'month') =>
+    apiClient.get(`/mentor/cohort/activity?period=${period}`),
+
   // AI-drafted narrative cohort summary (uses the mentor's AI connection).
   getCohortReportSummary: (period: 'week' | 'month') =>
     apiClient.post('/mentor/cohort/report-summary', { period }),

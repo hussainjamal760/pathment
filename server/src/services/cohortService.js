@@ -455,6 +455,55 @@ class CohortService {
   }
 
   /**
+   * Period-scoped THROUGHPUT for the mentor's whole cohort over the last 7
+   * (week) or 30 (month) days. Unlike the cohort snapshot (which is "now"),
+   * these numbers describe what actually happened inside the window — so the
+   * Reports week/month toggle changes them for real.
+   */
+  async getPeriodActivity(mentorId, period = 'week') {
+    const days = period === 'month' ? 30 : 7;
+    const since = new Date(Date.now() - days * 86400000);
+    const menteeIds = await this.resolveMenteeIds(mentorId);
+    if (!menteeIds.length) {
+      return { period, days, totalMentees: 0, tasksCompleted: 0, onTime: 0, onTimeRate: 0, pointsEarned: 0, blockersOpened: 0, blockersResolved: 0, activeMentees: 0 };
+    }
+    const inCohort = { [Op.in]: menteeIds };
+
+    const [completedTasks, submittedInWindow, blockersOpened, blockersResolved] = await Promise.all([
+      // Tasks completed inside the window (with lateness + points for quality/throughput).
+      models.AssignedTask.findAll({
+        where: { menteeId: inCohort, status: 'completed', completedAt: { [Op.gte]: since } },
+        attributes: ['menteeId', 'isLate', 'pointsAwarded', 'completedAt']
+      }),
+      // Tasks submitted inside the window (an activity signal even if not yet reviewed).
+      models.AssignedTask.findAll({
+        where: { menteeId: inCohort, submittedAt: { [Op.gte]: since } },
+        attributes: ['menteeId']
+      }),
+      models.Blocker.count({ where: { menteeId: inCohort, openedAt: { [Op.gte]: since } } }),
+      models.Blocker.count({ where: { menteeId: inCohort, resolvedAt: { [Op.gte]: since } } }),
+    ]);
+
+    const tasksCompleted = completedTasks.length;
+    const onTime = completedTasks.filter((t) => !t.isLate).length;
+    const onTimeRate = tasksCompleted ? Math.round((onTime / tasksCompleted) * 100) : 0;
+    const pointsEarned = completedTasks.reduce((s, t) => s + (t.pointsAwarded || 0), 0);
+
+    // A mentee is "active" this window if they completed or submitted any task in it.
+    const active = new Set();
+    completedTasks.forEach((t) => active.add(t.menteeId));
+    submittedInWindow.forEach((t) => active.add(t.menteeId));
+
+    return {
+      period, days,
+      totalMentees: menteeIds.length,
+      tasksCompleted, onTime, onTimeRate, pointsEarned,
+      blockersOpened, blockersResolved,
+      activeMentees: active.size,
+    };
+  }
+
+  /**
    * Generate a short, sendable written summary of the mentor's cohort using
    * their configured AI connection (feature: 'summary'). We compute the metrics
    * from authoritative cohort data here, hand the model a compact factual brief,
@@ -478,12 +527,18 @@ class CohortService {
     const pending = cohort.reduce((n, m) => n + m.pendingApprovals, 0);
     const openBlockers = cohort.reduce((n, m) => n + m.openBlockers, 0);
     const top = [...cohort].sort((a, b) => (b.absoluteProgress + b.onTimeRate) - (a.absoluteProgress + a.onTimeRate)).slice(0, 3);
+    const activity = await this.getPeriodActivity(mentorId, period);
 
     const brief = [
-      `Period: this ${period}`,
+      `Period: the last ${activity.days} days (this ${period})`,
       `Cohort size: ${size} mentees`,
-      `Average progress: ${avgProgress}%`,
-      `On-time delivery: ${avgOnTime}%`,
+      `--- Activity this ${period} (within the window) ---`,
+      `Tasks completed: ${activity.tasksCompleted} (${activity.onTime} on time, ${activity.onTimeRate}% on-time)`,
+      `Active mentees: ${activity.activeMentees} of ${activity.totalMentees}`,
+      `Blockers raised: ${activity.blockersOpened}; blockers resolved: ${activity.blockersResolved}`,
+      `--- Current standing (as of now) ---`,
+      `Average progress through programs: ${avgProgress}%`,
+      `Overall on-time delivery: ${avgOnTime}%`,
       avgRating ? `Average work quality: ${avgRating}/5` : 'Average work quality: no ratings yet',
       `On track: ${onTrack.length}; to watch: ${watch.length}; at risk: ${high.length}`,
       `Pending reviews: ${pending}; open blockers: ${openBlockers}`,
