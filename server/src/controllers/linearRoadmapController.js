@@ -41,7 +41,8 @@ const assign = catchAsync(async (req, res) => {
   const { menteeId, menteeIds, startStep = 0 } = req.body;
   if (Array.isArray(menteeIds) && menteeIds.length) {
     const results = await linearRoadmapService.bulkAssign(req.user.id, req.params.id, menteeIds, startStep);
-    return res.status(200).json(successResponse('Roadmap assigned', { results }));
+    const assigned = results.filter((r) => r.ok).length;
+    return res.status(200).json(successResponse('Roadmap assigned', { results, assigned, failed: results.length - assigned }));
   }
   const progress = await linearRoadmapService.assignToMentee(req.user.id, req.params.id, menteeId, startStep);
   res.status(200).json(successResponse('Roadmap assigned', { progress }));

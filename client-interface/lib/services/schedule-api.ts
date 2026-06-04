@@ -20,6 +20,14 @@ export const scheduleApi = {
   importTemplate: (orgId: string) => apiClient.post('/schedules/templates/import', { orgId }),
   assign: (id: string, menteeIds: string[]) => apiClient.post(`/schedules/templates/${id}/assign`, { menteeIds }),
 
+  // Admin org templates (the shared library mentors import).
+  listOrgTemplates: () => apiClient.get('/schedules/org'),
+  createOrgTemplate: (data: { name: string; description?: string; blocks: Partial<ScheduleBlock>[] }) =>
+    apiClient.post('/schedules/org', data),
+  updateOrgTemplate: (id: string, data: { name?: string; description?: string; blocks?: Partial<ScheduleBlock>[] }) =>
+    apiClient.patch(`/schedules/org/${id}`, data),
+  deleteOrgTemplate: (id: string) => apiClient.delete(`/schedules/org/${id}`),
+
   getMenteeSchedule: (menteeId: string) => apiClient.get(`/schedules/mentee/${menteeId}`),
   getMySchedule: () => apiClient.get('/schedules/me'),
   updateSlot: (menteeId: string, slotId: string, patch: {

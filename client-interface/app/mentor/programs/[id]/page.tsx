@@ -3,360 +3,183 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
-  BookOpen,
-  Users,
-  Clock,
-  CheckCircle2,
-  Circle,
-  ChevronDown,
-  Loader2,
-  Target,
+  BookOpen, Users, Users2, Crown, ChevronLeft, ArrowUpRight, Loader2,
+  ClipboardCheck, Route, CalendarClock, Mail, GraduationCap, Lock, Globe,
 } from 'lucide-react';
-import { useMentorProgramDetail } from '@/lib/hooks/mentor';
-import { PageHeader, TabBar, StatusBadge } from '@/components/admin/ui';
-import type { Tab } from '@/components/admin/ui';
+import { useMentorProgramDetail, type ProgramClanDetail, type ProgramPerson } from '@/lib/hooks/mentor';
+
+const STATUS_CLASS: Record<string, string> = {
+  published: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  draft: 'bg-slate-100 text-slate-600 border-slate-200',
+  archived: 'bg-slate-100 text-slate-500 border-slate-200',
+  completed: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+};
+
+function StatCard({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: number }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
+      <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-indigo-600" />
+      </div>
+      <div>
+        <div className="text-xl font-semibold text-slate-900 tabular-nums">{value}</div>
+        <div className="text-xs text-slate-500">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function PersonRow({ person }: { person: ProgramPerson }) {
+  return (
+    <Link
+      href={`/mentor/mentees/${person.id}`}
+      className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+    >
+      <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+        <span className="text-indigo-700 text-xs font-medium">{person.avatar}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-slate-900 truncate">{person.name}</p>
+        {person.email && <p className="text-xs text-slate-500 truncate flex items-center gap-1"><Mail className="w-3 h-3" />{person.email}</p>}
+      </div>
+      <ArrowUpRight className="w-4 h-4 text-slate-300 shrink-0" />
+    </Link>
+  );
+}
+
+function ClanCard({ clan }: { clan: ProgramClanDetail }) {
+  return (
+    <section className="bg-white rounded-2xl border border-slate-200 overflow-hidden" aria-label={`Clan ${clan.name}`}>
+      <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-3 flex-wrap">
+        <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0"><Users2 className="w-4.5 h-4.5 text-indigo-600" /></div>
+        <div className="min-w-0">
+          <h2 className="font-semibold text-slate-900 truncate">{clan.name}</h2>
+          <p className="text-xs text-slate-500 inline-flex items-center gap-1">
+            {clan.myRole === 'lead_mentor' ? <><Crown className="w-3 h-3 text-amber-500" />Lead mentor</> : 'Co-mentor'}
+          </p>
+        </div>
+        <span className="ml-auto text-xs text-slate-500">{clan.mentees.length} mentee{clan.mentees.length === 1 ? '' : 's'}</span>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {clan.coMentors.length > 0 && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Mentor team</p>
+            <div className="flex flex-wrap gap-2">
+              {clan.coMentors.map((c) => (
+                <span key={c.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-xs">
+                  {c.role === 'lead_mentor' && <Crown className="w-3 h-3 text-amber-500" />}{c.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Mentees</p>
+          {clan.mentees.length === 0 ? (
+            <p className="text-sm text-slate-500 py-2">No mentees placed in this clan yet — they'll appear here once enrolled.</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-2">
+              {clan.mentees.map((m) => <PersonRow key={m.id} person={m} />)}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const QUICK_ACTIONS = [
+  { href: '/mentor/review', icon: ClipboardCheck, label: 'Cohort review', hint: 'Review submissions & attendance' },
+  { href: '/mentor/roadmaps', icon: Route, label: 'Roadmaps', hint: 'Assign learning paths' },
+  { href: '/mentor/schedules', icon: CalendarClock, label: 'Schedules', hint: 'Set recurring rituals' },
+];
 
 export default function MentorProgramDetail() {
   const params = useParams();
   const id = params?.id as string;
-
-  const {
-    program,
-    levels,
-    roadmap,
-    myMentees,
-    loading,
-    loadingRoadmap,
-    activeTab,
-    selectedLevelId,
-    expandedWeeks,
-    setActiveTab,
-    setSelectedLevelId,
-    toggleWeek,
-  } = useMentorProgramDetail(id);
-
-  const tabs: Tab[] = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'roadmap', label: 'Roadmap' },
-    { id: 'mentees', label: 'My Mentees', count: myMentees.length },
-  ];
+  const { program, clans, menteeCount, coMentorCount, loading, notFound } = useMentorProgramDetail(id);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
   }
 
-  if (!program) {
+  if (notFound || !program) {
     return (
-      <div className="text-center py-20">
-        <p className="text-slate-500">Program not found.</p>
-        <Link href="/mentor/programs" className="text-indigo-600 hover:underline text-sm mt-2 inline-block">
-          Back to Programs
+      <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center max-w-xl mx-auto">
+        <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+        <p className="text-slate-700 font-medium">This program isn&apos;t one you mentor in</p>
+        <p className="text-slate-500 text-sm mt-1">You only see programs where you lead or co-mentor a clan.</p>
+        <Link href="/mentor/programs" className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-700 text-sm font-medium mt-3">
+          <ChevronLeft className="w-4 h-4" />Back to My Programs
         </Link>
       </div>
     );
   }
 
+  const statusCls = STATUS_CLASS[program.status || ''] || STATUS_CLASS.draft;
+
   return (
     <div className="space-y-6">
-      {/* Back */}
-      <PageHeader
-        backHref="/mentor/programs"
-        backLabel="Back to Programs"
-      />
+      <Link href="/mentor/programs" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <ChevronLeft className="w-4 h-4" />Back to My Programs
+      </Link>
 
-      {/* Hero Card */}
+      {/* Hero */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-indigo-600" />
-              </div>
-              <div>
-                <h1 className="text-slate-900">{program.name}</h1>
-                <StatusBadge status={program.status} noIcon />
-              </div>
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center shrink-0"><BookOpen className="w-6 h-6 text-indigo-600" /></div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-slate-900">{program.name}</h1>
+              {program.status && <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium capitalize ${statusCls}`}>{program.status}</span>}
+              {program.visibility && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-slate-200 text-slate-500 text-xs">
+                  {program.visibility === 'public' ? <Globe className="w-3 h-3" /> : <Lock className="w-3 h-3" />}{program.visibility}
+                </span>
+              )}
             </div>
-            <p className="text-slate-600 mt-3">{program.description || 'No description available'}</p>
-            {program.tags && program.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {program.tags.map((tag: string, i: number) => (
-                  <span key={i} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-sm">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Quick stats */}
-          <div className="flex sm:flex-col gap-4 sm:gap-3 sm:text-right">
-            <div className="bg-slate-50 rounded-xl px-4 py-3">
-              <div className="text-xs text-slate-500 mb-0.5">Duration</div>
-              <div className="text-slate-900 font-semibold text-sm">
-                {program.totalDurationWeeks || '—'} weeks
-              </div>
-            </div>
-            <div className="bg-slate-50 rounded-xl px-4 py-3">
-              <div className="text-xs text-slate-500 mb-0.5">My Mentees</div>
-              <div className="text-slate-900 font-semibold text-sm">{myMentees.length}</div>
-            </div>
-            <div className="bg-slate-50 rounded-xl px-4 py-3">
-              <div className="text-xs text-slate-500 mb-0.5">Levels</div>
-              <div className="text-slate-900 font-semibold text-sm">{levels.length}</div>
-            </div>
+            <p className="text-slate-600 mt-2 text-sm">{program.description || 'No description provided for this program.'}</p>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <TabBar tabs={tabs} activeTab={activeTab} onChange={(id) => setActiveTab(id as any)} variant="pill" />
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard icon={Users2} label="My clans" value={clans.length} />
+        <StatCard icon={GraduationCap} label="Mentees" value={menteeCount} />
+        <StatCard icon={Users} label="Co-mentors" value={coMentorCount} />
+      </div>
 
-      {/* ── OVERVIEW TAB ── */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          {/* Levels */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6">
-            <h2 className="text-slate-900 mb-4">Program Levels</h2>
-            {levels.length === 0 ? (
-              <p className="text-slate-500 text-sm">No levels defined yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {levels.map((level, idx) => (
-                  <div key={level.id} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-indigo-600 text-sm font-semibold">{idx + 1}</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-slate-900 font-medium">{level.name}</div>
-                      {level.description && (
-                        <p className="text-slate-500 text-sm mt-0.5 line-clamp-1">{level.description}</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-slate-500 text-sm">
-                      <Clock className="w-3.5 h-3.5" />
-                      {level.durationWeeks} weeks
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {QUICK_ACTIONS.map((a) => (
+          <Link key={a.href} href={a.href}
+            className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3 hover:border-indigo-300 hover:shadow-sm transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0"><a.icon className="w-5 h-5 text-indigo-600" /></div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-900">{a.label}</p>
+              <p className="text-xs text-slate-500 truncate">{a.hint}</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Clans + rosters */}
+      <div>
+        <h2 className="text-slate-900 mb-3">Your clans in this program</h2>
+        {clans.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center">
+            <Users2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-600">You don&apos;t run any clans in this program yet.</p>
           </div>
-
-          {/* Learning Outcomes of first level */}
-          {levels[0]?.learningOutcomes?.length > 0 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Target className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-slate-900">Learning Outcomes</h2>
-              </div>
-              <ul className="space-y-2">
-                {levels[0].learningOutcomes.map((outcome: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-600 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                    {outcome}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── ROADMAP TAB ── */}
-      {activeTab === 'roadmap' && (
-        <div className="space-y-4">
-          {/* Level selector */}
-          {levels.length > 1 && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
-              <span className="text-slate-600 text-sm font-medium">Level:</span>
-              <div className="flex gap-2 flex-wrap">
-                {levels.map((level) => (
-                  <button
-                    key={level.id}
-                    onClick={() => setSelectedLevelId(level.id)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                      selectedLevelId === level.id
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                    }`}
-                  >
-                    {level.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {loadingRoadmap ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
-            </div>
-          ) : !roadmap ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-              <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">No roadmap available for this level yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(roadmap.weeks || []).map((week: any, wIdx: number) => {
-                const isOpen = expandedWeeks.has(week.id);
-                return (
-                  <div key={week.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                    {/* Week Header */}
-                    <button
-                      onClick={() => toggleWeek(week.id)}
-                      className="w-full flex items-center gap-4 p-5 hover:bg-slate-50 transition-colors text-left"
-                    >
-                      <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-indigo-600 text-sm font-semibold">{wIdx + 1}</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-slate-900 font-medium">{week.title}</div>
-                        {week.milestone && (
-                          <div className="text-slate-500 text-xs mt-0.5">🎯 {week.milestone}</div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-slate-400 text-sm">
-                        <span>{week.tasks?.length || 0} tasks</span>
-                        <ChevronDown
-                          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        />
-                      </div>
-                    </button>
-
-                    {/* Week Tasks */}
-                    {isOpen && (
-                      <div className="border-t border-slate-100 divide-y divide-slate-100">
-                        {week.objectives && week.objectives.length > 0 && (
-                          <div className="px-5 py-3 bg-indigo-50/50">
-                            <p className="text-xs font-medium text-indigo-700 mb-1.5">Objectives</p>
-                            <ul className="space-y-1">
-                              {week.objectives.map((obj: string, i: number) => (
-                                <li key={i} className="text-xs text-slate-600 flex items-start gap-1.5">
-                                  <Circle className="w-3 h-3 text-indigo-400 mt-0.5 flex-shrink-0" />
-                                  {obj}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {(week.tasks || []).length === 0 ? (
-                          <div className="px-5 py-4 text-sm text-slate-400">No tasks in this week.</div>
-                        ) : (
-                          (week.tasks || []).map((task: any, tIdx: number) => (
-                            <div key={task.id} className="px-5 py-4 flex items-start gap-3">
-                              <span className="w-6 h-6 bg-slate-100 rounded-md flex items-center justify-center text-xs text-slate-500 flex-shrink-0 mt-0.5">
-                                {tIdx + 1}
-                              </span>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className="text-slate-900 text-sm font-medium">{task.title}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-xs capitalize ${
-                                    task.difficulty === 'easy' ? 'bg-green-100 text-green-700' :
-                                    task.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                    task.difficulty === 'hard' ? 'bg-orange-100 text-orange-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>
-                                    {task.difficulty}
-                                  </span>
-                                  <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs capitalize">
-                                    {task.type}
-                                  </span>
-                                </div>
-                                {task.description && (
-                                  <p className="text-slate-500 text-xs line-clamp-2">{task.description}</p>
-                                )}
-                                {task.estimatedHours && (
-                                  <div className="flex items-center gap-1 mt-1 text-slate-400 text-xs">
-                                    <Clock className="w-3 h-3" />
-                                    {task.estimatedHours}h estimated
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── MY MENTEES TAB ── */}
-      {activeTab === 'mentees' && (
-        <div className="space-y-4">
-          {myMentees.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-              <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500">You have no mentees in this program.</p>
-            </div>
-          ) : (
-            myMentees.map((match: any) => {
-              const mentee = match.mentee;
-              const enrollment = match.enrollment;
-              const progress = parseFloat(enrollment?.overallProgressPercentage || 0);
-              const progressColor =
-                progress >= 75 ? 'bg-green-500' :
-                progress >= 50 ? 'bg-blue-500' :
-                progress >= 25 ? 'bg-yellow-500' : 'bg-slate-300';
-
-              return (
-                <Link
-                  key={match.id}
-                  href={`/mentor/mentees/${mentee?.id}`}
-                  className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-5 hover:border-indigo-300 hover:shadow-md transition-all"
-                >
-                  {/* Avatar */}
-                  <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <span className="text-indigo-700 font-semibold text-lg">
-                      {mentee?.firstName?.[0]}{mentee?.lastName?.[0]}
-                    </span>
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-slate-900 font-medium">
-                        {mentee?.firstName} {mentee?.lastName}
-                      </span>
-                      <span className={`px-2 py-0.5 rounded-md text-xs capitalize ${
-                        match.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {match.status}
-                      </span>
-                    </div>
-                    <p className="text-slate-500 text-sm truncate">{mentee?.email}</p>
-
-                    {/* Progress bar */}
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                        <span>Progress</span>
-                        <span>{Math.round(progress)}%</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${progressColor} rounded-full transition-all`}
-                          style={{ width: `${progress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                </Link>
-              );
-            })
-          )}
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            {clans.map((c) => <ClanCard key={c.id} clan={c} />)}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

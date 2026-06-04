@@ -60,7 +60,7 @@ export { useMentorPrograms } from './useMentorPrograms';
 export type { UseMentorProgramsReturn } from './useMentorPrograms';
 
 export { useMentorProgramDetail } from './useMentorProgramDetail';
-export type { UseMentorProgramDetailReturn, ProgramDetailTab } from './useMentorProgramDetail';
+export type { UseMentorProgramDetailReturn, MentorProgramInfo, ProgramClanDetail, ProgramPerson } from './useMentorProgramDetail';
 
 export { useMentorTaskDetail } from './useMentorTaskDetail';
 export type { UseMentorTaskDetailReturn } from './useMentorTaskDetail';

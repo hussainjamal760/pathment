@@ -4,6 +4,13 @@ const c = require('../controllers/scheduleTemplateController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 const mentorOnly = [authenticate, authorize(['mentor', 'admin'])];
+const adminOnly = [authenticate, authorize(['admin'])];
+
+// Admin org templates (the shared library mentors import).
+router.get('/org', adminOnly, c.listOrg);
+router.post('/org', adminOnly, c.createOrg);
+router.patch('/org/:id', adminOnly, c.updateOrg);
+router.delete('/org/:id', adminOnly, c.deleteOrg);
 
 // Templates (mentor).
 router.get('/templates', mentorOnly, c.listTemplates);

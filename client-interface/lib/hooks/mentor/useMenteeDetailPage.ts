@@ -47,6 +47,15 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
       const matches = response?.data?.matches || response?.matches || [];
       if (matches.length > 0) {
         setMatch(matches[0]);
+      } else {
+        // Clan-placed mentees have no MentorMenteeMatch — resolve them via their
+        // enrollment instead so the page works for the clan model.
+        const enrRes: any = await enrollmentApi.getAll({ menteeId });
+        const enrollments = enrRes?.data?.enrollments || enrRes?.data || [];
+        const active = enrollments.find((e: any) => !['rejected', 'dropped'].includes(e.status)) || enrollments[0];
+        if (active) {
+          setMatch({ mentee: active.mentee, enrollment: active });
+        }
       }
       const tasksRes = await taskApi.getMentorTasks(user.id, { menteeId });
       setTasks(tasksRes?.data?.tasks || []);

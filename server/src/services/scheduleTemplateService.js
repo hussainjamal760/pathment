@@ -52,6 +52,40 @@ class ScheduleTemplateService {
     return { deleted: true };
   }
 
+  // ── Admin org templates (the shared library mentors import) ────────────────
+  async listOrgTemplates() {
+    return models.ScheduleTemplate.findAll({ where: { source: 'org' }, order: [['created_at', 'DESC']] });
+  }
+
+  async createOrgTemplate(adminId, { name, description, blocks }) {
+    if (!name || !name.trim()) throw new ValidationError('name is required');
+    return models.ScheduleTemplate.create({
+      name: name.trim(),
+      description: description || null,
+      source: 'org',
+      ownerMentorId: null,
+      blocks: this._normalizeBlocks(blocks),
+      createdBy: adminId
+    });
+  }
+
+  async updateOrgTemplate(id, updates) {
+    const t = await models.ScheduleTemplate.findByPk(id);
+    if (!t || t.source !== 'org') throw new NotFoundError('Org template not found');
+    if (updates.name !== undefined) t.name = updates.name;
+    if (updates.description !== undefined) t.description = updates.description;
+    if (updates.blocks !== undefined) t.blocks = this._normalizeBlocks(updates.blocks);
+    await t.save();
+    return t;
+  }
+
+  async deleteOrgTemplate(id) {
+    const t = await models.ScheduleTemplate.findByPk(id);
+    if (!t || t.source !== 'org') throw new NotFoundError('Org template not found');
+    await t.destroy();
+    return { deleted: true };
+  }
+
   /** Import an org template into a mentor-owned copy. */
   async importTemplate(mentorId, orgId) {
     const org = await models.ScheduleTemplate.findByPk(orgId);

@@ -42,6 +42,7 @@ export interface Enrollment {
     type: string;
     status: string;
   };
+  clan?: { id: string; name: string } | null;
   matches: Array<{
     id: string;
     status: string;

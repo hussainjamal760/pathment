@@ -26,6 +26,7 @@ import {
   School,
   BarChart2,
   ShieldAlert,
+  Flag,
   type LucideIcon
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
@@ -51,6 +52,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
     { path: '/admin/programs/list', icon: BookOpen, label: 'Programs' },
     { path: '/admin/cohorts', icon: CalendarRange, label: 'Intake' },
     { path: '/admin/roadmaps', icon: Route, label: 'Roadmaps' },
+    { path: '/admin/schedules', icon: CalendarClock, label: 'Schedules' },
     { path: '/admin/rewards', icon: Gift, label: 'Rewards' },
     { path: '/admin/mentor-spec', icon: Compass, label: 'Mentor Spec' },
     { path: '/admin/clans', icon: Users2, label: 'Clans' },
@@ -98,6 +100,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
     { path: '/mentee/daily-log', icon: CalendarCheck, label: 'Daily Log' },
     { path: '/mentee/tasks', icon: ClipboardList, label: 'My Tasks' },
     { path: '/mentee/progress', icon: BarChart2, label: 'My Progress' },
+    { path: '/mentee/blockers', icon: Flag, label: 'Blockers' },
     { path: '/mentee/meetings', icon: CalendarClock, label: 'My Mentor' },
     { path: '/mentee/gamification', icon: Trophy, label: 'Gamification' },
     { path: '/mentee/community', icon: Users, label: 'Community' },

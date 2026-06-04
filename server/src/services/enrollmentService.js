@@ -87,6 +87,21 @@ class EnrollmentService {
       subQuery: false,
     });
 
+    // Attach each mentee's clan (program-aware) without a JOIN fan-out: batch
+    // their active mentee memberships and map back onto the page's rows.
+    const menteeIds = [...new Set(rows.map((r) => r.menteeId))];
+    if (menteeIds.length) {
+      const memberships = await models.ClanMembership.findAll({
+        where: { userId: { [Op.in]: menteeIds }, role: 'mentee', status: 'active' },
+        include: [{ model: models.Clan, as: 'clan', attributes: ['id', 'name', 'programId'] }]
+      });
+      rows.forEach((r) => {
+        const forUser = memberships.filter((m) => m.userId === r.menteeId && m.clan);
+        const clan = forUser.find((m) => m.clan.programId === r.programId)?.clan || forUser[0]?.clan || null;
+        r.setDataValue('clan', clan ? { id: clan.id, name: clan.name } : null);
+      });
+    }
+
     return {
       enrollments: rows,
       pagination: {

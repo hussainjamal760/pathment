@@ -1,128 +1,99 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { programManagementApi } from '@/lib/services/program-api';
-import { matchingApi } from '@/lib/services/enrollment-api';
-import { useAuth } from '@/lib/context/AuthContext';
-import { toast } from 'sonner';
+import { useCallback, useEffect, useState } from 'react';
+import { clanApi } from '@/lib/services/clan-api';
 
-export type ProgramDetailTab = 'overview' | 'roadmap' | 'mentees';
-
-export interface UseMentorProgramDetailReturn {
-  program: any | null;
-  levels: any[];
-  roadmap: any | null;
-  myMentees: any[];
-  loading: boolean;
-  loadingRoadmap: boolean;
-  activeTab: ProgramDetailTab;
-  selectedLevelId: string;
-  expandedWeeks: Set<string>;
-  setActiveTab: (tab: ProgramDetailTab) => void;
-  setSelectedLevelId: (id: string) => void;
-  toggleWeek: (weekId: string) => void;
-  fetchRoadmap: () => Promise<void>;
+export interface ProgramPerson {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+  avatar: string;
 }
 
+export interface ProgramClanDetail {
+  id: string;
+  name: string;
+  myRole: 'lead_mentor' | 'co_mentor';
+  mentees: ProgramPerson[];
+  coMentors: ProgramPerson[];
+}
+
+export interface MentorProgramInfo {
+  id: string;
+  name: string;
+  status: string | null;
+  visibility: string | null;
+  description: string | null;
+}
+
+export interface UseMentorProgramDetailReturn {
+  program: MentorProgramInfo | null;
+  clans: ProgramClanDetail[];
+  menteeCount: number;
+  coMentorCount: number;
+  loading: boolean;
+  notFound: boolean;
+  refetch: () => Promise<void>;
+}
+
+const fullName = (u: any) => `${u?.firstName ?? ''} ${u?.lastName ?? ''}`.trim() || u?.email || 'Member';
+const initials = (u: any) => `${(u?.firstName || '')[0] || ''}${(u?.lastName || '')[0] || ''}`.toUpperCase() || '?';
+
+/**
+ * Mentor program detail, built only from what the mentor can actually access:
+ * the clans they lead/co-mentor in the program (via /clans/mentor/programs) and
+ * each clan's members (via /clans/:id). No deprecated levels / week-roadmaps and
+ * no private-program fetch that mentors aren't allowed to read.
+ */
 export function useMentorProgramDetail(programId: string): UseMentorProgramDetailReturn {
-  const { user } = useAuth();
-
-  const [program, setProgram] = useState<any>(null);
-  const [levels, setLevels] = useState<any[]>([]);
-  const [roadmap, setRoadmap] = useState<any>(null);
-  const [myMentees, setMyMentees] = useState<any[]>([]);
+  const [program, setProgram] = useState<MentorProgramInfo | null>(null);
+  const [clans, setClans] = useState<ProgramClanDetail[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingRoadmap, setLoadingRoadmap] = useState(false);
-  const [activeTab, setActiveTab] = useState<ProgramDetailTab>('overview');
-  const [selectedLevelId, setSelectedLevelId] = useState('');
-  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
+  const [notFound, setNotFound] = useState(false);
 
-  const fetchProgram = useCallback(async () => {
+  const fetchDetail = useCallback(async () => {
     if (!programId) return;
+    setLoading(true);
+    setNotFound(false);
     try {
-      setLoading(true);
-      const response = await programManagementApi.programs.getById(programId);
-      const programData = response?.data?.program || response?.program || response;
-      setProgram(programData);
-    } catch (error: any) {
-      console.error('Failed to fetch program:', error);
-      toast.error('Failed to load program');
+      const res: any = await clanApi.mentorPrograms();
+      const progs: any[] = res?.data?.programs ?? [];
+      const p = progs.find((x) => x.id === programId);
+      if (!p) { setProgram(null); setClans([]); setNotFound(true); return; }
+
+      setProgram({ id: p.id, name: p.name, status: p.status ?? null, visibility: p.visibility ?? null, description: p.description ?? null });
+
+      const detailed = await Promise.all((p.clans || []).map(async (c: any): Promise<ProgramClanDetail> => {
+        try {
+          const cr: any = await clanApi.get(c.id);
+          const memberships: any[] = cr?.data?.clan?.memberships ?? [];
+          const mentees: ProgramPerson[] = [];
+          const coMentors: ProgramPerson[] = [];
+          memberships.forEach((m) => {
+            if (!m.user) return;
+            const person: ProgramPerson = { id: m.user.id, name: fullName(m.user), email: m.user.email, role: m.role, avatar: initials(m.user) };
+            if (m.role === 'mentee') mentees.push(person);
+            else coMentors.push(person);
+          });
+          return { id: c.id, name: c.name, myRole: c.myRole, mentees, coMentors };
+        } catch {
+          return { id: c.id, name: c.name, myRole: c.myRole, mentees: [], coMentors: [] };
+        }
+      }));
+      setClans(detailed);
+    } catch {
+      setNotFound(true);
     } finally {
       setLoading(false);
     }
   }, [programId]);
 
-  // Levels were removed — programs no longer have level sub-structure.
-  const fetchLevels = useCallback(async () => {
-    setLevels([]);
-  }, []);
+  useEffect(() => { fetchDetail(); }, [fetchDetail]);
 
-  // Legacy week-based per-level roadmap was removed; linear roadmaps live in the
-  // Roadmaps area. This view no longer loads a curriculum.
-  const fetchRoadmap = useCallback(async () => {
-    try {
-      setLoadingRoadmap(true);
-      setRoadmap(null);
-    } finally {
-      setLoadingRoadmap(false);
-    }
-  }, [programId, selectedLevelId]);
+  const menteeCount = clans.reduce((n, c) => n + c.mentees.length, 0);
+  const coMentorCount = clans.reduce((n, c) => n + c.coMentors.length, 0);
 
-  const fetchMyMentees = useCallback(async () => {
-    if (!user?.id || !programId) return;
-    try {
-      const response = await matchingApi.getMatches({ mentorId: user.id, status: 'active' });
-      const matches = response?.data?.matches || response?.matches || [];
-      const inThisProgram = matches.filter(
-        (m: any) => m.enrollment?.program?.id === programId || m.enrollment?.programId === programId
-      );
-      setMyMentees(inThisProgram);
-    } catch (error: any) {
-      console.error('Failed to fetch mentees:', error);
-    }
-  }, [user?.id, programId]);
-
-  useEffect(() => {
-    if (programId) {
-      fetchProgram();
-      fetchLevels();
-    }
-  }, [programId, fetchProgram, fetchLevels]);
-
-  useEffect(() => {
-    if (user?.id && programId) {
-      fetchMyMentees();
-    }
-  }, [user?.id, programId, fetchMyMentees]);
-
-  useEffect(() => {
-    if (activeTab === 'roadmap' && selectedLevelId) {
-      fetchRoadmap();
-    }
-  }, [activeTab, selectedLevelId, fetchRoadmap]);
-
-  const toggleWeek = useCallback((weekId: string) => {
-    setExpandedWeeks((prev) => {
-      const next = new Set(prev);
-      if (next.has(weekId)) { next.delete(weekId); } else { next.add(weekId); }
-      return next;
-    });
-  }, []);
-
-  return {
-    program,
-    levels,
-    roadmap,
-    myMentees,
-    loading,
-    loadingRoadmap,
-    activeTab,
-    selectedLevelId,
-    expandedWeeks,
-    setActiveTab,
-    setSelectedLevelId,
-    toggleWeek,
-    fetchRoadmap,
-  };
+  return { program, clans, menteeCount, coMentorCount, loading, notFound, refetch: fetchDetail };
 }

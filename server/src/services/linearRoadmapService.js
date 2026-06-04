@@ -286,12 +286,20 @@ class LinearRoadmapService {
 
   /** Assign a roadmap to a mentee starting at a given step, and assign that step. */
   async assignToMentee(mentorId, roadmapId, menteeId, startStep = 0, slot = null) {
+    const roadmap = await models.Roadmap.findByPk(roadmapId);
     const steps = await this.getSteps(roadmapId);
     if (!steps.length) throw new ValidationError('This roadmap has no steps to assign');
     const idx = Math.max(0, Math.min(startStep, steps.length - 1));
 
-    const enrollment = await this._activeEnrollment(menteeId);
-    if (!enrollment) throw new ValidationError('Mentee has no enrollment to attach this work to');
+    let enrollment = await this._activeEnrollment(menteeId);
+    if (!enrollment) {
+      // Self-heal: a clan-placed mentee may not have an enrollment yet. Create
+      // one in the roadmap's program rather than failing the assignment.
+      if (!roadmap?.programId) throw new ValidationError('Mentee has no enrollment to attach this work to');
+      enrollment = await models.Enrollment.create({
+        menteeId, programId: roadmap.programId, status: 'active', enrolledAt: new Date()
+      });
+    }
 
     return sequelize.transaction(async (transaction) => {
       let progress = await models.RoadmapProgress.findOne({ where: { roadmapId, menteeId }, transaction });

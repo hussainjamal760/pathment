@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ChevronLeft, ChevronRight, SkipForward, Check, MessageSquarePlus, Loader2,
-  TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus,
+  TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
+import { useAuth } from '@/lib/context/AuthContext';
 import { mentorApi } from '@/lib/services/mentor-api';
+import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
 import { frictionApi } from '@/lib/services/friction-api';
 import { DualProgress } from '@/components/mentor/DualProgress';
@@ -29,12 +31,27 @@ function MomentumIcon({ m }: { m: CohortMomentum }) {
   return <Minus className="w-4 h-4 text-slate-400" />;
 }
 
+// Assigned-task status display (the mentee's "day" / current workload).
+const TASK_STATUS_META: Record<string, { label: string; cls: string }> = {
+  assigned: { label: 'Assigned', cls: 'bg-slate-100 text-slate-600' },
+  not_started: { label: 'Not started', cls: 'bg-slate-100 text-slate-600' },
+  in_progress: { label: 'In progress', cls: 'bg-sky-100 text-sky-700' },
+  submitted: { label: 'Submitted', cls: 'bg-indigo-100 text-indigo-700' },
+  revision_needed: { label: 'Changes requested', cls: 'bg-amber-100 text-amber-700' },
+  completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
+  cancelled: { label: 'Cancelled', cls: 'bg-slate-100 text-slate-400' },
+};
+const TASK_STATUS_ORDER = ['revision_needed', 'submitted', 'in_progress', 'assigned', 'not_started', 'completed', 'cancelled'];
+
 export default function CohortReview() {
   const router = useRouter();
+  const { user } = useAuth();
   const { cohort, loading } = useMentorCohort();
   const { queue, refetch: refetchQueue } = useMentorApprovals();
 
   const [idx, setIdx] = useState(0);
+  const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [tasksLoading, setTasksLoading] = useState(false);
   const [attendance, setAttendance] = useState<Record<string, Attendance>>({});
   const [deferred, setDeferred] = useState<Set<string>>(new Set());
   const [seen, setSeen] = useState<Set<string>>(new Set());
@@ -53,13 +70,27 @@ export default function CohortReview() {
     [queue, mentee?.id]
   );
 
-  // Load open blockers for the current mentee; reset per-mentee local state.
+  // Load open blockers + assigned tasks for the current mentee; reset state.
   useEffect(() => {
     if (!mentee) return;
-    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]);
+    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]);
     setSeen((s) => new Set(s).add(mentee.id));
     frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {});
-  }, [mentee?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (user?.id) {
+      setTasksLoading(true);
+      taskApi.getMentorTasks(user.id, { menteeId: mentee.id })
+        .then((r: any) => setTasks(r?.data?.tasks ?? []))
+        .catch(() => setTasks([]))
+        .finally(() => setTasksLoading(false));
+    }
+  }, [mentee?.id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The mentee's assigned work, grouped by status (their "day").
+  const taskGroups = useMemo(() => {
+    const by: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    tasks.forEach((t) => { const k = t.status || 'assigned'; (by[k] = by[k] || []).push(t); });
+    return TASK_STATUS_ORDER.filter((s) => by[s]?.length).map((s) => ({ status: s, items: by[s] }));
+  }, [tasks]);
 
   const go = useCallback((delta: number) => {
     setIdx((i) => Math.max(0, Math.min(cohort.length - 1, i + delta)));
@@ -70,7 +101,12 @@ export default function CohortReview() {
     go(1);
   }, [mentee, go]);
 
-  const refresh = async () => { await refetchQueue(); };
+  const refresh = async () => {
+    await refetchQueue();
+    if (user?.id && mentee) {
+      try { const r: any = await taskApi.getMentorTasks(user.id, { menteeId: mentee.id }); setTasks(r?.data?.tasks ?? []); } catch { /* keep prior */ }
+    }
+  };
 
   const approve = useCallback(async (item: ApprovalItem) => {
     try {
@@ -107,6 +143,22 @@ export default function CohortReview() {
   const resolveBlocker = async (id: string) => {
     try { setBusy(id); await frictionApi.resolveBlocker(id); setBlockers((b) => b.filter((x) => x.id !== id)); }
     catch { toast.error('Could not resolve'); } finally { setBusy(null); }
+  };
+
+  // Mentor logs a blocker on the current mentee's behalf.
+  const [showAddBlocker, setShowAddBlocker] = useState(false);
+  const [bTitle, setBTitle] = useState('');
+  const [bCat, setBCat] = useState('technical');
+  const [bSev, setBSev] = useState('medium');
+  const addBlocker = async () => {
+    if (!bTitle.trim() || !mentee) return;
+    try {
+      setBusy('add-blocker');
+      const r: any = await frictionApi.createBlocker({ menteeId: mentee.id, title: bTitle.trim(), category: bCat, severity: bSev });
+      if (r?.data?.blocker) setBlockers((b) => [r.data.blocker, ...b]);
+      setBTitle(''); setBCat('technical'); setBSev('medium'); setShowAddBlocker(false);
+      toast.success('Blocker logged');
+    } catch { toast.error('Could not add blocker'); } finally { setBusy(null); }
   };
 
   // Keyboard shortcuts.
@@ -201,6 +253,55 @@ export default function CohortReview() {
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}
           </div>
 
+          {/* Assigned work — everything currently on this mentee's plate */}
+          <div className="bg-white rounded-2xl border border-slate-200">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
+              <ListTodo className="w-4 h-4 text-indigo-500" />
+              <h3 className="text-slate-900 font-medium">Assigned work</h3>
+              {tasks.length > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{tasks.length}</span>}
+              <button onClick={() => setAssigning(true)} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"><Plus className="w-3.5 h-3.5" />Assign</button>
+            </div>
+            <div className="p-4">
+              {tasksLoading ? (
+                <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
+              ) : tasks.length === 0 ? (
+                <p className="text-sm text-slate-500 px-1 py-2">Nothing assigned yet — use Assign to give {mentee!.name.split(' ')[0]} their first task.</p>
+              ) : (
+                <div className="space-y-4">
+                  {taskGroups.map((g) => {
+                    const meta = TASK_STATUS_META[g.status] ?? TASK_STATUS_META.assigned;
+                    return (
+                      <div key={g.status}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{meta.label}</span>
+                          <span className="text-xs text-slate-400">{g.items.length}</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {g.items.map((t: any) => { /* eslint-disable-line @typescript-eslint/no-explicit-any */
+                            const due = t.dueDate ? new Date(t.dueDate) : null;
+                            const overdue = due && t.status !== 'completed' && due.getTime() < Date.now();
+                            return (
+                              <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm text-slate-900 truncate">{t.roadmapTask?.title || t.title || 'Task'}</p>
+                                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    {t.roadmapTask?.type && <span className="capitalize">{t.roadmapTask.type}</span>}
+                                    {due && <span className={overdue ? 'text-red-600 inline-flex items-center gap-1' : ''}>{overdue && <Clock className="w-3 h-3" />}due {due.toLocaleDateString()}</span>}
+                                  </div>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${meta.cls}`}>{meta.label}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Submissions to review */}
           <div className="bg-white rounded-2xl border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
@@ -266,7 +367,26 @@ export default function CohortReview() {
 
           {/* Blockers */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
-            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" />Open blockers</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" />Open blockers</h3>
+              <button onClick={() => setShowAddBlocker((s) => !s)} title="Log a blocker" className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100"><Plus className="w-4 h-4" /></button>
+            </div>
+            {showAddBlocker && (
+              <div className="mb-3 space-y-2 rounded-xl border border-slate-200 p-3 bg-slate-50">
+                <input value={bTitle} onChange={(e) => setBTitle(e.target.value)} placeholder="What's blocking them?" className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <div className="flex gap-2">
+                  <select value={bCat} onChange={(e) => setBCat(e.target.value)} className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    {['technical', 'knowledge', 'access', 'personal'].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <select value={bSev} onChange={(e) => setBSev(e.target.value)} className="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    {['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <button onClick={addBlocker} disabled={busy === 'add-blocker' || !bTitle.trim()} className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50">
+                  {busy === 'add-blocker' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log blocker
+                </button>
+              </div>
+            )}
             {blockers.length === 0 ? (
               <p className="text-sm text-slate-500">None open.</p>
             ) : (

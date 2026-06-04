@@ -177,6 +177,15 @@ const columns: DataTableColumn<Enrollment>[] = [
     ),
   },
   {
+    key: 'clan',
+    label: 'Clan',
+    render: (_, row) => (
+      row.clan?.name
+        ? <span className="text-sm text-slate-900 truncate max-w-[160px]">{row.clan.name}</span>
+        : <span className="text-slate-400 text-sm">—</span>
+    ),
+  },
+  {
     key: 'status',
     label: 'Status',
     render: (val) => <StatusBadge status={val} />,

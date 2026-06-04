@@ -46,7 +46,28 @@ const updateSlot = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Slot updated', { slot }));
 });
 
+// ── Admin org templates ──────────────────────────────────────────────────────
+const listOrg = catchAsync(async (req, res) => {
+  const templates = await svc.listOrgTemplates();
+  res.status(200).json(successResponse('Org templates retrieved', { templates }));
+});
+
+const createOrg = catchAsync(async (req, res) => {
+  const template = await svc.createOrgTemplate(req.user.id, req.body);
+  res.status(201).json(successResponse('Org template created', { template }, 201));
+});
+
+const updateOrg = catchAsync(async (req, res) => {
+  const template = await svc.updateOrgTemplate(req.params.id, req.body);
+  res.status(200).json(successResponse('Org template updated', { template }));
+});
+
+const deleteOrg = catchAsync(async (req, res) => {
+  res.status(200).json(successResponse('Org template deleted', await svc.deleteOrgTemplate(req.params.id)));
+});
+
 module.exports = {
   listTemplates, createTemplate, updateTemplate, deleteTemplate, importTemplate,
-  assign, getMenteeSchedule, getMySchedule, updateSlot
+  assign, getMenteeSchedule, getMySchedule, updateSlot,
+  listOrg, createOrg, updateOrg, deleteOrg
 };

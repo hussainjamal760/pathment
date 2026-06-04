@@ -148,8 +148,16 @@ function AssignDrawer({ roadmap, onClose, onAssigned }: { roadmap: LinearRoadmap
     if (selected.size === 0) { toast.error('Pick at least one mentee'); return; }
     try {
       setSaving(true);
-      await mentorApi.assignRoadmap(roadmap.id, { menteeIds: [...selected], startStep });
-      toast.success(`Assigned "${roadmap.name}" to ${selected.size} mentee${selected.size > 1 ? 's' : ''}`);
+      const res: any = await mentorApi.assignRoadmap(roadmap.id, { menteeIds: [...selected], startStep });
+      const assigned = res?.data?.assigned ?? selected.size;
+      const failed = res?.data?.failed ?? 0;
+      if (assigned === 0) {
+        const reason = res?.data?.results?.find((r: any) => !r.ok)?.error;
+        toast.error(reason || 'Could not assign the roadmap');
+        setSaving(false);
+        return;
+      }
+      toast.success(`Assigned "${roadmap.name}" to ${assigned} mentee${assigned > 1 ? 's' : ''}${failed ? ` (${failed} failed)` : ''}`);
       onAssigned();
       onClose();
     } catch {
