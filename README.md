@@ -68,6 +68,7 @@ written to take you from zero to productive:
 
 | Guide | What it covers |
 | --- | --- |
+| **[docs/features/](docs/features/README.md)** | **The feature manual — one deep-dive per feature** (what it is, data model, backend, frontend, and the journey for each role). Start here to understand any specific feature. |
 | **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | The big picture: the monorepo apps, how a request flows (route → controller → service → model), auth & capabilities, the core apply → accept → register → place → work life-cycle, real-time messaging, background jobs, AI, theming, and the conventions every contributor follows. |
 | **[docs/DATABASE.md](docs/DATABASE.md)** | The complete data model: a "spine" diagram of the core entities plus a per-domain ER diagram (Mermaid) for all 83 models, schema conventions, and the migration history. |
 | **[server/README.md](server/README.md)** | Backend deep-dive: modules, API endpoints, background jobs, security. |
@@ -308,10 +309,10 @@ Frontend will run at: `http://localhost:3000`
 server/
 ├── config/
 │   └── config.json              # Database configuration
-├── docs/                        # API and module documentation
+├── docs/                        # API reference + quick start + testing guides
 │   ├── API_DOCUMENTATION.md
-│   ├── AUTH_MODULE_COMPLETE.md
-│   └── PROGRAMS_MODULE_COMPLETE.md
+│   ├── QUICK_START.md
+│   └── TESTING_AUTH.md
 ├── postman/                     # Postman collection for API testing
 ├── scripts/                     # Database and utility scripts
 │   ├── createTables.js

@@ -29,7 +29,6 @@ pathment/
 ├── server/            # Backend API — Node.js + Express + Sequelize + PostgreSQL + Socket.IO
 ├── client-interface/  # The product app — Next.js (App Router) + React + Tailwind v4
 ├── marketing-site/    # Public landing page — Next.js (apex domain)
-├── new designs/       # Vite/React prototype = the design source of truth for the rebuild
 └── docs/              # This documentation
 ```
 
@@ -38,9 +37,6 @@ pathment/
 | `server` | Express 4, Sequelize 6, PostgreSQL, JWT, Socket.IO, Bull + Redis, Resend (email) | `5000` |
 | `client-interface` | Next.js 16, React 19, TypeScript, Tailwind v4, Axios, socket.io-client | `3000` |
 | `marketing-site` | Next.js 16, React 19, Tailwind | `3001` |
-
-The `new designs/` folder is **not shipped** — it's the prototype the live client is being
-rebuilt against. When a screen is redesigned, this is where the intended look/UX comes from.
 
 ---
 
@@ -227,6 +223,7 @@ Full details, env var reference, and troubleshooting live in the root
 
 | You want to… | Start here |
 | --- | --- |
+| Understand a specific feature (per role) | [docs/features/](./features/README.md) |
 | Understand the data | [docs/DATABASE.md](./DATABASE.md) |
 | Add a backend feature | `server/src/routes` → `controllers` → `services` → `models` |
 | Add a screen | `client-interface/app/{role}/…` + `lib/services/*-api.ts` |

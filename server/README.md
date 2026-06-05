@@ -87,12 +87,10 @@ server/
 │   │   └── index.js        # Sequelize connection
 │   └── index.js            # Server entry point
 ├── docs/
-│   ├── AUTH_MODULE_COMPLETE.md
 │   ├── API_DOCUMENTATION.md
-│   ├── TESTING_AUTH.md
 │   ├── QUICK_START.md
-│   ├── IMPLEMENTATION_SUMMARY.md
-│   └── MODELS_STATUS.md
+│   ├── TESTING_AUTH.md
+│   └── TESTING_PROGRAMS.md
 ├── .env
 ├── package.json
 └── README.md
@@ -293,11 +291,11 @@ For local dev without Redis at all, bulk invites degrade gracefully — the queu
 
 ## 📚 Documentation
 
-- [API Documentation](./docs/API_DOCUMENTATION.md) - Complete API reference
-- [Auth Module](./docs/AUTH_MODULE_COMPLETE.md) - Authentication implementation details
+- [Feature Guide](../docs/features/README.md) - **Every feature explained end-to-end, per role** (start here)
+- [Data Model](../docs/DATABASE.md) - All 83 models + ER diagrams
+- [Architecture](../docs/ARCHITECTURE.md) - How the system fits together
+- [API Documentation](./docs/API_DOCUMENTATION.md) - Endpoint reference
 - [Testing Guide](./docs/TESTING_AUTH.md) - Manual testing instructions
-- [Models Status](./docs/MODELS_STATUS.md) - Database models overview
-- [Implementation Summary](./docs/IMPLEMENTATION_SUMMARY.md) - Full implementation details
 
 ## 🤝 Development Workflow
 
