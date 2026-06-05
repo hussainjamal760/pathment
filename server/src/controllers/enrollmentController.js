@@ -106,7 +106,7 @@ exports.rejectEnrollment = catchAsync(async (req, res) => {
 exports.requestCompletion = catchAsync(async (req, res) => {
   const { id } = req.params;
   const enrollment = await enrollmentService.requestCompletion(id, req.user.id, req.user.role);
-  res.status(200).json(successResponse('Completion requested — awaiting mentor/admin approval', { enrollment }));
+  res.status(200).json(successResponse('Completion requested - awaiting mentor/admin approval', { enrollment }));
 });
 
 /**
@@ -117,8 +117,8 @@ exports.approveCompletion = catchAsync(async (req, res) => {
   const { id } = req.params;
   const result = await enrollmentService.approveCompletion(id, req.user.id, req.user.role);
   const message = result.hasNextLevel
-    ? `Level completed — mentee is ready to be promoted to "${result.nextLevelName}"`
-    : 'Program completed — mentee has finished all levels';
+    ? `Level completed - mentee is ready to be promoted to "${result.nextLevelName}"`
+    : 'Program completed - mentee has finished all levels';
   res.status(200).json(successResponse(message, result));
 });
 
@@ -130,7 +130,7 @@ exports.rejectCompletion = catchAsync(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
   const enrollment = await enrollmentService.rejectCompletion(id, req.user.id, req.user.role, reason);
-  res.status(200).json(successResponse('Completion request rejected — enrollment remains active', { enrollment }));
+  res.status(200).json(successResponse('Completion request rejected - enrollment remains active', { enrollment }));
 });
 
 /**

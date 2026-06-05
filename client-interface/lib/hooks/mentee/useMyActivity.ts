@@ -31,7 +31,7 @@ export function useMyActivity(): UseMyActivityReturn {
       setDailySessions(payload?.dailySessions ?? []);
       setRecentEvents(payload?.recentEvents ?? []);
     } catch {
-      // Non-fatal — activity view failure must never break the dashboard
+      // Non-fatal - activity view failure must never break the dashboard
     } finally {
       setLoading(false);
     }

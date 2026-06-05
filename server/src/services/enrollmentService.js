@@ -8,7 +8,7 @@ const groqService = require('./groqService');
 class EnrollmentService {
   /**
    * Return overall enrollment counts by status group.
-   * Runs COUNT queries across the full table — never paginated.
+   * Runs COUNT queries across the full table - never paginated.
    */
   async getEnrollmentStats() {
     const [total, active, pendingMatch, pendingCompletion, completed, dropped] = await Promise.all([
@@ -35,7 +35,7 @@ class EnrollmentService {
 
     // Server-side search across mentee name, email and program name.
     // Uses $association.column$ syntax so Sequelize can push the filter
-    // to the JOIN — requires subQuery: false + distinct: true below.
+    // to the JOIN - requires subQuery: false + distinct: true below.
     if (search && search.trim()) {
       const like = `%${search.trim()}%`;
       where[Op.or] = [
@@ -328,7 +328,7 @@ class EnrollmentService {
       recipients: [{ userId: enrollment.menteeId }],
       payload: {
         title: 'Program completed 🎉',
-        message: `Congratulations — you've completed "${programName}"!`,
+        message: `Congratulations - you've completed "${programName}"!`,
         actionUrl: `/mentee/programs`,
         actionLabel: 'View programs',
         relatedEntityType: 'enrollment',
@@ -343,7 +343,7 @@ class EnrollmentService {
       recipients: [{ userId: enrollment.menteeId }],
       payload: {
         title: 'How was your mentorship?',
-        message: 'Share anonymous feedback on your mentor — it takes a minute and helps the next mentee.',
+        message: 'Share anonymous feedback on your mentor - it takes a minute and helps the next mentee.',
         actionUrl: `/mentee/dashboard?review=${enrollment.id}`,
         actionLabel: 'Leave feedback',
         relatedEntityType: 'enrollment',

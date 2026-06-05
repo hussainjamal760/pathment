@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Trophy, Loader2, Award, TrendingUp, TrendingDown, Minus, Crown, Info } from 'lucide-react';
 import { useMentorCohort, type CohortMentee, type CohortMomentum } from '@/lib/hooks/mentor';
 
-// Real, honest signals only — no fabricated XP. Standings rank by RELATIVE
+// Real, honest signals only - no fabricated XP. Standings rank by RELATIVE
 // progress (the platform's fairness metric: output credited for logged,
 // accepted blockers), tie-broken by on-time reliability.
 const scoreOf = (m: CohortMentee) => m.relativeProgress * 1000 + m.onTimeRate;
@@ -59,11 +59,11 @@ export default function MentorLeaderboard() {
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-slate-900 mb-1">Cohort standings</h1>
-        <p className="text-slate-600">Ranked by fair progress — no vanity points.</p>
+        <p className="text-slate-600">Ranked by fair progress - no vanity points.</p>
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 max-w-xl">
           <Info className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
           <p className="text-xs text-slate-500 leading-relaxed">
-            <span className="font-medium text-slate-700">Fair progress</span> credits output for logged, accepted blockers — so effort against real constraints counts, not just raw completion.
+            <span className="font-medium text-slate-700">Fair progress</span> credits output for logged, accepted blockers - so effort against real constraints counts, not just raw completion.
           </p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function MentorLeaderboard() {
         </div>
       ) : (
         <>
-          {/* Leader spotlight — one feature, not three floating cards */}
+          {/* Leader spotlight - one feature, not three floating cards */}
           {leader && (
             <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 dark:from-amber-500/10 to-card p-5 flex items-center gap-4">
               <div className="relative shrink-0">
@@ -114,7 +114,7 @@ export default function MentorLeaderboard() {
             </div>
           )}
 
-          {/* Standings — one scannable board, fair-progress bar per row */}
+          {/* Standings - one scannable board, fair-progress bar per row */}
           <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
             {ranked.map((m, i) => {
               const rs = rankStyle(i);

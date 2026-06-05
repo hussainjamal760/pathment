@@ -111,7 +111,7 @@ export default function AdminInvitesPage() {
         <input
           value={row.program ?? ''}
           onChange={(e) => updateCsvRow(row._idx, 'program', e.target.value)}
-          placeholder={row.role === 'mentee' ? 'Required' : '—'}
+          placeholder={row.role === 'mentee' ? 'Required' : '-'}
           className="w-full px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-500 text-sm"
         />
       ),
@@ -170,8 +170,8 @@ export default function AdminInvitesPage() {
   const successColumns: DataTableColumn<{ email: string; role: string; program?: string; clan?: string; _idx: number }>[] = [
     { key: 'email', label: 'Email', headerClassName: 'text-emerald-700', cellClassName: 'text-slate-700' },
     { key: 'role', label: 'Role', headerClassName: 'text-emerald-700', cellClassName: 'capitalize text-slate-600' },
-    { key: 'program', label: 'Program', headerClassName: 'text-emerald-700', cellClassName: 'text-slate-600', render: (_, r) => r.program || '—' },
-    { key: 'clan', label: 'Clan', headerClassName: 'text-emerald-700', cellClassName: 'text-slate-600', render: (_, r) => r.clan || '—' },
+    { key: 'program', label: 'Program', headerClassName: 'text-emerald-700', cellClassName: 'text-slate-600', render: (_, r) => r.program || '-' },
+    { key: 'clan', label: 'Clan', headerClassName: 'text-emerald-700', cellClassName: 'text-slate-600', render: (_, r) => r.clan || '-' },
   ];
 
   const skippedColumns: DataTableColumn<{ email: string; role: string; reason: string; program?: string; clan?: string; _idx: number }>[] = [
@@ -238,7 +238,7 @@ export default function AdminInvitesPage() {
             </div>
           </div>
 
-          {/* Placement — the invite is the enrollment. Mentees need a program;
+          {/* Placement - the invite is the enrollment. Mentees need a program;
               mentors need a clan (program just narrows the clan list). */}
           <div className="grid md:grid-cols-2 gap-3">
             <div>

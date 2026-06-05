@@ -4,7 +4,7 @@ const publicController = require('../controllers/publicController');
 const upload = require('../middlewares/upload');
 
 /**
- * Public, UNAUTHENTICATED intake surface. Nothing here requires a login — it
+ * Public, UNAUTHENTICATED intake surface. Nothing here requires a login - it
  * exposes only published programs, a cohort apply form behind a shareable slug,
  * and an applicant's own record behind their magic-link token.
  */

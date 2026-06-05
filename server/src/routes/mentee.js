@@ -5,7 +5,7 @@ const dailyLogController = require('../controllers/dailyLogController');
 const { authenticate, authorize } = require('../middlewares/auth');
 
 /**
- * Mentee-area routes — scoped to the logged-in mentee (distinct from the
+ * Mentee-area routes - scoped to the logged-in mentee (distinct from the
  * admin-facing /mentees directory listing).
  */
 

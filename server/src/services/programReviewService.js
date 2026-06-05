@@ -7,7 +7,7 @@ const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/err
  *
  * Design intent (the "clever, fair" mechanism):
  *  - Feedback is per-dimension (responsiveness/helpfulness/clarity/support) on a
- *    1–5 scale, plus optional free text and a would-recommend flag.
+ *    1-5 scale, plus optional free text and a would-recommend flag.
  *  - It is ANONYMOUS to the mentor: the mentor only ever sees AGGREGATES, and
  *    only once there are enough responses to mask any single voice.
  *  - To resist a single angry/over-generous review skewing things, aggregates
@@ -73,7 +73,7 @@ class ProgramReviewService {
 
   /**
    * Mentee submits (or updates) their review for a completed enrollment.
-   * One review per (program, reviewer) — enforced by a unique index; we upsert.
+   * One review per (program, reviewer) - enforced by a unique index; we upsert.
    */
   async submitReview(enrollmentId, reviewerId, { dimensions, reviewText, wouldRecommend } = {}) {
     const enrollment = await models.Enrollment.findByPk(enrollmentId);
@@ -130,7 +130,7 @@ class ProgramReviewService {
     };
   }
 
-  /** Trimmed mean — drops one high + one low once there are ≥4 values. */
+  /** Trimmed mean - drops one high + one low once there are ≥4 values. */
   _trimmedMean(nums) {
     if (!nums.length) return null;
     if (nums.length < 4) {

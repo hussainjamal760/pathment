@@ -148,7 +148,7 @@ function ApplicationDrawer({
                 {entries.map(([k, v]) => (
                   <div key={k} className="flex gap-3 px-3 py-2">
                     <dt className="w-40 shrink-0 text-xs font-medium text-slate-500 capitalize">{k.replace(/_/g, ' ')}</dt>
-                    <dd className="text-sm text-slate-700 break-words">{String(v ?? '') || '—'}</dd>
+                    <dd className="text-sm text-slate-700 break-words">{String(v ?? '') || '-'}</dd>
                   </div>
                 ))}
               </dl>
@@ -235,7 +235,7 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
     finally { setBusy(false); }
   };
 
-  // Open the cohort's assessment in the builder — create + attach it first if
+  // Open the cohort's assessment in the builder - create + attach it first if
   // there isn't one yet (one click, no separate "create then attach" dance).
   const editAssessment = async () => {
     setBusy(true);
@@ -417,13 +417,13 @@ function AssessmentSubmissionView({ assessment, submission }: { assessment: any;
       const isRight = correct.length && a.optionIds && correct.length === a.optionIds.length && correct.every((c: string) => a.optionIds.includes(c));
       return (
         <span className={isRight ? 'text-emerald-700' : 'text-slate-700'}>
-          {picked.length ? picked.join(', ') : '—'}{correct.length ? (isRight ? ' ✓' : ' ✗') : ''}
+          {picked.length ? picked.join(', ') : '-'}{correct.length ? (isRight ? ' ✓' : ' ✗') : ''}
         </span>
       );
     }
-    if (q.type === 'file_upload') return a.fileUrl ? <a href={a.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 underline">{a.fileName || 'View file'}</a> : <span className="text-slate-400">—</span>;
-    if (q.type === 'external_link') return a.link ? <a href={a.link} target="_blank" rel="noreferrer" className="text-brand-600 underline break-all">{a.link}</a> : <span className="text-slate-400">—</span>;
-    return <span className="text-slate-700 whitespace-pre-wrap">{a.text || '—'}</span>;
+    if (q.type === 'file_upload') return a.fileUrl ? <a href={a.fileUrl} target="_blank" rel="noreferrer" className="text-brand-600 underline">{a.fileName || 'View file'}</a> : <span className="text-slate-400">-</span>;
+    if (q.type === 'external_link') return a.link ? <a href={a.link} target="_blank" rel="noreferrer" className="text-brand-600 underline break-all">{a.link}</a> : <span className="text-slate-400">-</span>;
+    return <span className="text-slate-700 whitespace-pre-wrap">{a.text || '-'}</span>;
   };
 
   const saveGrade = async () => {
@@ -546,7 +546,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
       ) : applications.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center">
           <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-600">No applications here yet — import a CSV to bring applicants in.</p>
+          <p className="text-slate-600">No applications here yet - import a CSV to bring applicants in.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-card">
@@ -567,11 +567,11 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
                     <p className="font-medium text-slate-900">{fullName(a)}</p>
                     <p className="text-xs text-slate-500">{a.email}</p>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">{a.programPreference || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">{a.programPreference || '-'}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CHIP[a.status]}`}>{a.status.replace(/_/g, ' ')}</span>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell text-slate-600">{a.assessmentScore != null ? a.assessmentScore : '—'}</td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-slate-600">{a.assessmentScore != null ? a.assessmentScore : '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <span className="text-brand-600 text-xs font-medium">Review</span>
                   </td>

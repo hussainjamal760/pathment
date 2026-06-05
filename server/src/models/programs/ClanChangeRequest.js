@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * ClanChangeRequest — a request to move a mentee from one clan to another.
+   * ClanChangeRequest - a request to move a mentee from one clan to another.
    * On approval the mentee's clan membership is actually moved.
    */
   const ClanChangeRequest = sequelize.define('ClanChangeRequest', {

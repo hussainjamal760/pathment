@@ -13,10 +13,10 @@ interface MenuPanelProps {
 }
 
 /**
- * MenuPanel — the consistent surface for a click-opened dropdown/action menu.
+ * MenuPanel - the consistent surface for a click-opened dropdown/action menu.
  * Drop it in place of the bespoke `absolute … bg-card border …` panel div: the
  * trigger, open-state, and outside-click stay at the call site, but placement is
- * standardized — opens downward + start-aligned by default, and **auto-flips up
+ * standardized - opens downward + start-aligned by default, and **auto-flips up
  * or to the end edge** when it would run off the viewport. Dark-mode aware.
  * (Render it only while the menu is open so it measures correctly.)
  */

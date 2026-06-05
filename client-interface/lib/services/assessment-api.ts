@@ -27,7 +27,7 @@ export interface Assessment {
   questions?: (AssessmentQuestionInput & { id: string })[];
 }
 
-/** Assessment authoring — admin only. */
+/** Assessment authoring - admin only. */
 export const assessmentApi = {
   list: (params?: { programId?: string; status?: string }) =>
     apiClient.get<any>('/assessments', { params }).then((r) => (r.data?.assessments || []) as Assessment[]),

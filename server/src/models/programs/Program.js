@@ -33,7 +33,7 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     // Discoverability, separate from lifecycle status. Private programs never
-    // appear in any discovery surface — they're reached only by invite/assignment.
+    // appear in any discovery surface - they're reached only by invite/assignment.
     visibility: {
       type: DataTypes.STRING(20),
       allowNull: false,

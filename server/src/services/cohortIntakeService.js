@@ -6,7 +6,7 @@ const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes')
 /**
  * Cohort (intake batch) management. A cohort is a program's season of intake;
  * only an 'open' cohort accepts applications. Running an off year is simply not
- * opening a new cohort — historical cohorts stay intact and queryable.
+ * opening a new cohort - historical cohorts stay intact and queryable.
  */
 class CohortIntakeService {
   async listCohorts({ programId, status } = {}) {
@@ -133,7 +133,7 @@ class CohortIntakeService {
 
   /**
    * Copy the intake CONFIG (application form fields + attached assessment) from
-   * one cohort onto another — so a new season isn't rebuilt from scratch. Does
+   * one cohort onto another - so a new season isn't rebuilt from scratch. Does
    * NOT copy the public slug, status, window, or applications. Idempotent: same
    * source → same result.
    */

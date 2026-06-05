@@ -2,9 +2,9 @@
  * Catalog of "profile" fields an admin can add to a cohort's application form.
  * Each is tagged with a `key` (the stable field key stored in the application's
  * `responses`) and where it maps on registration so the mentee NEVER re-enters
- * it during onboarding — collect once at apply, reuse everywhere.
+ * it during onboarding - collect once at apply, reuse everywhere.
  *
- * `target`: 'user' | 'menteeProfile' — which record the answer lands on.
+ * `target`: 'user' | 'menteeProfile' - which record the answer lands on.
  * `field`:  the column on that record.
  * `array`:  true → the answer is split into a string[] (comma/newline separated).
  *

@@ -55,7 +55,7 @@ export default function AdminAssessmentsPage() {
       ) : assessments.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center">
           <ClipboardCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-600">No assessments yet — create one to add to an intake.</p>
+          <p className="text-slate-600">No assessments yet - create one to add to an intake.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

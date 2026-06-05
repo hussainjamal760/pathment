@@ -172,7 +172,7 @@ class NotificationScheduler {
   }
 
   /**
-   * Weekly clan standup prompt — auto-posts a 'standup' post into every active
+   * Weekly clan standup prompt - auto-posts a 'standup' post into every active
    * clan's community space so each squad has a recurring check-in thread. The
    * post is authored by the clan's lead mentor (falling back to its creator).
    * Idempotent: skips a clan that already has a standup posted in the last 6 days.

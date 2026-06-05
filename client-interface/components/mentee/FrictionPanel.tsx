@@ -13,7 +13,7 @@ const SEVERITIES = ['low', 'medium', 'high'];
 const FRICTION_KINDS = ['job', 'domestic', 'electricity', 'hardware', 'health', 'connectivity', 'other'];
 
 /**
- * MenteeFrictionPanel — lets a mentee log what's getting in the way, framed so
+ * MenteeFrictionPanel - lets a mentee log what's getting in the way, framed so
  * it clearly HELPS them (it feeds the fairness read; accepted external delays
  * count in their favour). Three actions: log a blocker, log a delay, ask for
  * more time.
@@ -42,7 +42,7 @@ export function FrictionPanel({ taskId }: { taskId: string }) {
     try {
       setSaving(true);
       await frictionApi.createBlocker({ assignedTaskId: taskId, title: bTitle.trim(), category: bCat, severity: bSev });
-      toast.success('Blocker logged — your mentor can see it now');
+      toast.success('Blocker logged - your mentor can see it now');
       setBTitle(''); setDone('blocker'); setOpen(null);
     } catch { toast.error('Could not log the blocker'); }
     finally { setSaving(false); }
@@ -53,7 +53,7 @@ export function FrictionPanel({ taskId }: { taskId: string }) {
     try {
       setSaving(true);
       await frictionApi.createDelay({ assignedTaskId: taskId, reason: dReason.trim(), kind: dKind, days: dDays });
-      toast.success('Logged — this helps measure your progress fairly');
+      toast.success('Logged - this helps measure your progress fairly');
       setDReason(''); setDone('delay'); setOpen(null);
     } catch { toast.error('Could not log the delay'); }
     finally { setSaving(false); }
@@ -88,7 +88,7 @@ export function FrictionPanel({ taskId }: { taskId: string }) {
     <div className="bg-card rounded-2xl border border-slate-200 p-6">
       <h2 className="text-lg font-semibold text-slate-900">What&apos;s getting in the way?</h2>
       <p className="text-sm text-slate-500 mt-1">
-        Logging this helps your mentor support you — and real constraints count in your favour, not against you.
+        Logging this helps your mentor support you - and real constraints count in your favour, not against you.
       </p>
 
       <div className="flex flex-wrap gap-2 mt-4">

@@ -1,4 +1,4 @@
-# Pathment — Architecture (Zero to Hero)
+# Pathment - Architecture (Zero to Hero)
 
 > Read this once and you'll understand how the whole system fits together: the apps, how
 > a request flows, how people get in and do work, and the patterns every contributor is
@@ -16,9 +16,9 @@ badges, leaderboards, gifts), scheduling, and analytics.
 
 Three roles, capability-aware so one account can hold several:
 
-- **Admin** — runs intake, creates programs/cohorts/clans, invites users, oversees everything.
-- **Mentor** — leads a clan, assigns and reviews tasks, mentors mentees, holds 1:1s.
-- **Mentee** — works the roadmap, submits tasks, participates in the community.
+- **Admin** - runs intake, creates programs/cohorts/clans, invites users, oversees everything.
+- **Mentor** - leads a clan, assigns and reviews tasks, mentors mentees, holds 1:1s.
+- **Mentee** - works the roadmap, submits tasks, participates in the community.
 
 ---
 
@@ -26,9 +26,9 @@ Three roles, capability-aware so one account can hold several:
 
 ```
 pathment/
-├── server/            # Backend API — Node.js + Express + Sequelize + PostgreSQL + Socket.IO
-├── client-interface/  # The product app — Next.js (App Router) + React + Tailwind v4
-├── marketing-site/    # Public landing page — Next.js (apex domain)
+├── server/            # Backend API - Node.js + Express + Sequelize + PostgreSQL + Socket.IO
+├── client-interface/  # The product app - Next.js (App Router) + React + Tailwind v4
+├── marketing-site/    # Public landing page - Next.js (apex domain)
 └── docs/              # This documentation
 ```
 
@@ -49,7 +49,7 @@ HTTP request
   → routes/        (URL + middleware: authenticate, authorize, validate)
     → controllers/ (thin: parse req, call a service, shape the HTTP response)
       → services/  (ALL business logic + transactions live here)
-        → models/  (Sequelize — the only thing that touches the DB)
+        → models/  (Sequelize - the only thing that touches the DB)
           → PostgreSQL
 ```
 
@@ -62,7 +62,7 @@ HTTP request
   singletons (`module.exports = new XService()`).
 - **Models are loaded automatically.** `server/src/db/index.js` walks `src/models/**`,
   registers every model, then runs each model's `associate()`. You never wire models
-  manually — drop a file in the right domain folder and it's live.
+  manually - drop a file in the right domain folder and it's live.
 - **Validation** uses Joi schemas in `src/validations/`, applied via
   `validateBody/validateParams/validateQuery` middleware.
 - **Errors** are typed (`NotFoundError`, `ValidationError`, `ConflictError`,
@@ -95,7 +95,7 @@ This is the spine of the product. (See the matching diagram in
    issues a `RegistrationInvite` carrying `programId` + optional `clanId` + `cohortId`.
 3. **Register** → the invite is **email-bound** and consumed at `/register?invite=…`.
    `authService` creates the `User` (+ role profile + settings), marks the email
-   pre-verified (the invite proves it), and — for mentees — creates:
+   pre-verified (the invite proves it), and - for mentees - creates:
    - an `Enrollment` (program + cohort lineage), and
    - a `ClanMembership` (if the invite named a clan), linked to the enrollment.
 4. **Work** → the program's `Roadmap` → `RoadmapTask`s are handed out as `AssignedTask`s.
@@ -103,21 +103,21 @@ This is the spine of the product. (See the matching diagram in
    (approve / approve-with-notes / request-changes / reject).
 5. **Progress** → `taskService.updateEnrollmentTaskStats` recomputes the enrollment's
    `tasksTotal / tasksCompleted / overallProgressPercentage / status` on every
-   assign/submit/review. **This is the single source of truth for progress** — totals are
+   assign/submit/review. **This is the single source of truth for progress** - totals are
    based on live (non-cancelled) assigned tasks, so completion can never falsely read 100%.
 6. **Complete** → when all tasks are done the mentor confirms completion (mentee can't
    self-complete), which can trigger anonymous structured program feedback.
 
 **Visibility gating:** programs are `private` by default; only `published` + `public`
 programs appear to non-admins. Community spaces and most data are gated by clan/cohort/
-program membership — a person sees the org's content only once they're placed.
+program membership - a person sees the org's content only once they're placed.
 
-> **Self-serve intake:** steps 1–2 also work without an admin importing anyone. A cohort
+> **Self-serve intake:** steps 1-2 also work without an admin importing anyone. A cohort
 > can publish a **shareable apply link** (`publicSlug`, gated by status/window/cap), and the
 > public **program catalog** (`/programs`) lets visitors browse published programs and apply.
 > Applicants use an **email magic-link** (`Application.accessTokenHash`) to track status and
 > complete an optional, admin-built **assessment** (mixed-type: MCQ auto-graded, text, file,
-> link) before review — see `publicIntakeService` + `assessmentService`. No account is created
+> link) before review - see `publicIntakeService` + `assessmentService`. No account is created
 > until they're accepted and register via the invite.
 
 ---
@@ -137,7 +137,7 @@ program membership — a person sees the org's content only once they're placed.
 
 ## 6. Background jobs & email
 
-- **Bull + Redis (Upstash)** power async work — notably bulk CSV invite emails
+- **Bull + Redis (Upstash)** power async work - notably bulk CSV invite emails
   (`queues/` enqueue, `workers/` process). Bootstrapped in `server/src/index.js`.
 - **Email** goes through a notification orchestrator → `emailService` (Resend). Outbound
   mail can also be staged in the `email_queue` table.
@@ -170,7 +170,7 @@ program membership — a person sees the org's content only once they're placed.
   authoritative. A centralized `brand-*` token scale drives all accent color, so the whole
   app re-skins by swapping CSS vars. Per-user accent "vibe" presets set
   `html[data-accent="…"]`; dark mode overrides `--color-slate-*` under `.dark`.
-  **Never hardcode `indigo-*`** — use `brand-*`.
+  **Never hardcode `indigo-*`** - use `brand-*`.
 - **Shared Drawer** (`components/shared/Drawer.tsx`) is the standard accessible
   side-drawer for forms that "ask" the user something.
 

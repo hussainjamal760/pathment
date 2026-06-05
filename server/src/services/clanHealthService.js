@@ -16,10 +16,10 @@ function nameOf(user) {
 }
 
 function initialsOf(user) {
-  if (!user) return '—';
+  if (!user) return '-';
   const a = (user.firstName || '').charAt(0);
   const b = (user.lastName || '').charAt(0);
-  return (a + b).toUpperCase() || '—';
+  return (a + b).toUpperCase() || '-';
 }
 
 /**
@@ -27,7 +27,7 @@ function initialsOf(user) {
  *   red    → "Needs attention"  (a third of the cohort at risk, or completion stalled)
  *   amber  → "Watch"            (some risk / slipping on-time / behind pace)
  *   green  → "Healthy"          (everyone tracking)
- * An empty clan (no active mentees) is "Watch" — nothing to read yet.
+ * An empty clan (no active mentees) is "Watch" - nothing to read yet.
  */
 function deriveStatus({ memberCount, atRisk, avgCompletion, avgOnTime }) {
   if (memberCount === 0) return { status: 'amber', label: 'Watch', reason: 'No active mentees yet' };
@@ -169,7 +169,7 @@ class ClanHealthService {
 
   /**
    * Org Insights payload (admin /admin/insights): a worst-first CLAN comparison
-   * plus the fairness lens — org absolute vs relative progress and a per-mentee
+   * plus the fairness lens - org absolute vs relative progress and a per-mentee
    * distribution. "Extensions" = accepted DelayEvents (friction the org granted).
    */
   async orgInsights() {

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * RoadmapProgress — a mentee's position in a linear roadmap. currentStep is
+   * RoadmapProgress - a mentee's position in a linear roadmap. currentStep is
    * the index into the roadmap's ordered steps. Approving a roadmap-linked task
    * advances this and auto-assigns the next step.
    */

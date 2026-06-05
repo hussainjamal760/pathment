@@ -41,7 +41,7 @@ class TaskService {
       enrollmentId = enrollment.id;
     }
 
-    // Verify the mentor is responsible for this mentee — via a legacy 1:1 match
+    // Verify the mentor is responsible for this mentee - via a legacy 1:1 match
     // OR (the current model) a shared clan where the mentor leads/co-mentors and
     // the mentee is an active member.
     const isMentor = await this._isMentorForMentee(mentorId, menteeId);
@@ -58,7 +58,7 @@ class TaskService {
         throw new NotFoundError('Roadmap task not found');
       }
     } else {
-      // Create custom roadmap task (not part of any roadmap — a one-off).
+      // Create custom roadmap task (not part of any roadmap - a one-off).
       roadmapTask = await models.RoadmapTask.create({
         title,
         description: description || title || 'No description provided',
@@ -525,8 +525,8 @@ class TaskService {
     const enrollment = await models.Enrollment.findByPk(enrollmentId);
     if (!enrollment) return null;
 
-    // Progress is measured against the mentee's ACTUAL workload — every
-    // non-cancelled task assigned to this enrollment — and completed is the done
+    // Progress is measured against the mentee's ACTUAL workload - every
+    // non-cancelled task assigned to this enrollment - and completed is the done
     // subset of that SAME set. This keeps completed ⊆ total, so the bar can never
     // read 100% while real tasks are still outstanding (the old base-roadmap +
     // custom heuristic undercounted tasks assigned from non-base/local roadmaps,
@@ -551,13 +551,13 @@ class TaskService {
       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
       : null;
 
-    // Percentage against the full program — grows steadily as work is done
+    // Percentage against the full program - grows steadily as work is done
     const overallProgressPercentage = tasksTotal > 0
       ? Math.round((tasksCompleted / tasksTotal) * 100)
       : 0;
 
     // Completion is the MENTOR's call. When every program task (roadmap + custom)
-    // is done we don't silently complete — we flag the enrollment as ready for
+    // is done we don't silently complete - we flag the enrollment as ready for
     // sign-off ('pending_completion', marked system-requested) so the mentor is
     // prompted to confirm. If work reopens, only the system-flagged ones revert.
     const allProgramTasksDone = tasksTotal > 0 && tasksCompleted >= tasksTotal;
@@ -576,7 +576,7 @@ class TaskService {
         };
       }
     } else if (current === 'pending_completion' && currentEnrollment?.completionRequestedByRole === 'system') {
-      // Auto-flagged as ready, but new work appeared — send it back to active.
+      // Auto-flagged as ready, but new work appeared - send it back to active.
       statusUpdate = {
         status: 'active',
         completionRequestedAt: null,
@@ -622,7 +622,7 @@ class TaskService {
   /**
    * Notify the mentee's mentor(s) that an enrollment has all tasks done and is
    * ready for their completion sign-off. Resolves mentors via active 1:1 match
-   * OR the mentee's active clan (lead/co/core mentors) — same union the
+   * OR the mentee's active clan (lead/co/core mentors) - same union the
    * completion authorization uses. Mentee gets program + program name context.
    */
   async _notifyMentorsReadyForSignoff(enrollment) {

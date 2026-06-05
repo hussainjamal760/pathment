@@ -20,7 +20,7 @@ export function WalkthroughMount({ role }: { role: UserRole }) {
     const onStart = () => setOpen(true);
     window.addEventListener(TOUR_EVENT, onStart);
 
-    // First-time auto-start (desktop only — the tour points at the sidebar).
+    // First-time auto-start (desktop only - the tour points at the sidebar).
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const seen = localStorage.getItem(seenKey(role));

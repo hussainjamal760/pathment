@@ -31,7 +31,7 @@ export default function MenteeMeetings() {
     try {
       setSaving(true);
       await meetingsApi.book(booking.id, agenda.trim() || undefined);
-      toast.success('1:1 booked — see you there!');
+      toast.success('1:1 booked - see you there!');
       setBooking(null); setAgenda(''); setOpenPicker(null);
       refetch();
     } catch (e: any) {
@@ -103,7 +103,7 @@ export default function MenteeMeetings() {
 
                           {b.slots.length === 0 ? (
                             <p className="mt-3 text-sm text-slate-400 rounded-xl bg-slate-50 border border-slate-100 px-3.5 py-2.5">
-                              {b.mentor.name.split(' ')[0]} hasn&apos;t opened any 1:1 times yet — message them to set some up.
+                              {b.mentor.name.split(' ')[0]} hasn&apos;t opened any 1:1 times yet - message them to set some up.
                             </p>
                           ) : open && (
                             <div className="mt-4 rounded-xl border border-slate-200 p-3">

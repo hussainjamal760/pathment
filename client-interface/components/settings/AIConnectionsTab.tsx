@@ -7,7 +7,7 @@ import type { AIProvider, AIFeature, AIKeyStatus } from '@/lib/services/ai-conne
 import { Drawer } from '@/components/shared/Drawer';
 
 const PROVIDER_META: Record<AIProvider, { label: string; hint: string; keyPrefix: string; models: string[] }> = {
-  groq: { label: 'Groq', hint: 'Fastest — great for summaries & nudges.', keyPrefix: 'gsk_', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b'] },
+  groq: { label: 'Groq', hint: 'Fastest - great for summaries & nudges.', keyPrefix: 'gsk_', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b'] },
   openai: { label: 'OpenAI', hint: 'Strong reasoning for delay analysis.', keyPrefix: 'sk-', models: ['gpt-4o', 'gpt-4o-mini'] },
   anthropic: { label: 'Anthropic', hint: 'Nuanced, careful coaching language.', keyPrefix: 'sk-ant-', models: ['claude-sonnet-4', 'claude-haiku-4'] },
   gemini: { label: 'Google Gemini', hint: 'Long context, low cost.', keyPrefix: 'AIza', models: ['gemini-2.0-flash', 'gemini-1.5-pro'] },
@@ -55,7 +55,7 @@ export default function AIConnectionsTab() {
         {connections.length === 0 ? (
           <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-200 p-10 text-center">
             <KeyRound className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-600">No AI connections yet — add a provider key to power AI features.</p>
+            <p className="text-slate-600">No AI connections yet - add a provider key to power AI features.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -137,7 +137,7 @@ function AddKeyModal({ onClose, onAdd }: { onClose: () => void; onAdd: (d: { pro
       open
       onClose={onClose}
       title="Add AI connection"
-      subtitle="Bring your own provider key — stored encrypted, shown masked."
+      subtitle="Bring your own provider key - stored encrypted, shown masked."
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>

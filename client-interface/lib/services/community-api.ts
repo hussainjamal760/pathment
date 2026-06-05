@@ -31,7 +31,7 @@ const params = (q: Record<string, unknown>) => {
   return out;
 };
 
-/** Community v2 — scoped spaces, posts, threads, Q&A, moderation. */
+/** Community v2 - scoped spaces, posts, threads, Q&A, moderation. */
 export const communityApi = {
   // spaces & people
   spaces: () => apiClient.get('/community/spaces'),

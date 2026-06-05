@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Collaborator — a specialist (psychologist, career coach, guest mentor,
+   * Collaborator - a specialist (psychologist, career coach, guest mentor,
    * domain expert) invited to work with a mentee. Anything they contribute is
    * attributed to them. Free-form name/role so external specialists who aren't
    * platform users can still be represented.

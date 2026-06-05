@@ -4,7 +4,7 @@ const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes')
 const linearRoadmapService = require('./linearRoadmapService');
 
 /**
- * scheduleTemplateService — reusable day-shape templates + per-mentee filled
+ * scheduleTemplateService - reusable day-shape templates + per-mentee filled
  * schedules. A template's blocks (pure structure) seed a mentee's slots on
  * assignment; each slot is then filled (roadmap chain / recurring / empty).
  */
@@ -186,7 +186,7 @@ class ScheduleTemplateService {
     await ms.save();
 
     // Filling a roadmap slot kicks off the chain's first roadmap (non-fatal if the
-    // mentee can't be assigned yet — e.g. no enrollment).
+    // mentee can't be assigned yet - e.g. no enrollment).
     let chainStarted = null;
     if (slot.kind === 'roadmap' && mentorId && Array.isArray(slot.roadmapChain) && slot.roadmapChain.length) {
       try {

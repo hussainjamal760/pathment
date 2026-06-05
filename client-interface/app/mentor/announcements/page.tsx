@@ -49,11 +49,11 @@ export default function MentorAnnouncements() {
         <p className="text-slate-600">Post updates to your clan&apos;s mentees, and see what admins have shared.</p>
       </div>
 
-      {/* Composer — mentors announce to a clan they lead */}
+      {/* Composer - mentors announce to a clan they lead */}
       <div className="bg-card rounded-2xl border border-slate-200 p-6 space-y-3">
         <div className="flex items-center gap-2"><Send className="w-4 h-4 text-brand-500" /><h2 className="text-slate-900">New announcement</h2></div>
         {clans.length === 0 ? (
-          <p className="text-sm text-slate-500">You don&apos;t lead any clan yet — once you do, you can announce to its mentees here.</p>
+          <p className="text-sm text-slate-500">You don&apos;t lead any clan yet - once you do, you can announce to its mentees here.</p>
         ) : (
           <>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={field} />

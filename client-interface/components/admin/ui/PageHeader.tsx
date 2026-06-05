@@ -8,7 +8,7 @@ interface PageHeaderProps {
   /** Shows an ← back link */
   backHref?: string;
   backLabel?: string;
-  /** Right-side slot — pass any buttons/links */
+  /** Right-side slot - pass any buttons/links */
   actions?: React.ReactNode;
 }
 

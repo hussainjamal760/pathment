@@ -25,7 +25,7 @@ class SubmissionService {
 
     // Upload files to Cloudinary
     // PDFs and documents must use 'raw' so Cloudinary delivers them via
-    // /raw/upload/ — using 'auto' maps PDFs to the image pipeline
+    // /raw/upload/ - using 'auto' maps PDFs to the image pipeline
     // (/image/upload/) which requires signing and returns 401.
     const getCloudinaryResourceType = (mimetype) => {
       if (mimetype.startsWith('video/')) return 'video';
@@ -382,7 +382,7 @@ class SubmissionService {
     await task.update(updateData);
 
     // Auto-advance a roadmap chain FIRST (assign the next step) so the stats
-    // recompute below counts it — otherwise approving the last-assigned step
+    // recompute below counts it - otherwise approving the last-assigned step
     // would momentarily read 100% and flag the enrollment ready-to-complete
     // before the next step appears.
     if (isApproved) {
@@ -446,7 +446,7 @@ class SubmissionService {
       payload: {
         title: isApproved ? `“${reviewedTitle}” approved 🎉` : `Changes requested on “${reviewedTitle}”`,
         message: isApproved
-          ? `Your mentor approved “${reviewedTitle}”${ratingStr ? ` · ${ratingStr}` : ''}. Nice work — keep the momentum going.`
+          ? `Your mentor approved “${reviewedTitle}”${ratingStr ? ` · ${ratingStr}` : ''}. Nice work - keep the momentum going.`
           : `Your mentor asked for another pass on “${reviewedTitle}”. Read their notes and resubmit when ready.`,
         actionUrl: `/mentee/tasks/${task.id}`,
         actionLabel: isApproved ? 'See review' : 'View notes & resubmit',

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CrossClanAssignment — a record that someone is helping across clans:
+   * CrossClanAssignment - a record that someone is helping across clans:
    * a mentor covering another clan, a specialist (e.g. psychologist) attached,
    * or co-mentee access. Lightweight record, not a workflow.
    */

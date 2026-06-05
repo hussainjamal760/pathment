@@ -47,7 +47,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       field: 'revoked_at'
     },
-    // Placement baked into the invite — the source of truth for enrollment.
+    // Placement baked into the invite - the source of truth for enrollment.
     // Mentee invites carry a program; mentor invites carry the clan they'll
     // lead (program derived from it). clan_id is optional for mentees.
     programId: {

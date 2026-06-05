@@ -1,7 +1,7 @@
 /**
  * Client mirror of the server permission vocabulary
  * (server/src/config/permissions.js). Use these constants with useCan() /
- * <PermissionGuard> to show or hide UI. NOTE: this is UX only — the server is
+ * <PermissionGuard> to show or hide UI. NOTE: this is UX only - the server is
  * always the source of truth and re-checks every request.
  */
 export const PERMISSIONS = {

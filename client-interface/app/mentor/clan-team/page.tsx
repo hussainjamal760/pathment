@@ -48,7 +48,7 @@ export default function ClanTeamPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-slate-900 mb-2 inline-flex items-center gap-2"><Users2 className="w-6 h-6 text-brand-600" /> Clan Team</h1>
-        <p className="text-slate-600">Manage the people who help run your clan — add co-mentors and core-team members. Mentees are placed by admins.</p>
+        <p className="text-slate-600">Manage the people who help run your clan - add co-mentors and core-team members. Mentees are placed by admins.</p>
       </div>
 
       <PendingCoverInvites />
@@ -174,7 +174,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 const STATUS_LABEL: Record<string, string> = { pending: 'Awaiting acceptance', active: 'Active', declined: 'Declined' };
 
-/** A mentor's own inbox of cover requests addressed to them — accept or decline. */
+/** A mentor's own inbox of cover requests addressed to them - accept or decline. */
 function PendingCoverInvites() {
   const [rows, setRows] = useState<MyCrossClan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -192,7 +192,7 @@ function PendingCoverInvites() {
     setBusy(id);
     try {
       await clanRequestsApi.respondCrossClan(id, accept);
-      toast.success(accept ? 'Accepted — you now have access' : 'Declined');
+      toast.success(accept ? 'Accepted - you now have access' : 'Declined');
       load();
     } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not respond')); }
     finally { setBusy(null); }

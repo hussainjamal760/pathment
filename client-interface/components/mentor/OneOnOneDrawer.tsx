@@ -12,7 +12,7 @@ const SENTIMENTS: { key: string; label: string }[] = [
 ];
 
 /**
- * Log a 1:1 after it happens — summary, sentiment read, issues raised, and
+ * Log a 1:1 after it happens - summary, sentiment read, issues raised, and
  * next steps. Mirrors the prototype's OneOnOneDrawer.
  */
 export function OneOnOneDrawer({

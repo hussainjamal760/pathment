@@ -54,7 +54,7 @@ class ProgramService {
       description,
       type,
       status: status || 'draft',
-      // Private by default — programs are invite-driven, never publicly browsed.
+      // Private by default - programs are invite-driven, never publicly browsed.
       visibility: visibility === 'public' ? 'public' : 'private',
       totalDurationWeeks,
       estimatedHoursPerWeek,
@@ -82,7 +82,7 @@ class ProgramService {
       }
     });
 
-    // Only public programs are broadcast to mentees — private programs are
+    // Only public programs are broadcast to mentees - private programs are
     // invite-driven and never browsed, so no "new program available" blast.
     if (program.status === 'published' && program.visibility === 'public') {
       const mentees = await models.User.findAll({

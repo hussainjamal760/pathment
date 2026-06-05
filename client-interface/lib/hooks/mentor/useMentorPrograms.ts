@@ -30,7 +30,7 @@ export interface UseMentorProgramsReturn {
 }
 
 /**
- * Programs the mentor runs, derived from the clans they lead/co-mentor — so a
+ * Programs the mentor runs, derived from the clans they lead/co-mentor - so a
  * mentor sees a program the moment they're assigned a clan in it, even before
  * any mentees arrive (clan-based assignment, not 1:1 matches).
  */

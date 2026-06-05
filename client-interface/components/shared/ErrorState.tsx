@@ -6,7 +6,7 @@ import { cn } from '@/components/ui/utils';
 
 interface ErrorStateProps {
   message?: string;
-  /** Show a retry button — pass the refetch callback */
+  /** Show a retry button - pass the refetch callback */
   onRetry?: () => void;
   /** Compact inline variant vs full-page centred variant */
   variant?: 'inline' | 'page';
@@ -44,7 +44,7 @@ export function ErrorState({
     );
   }
 
-  // inline (default) — banner style, great inside table wrappers
+  // inline (default) - banner style, great inside table wrappers
   return (
     <div
       className={cn(

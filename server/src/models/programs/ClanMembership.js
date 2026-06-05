@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * ClanMembership — a user's clan-scoped role. This is what makes roles
+   * ClanMembership - a user's clan-scoped role. This is what makes roles
    * contextual: the same user can be a 'mentee' in one clan and a 'co_mentor'
    * (or 'lead_mentor' / 'core_team') in another. Platform-level capabilities
    * live on User.capabilities; the per-clan role lives here.

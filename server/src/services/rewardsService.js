@@ -83,7 +83,7 @@ class RewardsService {
       // Mentees spend points they've earned from completed work.
       const { balance } = await this.menteePointsBalance(menteeId);
       if (gift.costXp > 0 && balance < gift.costXp) {
-        throw new ValidationError(`Not enough points — mentee has ${balance}, needs ${gift.costXp}`);
+        throw new ValidationError(`Not enough points - mentee has ${balance}, needs ${gift.costXp}`);
       }
       if (gift.stock !== null) {
         if (gift.stock <= 0) throw new ValidationError('This gift is out of stock');

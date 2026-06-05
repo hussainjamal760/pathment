@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ProgressBarProps {
-  /** 0–100 */
+  /** 0-100 */
   value: number;
   /** Tailwind bg class for the filled bar, default: 'bg-brand-500' */
   color?: string;

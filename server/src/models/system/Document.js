@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Document — an org-shared library item (mentorship guidance, reading,
+   * Document - an org-shared library item (mentorship guidance, reading,
    * templates, policies) all mentors can see.
    */
   const Document = sequelize.define('Document', {
@@ -13,7 +13,7 @@ module.exports = (sequelize, DataTypes) => {
       validate: { isIn: [['guidance', 'reading', 'template', 'policy']] }
     },
     summary: { type: DataTypes.TEXT, allowNull: true },
-    // Rich-text article body (HTML from the editor). Optional — an item can be a
+    // Rich-text article body (HTML from the editor). Optional - an item can be a
     // written article, an external link (url), or both.
     content: { type: DataTypes.TEXT, allowNull: true },
     author: { type: DataTypes.STRING(150), allowNull: true },

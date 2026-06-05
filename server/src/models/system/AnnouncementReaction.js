@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * AnnouncementReaction — a user's reaction to an announcement (acknowledged
+   * AnnouncementReaction - a user's reaction to an announcement (acknowledged
    * or helpful). One row per (announcement, user, type) so counts are real and
    * each user can toggle their own.
    */

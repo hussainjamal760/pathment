@@ -81,7 +81,7 @@ export function useMenteeTasks(): UseMenteeTasksReturn {
     if (user?.id) fetchEnrollments();
   }, [user?.id, fetchEnrollments]);
 
-  // Re-fetch tasks when filter or program selection changes — only after enrollments are loaded
+  // Re-fetch tasks when filter or program selection changes - only after enrollments are loaded
   useEffect(() => {
     if (user?.id && enrollmentsReady) fetchTasks();
   }, [user?.id, filterStatus, selectedEnrollmentId, fetchTasks, enrollmentsReady]);

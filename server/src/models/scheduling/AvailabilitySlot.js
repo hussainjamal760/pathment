@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * AvailabilitySlot — a Calendly-style bookable slot a mentor publishes.
+   * AvailabilitySlot - a Calendly-style bookable slot a mentor publishes.
    * A mentee books one and it becomes a ScheduledMeeting.
    */
   const AvailabilitySlot = sequelize.define('AvailabilitySlot', {

@@ -59,7 +59,7 @@ const ROLES = {
   lead_mentor: {
     label: 'Lead mentor',
     scope: 'clan',
-    description: 'Leads a clan — full mentoring plus member management.',
+    description: 'Leads a clan - full mentoring plus member management.',
     permissions: [
       P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE,
       P.CLAN_MANAGE_MEMBERS, P.ROADMAP_PUBLISH_LOCAL,

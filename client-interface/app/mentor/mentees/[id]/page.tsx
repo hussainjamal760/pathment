@@ -104,7 +104,7 @@ export default function MenteeDetail() {
       setFrictionBusy(id);
       await frictionApi.acceptDelay(id);
       await refetchProfile();
-      toast.success('Delay accepted — counted in their favour');
+      toast.success('Delay accepted - counted in their favour');
     } catch { toast.error('Could not update the delay'); }
     finally { setFrictionBusy(null); }
   };
@@ -214,7 +214,7 @@ export default function MenteeDetail() {
                 <span className="text-slate-300">·</span>
                 <span>{levelName}</span>
                 <span className="text-slate-300">·</span>
-                <span>Wk {week}/{totalWeeks || '—'}</span>
+                <span>Wk {week}/{totalWeeks || '-'}</span>
                 <span className="text-slate-300">·</span>
                 <span className="inline-flex items-center gap-1"><Mail className="w-3.5 h-3.5" />{mentee?.email}</span>
               </div>
@@ -255,7 +255,7 @@ export default function MenteeDetail() {
             <div>
               <p className="text-amber-900 font-medium text-sm">
                 {enrollment.completionRequestedByRole === 'system'
-                  ? `${mentee?.firstName} ${mentee?.lastName} has finished every task — ready for your sign-off`
+                  ? `${mentee?.firstName} ${mentee?.lastName} has finished every task - ready for your sign-off`
                   : `${mentee?.firstName} ${mentee?.lastName} has requested completion`}
               </p>
               <p className="text-amber-700 text-xs mt-1">
@@ -278,10 +278,10 @@ export default function MenteeDetail() {
 
       {/* ── Metric chips ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricChip label="On-time" value={insights ? `${insights.onTimeRate}%` : '—'} />
+        <MetricChip label="On-time" value={insights ? `${insights.onTimeRate}%` : '-'} />
         <MetricChip label="Awaiting review" value={insights?.pendingApprovals ?? 0} />
         <MetricChip label="Open blockers" value={insights?.openBlockers ?? 0} />
-        <MetricChip label="Avg rating" value={insights && insights.avgRating > 0 ? insights.avgRating.toFixed(1) : '—'} />
+        <MetricChip label="Avg rating" value={insights && insights.avgRating > 0 ? insights.avgRating.toFixed(1) : '-'} />
       </div>
 
       {/* ── AI summary + measured fairly ─────────────────────────────── */}

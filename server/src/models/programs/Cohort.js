@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
     description: {
       type: DataTypes.TEXT
     },
-    // Intake lifecycle. Only an 'open' cohort accepts applications/invites —
+    // Intake lifecycle. Only an 'open' cohort accepts applications/invites -
     // an off year is simply a program with no open cohort. Nothing breaks.
     status: {
       type: DataTypes.STRING(20),

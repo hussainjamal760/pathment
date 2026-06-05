@@ -3,7 +3,7 @@
 import { Sparkles } from 'lucide-react';
 
 /**
- * A quiet, tinted "read" of the mentee — the summary + the concrete signals it
+ * A quiet, tinted "read" of the mentee - the summary + the concrete signals it
  * is based on. Explainable by design: it always shows the signals so it never
  * reads as a black box, and it never gates a human decision.
  */

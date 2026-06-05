@@ -10,7 +10,7 @@ class NotificationOrchestrator {
     // Explicit kill-switch wins either way.
     if (raw === '0' || raw === 'false' || raw === 'no') return false;
     if (raw === '1' || raw === 'true' || raw === 'yes') return true;
-    // Default: ON when Resend is configured (e.g. the Pro plan), OFF otherwise —
+    // Default: ON when Resend is configured (e.g. the Pro plan), OFF otherwise -
     // so important notification emails work out of the box without extra config.
     return Boolean(process.env.RESEND_API_KEY);
   }

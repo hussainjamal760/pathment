@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Track — a lightweight personal lane for one mentee (e.g. "Frontend",
+   * Track - a lightweight personal lane for one mentee (e.g. "Frontend",
    * "Soft skills"). Tasks belong to a track via AssignedTask.trackId; the
    * mentee's This-Week view groups by track and the mentor curates lanes
    * from the mentee profile. Archiving hides a lane without deleting history.

@@ -25,7 +25,7 @@ const LABELS: Record<string, string> = {
 /**
  * Admin moderation view of a mentor's anonymous feedback. Admins see the full
  * aggregate plus the raw reviews (reviewer identity withheld by default to keep
- * the anonymity promise) — for spotting patterns and handling abuse.
+ * the anonymity promise) - for spotting patterns and handling abuse.
  */
 export function MentorFeedbackAdminPanel({ mentorId }: { mentorId: string }) {
   const [data, setData] = useState<Data | null>(null);
@@ -67,7 +67,7 @@ export function MentorFeedbackAdminPanel({ mentorId }: { mentorId: string }) {
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
             <div className="flex items-center gap-1.5">
               <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-              <span className="text-lg font-semibold text-slate-900">{data.summary.overall?.toFixed(1) ?? '—'}</span>
+              <span className="text-lg font-semibold text-slate-900">{data.summary.overall?.toFixed(1) ?? '-'}</span>
               <span className="text-sm text-slate-400">/ 5</span>
             </div>
             {typeof data.summary.recommendRate === 'number' && (

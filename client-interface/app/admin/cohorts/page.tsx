@@ -77,9 +77,9 @@ function CreateCohortDrawer({ onClose, onCreated }: { onClose: () => void; onCre
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
             <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className={field}>
-              <option value="planning">Planning — not yet accepting</option>
-              <option value="open">Open — accepting applications</option>
-              <option value="closed">Closed — intake done</option>
+              <option value="planning">Planning - not yet accepting</option>
+              <option value="open">Open - accepting applications</option>
+              <option value="closed">Closed - intake done</option>
               <option value="running">Running</option>
               <option value="completed">Completed</option>
             </select>
@@ -119,7 +119,7 @@ function CohortCard({ cohort }: { cohort: Cohort }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-medium text-slate-900 truncate">{cohort.name}</p>
-          <p className="mt-0.5 text-xs text-slate-500 truncate">{cohort.program?.name || '—'}</p>
+          <p className="mt-0.5 text-xs text-slate-500 truncate">{cohort.program?.name || '-'}</p>
         </div>
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-xs font-medium shrink-0 ${meta.cls}`}>{meta.label}</span>
       </div>
@@ -153,7 +153,7 @@ export default function AdminCohortsPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-slate-900 mb-2">Intake</h1>
-          <p className="text-slate-600">Run registration in cohorts — import applicants, review, and accept into a program.</p>
+          <p className="text-slate-600">Run registration in cohorts - import applicants, review, and accept into a program.</p>
         </div>
         <button onClick={() => setCreating(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> New cohort
@@ -170,7 +170,7 @@ export default function AdminCohortsPage() {
       ) : cohorts.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center">
           <CalendarRange className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-600">No cohorts yet — create one to open an intake for a program.</p>
+          <p className="text-slate-600">No cohorts yet - create one to open an intake for a program.</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

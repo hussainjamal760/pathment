@@ -159,7 +159,7 @@ export function ActivityCard({
               value={
                 (summary?.totalWorkHours ?? 0) > 0
                   ? `${summary!.totalWorkHours}h`
-                  : '—'
+                  : '-'
               }
               color="bg-violet-50 text-violet-600"
             />

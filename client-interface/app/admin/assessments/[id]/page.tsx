@@ -197,11 +197,11 @@ export default function AssessmentBuilderPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Pass score</label>
-            <input type="number" value={meta.passingScore} onChange={(e) => setMeta({ ...meta, passingScore: e.target.value })} placeholder="—" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" value={meta.passingScore} onChange={(e) => setMeta({ ...meta, passingScore: e.target.value })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Time limit (min)</label>
-            <input type="number" value={meta.timeLimitMins} onChange={(e) => setMeta({ ...meta, timeLimitMins: e.target.value })} placeholder="—" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" value={meta.timeLimitMins} onChange={(e) => setMeta({ ...meta, timeLimitMins: e.target.value })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
         </div>
         <p className="text-xs text-slate-400">{questions.length} questions · {totalPoints} auto-graded points</p>
@@ -285,7 +285,7 @@ function QuestionCard({
 
           {isChoice && (
             <div className="mt-3 space-y-2">
-              <p className="text-xs text-slate-500">Options — mark the correct one{q.type === 'multi_select' ? '(s)' : ''}.</p>
+              <p className="text-xs text-slate-500">Options - mark the correct one{q.type === 'multi_select' ? '(s)' : ''}.</p>
               {q.options.map((o) => (
                 <div key={o.id} className="flex items-center gap-2">
                   <input

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CommunityReaction — a user's reaction to a community post (cheers/helpful).
+   * CommunityReaction - a user's reaction to a community post (cheers/helpful).
    * One row per (post, user, type) so counts are real and toggleable.
    */
   const CommunityReaction = sequelize.define('CommunityReaction', {

@@ -92,7 +92,7 @@ function PeopleTab() {
             {searching ? (
               <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-600" /></div>
             ) : results.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-400">{query.trim() ? 'No matches.' : 'No users yet — invite someone to get started.'}</p>
+              <p className="py-8 text-center text-sm text-slate-400">{query.trim() ? 'No matches.' : 'No users yet - invite someone to get started.'}</p>
             ) : results.map((u) => (
               <button
                 key={u.id}
@@ -109,7 +109,7 @@ function PeopleTab() {
       <div className="lg:col-span-7">
         {selected ? <AccessPanel user={selected} /> : (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-card p-12 text-center text-slate-400">
-            Select someone to view and manage their roles — or <button onClick={() => setInviting(true)} className="text-brand-600 font-medium">invite a new person</button> with a role.
+            Select someone to view and manage their roles - or <button onClick={() => setInviting(true)} className="text-brand-600 font-medium">invite a new person</button> with a role.
           </div>
         )}
       </div>
@@ -154,7 +154,7 @@ function InviteWithAccessDrawer({ onClose, onInvited }: { onClose: () => void; o
         scopeType: scopeLevel,
         scopeId: scopeLevel === 'self' ? null : needsTarget ? scopeId : null,
       });
-      toast.success('Invite sent — the role applies when they register');
+      toast.success('Invite sent - the role applies when they register');
       onInvited();
     } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not send invite')); }
     finally { setSaving(false); }

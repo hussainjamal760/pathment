@@ -28,7 +28,7 @@ function AdminClanRequestsInner() {
   const searchParams = useSearchParams();
 
   // Deep-link support: /admin/requests?tab=cross opens the Cross-clan tab
-  // (e.g. from the "Cross-clan cover arranged" notification) — reactive, so it
+  // (e.g. from the "Cross-clan cover arranged" notification) - reactive, so it
   // also switches when the user is already on the page.
   useEffect(() => {
     const t = searchParams.get('tab');
@@ -133,13 +133,13 @@ function AdminClanRequestsInner() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-slate-900">{r.mentee}</p>
                       <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
-                        <span>{r.fromClan || '—'}</span><ArrowRight className="w-3 h-3" /><span>{r.toClan}</span>
+                        <span>{r.fromClan || '-'}</span><ArrowRight className="w-3 h-3" /><span>{r.toClan}</span>
                       </div>
                       {r.reason && <p className="text-xs text-slate-500 mt-1">{r.reason}</p>}
                     </div>
                     {r.status === 'pending' ? (
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => act(r.id, () => clanRequestsApi.resolveRequest(r.id, 'approved'), 'Approved — mentee moved')} disabled={busy === r.id}
+                        <button onClick={() => act(r.id, () => clanRequestsApi.resolveRequest(r.id, 'approved'), 'Approved - mentee moved')} disabled={busy === r.id}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 disabled:opacity-50"><Check className="w-3.5 h-3.5" />Approve</button>
                         <button onClick={() => act(r.id, () => clanRequestsApi.resolveRequest(r.id, 'denied'), 'Denied')} disabled={busy === r.id}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-red-300 hover:text-red-600 disabled:opacity-50"><X className="w-3.5 h-3.5" />Deny</button>
@@ -156,7 +156,7 @@ function AdminClanRequestsInner() {
           {/* Cross-clan */}
           {tab === 'cross' && (
             <div className="space-y-4">
-              {/* Current assignments first — this is what people come to see. */}
+              {/* Current assignments first - this is what people come to see. */}
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold text-slate-700">
                   Cross-clan support {crossClan.length > 0 && <span className="text-slate-400 font-normal">· {crossClan.length}</span>}
@@ -177,8 +177,8 @@ function AdminClanRequestsInner() {
                       <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium shrink-0">{CROSS_KINDS.find((k) => k.key === c.kind)?.label ?? c.kind}</span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-slate-800 truncate">
-                          <span className="font-medium">{c.user || '—'}</span>
-                          <span className="text-slate-400"> → {c.toClan || '—'}</span>
+                          <span className="font-medium">{c.user || '-'}</span>
+                          <span className="text-slate-400"> → {c.toClan || '-'}</span>
                         </p>
                         {c.note && <p className="text-xs text-slate-500 truncate">{c.note}</p>}
                       </div>
@@ -191,7 +191,7 @@ function AdminClanRequestsInner() {
                 </div>
               )}
 
-              {/* Grant form — revealed on demand so it never buries the list. */}
+              {/* Grant form - revealed on demand so it never buries the list. */}
               {showCcForm && (
               <div className="bg-card rounded-2xl border border-slate-200 p-4 space-y-3">
                 <p className="text-sm font-medium text-slate-700">Give someone temporary access to another clan</p>
@@ -241,13 +241,13 @@ function AdminClanRequestsInner() {
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">From clan <span className="text-slate-400">(optional)</span></label>
                     <select value={ccFromClan} onChange={(e) => setCcFromClan(e.target.value)} className={`${field} w-full`}>
-                      <option value="">—</option>
+                      <option value="">-</option>
                       {clans.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <input value={ccNote} onChange={(e) => setCcNote(e.target.value)} placeholder="Note (optional) — e.g. covering while lead is on leave" className={`${field} w-full`} />
+                <input value={ccNote} onChange={(e) => setCcNote(e.target.value)} placeholder="Note (optional) - e.g. covering while lead is on leave" className={`${field} w-full`} />
                 <div className="flex justify-end">
                   <button onClick={addCross} disabled={busy === 'cc'} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
                     {busy === 'cc' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Grant access

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CommunityComment — a reply on a CommunityPost. Supports one level of
+   * CommunityComment - a reply on a CommunityPost. Supports one level of
    * threading via parentId (a reply to a reply still attaches to the same
    * post, with parentId pointing at the comment it answers). A question post's
    * accepted answer is a comment referenced by CommunityPost.acceptedCommentId.

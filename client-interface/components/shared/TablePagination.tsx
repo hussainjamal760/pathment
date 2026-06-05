@@ -82,7 +82,7 @@ export function TablePagination({
           <p className="text-sm text-muted-foreground whitespace-nowrap">
             Showing{' '}
             <span className="font-medium text-foreground">{from}</span>
-            {' – '}
+            {' - '}
             <span className="font-medium text-foreground">{to}</span>
             {' of '}
             <span className="font-medium text-foreground">{total}</span>

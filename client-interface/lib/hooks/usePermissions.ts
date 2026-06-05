@@ -13,7 +13,7 @@ let inflight: Promise<PermState> | null = null;
 
 /**
  * The current user's permission UNION (across all scopes) + an `canAccessAdmin`
- * flag, for showing/hiding UI. Server still enforces per-request — this is UX
+ * flag, for showing/hiding UI. Server still enforces per-request - this is UX
  * only; fine-grained per-resource checks remain server-side.
  */
 export function usePermissions() {

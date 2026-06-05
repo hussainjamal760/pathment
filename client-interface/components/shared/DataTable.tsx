@@ -24,7 +24,7 @@ export interface DataTableColumn<T> {
   label: string;
   /** Enable client-side sort on this column */
   sortable?: boolean;
-  /** Custom renderer — receives (value, row) */
+  /** Custom renderer - receives (value, row) */
   render?: (value: any, row: T) => ReactNode;
   /** Extra classes for the <th> */
   headerClassName?: string;
@@ -46,7 +46,7 @@ export interface DataTableProps<T extends Record<string, any>> {
   columns: DataTableColumn<T>[];
   /** Row data */
   data: T[];
-  /** Unique key for each row — used for selection tracking */
+  /** Unique key for each row - used for selection tracking */
   rowKey?: keyof T;
   /** Show loading skeleton */
   isLoading?: boolean;
@@ -263,7 +263,7 @@ export function DataTable<T extends Record<string, any>>({
                       key={String(col.key)}
                       className={cn(alignClass(col.align), col.cellClassName)}
                     >
-                      {col.render ? col.render(rawValue, row) : (rawValue ?? '—')}
+                      {col.render ? col.render(rawValue, row) : (rawValue ?? '-')}
                     </TableCell>
                   );
                 })}

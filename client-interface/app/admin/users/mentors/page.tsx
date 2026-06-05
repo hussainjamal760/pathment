@@ -58,7 +58,7 @@ const columns: DataTableColumn<MentorListItem>[] = [
       const mp = row.mentorProfile;
       return (
         <div className="min-w-0">
-          <p className="text-sm text-slate-900 truncate">{mp?.title ?? '—'}</p>
+          <p className="text-sm text-slate-900 truncate">{mp?.title ?? '-'}</p>
           {mp?.organization && (
             <p className="text-xs text-slate-500 mt-0.5 truncate">{mp.organization}</p>
           )}
@@ -97,7 +97,7 @@ const columns: DataTableColumn<MentorListItem>[] = [
     label: 'Specializations',
     render: (_, row) => {
       const specs = row.mentorProfile?.specialization ?? [];
-      if (specs.length === 0) return <span className="text-slate-400 text-sm">—</span>;
+      if (specs.length === 0) return <span className="text-slate-400 text-sm">-</span>;
       const visible = specs.slice(0, 2);
       const remaining = specs.length - visible.length;
       return (
@@ -152,7 +152,7 @@ const columns: DataTableColumn<MentorListItem>[] = [
           })}
         </span>
       ) : (
-        <span className="text-slate-400">—</span>
+        <span className="text-slate-400">-</span>
       ),
   },
 ];
@@ -241,7 +241,7 @@ export default function AdminMentorsListPage() {
 
   const avgRating = (() => {
     const rated = mentors.filter((m) => m.mentorProfile?.avgFeedbackRating);
-    if (!rated.length) return '—';
+    if (!rated.length) return '-';
     const avg =
       rated.reduce((s, m) => s + Number(m.mentorProfile!.avgFeedbackRating), 0) / rated.length;
     return avg.toFixed(1);
@@ -306,27 +306,27 @@ export default function AdminMentorsListPage() {
         <StatsCard
           icon={GraduationCap}
           label="Total Mentors"
-          value={isLoading ? '—' : pagination.total}
+          value={isLoading ? '-' : pagination.total}
           colorClass="text-purple-600 bg-purple-50"
         />
         <StatsCard
           icon={UserCheck}
           label="Accepting Now"
-          value={isLoading ? '—' : acceptingCount}
+          value={isLoading ? '-' : acceptingCount}
           colorClass="text-green-600 bg-green-50"
           sub="on this page"
         />
         <StatsCard
           icon={TrendingDown}
           label="At Full Capacity"
-          value={isLoading ? '—' : atCapacityCount}
+          value={isLoading ? '-' : atCapacityCount}
           colorClass="text-amber-600 bg-amber-50"
           sub="on this page"
         />
         <StatsCard
           icon={Star}
           label="Avg Rating"
-          value={isLoading ? '—' : avgRating}
+          value={isLoading ? '-' : avgRating}
           colorClass="text-brand-600 bg-brand-50"
           sub="on this page"
         />

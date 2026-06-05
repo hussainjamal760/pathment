@@ -1,6 +1,6 @@
 # Intake & Assessments
 
-**What it is:** the self-serve admissions pipeline — a public program catalog, shareable
+**What it is:** the self-serve admissions pipeline - a public program catalog, shareable
 cohort apply links, applications with admin review, admin-built assessments of any type, and
 the accept → invite → register → placement flow. Whatever's collected up front **carries
 forward** so the mentee never re-types it.

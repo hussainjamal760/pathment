@@ -6,7 +6,7 @@ import { UserPlus, Loader2, Trash2, Stethoscope } from 'lucide-react';
 import type { ProfileCollaborator } from '@/lib/hooks/mentor';
 
 /**
- * Collaborators — specialists invited to work with a mentee (psychologist,
+ * Collaborators - specialists invited to work with a mentee (psychologist,
  * career coach, guest mentor…). Mirrors the prototype's collaborators panel.
  */
 export function CollaboratorsCard({

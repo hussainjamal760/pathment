@@ -19,7 +19,7 @@ const WIDTHS = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-xl' } as const;
 const DURATION = 250; // keep in sync with the duration-[250ms] classes below
 
 /**
- * Drawer — the single, accessible right slide-over used across admin / mentor /
+ * Drawer - the single, accessible right slide-over used across admin / mentor /
  * mentee for any "add / edit / assign" form. Animates smoothly both in AND out
  * (stays mounted through the exit), and handles Escape-to-close, body scroll
  * lock, backdrop dismiss, and focus.
@@ -38,7 +38,7 @@ export function Drawer({ open, onClose, title, subtitle, width = 'md', footer, c
     if (open) {
       setMounted(true);
       // Two frames so the initial off-screen transform paints before we flip
-      // to the on-screen one — otherwise the browser skips the transition.
+      // to the on-screen one - otherwise the browser skips the transition.
       let r2 = 0;
       const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setShown(true)); });
       return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };

@@ -64,7 +64,7 @@ export default function MenteeProgress() {
   if (error || !progress) {
     return (
       <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center max-w-3xl">
-        <p className="text-slate-600 mb-3">{error || 'No progress data yet — once you start tasks this fills in.'}</p>
+        <p className="text-slate-600 mb-3">{error || 'No progress data yet - once you start tasks this fills in.'}</p>
         {error && <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>}
       </div>
     );
@@ -76,10 +76,10 @@ export default function MenteeProgress() {
   const momentumTone = progress.momentum === 'up' ? 'text-emerald-600' : progress.momentum === 'down' ? 'text-amber-600' : 'text-slate-500';
 
   const encouragement = gap >= 8
-    ? "You're doing better than the raw numbers suggest — your logged constraints are counted, and it shows."
+    ? "You're doing better than the raw numbers suggest - your logged constraints are counted, and it shows."
     : progress.momentum === 'up'
     ? "Nice rhythm. Keep the steady cadence going."
-    : "Every step counts. Log anything getting in your way — it helps, it doesn't hurt.";
+    : "Every step counts. Log anything getting in your way - it helps, it doesn't hurt.";
 
   const openBlockers = progress.blockers.filter((b) => b.status === 'open');
 
@@ -87,7 +87,7 @@ export default function MenteeProgress() {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-slate-900 mb-2">My progress</h1>
-        <p className="text-slate-600">Where you are — measured fairly, with your real constraints counted.</p>
+        <p className="text-slate-600">Where you are - measured fairly, with your real constraints counted.</p>
       </div>
 
       {/* Metrics */}
@@ -95,7 +95,7 @@ export default function MenteeProgress() {
         <MetricChip label="On-time" value={`${progress.onTimeRate}%`} />
         <MetricChip label="Awaiting review" value={progress.pendingApprovals} />
         <MetricChip label="Open blockers" value={openBlockers.length} />
-        <MetricChip label="Week" value={`${progress.week}/${progress.totalWeeks || '—'}`} />
+        <MetricChip label="Week" value={`${progress.week}/${progress.totalWeeks || '-'}`} />
       </div>
 
       {/* Summary + dual progress */}

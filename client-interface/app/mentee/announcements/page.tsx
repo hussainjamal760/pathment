@@ -17,7 +17,7 @@ export default function MenteeAnnouncements() {
         loading={loading}
         error={error}
         onRefresh={refetch}
-        emptyHint="No announcements yet — your mentor and admins will post here."
+        emptyHint="No announcements yet - your mentor and admins will post here."
       />
     </div>
   );

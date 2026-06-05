@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * MessageReaction — a user's emoji reaction to a chat message. One row per
+   * MessageReaction - a user's emoji reaction to a chat message. One row per
    * (message, user) so each person has a single reaction they can change or
    * remove (WhatsApp-style toggle).
    */

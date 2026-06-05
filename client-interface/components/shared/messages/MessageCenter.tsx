@@ -476,7 +476,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                   // A new day → show a centered date separator above this message.
                   const showDateSeparator = !prev || !sameDay(prev.createdAt, message.createdAt);
                   // Consecutive messages from the same sender on the same day collapse
-                  // into one visual group — only the first shows the name + extra gap.
+                  // into one visual group - only the first shows the name + extra gap.
                   const startsRun = showDateSeparator || !prev || prev.senderId !== message.senderId;
 
                   // Group reactions by emoji so chips show "👍 2" and mark which I added.
@@ -543,7 +543,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                           </div>
                         </div>
 
-                        {/* Hover reaction picker — floating pill that pops above the bubble */}
+                        {/* Hover reaction picker - floating pill that pops above the bubble */}
                         <div
                           className={`absolute -top-11 ${mine ? 'right-0' : 'left-0'} z-10 origin-bottom flex items-center gap-0.5 rounded-full border border-slate-200 bg-card px-1.5 py-1 shadow-lg opacity-0 scale-90 translate-y-1.5 pointer-events-none transition-all duration-150 ease-out group-hover/msg:opacity-100 group-hover/msg:scale-100 group-hover/msg:translate-y-0 group-hover/msg:pointer-events-auto focus-within:opacity-100 focus-within:scale-100 focus-within:translate-y-0 focus-within:pointer-events-auto`}
                         >
@@ -563,7 +563,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                           })}
                         </div>
 
-                        {/* Reaction chips — sit on the bubble's bottom edge (WhatsApp-style) */}
+                        {/* Reaction chips - sit on the bubble's bottom edge (WhatsApp-style) */}
                         {grouped.length > 0 && (
                           <div className={`flex flex-wrap gap-1 -mt-2 ${mine ? 'justify-end pr-1' : 'pl-1'} relative z-[1]`}>
                             {grouped.map((entry) => (
@@ -571,7 +571,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                                 key={entry.emoji}
                                 type="button"
                                 onClick={() => reactToMessage(message.id, entry.emoji)}
-                                title={entry.mine ? 'You reacted — tap to remove' : 'Tap to react'}
+                                title={entry.mine ? 'You reacted - tap to remove' : 'Tap to react'}
                                 className={`inline-flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-xs shadow-sm transition-all hover:-translate-y-0.5 ${
                                   entry.mine
                                     ? 'border-brand-300 ring-1 ring-brand-200 bg-brand-50 dark:bg-brand-500/15'

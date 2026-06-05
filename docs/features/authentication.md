@@ -1,6 +1,6 @@
 # Authentication
 
-**What it is:** how people sign in and prove who they are — JWT-based login with refresh
+**What it is:** how people sign in and prove who they are - JWT-based login with refresh
 tokens, optional 2FA, email verification, password reset, and **invite-based registration**.
 
 **Why it exists:** the platform is invite-/application-driven (you don't sign up off the
@@ -12,16 +12,16 @@ already says which program/clan/role you join.
 `MenteeProfile` / `AdminProfile` (one-to-one role data), `RefreshToken`,
 `EmailVerificationToken`, `PasswordResetToken`, `UserSession`, `TwoFactorAuth`,
 `RegistrationInvite` (email-bound; carries `programId`/`clanId`/`cohortId` + optional
-`metadata.pendingGrants`). See [DATABASE.md §3–4](../DATABASE.md).
+`metadata.pendingGrants`). See [DATABASE.md §3-4](../DATABASE.md).
 
 ## Backend
 Service: `authService`. Routes (`/api/auth`, public unless noted):
-- `POST /register` — consumes an invite token; creates `User` + role profile + `UserSettings`; marks email pre-verified (the invite proves it); for mentees creates `Enrollment` (+ `ClanMembership` if the invite names a clan); applies any `pendingGrants` (see [Authorization](./authorization-rbac.md)); links the originating `Application`.
-- `POST /login` — verifies bcrypt password; if 2FA on, returns a 5-min temp token + `requiresTwoFactor`; else issues access + refresh JWT.
+- `POST /register` - consumes an invite token; creates `User` + role profile + `UserSettings`; marks email pre-verified (the invite proves it); for mentees creates `Enrollment` (+ `ClanMembership` if the invite names a clan); applies any `pendingGrants` (see [Authorization](./authorization-rbac.md)); links the originating `Application`.
+- `POST /login` - verifies bcrypt password; if 2FA on, returns a 5-min temp token + `requiresTwoFactor`; else issues access + refresh JWT.
 - `POST /refresh` · `POST /verify-email` · `POST /resend-verification` · `POST /forgot-password` · `POST /reset-password` · `GET /invites/:token` (invite preview, returns program/clan + applicant name for prefill).
 - Protected: `GET /me`, `POST /change-password`, `POST /logout`, 2FA setup/verify/disable.
 
-**Middleware:** `authenticate` (verifies JWT, loads user, checks active + email-verified) and `authorize([roles])` (capability-aware — passes if any of the user's `capabilities` match). Authorization beyond role is handled by [Scoped RBAC](./authorization-rbac.md).
+**Middleware:** `authenticate` (verifies JWT, loads user, checks active + email-verified) and `authorize([roles])` (capability-aware - passes if any of the user's `capabilities` match). Authorization beyond role is handled by [Scoped RBAC](./authorization-rbac.md).
 
 ## Frontend
 `app/(auth)/login`, `/register` (reads `?invite=`, prefills name/email), `/verify-email`,

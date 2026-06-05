@@ -12,7 +12,7 @@ router.get('/led-clans', authenticate, authorize(['mentor', 'admin']), announcem
 
 // Admins + mentors compose (the service authorizes WHAT each may target).
 router.post('/', authenticate, authorize(['admin', 'mentor']), announcementController.create);
-// Pin / remove — admin or the author (enforced in the service).
+// Pin / remove - admin or the author (enforced in the service).
 router.patch('/:id/pin', authenticate, authorize(['admin', 'mentor']), announcementController.togglePin);
 router.delete('/:id', authenticate, authorize(['admin', 'mentor']), announcementController.remove);
 

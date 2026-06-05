@@ -5,7 +5,7 @@
 **TaskSubmissions**, which the mentor reviews with **TaskFeedback**. Approving a step can
 auto-assign the next.
 
-**Why it exists:** structured, reviewable work is the core of mentorship — clear
+**Why it exists:** structured, reviewable work is the core of mentorship - clear
 deliverables, a submit→review loop, and progress that's measurable.
 
 ## Data model
@@ -20,12 +20,12 @@ inlineFeedback, checkedCriteria). `Track` (per-mentee personal lanes). See [DATA
 
 ## Backend
 - **`/api/tasks`** (assign/list/detail/status) and **`/api/submissions`** (submit with files, review). `taskService` + `submissionService` own the logic; `submissionService.reviewSubmission` advances the roadmap on approval, then recomputes enrollment stats.
-- **Roadmap authoring:** **org** roadmaps `/api/roadmaps/org` (`roadmap.author`) — the shared library mentors import; **mentor local** roadmaps under `/api/mentor/roadmaps` (build, import from org, add steps, assign to one/many mentees). `GET /api/roadmaps/me` = a mentee's step progress.
+- **Roadmap authoring:** **org** roadmaps `/api/roadmaps/org` (`roadmap.author`) - the shared library mentors import; **mentor local** roadmaps under `/api/mentor/roadmaps` (build, import from org, add steps, assign to one/many mentees). `GET /api/roadmaps/me` = a mentee's step progress.
 - **Tracks (`/api/tracks`):** per-mentee lanes to organize assigned tasks (create, reorder, archive, add tasks).
-- Progress is recomputed by `taskService.updateEnrollmentTaskStats` on every assign/submit/review — the **single source of truth** (see [Enrollment & Progress](./enrollment-and-progress.md)).
+- Progress is recomputed by `taskService.updateEnrollmentTaskStats` on every assign/submit/review - the **single source of truth** (see [Enrollment & Progress](./enrollment-and-progress.md)).
 
 ## Frontend
-- **Mentor:** `/mentor/roadmaps` (build/import/assign), `/mentor/tasks` + `/mentor/tasks/[id]` + `/mentor/tasks/[id]/feedback`, `/mentor/review` (cohort review — assign tasks/roadmaps to many), `/mentor/approvals` (review queue, bulk-approve).
+- **Mentor:** `/mentor/roadmaps` (build/import/assign), `/mentor/tasks` + `/mentor/tasks/[id]` + `/mentor/tasks/[id]/feedback`, `/mentor/review` (cohort review - assign tasks/roadmaps to many), `/mentor/approvals` (review queue, bulk-approve).
 - **Mentee:** `/mentee/tasks` + `/mentee/tasks/[id]` + `/mentee/tasks/[id]/submit` (submit text/links/files, request extension).
 - **Admin:** `/admin/roadmaps` (org roadmap library authoring).
 
@@ -36,7 +36,7 @@ inlineFeedback, checkedCriteria). `Track` (per-mentee personal lanes). See [DATA
 
 ## Rules & edge cases
 - Submissions are **versioned**; feedback attaches to a version; "request changes" bumps a revision.
-- Enrollment progress counts **live (non-cancelled) assigned tasks**, never the template — so completion can't falsely read 100%.
+- Enrollment progress counts **live (non-cancelled) assigned tasks**, never the template - so completion can't falsely read 100%.
 - Org vs local roadmaps: org = shared/published library; local = a mentor's own (can be imported from org).
 - `dueOffsetDays` makes a step's due date relative to assignment.
 

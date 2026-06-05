@@ -1,9 +1,9 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * MenteeSchedule — a mentee's current day as an ordered list of filled slots.
+   * MenteeSchedule - a mentee's current day as an ordered list of filled slots.
    * Seeded from a ScheduleTemplate's blocks on assignment, then each slot is
    * filled (kind: 'roadmap' with a roadmapChain, 'recurring' with a config, or
-   * 'empty'). Independent snapshot — editing the template does not change it.
+   * 'empty'). Independent snapshot - editing the template does not change it.
    *
    * schedule: SlotConfig[] = [{ id, label, time, days, kind, roadmapChain?, recurring?, bookable? }]
    */

@@ -26,7 +26,7 @@ const LABELS: Record<string, string> = {
 /**
  * The mentor's own anonymous feedback, shown only once enough mentees have
  * responded (server-gated) so no single voice is identifiable. Aggregates are
- * trimmed-mean to soften outliers — protecting the mentor from one bad day.
+ * trimmed-mean to soften outliers - protecting the mentor from one bad day.
  */
 export function MentorFeedbackCard() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -63,7 +63,7 @@ export function MentorFeedbackCard() {
     </div>
   );
 
-  // Not enough responses yet — keep it private.
+  // Not enough responses yet - keep it private.
   if (!summary.revealed) {
     const need = (summary.minResponses ?? 3) - (summary.total ?? 0);
     return (
@@ -89,7 +89,7 @@ export function MentorFeedbackCard() {
       <div className="flex flex-wrap items-end gap-x-8 gap-y-3 mb-5">
         <div>
           <p className="text-3xl font-semibold text-slate-900 leading-none">
-            {summary.overall?.toFixed(1) ?? '—'}
+            {summary.overall?.toFixed(1) ?? '-'}
             <span className="text-base font-normal text-slate-400"> / 5</span>
           </p>
           <p className="text-xs text-slate-500 mt-1">Overall · {summary.total} responses</p>
@@ -112,7 +112,7 @@ export function MentorFeedbackCard() {
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
               </div>
-              <span className="w-10 text-right text-sm text-slate-500 shrink-0">{d ? d.average.toFixed(1) : '—'}</span>
+              <span className="w-10 text-right text-sm text-slate-500 shrink-0">{d ? d.average.toFixed(1) : '-'}</span>
             </div>
           );
         })}

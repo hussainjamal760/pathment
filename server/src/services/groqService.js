@@ -6,10 +6,10 @@ class GroqService {
   constructor() {
     // OpenAI clients are cached by `${baseURL}|${apiKey}` so we don't rebuild
     // one per call. The active key is resolved per request (configured AI
-    // connection first, env fallback second) — see `_resolve`.
+    // connection first, env fallback second) - see `_resolve`.
     this._clients = new Map();
     if (!config.ai.apiKey) {
-      console.log('ℹ AI: no env key set — relying on configured AI connections (Settings → AI Connections).');
+      console.log('ℹ AI: no env key set - relying on configured AI connections (Settings → AI Connections).');
     }
   }
 

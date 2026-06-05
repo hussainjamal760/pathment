@@ -19,8 +19,8 @@ interface SelectMenuProps {
 }
 
 /**
- * SelectMenu — the single, consistent single-select dropdown. Replaces native
- * `<select>` (whose option popup the browser positions unpredictably — sometimes
+ * SelectMenu - the single, consistent single-select dropdown. Replaces native
+ * `<select>` (whose option popup the browser positions unpredictably - sometimes
  * above, sometimes elsewhere) with a menu that always anchors to the trigger,
  * opens downward, flips up only when there isn't room, aligns to trigger width,
  * is dark-mode aware, and is keyboard accessible (↑/↓/Enter/Esc).

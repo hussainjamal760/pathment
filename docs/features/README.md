@@ -1,8 +1,8 @@
-# Pathment — Feature Guide
+# Pathment - Feature Guide
 
 This folder is the **feature-by-feature manual** for Pathment. Each file explains one
 feature end to end: what it is, why it exists, the data behind it, the backend flow, the
-frontend, and — most importantly — **what each role (admin / mentor / mentee) actually
+frontend, and - most importantly - **what each role (admin / mentor / mentee) actually
 does**. Read a single file and you'll understand that feature without reading code.
 
 > For the big picture first, read **[../ARCHITECTURE.md](../ARCHITECTURE.md)** (how the
@@ -13,14 +13,14 @@ does**. Read a single file and you'll understand that feature without reading co
 
 Every feature file follows the same template so things are easy to find and remember:
 
-1. **What it is** — one or two sentences.
-2. **Why it exists** — the problem it solves.
-3. **Data model** — the tables involved (see DATABASE.md for full columns).
-4. **Backend** — key services + the API endpoints.
-5. **Frontend** — the pages/components.
-6. **Role flows** — the journey for admin, mentor, and mentee.
-7. **Rules & edge cases** — the non-obvious logic.
-8. **Related** — links to adjacent features.
+1. **What it is** - one or two sentences.
+2. **Why it exists** - the problem it solves.
+3. **Data model** - the tables involved (see DATABASE.md for full columns).
+4. **Backend** - key services + the API endpoints.
+5. **Frontend** - the pages/components.
+6. **Role flows** - the journey for admin, mentor, and mentee.
+7. **Rules & edge cases** - the non-obvious logic.
+8. **Related** - links to adjacent features.
 
 ## The features
 

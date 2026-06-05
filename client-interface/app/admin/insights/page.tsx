@@ -33,7 +33,7 @@ export default function AdminInsights() {
     <div className="space-y-6">
       <PageHeader title="Insights" subtitle="Outcomes, fairness and clan comparisons across the org" />
 
-      {/* Fairness digest — the org's headline story */}
+      {/* Fairness digest - the org's headline story */}
       <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 dark:from-brand-500/10 to-card p-5 flex flex-wrap items-start gap-3">
         <span className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
           <Scale className="w-5 h-5 text-brand-600" />
@@ -45,7 +45,7 @@ export default function AdminInsights() {
             {kpis.clansRed > 0 ? <> · {redClans.slice(0, 3).join(', ')}{redClans.length > 3 ? ` +${redClans.length - 3}` : ''} need attention</> : <> · none in the red</>}.
             {' '}Org relative progress runs{' '}
             <strong className="text-brand-700 tabular-nums">{gap >= 0 ? `${gap} pts above` : `${Math.abs(gap)} pts below`}</strong>{' '}
-            absolute — friction is being logged, not papered over.
+            absolute - friction is being logged, not papered over.
           </p>
         </div>
       </div>
@@ -66,7 +66,7 @@ export default function AdminInsights() {
         ))}
       </div>
 
-      {/* Clan comparison — worst first */}
+      {/* Clan comparison - worst first */}
       <div className="bg-card rounded-2xl border border-slate-200">
         <div className="px-6 py-5 border-b border-slate-100">
           <h2 className="text-slate-900">Clan comparison</h2>
@@ -112,7 +112,7 @@ export default function AdminInsights() {
         )}
       </div>
 
-      {/* Absolute vs relative — the fairness distribution */}
+      {/* Absolute vs relative - the fairness distribution */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="bg-card rounded-2xl border border-slate-200 p-6 lg:col-span-1">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Org cohort average</p>
@@ -128,12 +128,12 @@ export default function AdminInsights() {
           </div>
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
             The cohort runs <strong className="text-brand-700 tabular-nums">{Math.abs(gap)} pts</strong> {gap >= 0 ? 'higher' : 'lower'} on
-            relative progress — the friction layer is doing visible work.
+            relative progress - the friction layer is doing visible work.
           </p>
         </div>
 
         <div className="bg-card rounded-2xl border border-slate-200 p-6 lg:col-span-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-3">By mentee — widest fairness gap first</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-3">By mentee - widest fairness gap first</p>
           {distribution.length === 0 ? (
             <p className="text-sm text-slate-400">No mentees to show.</p>
           ) : (
@@ -171,7 +171,7 @@ export default function AdminInsights() {
         <div className="bg-card rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" /><span className="text-xs text-slate-500">Open blockers</span></div>
           <div className="mt-2 text-2xl font-semibold text-slate-900 tabular-nums">{kpis.totalOpenBlockers}</div>
-          <p className="mt-1 text-xs text-slate-400">{clans.length ? `Densest in ${[...clans].sort((a, b) => b.openBlockers - a.openBlockers)[0].name}.` : '—'}</p>
+          <p className="mt-1 text-xs text-slate-400">{clans.length ? `Densest in ${[...clans].sort((a, b) => b.openBlockers - a.openBlockers)[0].name}.` : '-'}</p>
         </div>
         <div className="bg-card rounded-2xl border border-slate-200 p-5">
           <div className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-red-500" /><span className="text-xs text-slate-500">Clans in red</span></div>

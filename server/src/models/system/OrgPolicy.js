@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * OrgPolicy — a single-row store for org-level authored content. Currently used
+   * OrgPolicy - a single-row store for org-level authored content. Currently used
    * only for the Mentor Spec handbook (category `mentor_spec`); see mentorSpecService.
    */
   const OrgPolicy = sequelize.define('OrgPolicy', {

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 
 /**
  * Public shell for the unauthenticated intake surface (program catalog, apply
- * forms, applicant status). Deliberately minimal — visitors see only offerings,
+ * forms, applicant status). Deliberately minimal - visitors see only offerings,
  * nothing internal, until they're placed.
  */
 export default function PublicLayout({ children }: { children: ReactNode }) {
@@ -23,7 +23,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
       </header>
       <main className="flex-1">{children}</main>
       <footer className="border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-        © Pathment — structured mentorship programs
+        © Pathment - structured mentorship programs
       </footer>
     </div>
   );

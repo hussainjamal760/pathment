@@ -55,7 +55,7 @@ const inviteWithRole = catchAsync(async (req, res) => {
   res.status(201).json(successResponse('Invite sent', result, 201));
 });
 
-/** The current user's permission union (any scope) + admin-area flag — UI gating. */
+/** The current user's permission union (any scope) + admin-area flag - UI gating. */
 const myPermissions = catchAsync(async (req, res) => {
   const [permissions, canAccessAdmin] = await Promise.all([
     authzService.getPermissionUnion(req.user),

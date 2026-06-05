@@ -5,7 +5,7 @@ const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 /**
- * schedulingService — 1:1 availability + meeting booking.
+ * schedulingService - 1:1 availability + meeting booking.
  */
 class SchedulingService {
   // ── Availability (mentor) ─────────────────────────────────────────────────
@@ -43,7 +43,7 @@ class SchedulingService {
     const slot = await models.AvailabilitySlot.findByPk(slotId);
     if (!slot) throw new NotFoundError('Slot not found');
     if (slot.mentorId !== mentorId) throw new ValidationError('Not your slot');
-    if (slot.taken) throw new ValidationError('This slot is booked — cancel the meeting first');
+    if (slot.taken) throw new ValidationError('This slot is booked - cancel the meeting first');
     await slot.destroy();
     return { deleted: true };
   }
@@ -128,7 +128,7 @@ class SchedulingService {
           recipients: [{ userId: meeting.mentorId }],
           payload: {
             title: 'A mentee booked a 1:1',
-            message: `${meeting.day} at ${meeting.time}${meeting.agenda ? ` — ${meeting.agenda}` : ''}`,
+            message: `${meeting.day} at ${meeting.time}${meeting.agenda ? ` - ${meeting.agenda}` : ''}`,
             actionUrl: '/mentor/schedules',
             actionLabel: 'View schedule'
           }
@@ -192,7 +192,7 @@ class SchedulingService {
       eventKey: NOTIFICATION_EVENTS.MEETING_CANCELLED,
       recipients: [{ userId: recipientId }],
       payload: {
-        title: `1:1 cancelled — ${when}`,
+        title: `1:1 cancelled - ${when}`,
         message: `${cancellerName} cancelled your 1:1 on ${when}.${reasonLine}${byMentor ? ' Book another slot when you’re ready.' : ''}`,
         actionUrl: byMentor ? '/mentee/meetings' : '/mentor/schedules',
         actionLabel: byMentor ? 'Find a new slot' : 'View schedule',

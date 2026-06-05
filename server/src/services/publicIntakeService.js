@@ -15,7 +15,7 @@ const ACCESS_TOKEN_TTL_DAYS = 60;
  * The public, unauthenticated intake surface: a program catalog anyone can
  * browse, a self-serve application form behind a cohort link, and a magic-link
  * status/assessment page for not-yet-registered applicants. Nothing here exposes
- * internal org data — only published programs and the applicant's own record.
+ * internal org data - only published programs and the applicant's own record.
  */
 class PublicIntakeService {
   // ── Catalog ────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ class PublicIntakeService {
 
     // If they already have a real account, they should log in, not apply.
     const existingUser = await models.User.findOne({ where: { email } });
-    if (existingUser) throw new ConflictError('An account already exists for this email — please log in instead');
+    if (existingUser) throw new ConflictError('An account already exists for this email - please log in instead');
 
     const rawToken = generateRandomToken();
     const accessTokenHash = hashToken(rawToken);
@@ -271,11 +271,11 @@ class PublicIntakeService {
             ${requiresAssessment ? 'Start assessment / track status' : 'Track your application'}
           </a>
         </p>
-        <p style="color:#64748b;font-size:13px">Keep this link private — it's your personal access to this application.</p>
+        <p style="color:#64748b;font-size:13px">Keep this link private - it's your personal access to this application.</p>
       </div>`;
     return emailService.sendEmail({
       to: email,
-      subject: `Application received — ${programName}`,
+      subject: `Application received - ${programName}`,
       html,
       text: `Thanks for applying to ${programName} (${cohort.name}). ${action} Track it here: ${statusUrl}`,
       emailType: 'intake_application'

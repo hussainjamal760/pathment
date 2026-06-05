@@ -5,7 +5,7 @@ import { usePermissions } from '@/lib/hooks/usePermissions';
 import type { Permission } from '@/lib/config/permissions';
 
 /**
- * Show children only if the user holds the permission (UX gating — the server
+ * Show children only if the user holds the permission (UX gating - the server
  * still enforces). Pass `anyOf` for "has at least one of these".
  */
 export function PermissionGuard({

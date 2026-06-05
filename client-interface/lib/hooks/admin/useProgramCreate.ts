@@ -50,7 +50,7 @@ interface UseProgramCreateReturn {
 }
 
 /**
- * Program creation — a single step. The admin fills in program details; levels
+ * Program creation - a single step. The admin fills in program details; levels
  * no longer exist (curriculum is authored as roadmaps in the Roadmaps area), so
  * on create we land on the program page with the "Author roadmaps" handoff.
  */
@@ -116,7 +116,7 @@ export function useProgramCreate(): UseProgramCreateReturn {
       };
       const programId = response?.program?.id ?? response?.data?.program?.id;
       if (!programId) throw new Error('Program ID not returned from API');
-      toast.success('Program created — now author its roadmaps.');
+      toast.success('Program created - now author its roadmaps.');
       router.push(`/admin/programs/${programId}`);
     } catch (err: unknown) {
       toast.error(extractApiErrorMessage(err, 'Failed to create program'));

@@ -117,7 +117,7 @@ const logEvent = catchAsync(async (req, res) => {
       eventType,
       eventCategory,
       eventData: { entityType, entityId, ...metadata },
-      sessionId: null, // Not linking to session UUID — keeps it simple
+      sessionId: null, // Not linking to session UUID - keeps it simple
     }),
     getOrCreateSession(userId),
   ]);

@@ -16,7 +16,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * are shown read-only; only explicit role_assignments rows are revocable here.
  */
 class AccessService {
-  /** The role catalog for the admin UI — built-in + custom roles. */
+  /** The role catalog for the admin UI - built-in + custom roles. */
   async listRoleCatalog() {
     const builtIn = Object.entries(ROLES).map(([key, r]) => ({
       key, label: r.label, scope: r.scope, description: r.description,
@@ -86,7 +86,7 @@ class AccessService {
     const role = await models.CustomRole.findByPk(id);
     if (!role) throw new NotFoundError('Custom role not found');
     const inUse = await models.RoleAssignment.count({ where: { role: role.key } });
-    if (inUse > 0) throw new ValidationError('This role is assigned to users — revoke those grants first');
+    if (inUse > 0) throw new ValidationError('This role is assigned to users - revoke those grants first');
     await role.destroy();
     authzService.invalidateCustomRoles();
     return { deleted: true };
@@ -184,7 +184,7 @@ class AccessService {
   /**
    * Invite a not-yet-registered person and pre-assign them a role that's applied
    * automatically when they register. Unlike a placement invite, this carries no
-   * program/clan placement — just an account (mentor/mentee base) plus the role
+   * program/clan placement - just an account (mentor/mentee base) plus the role
    * grant, stashed in the invite's metadata for authService.register to apply.
    */
   async inviteWithRole({ email, baseRole = 'mentor', role, scopeType = 'org', scopeId = null }, invitedBy) {
@@ -200,7 +200,7 @@ class AccessService {
     if (scopeType === 'clan' && !(await models.Clan.findByPk(scopeId))) throw new ValidationError('Clan not found');
 
     const existingUser = await models.User.findOne({ where: { email: normalizedEmail } });
-    if (existingUser) throw new ConflictError('A user already exists for this email — grant the role to them directly instead');
+    if (existingUser) throw new ConflictError('A user already exists for this email - grant the role to them directly instead');
     const activeInvite = await models.RegistrationInvite.findOne({
       where: { email: normalizedEmail, usedAt: null, revokedAt: null, expiresAt: { [Op.gt]: new Date() } }
     });

@@ -3,7 +3,7 @@ const { models } = require('../db');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors/errorTypes');
 
 /**
- * aiConnectionService — AI provider keys (bring-your-own-key) + feature routing.
+ * aiConnectionService - AI provider keys (bring-your-own-key) + feature routing.
  *
  * Scope: a connection's ownerId is NULL for org-wide keys (admin-managed) or a
  * user id for a mentor's personal keys. A user only ever sees/manages the keys
@@ -193,7 +193,7 @@ class AIConnectionService {
         if (row) return this._toConfig(row);
       }
     }
-    // 3) Any org connection — prefer a connected one, else most recent.
+    // 3) Any org connection - prefer a connected one, else most recent.
     const orgRows = await models.AIConnection.findAll({ where: { ownerId: null }, order: [['created_at', 'DESC']] });
     if (orgRows.length) {
       const chosen = orgRows.find((r) => r.status === 'connected') || orgRows[0];

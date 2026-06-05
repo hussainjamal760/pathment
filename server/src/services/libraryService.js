@@ -3,7 +3,7 @@ const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes')
 
 const CATEGORIES = ['guidance', 'reading', 'template', 'policy'];
 
-/** Org-shared mentor Library — rich-text articles, links, templates, policies. */
+/** Org-shared mentor Library - rich-text articles, links, templates, policies. */
 class LibraryService {
   _meta(d) {
     return {

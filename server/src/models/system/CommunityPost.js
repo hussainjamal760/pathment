@@ -1,8 +1,8 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CommunityPost — a post inside a community space. Every post is scoped to a
+   * CommunityPost - a post inside a community space. Every post is scoped to a
    * space (clan / cohort / program / global) so the feed mirrors the org
-   * hierarchy. Types: kudos (optionally to someone), win, question (Q&A — can be
+   * hierarchy. Types: kudos (optionally to someone), win, question (Q&A - can be
    * resolved with an accepted answer), discussion, resource, meme, standup.
    * Threaded replies live in CommunityComment; reactions in CommunityReaction.
    */

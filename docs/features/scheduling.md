@@ -15,11 +15,11 @@ config). See [DATABASE.md §10](../DATABASE.md).
 
 ## Backend
 - **Meetings (`/api/meetings`):** `POST /availability` + `GET /availability/mine` + `DELETE /availability/:id` (mentor publishes slots), `GET /bookable` + `POST /book` (mentee books), `GET /` (my meetings), `PATCH /:id/status` (mark done / cancel with reason).
-- **Schedules (`/api/schedules`):** **org** templates `/org` (`program.manage`) — the shared library; **mentor** templates `/templates` (create/import/assign); per-mentee `/me`, `/mentee/:id`, slot edits. `schedulingService` powers availability + meetings.
+- **Schedules (`/api/schedules`):** **org** templates `/org` (`program.manage`) - the shared library; **mentor** templates `/templates` (create/import/assign); per-mentee `/me`, `/mentee/:id`, slot edits. `schedulingService` powers availability + meetings.
 
 ## Frontend
 - **Mentor:** `/mentor/schedules` (publish availability, manage templates, assign mentee schedules); meeting notes captured per 1:1.
-- **Mentee:** `/mentee/meetings` ("My Mentor") — see the mentor's open times, book a 1:1, view upcoming.
+- **Mentee:** `/mentee/meetings` ("My Mentor") - see the mentor's open times, book a 1:1, view upcoming.
 - **Admin:** `/admin/schedules` (org schedule templates).
 
 ## Role flows
@@ -29,7 +29,7 @@ config). See [DATABASE.md §10](../DATABASE.md).
 
 ## Rules & edge cases
 - A slot is single-use (`taken`/`takenBy`); booking marks it taken and creates a meeting.
-- Cancelling a meeting requires a reason, which is shown to the other party + emailed (see [Notifications](./notifications-and-email.md) — `meeting_cancelled`).
+- Cancelling a meeting requires a reason, which is shown to the other party + emailed (see [Notifications](./notifications-and-email.md) - `meeting_cancelled`).
 - Availability slots are de-duplicated per (mentor, date, time).
 
 ## Related

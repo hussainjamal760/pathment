@@ -26,7 +26,7 @@ module.exports = (sequelize, DataTypes) => {
     phone: {
       type: DataTypes.STRING(40)
     },
-    // The program the applicant asked for (free text from intake) — used for
+    // The program the applicant asked for (free text from intake) - used for
     // triage. Actual placement comes from the cohort's program on accept.
     programPreference: {
       type: DataTypes.STRING(255),
@@ -76,7 +76,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       field: 'user_id'
     },
-    // The full, schema-free intake answers — survives the form changing year to
+    // The full, schema-free intake answers - survives the form changing year to
     // year. Operational fields are normalized onto MenteeProfile at accept time.
     responses: {
       type: DataTypes.JSONB,

@@ -172,7 +172,7 @@ const columns: DataTableColumn<Enrollment>[] = [
     label: 'Program',
     render: (_, row) => (
       <div className="min-w-0">
-        <p className="text-sm text-slate-900 truncate max-w-[180px]">{row.program?.name ?? '—'}</p>
+        <p className="text-sm text-slate-900 truncate max-w-[180px]">{row.program?.name ?? '-'}</p>
       </div>
     ),
   },
@@ -182,7 +182,7 @@ const columns: DataTableColumn<Enrollment>[] = [
     render: (_, row) => (
       row.clan?.name
         ? <span className="text-sm text-slate-900 truncate max-w-[160px]">{row.clan.name}</span>
-        : <span className="text-slate-400 text-sm">—</span>
+        : <span className="text-slate-400 text-sm">-</span>
     ),
   },
   {
@@ -212,7 +212,7 @@ const columns: DataTableColumn<Enrollment>[] = [
         <span className="text-sm text-slate-600">
           {new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
-      ) : <span className="text-slate-400">—</span>,
+      ) : <span className="text-slate-400">-</span>,
   },
 ];
 // ─── Actions column is added inside the component to access state ─────────────
@@ -291,7 +291,7 @@ export default function EnrollmentOverviewPage() {
       const res = await enrollmentApi.approveCompletion(enrollmentId);
       const result = (res as any)?.data?.result;
       if (result?.autoPromoted) {
-        toast.success(`Level complete! Mentee advanced to "${result.nextLevelName}" — awaiting new mentor match.`);
+        toast.success(`Level complete! Mentee advanced to "${result.nextLevelName}" - awaiting new mentor match.`);
       } else if (result?.hasNextLevel === false) {
         toast.success('Program completed!');
       } else {
@@ -391,7 +391,7 @@ export default function EnrollmentOverviewPage() {
       {/* ── Header ── */}
       <PageHeader
         title="Enrollment Overview"
-        subtitle="Track mentee–mentor pairings and program progress"
+        subtitle="Track mentee-mentor pairings and program progress"
         backHref="/admin/dashboard"
         backLabel="Back to Dashboard"
         actions={

@@ -8,7 +8,7 @@ const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-
 const labelCls = 'block text-sm font-medium text-slate-700 mb-1';
 
 /**
- * CreateProgramDrawer — right-side slide-over to create a program, matching the
+ * CreateProgramDrawer - right-side slide-over to create a program, matching the
  * app's other create drawers (indigo/slate, accessible). On success it routes to
  * the new program where curriculum is authored as roadmaps.
  */
@@ -59,7 +59,7 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h2 id="create-program-title" className="font-semibold text-slate-900">Create program</h2>
-            <p className="text-sm text-slate-500">Set up the program — then author its roadmaps.</p>
+            <p className="text-sm text-slate-500">Set up the program - then author its roadmaps.</p>
           </div>
           <button onClick={onClose} aria-label="Close" className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
@@ -98,8 +98,8 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
           <div>
             <label htmlFor="cp-visibility" className={labelCls}>Visibility</label>
             <select id="cp-visibility" value={programData.visibility} onChange={(e) => setProgramData({ ...programData, visibility: e.target.value })} className={field}>
-              <option value="private">Private — invite-only, never browsed</option>
-              <option value="public">Public — discoverable by mentees</option>
+              <option value="private">Private - invite-only, never browsed</option>
+              <option value="public">Public - discoverable by mentees</option>
             </select>
             <p className="mt-1 text-xs text-slate-500">
               Private programs are reached only through invites or admin placement. Keep private unless you want a public catalog.

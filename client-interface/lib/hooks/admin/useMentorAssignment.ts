@@ -148,7 +148,7 @@ export function useMentorAssignment(): UseMentorAssignmentReturn {
       setMentorTotalPages(response?.pagination?.totalPages ?? 1);
       setMentorTotal(response?.pagination?.totalItems ?? 0);
     } catch {
-      // silent — search errors shouldn't block the page
+      // silent - search errors shouldn't block the page
     } finally {
       setMentorsLoading(false);
     }

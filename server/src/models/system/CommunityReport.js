@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CommunityReport — a member flags a post or comment for moderator (mentor /
+   * CommunityReport - a member flags a post or comment for moderator (mentor /
    * admin) attention. Polymorphic over post|comment via targetType/targetId.
    */
   const CommunityReport = sequelize.define('CommunityReport', {

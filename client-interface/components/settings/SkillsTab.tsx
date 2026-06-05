@@ -8,8 +8,8 @@ import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
 interface Picked { skillId: string; name: string; proficiencyLevel: number }
 
-// Proficiency: 4 clear levels stored as 1–100. New skills default to Intermediate
-// so nobody is forced to set a level — they can tap the pill to adjust.
+// Proficiency: 4 clear levels stored as 1-100. New skills default to Intermediate
+// so nobody is forced to set a level - they can tap the pill to adjust.
 const LEVELS = [
   { value: 25, label: 'Beginner', cls: 'bg-slate-100 text-slate-600' },
   { value: 50, label: 'Intermediate', cls: 'bg-sky-100 text-sky-700' },
@@ -22,9 +22,9 @@ const levelOf = (n: number) => LEVELS.reduce((b, l) => (Math.abs(l.value - n) < 
 /**
  * Fast Skills editor: type to search the catalog and add instantly (Enter or
  * click), one-tap suggested chips, and an inline level pill on each skill you
- * can tap to cycle. Auto-saves (debounced) — no Save button to remember.
+ * can tap to cycle. Auto-saves (debounced) - no Save button to remember.
  */
-export function SkillsTab({ heading = 'Your skills', blurb = 'Type to add skills — your level defaults to Intermediate; tap a level pill to change it.' }: { heading?: string; blurb?: string }) {
+export function SkillsTab({ heading = 'Your skills', blurb = 'Type to add skills - your level defaults to Intermediate; tap a level pill to change it.' }: { heading?: string; blurb?: string }) {
   const [catalog, setCatalog] = useState<Skill[]>([]);
   const [picked, setPicked] = useState<Picked[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +56,7 @@ export function SkillsTab({ heading = 'Your skills', blurb = 'Type to add skills
     return () => { active = false; };
   }, []);
 
-  // Auto-save (debounced) on any change — skip the initial server-populated set.
+  // Auto-save (debounced) on any change - skip the initial server-populated set.
   useEffect(() => {
     if (loading) return;
     if (firstRun.current) { firstRun.current = false; return; }
@@ -148,7 +148,7 @@ export function SkillsTab({ heading = 'Your skills', blurb = 'Type to add skills
 
       {/* Selected skills */}
       {picked.length === 0 ? (
-        <p className="text-sm text-slate-400">No skills yet — search above or tap a suggestion.</p>
+        <p className="text-sm text-slate-400">No skills yet - search above or tap a suggestion.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {picked.map((p) => {

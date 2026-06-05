@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * MeetingNote — a logged 1:1 (or standup/review/pairing) record: what was
+   * MeetingNote - a logged 1:1 (or standup/review/pairing) record: what was
    * discussed, the read on sentiment, issues raised, and next steps. Shows on
    * the mentee profile's 1:1 timeline. Standalone (may or may not link to a
    * booked ScheduledMeeting).

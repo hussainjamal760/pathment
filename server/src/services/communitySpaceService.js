@@ -11,7 +11,7 @@ const isAdmin = (user) => {
 const MENTOR_CLAN_ROLES = ['lead_mentor', 'co_mentor', 'core_team'];
 
 /**
- * Community spaces are not a table — they are *derived* from the relationships
+ * Community spaces are not a table - they are *derived* from the relationships
  * a user already has (ClanMembership, Enrollment). A space is one of:
  *   - clan     → a single clan's working space (members = active ClanMembership)
  *   - cohort   → an intake batch's space (mentees of the cohort + mentors of the
@@ -63,7 +63,7 @@ class CommunitySpaceService {
     const mentorProgramIds = new Set();
     const programNames = new Map();
 
-    // Clan spaces (the squad — most active).
+    // Clan spaces (the squad - most active).
     for (const m of memberships) {
       if (!m.clan) continue;
       const moderator = isAdmin(user) || MENTOR_CLAN_ROLES.includes(m.role);
@@ -140,7 +140,7 @@ class CommunitySpaceService {
       }
     }
 
-    // Global lounge — everyone.
+    // Global lounge - everyone.
     add({
       key: 'global',
       type: 'global',
@@ -221,7 +221,7 @@ class CommunitySpaceService {
       return [...ids];
     }
 
-    // global: not enumerated (too broad) — callers notify only @mentioned users.
+    // global: not enumerated (too broad) - callers notify only @mentioned users.
     return [];
   }
 

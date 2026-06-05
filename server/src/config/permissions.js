@@ -1,10 +1,10 @@
 /**
- * The permission vocabulary — the single source of truth for every action that
+ * The permission vocabulary - the single source of truth for every action that
  * can be authorized. Keep keys stable (they're persisted in role bundles and
  * checked in code). Grouped by domain for readability only.
  *
  * A permission answers "WHAT can you do"; the scope it's checked at (org /
- * program / clan / self) answers "ON WHAT" — see authzService.
+ * program / clan / self) answers "ON WHAT" - see authzService.
  */
 const PERMISSIONS = {
   // Programs & curriculum

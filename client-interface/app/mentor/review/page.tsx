@@ -129,7 +129,7 @@ export default function CohortReview() {
     try {
       setBusy(item.submissionId);
       await submissionService.reviewSubmission(item.submissionId, { rating: 5, feedbackText: 'Approved.', isApproved: true, decision: 'approved' });
-      toast.success('Approved — marked complete');
+      toast.success('Approved - marked complete');
       await refresh();
     } catch { toast.error('Could not approve'); } finally { setBusy(null); }
   }, [refresh]);
@@ -138,7 +138,7 @@ export default function CohortReview() {
     try {
       setBusy(item.submissionId);
       await submissionService.reviewSubmission(item.submissionId, { rating: 3, feedbackText: 'Please take another pass.', isApproved: false, decision: 'changes', revisionNotes: 'Please take another pass.' });
-      toast.success('Changes requested — sent back to the mentee');
+      toast.success('Changes requested - sent back to the mentee');
       await refresh();
     } catch { toast.error('Could not update'); } finally { setBusy(null); }
   }, [refresh]);
@@ -262,7 +262,7 @@ export default function CohortReview() {
                   <MomentumIcon m={mentee!.momentum} />
                   <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />{risk.label}</span>
                 </div>
-                <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '—'} · {mentee!.onTimeRate}% on-time</div>
+                <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '-'} · {mentee!.onTimeRate}% on-time</div>
               </div>
               <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5 shrink-0">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
             </div>
@@ -270,7 +270,7 @@ export default function CohortReview() {
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}
           </div>
 
-          {/* Assigned work — everything currently on this mentee's plate */}
+          {/* Assigned work - everything currently on this mentee's plate */}
           <div className="bg-card rounded-2xl border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
               <ListTodo className="w-4 h-4 text-brand-500" />
@@ -282,7 +282,7 @@ export default function CohortReview() {
               {tasksLoading ? (
                 <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
               ) : dayTasks.length === 0 ? (
-                <p className="text-sm text-slate-500 px-1 py-2">Nothing assigned yet — use Assign to give {mentee!.name.split(' ')[0]} their first task.</p>
+                <p className="text-sm text-slate-500 px-1 py-2">Nothing assigned yet - use Assign to give {mentee!.name.split(' ')[0]} their first task.</p>
               ) : (
                 <div className="space-y-4">
                   {taskGroups.map((g) => {
@@ -338,7 +338,7 @@ export default function CohortReview() {
             </div>
             <div className="p-4">
               {pending.length === 0 ? (
-                <p className="text-sm text-slate-500 flex items-center gap-2 px-1 py-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" />Nothing waiting — all clear.</p>
+                <p className="text-sm text-slate-500 flex items-center gap-2 px-1 py-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" />Nothing waiting - all clear.</p>
               ) : (
                 <div className="space-y-2">
                   {pending.map((item, i) => (

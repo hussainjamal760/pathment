@@ -51,7 +51,7 @@ const ensureCohortAssessment = catchAsync(async (req, res) => {
     return res.status(200).json(successResponse('Assessment ready', { assessment: existing }));
   }
   const assessment = await assessmentService.createAssessment(
-    { title: `${cohort.name} — assessment`, programId: cohort.programId },
+    { title: `${cohort.name} - assessment`, programId: cohort.programId },
     req.user.id
   );
   await cohortIntakeService.updateCohort(req.params.id, { assessmentId: assessment.id });

@@ -22,7 +22,7 @@ const GROUPS: Record<GroupKey, { title: string; blurb: string; accent: string; r
   },
   disengaged: {
     title: 'Disengaged',
-    blurb: 'Behind with little logged reason — effort looks like it’s dropping. Reach out early.',
+    blurb: 'Behind with little logged reason - effort looks like it’s dropping. Reach out early.',
     accent: 'text-red-700', ring: 'border-red-200',
   },
   watch: {
@@ -134,7 +134,7 @@ export default function MentorAtRisk() {
       <div>
         <h1 className="text-slate-900 mb-2">At risk</h1>
         <p className="text-slate-600">
-          {loading ? 'Loading…' : `${totalAtRisk} mentee${totalAtRisk === 1 ? '' : 's'} need a closer look — separated by whether real constraints explain it.`}
+          {loading ? 'Loading…' : `${totalAtRisk} mentee${totalAtRisk === 1 ? '' : 's'} need a closer look - separated by whether real constraints explain it.`}
         </p>
       </div>
 
@@ -147,7 +147,7 @@ export default function MentorAtRisk() {
         </div>
       ) : totalAtRisk === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center">
-          <p className="text-slate-600">Nobody&apos;s at risk right now — the whole cohort is on track.</p>
+          <p className="text-slate-600">Nobody&apos;s at risk right now - the whole cohort is on track.</p>
         </div>
       ) : (
         (['disengaged', 'struggling', 'watch'] as GroupKey[]).map((key) => {

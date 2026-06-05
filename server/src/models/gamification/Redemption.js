@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Redemption — a gift redeemed for a mentee by a mentor/admin. costXp is
+   * Redemption - a gift redeemed for a mentee by a mentor/admin. costXp is
    * snapshotted at redemption time.
    */
   const Redemption = sequelize.define('Redemption', {

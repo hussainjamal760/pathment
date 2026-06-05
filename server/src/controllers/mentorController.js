@@ -22,7 +22,7 @@ const getAllMentors = catchAsync(async (req, res) => {
     ]
   } : {};
 
-  // Build mentor profile include — optionally filter by accepting status
+  // Build mentor profile include - optionally filter by accepting status
   const mentorProfileInclude = {
     model: models.MentorProfile,
     as: 'mentorProfile',
@@ -120,7 +120,7 @@ const getMentorById = catchAsync(async (req, res) => {
       )
     : null;
 
-  // Fetch active matches — match must be active AND enrollment must not be terminated.
+  // Fetch active matches - match must be active AND enrollment must not be terminated.
   // Matches are sometimes left in 'active' state even after the enrollment reaches
   // program_completed or dropped, so we exclude those enrollment statuses explicitly.
   const TERMINAL_ENROLLMENT_STATUSES = ['program_completed', 'dropped', 'rejected', 'withdrawn'];

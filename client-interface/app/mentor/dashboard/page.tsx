@@ -65,7 +65,7 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
           <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
             <span>{m.level}</span>
             <span className="text-slate-300">·</span>
-            <span>Wk {m.week}/{m.totalWeeks || '—'}</span>
+            <span>Wk {m.week}/{m.totalWeeks || '-'}</span>
             <span className="text-slate-300">·</span>
             <Clock className="w-3 h-3" />
             <span>{m.lastActive}</span>
@@ -214,8 +214,8 @@ export default function MentorCockpit() {
           <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-600">
             {cohort.length === 0
-              ? "No mentees in your cohort yet — they'll appear here once assigned to a clan you mentor."
-              : 'No mentees match this filter — nice and quiet.'}
+              ? "No mentees in your cohort yet - they'll appear here once assigned to a clan you mentor."
+              : 'No mentees match this filter - nice and quiet.'}
           </p>
         </div>
       ) : (

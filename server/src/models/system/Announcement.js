@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Announcement — an org broadcast (one source of truth, replacing scattered
+   * Announcement - an org broadcast (one source of truth, replacing scattered
    * threads). Audience is 'all' or a specific programId. Can be pinned.
    */
   const Announcement = sequelize.define('Announcement', {

@@ -72,7 +72,7 @@ export default function LibraryView({ canCurate = false }: { canCurate?: boolean
           <h1 className="text-slate-900 mb-1">Library</h1>
           <p className="text-slate-600">
             {canCurate
-              ? 'Write and share mentoring guidance, templates, reading and policies — the team’s shared playbook.'
+              ? 'Write and share mentoring guidance, templates, reading and policies - the team’s shared playbook.'
               : 'Guidance, templates, reading and policies shared by your mentors and the team.'}
           </p>
         </div>
@@ -309,7 +309,7 @@ function EditorDrawer({ doc, onClose, onSaved }: { doc: LibraryDoc | null; onClo
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Read time (min)</label>
-            <input type="number" min={0} value={readMins} onChange={(e) => setReadMins(e.target.value)} placeholder="—" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card" />
+            <input type="number" min={0} value={readMins} onChange={(e) => setReadMins(e.target.value)} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card" />
           </div>
         </div>
       </div>

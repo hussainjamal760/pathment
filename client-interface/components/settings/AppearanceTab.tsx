@@ -10,7 +10,7 @@ const MODES: { key: ThemeMode; label: string; Icon: typeof Sun }[] = [
 ];
 
 /**
- * Appearance settings — "Pick your vibe". A grid of accent presets that recolor
+ * Appearance settings - "Pick your vibe". A grid of accent presets that recolor
  * the whole app instantly (via ThemeContext → CSS vars) and persist per-user
  * (localStorage + server). Each preset only swaps the brand scale, so contrast,
  * neutrals and status colors are always safe.
@@ -39,7 +39,7 @@ export function AppearanceTab() {
       <div>
         <h2 className="text-slate-900 flex items-center gap-2"><Palette className="w-4 h-4 text-brand-500" />Pick your vibe</h2>
         <p className="text-slate-600 text-sm mt-1">
-          Choose an accent that feels like you — it recolors your whole experience instantly and saves to your account.
+          Choose an accent that feels like you - it recolors your whole experience instantly and saves to your account.
         </p>
       </div>
 
@@ -80,7 +80,7 @@ export function AppearanceTab() {
       <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-3">
         <Sparkles className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
         <p className="text-sm text-slate-600">
-          Your pick follows you across devices. It only changes the accent — text, surfaces and status colors stay clear and readable.
+          Your pick follows you across devices. It only changes the accent - text, surfaces and status colors stay clear and readable.
         </p>
       </div>
     </div>

@@ -13,7 +13,7 @@ export interface RolePrefs {
   /**
    * True only when the user EXPLICITLY reordered via customize→move. Legacy prefs
    * (older builds auto-froze `order` on pin) lack this, so we ignore their order
-   * and fall back to adaptive — auto-migrating them without clearing storage.
+   * and fall back to adaptive - auto-migrating them without clearing storage.
    */
   manual?: boolean;
 }

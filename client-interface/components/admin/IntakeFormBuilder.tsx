@@ -54,7 +54,7 @@ export function IntakeFormBuilder({
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500">
-        Name and email are always collected. Add anything else here — <span className="text-brand-700 font-medium">profile fields</span> carry
+        Name and email are always collected. Add anything else here - <span className="text-brand-700 font-medium">profile fields</span> carry
         straight to the mentee&apos;s profile (no re-typing later); custom questions are kept for your review.
       </p>
 

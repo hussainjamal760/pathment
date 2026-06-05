@@ -155,7 +155,7 @@ export default function MenteeSettings() {
           {/* Appearance Tab */}
           {activeTab === 'appearance' && <AppearanceTab />}
 
-          {/* Learning profile — folded into the Profile tab (no separate tab) */}
+          {/* Learning profile - folded into the Profile tab (no separate tab) */}
           {activeTab === 'profile' && (
             <div className="space-y-6 pt-8 mt-8 border-t border-slate-100 dark:border-slate-700">
               <div>

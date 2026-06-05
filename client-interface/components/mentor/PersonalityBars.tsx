@@ -12,7 +12,7 @@ const DIMS: { key: keyof Personality; label: string }[] = [
 ];
 
 /**
- * Working-style read (4 dims, 0–100). Read-only by default; pass onSave to make
+ * Working-style read (4 dims, 0-100). Read-only by default; pass onSave to make
  * it editable (mentor profile). Faithful to the prototype's Personality model.
  */
 export function PersonalityBars({
@@ -71,7 +71,7 @@ export function PersonalityBars({
           </div>
         </div>
       ) : !hasAny ? (
-        <p className="text-sm text-slate-500">Not assessed yet{onSave ? ' — set it from your 1:1s and observations.' : '.'}</p>
+        <p className="text-sm text-slate-500">Not assessed yet{onSave ? ' - set it from your 1:1s and observations.' : '.'}</p>
       ) : (
         <div className="space-y-3">
           {DIMS.map((d) => {
@@ -80,7 +80,7 @@ export function PersonalityBars({
               <div key={d.key}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs text-slate-600">{d.label}</span>
-                  <span className="text-xs font-semibold text-slate-700 tabular-nums">{v ?? '—'}</span>
+                  <span className="text-xs font-semibold text-slate-700 tabular-nums">{v ?? '-'}</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                   <div className="h-full rounded-full bg-brand-500" style={{ width: `${v ?? 0}%` }} />

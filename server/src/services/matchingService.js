@@ -242,7 +242,7 @@ class MatchingService {
     return suggestions.sort((a, b) => b.matchScore - a.matchScore);
   }
 
-  /** Candidate mentors for matching — all active mentors (no level gating). */
+  /** Candidate mentors for matching - all active mentors (no level gating). */
   async getCandidateMentors() {
     const mentors = await models.User.findAll({
       where: { role: 'mentor' },
@@ -558,8 +558,8 @@ class MatchingService {
    * Auto-match all pending enrollments using AI suggestions.
    * Takes the top-scored mentor for each pending_match enrollment.
    *
-   * @param {string|null} programId  – optionally scope to a single program
-   * @param {string}      matchedBy  – admin user id performing the action
+   * @param {string|null} programId  - optionally scope to a single program
+   * @param {string}      matchedBy  - admin user id performing the action
    * @returns {{ matched, skipped, failed, summary }}
    */
   async autoMatchPending(programId, matchedBy) {

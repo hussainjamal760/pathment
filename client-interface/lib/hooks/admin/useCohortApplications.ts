@@ -93,7 +93,7 @@ export function useCohortApplications(cohortId: string) {
   const acceptApplication = useCallback(async (id: string, clanId?: string) => {
     try {
       await applicationApi.accept(id, clanId);
-      toast.success('Accepted — invite issued to the applicant');
+      toast.success('Accepted - invite issued to the applicant');
       await refetch();
     } catch (err) {
       toast.error(extractApiErrorMessage(err, 'Failed to accept application'));

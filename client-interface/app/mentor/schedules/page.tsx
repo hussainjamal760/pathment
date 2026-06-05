@@ -127,7 +127,7 @@ function AssignModal({ template, cohort, onClose }: { template: ScheduleTemplate
       open
       onClose={onClose}
       title={`Assign "${template.name}"`}
-      subtitle="Seeds each mentee's day with these blocks as empty slots — fill them in the Fill schedules tab."
+      subtitle="Seeds each mentee's day with these blocks as empty slots - fill them in the Fill schedules tab."
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
@@ -170,7 +170,7 @@ function FillTab() {
       const startedId = res?.data?.slot?.chainStarted;
       if (startedId) {
         const rm = local.find((r) => r.id === startedId);
-        toast.success(`Slot saved — started "${rm?.name || 'roadmap'}" for this mentee`);
+        toast.success(`Slot saved - started "${rm?.name || 'roadmap'}" for this mentee`);
       } else {
         toast.success('Slot saved');
       }
@@ -189,7 +189,7 @@ function FillTab() {
 
       {!menteeId ? <p className="text-sm text-slate-500">Pick a mentee to fill their slots.</p>
         : loading ? <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
-        : slots.length === 0 ? <p className="text-sm text-slate-500">No schedule assigned yet — assign a template first.</p>
+        : slots.length === 0 ? <p className="text-sm text-slate-500">No schedule assigned yet - assign a template first.</p>
         : (
           <div className="space-y-3">
             {slots.map((s) => (
@@ -268,7 +268,7 @@ function AvailabilityTab() {
     try {
       setBusyId(cancelFor.id);
       await meetingsApi.updateStatus(cancelFor.id, 'cancelled', cancelReason.trim() || undefined);
-      toast.success('1:1 cancelled — the mentee has been notified');
+      toast.success('1:1 cancelled - the mentee has been notified');
       setCancelFor(null); setCancelReason(''); refetch();
     } catch { toast.error('Could not cancel'); } finally { setBusyId(null); }
   };
@@ -340,7 +340,7 @@ function AvailabilityTab() {
           onChange={(e) => setCancelReason(e.target.value)}
           rows={4}
           maxLength={1000}
-          placeholder="e.g. Something urgent came up — let's rebook for later this week."
+          placeholder="e.g. Something urgent came up - let's rebook for later this week."
           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
         />
         <p className="mt-2 text-xs text-slate-400">A short reason helps your mentee understand and rebook. The slot is freed so they can book again.</p>

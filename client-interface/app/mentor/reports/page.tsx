@@ -34,8 +34,8 @@ const avg = (arr: number[]) => (arr.length ? arr.reduce((a, b) => a + b, 0) / ar
 function nextStep(m: CohortMentee): string {
   if (m.openBlockers > 0) return `Clear ${m.openBlockers} blocker${m.openBlockers > 1 ? 's' : ''}`;
   if (m.pendingApprovals > 0) return `Review ${m.pendingApprovals} submission${m.pendingApprovals > 1 ? 's' : ''}`;
-  if (m.relativeProgress - m.absoluteProgress >= 15) return 'Falling behind pace — check in';
-  if (m.momentum === 'down') return 'Going quiet — reach out';
+  if (m.relativeProgress - m.absoluteProgress >= 15) return 'Falling behind pace - check in';
+  if (m.momentum === 'down') return 'Going quiet - reach out';
   return 'Check in';
 }
 
@@ -78,7 +78,7 @@ export default function MentorReports() {
   const [activity, setActivity] = useState<PeriodActivity | null>(null);
   const [activityLoading, setActivityLoading] = useState(true);
 
-  // Period-scoped throughput — refetches when the week/month toggle changes.
+  // Period-scoped throughput - refetches when the week/month toggle changes.
   useEffect(() => {
     let cancelled = false;
     setActivityLoading(true);
@@ -122,10 +122,10 @@ export default function MentorReports() {
 
     const actions: string[] = [];
     if (pending > 0) actions.push(`Clear ${pending} pending review${pending > 1 ? 's' : ''} in your approvals queue.`);
-    if (high.length) actions.push(`Prioritise ${high.map((m) => firstName(m.name)).join(', ')} — flagged at risk.`);
+    if (high.length) actions.push(`Prioritise ${high.map((m) => firstName(m.name)).join(', ')} - flagged at risk.`);
     if (openBlockers > 0) actions.push(`Help unblock ${openBlockers} open blocker${openBlockers > 1 ? 's' : ''} across the cohort.`);
     if (slipping > 0) actions.push(`Re-engage ${slipping} mentee${slipping > 1 ? 's' : ''} whose momentum is slipping.`);
-    if (!actions.length) actions.push('Cohort is healthy — keep the steady cadence and celebrate the wins.');
+    if (!actions.length) actions.push('Cohort is healthy - keep the steady cadence and celebrate the wins.');
 
     const band = bandFor(health);
     const overview =
@@ -143,7 +143,7 @@ export default function MentorReports() {
   const copy = async () => {
     if (!report) return;
     const lines = [
-      `COHORT REPORT — this ${period}${user?.firstName ? ` · ${user.firstName}` : ''}`,
+      `COHORT REPORT - this ${period}${user?.firstName ? ` · ${user.firstName}` : ''}`,
       '='.repeat(48),
       '',
       report.overview,
@@ -159,11 +159,11 @@ export default function MentorReports() {
       `Open work: ${report.pending} pending review${report.pending === 1 ? '' : 's'}, ${report.openBlockers} blocker${report.openBlockers === 1 ? '' : 's'}`,
       '',
       'TOP PERFORMERS',
-      ...report.highlights.map((m) => `  • ${m.name} — ${pct(m.absoluteProgress)} progress, ${pct(m.onTimeRate)} on time${m.avgRating > 0 ? `, ${m.avgRating}★` : ''}`),
+      ...report.highlights.map((m) => `  • ${m.name} - ${pct(m.absoluteProgress)} progress, ${pct(m.onTimeRate)} on time${m.avgRating > 0 ? `, ${m.avgRating}★` : ''}`),
       '',
       'NEEDS ATTENTION',
       ...(report.atRisk.length
-        ? report.atRisk.map((m) => `  • ${m.name} (${m.risk}) — ${m.riskReason || 'flagged'} → ${nextStep(m)}`)
+        ? report.atRisk.map((m) => `  • ${m.name} (${m.risk}) - ${m.riskReason || 'flagged'} → ${nextStep(m)}`)
         : ['  • Nobody flagged right now.']),
       '',
       'RECOMMENDED ACTIONS',
@@ -181,9 +181,9 @@ export default function MentorReports() {
       setAiLoading(true);
       const res = await mentorApi.getCohortReportSummary(period);
       const text = res?.data?.summary ?? res?.summary ?? '';
-      if (!text) { toast.error('The model returned an empty draft — try again'); return; }
+      if (!text) { toast.error('The model returned an empty draft - try again'); return; }
       setAiDraft(text);
-      toast.success('Draft ready — edit it, then copy or print');
+      toast.success('Draft ready - edit it, then copy or print');
     } catch (err) {
       toast.error(extractApiErrorMessage(err, 'Could not draft the summary. Check Settings → AI Connections.'));
     } finally {
@@ -205,7 +205,7 @@ export default function MentorReports() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-slate-900 mb-1">Cohort report</h1>
-          <p className="text-slate-600">A ready-to-share read of how your mentees are doing — drop it into your update.</p>
+          <p className="text-slate-600">A ready-to-share read of how your mentees are doing - drop it into your update.</p>
         </div>
         <div className="no-print flex flex-wrap items-center gap-2 shrink-0">
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
@@ -250,7 +250,7 @@ export default function MentorReports() {
         <div id="cohort-report" className="space-y-6">
           {/* Print-only header (the on-screen title/controls are hidden when printing) */}
           <div className="hidden print:block mb-2">
-            <h1 className="text-xl font-bold text-slate-900">Cohort report — this {period}</h1>
+            <h1 className="text-xl font-bold text-slate-900">Cohort report - this {period}</h1>
             <p className="text-sm text-slate-500">{user?.firstName ? `${user.firstName} · ` : ''}{new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
 
@@ -285,7 +285,7 @@ export default function MentorReports() {
             </div>
           )}
 
-          {/* Executive summary — health + distribution */}
+          {/* Executive summary - health + distribution */}
           <div className={`rounded-2xl border p-6 ${report.band.soft}`}>
             <div className="flex flex-col sm:flex-row sm:items-center gap-5">
               {/* Health score */}
@@ -330,7 +330,7 @@ export default function MentorReports() {
             </div>
           </div>
 
-          {/* Period-scoped throughput — driven by the week/month toggle */}
+          {/* Period-scoped throughput - driven by the week/month toggle */}
           <div className="bg-card rounded-2xl border border-slate-200 p-6">
             <div className="flex items-center justify-between gap-2 mb-4">
               <h2 className="text-slate-900 flex items-center gap-2"><Activity className="w-4 h-4 text-brand-500" />This {period}</h2>
@@ -344,7 +344,7 @@ export default function MentorReports() {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   { label: 'Tasks completed', value: String(activity.tasksCompleted), sub: `${activity.onTime} on time` },
-                  { label: 'On-time this period', value: activity.tasksCompleted ? `${activity.onTimeRate}%` : '—', sub: activity.tasksCompleted ? 'of completed tasks' : 'nothing completed yet' },
+                  { label: 'On-time this period', value: activity.tasksCompleted ? `${activity.onTimeRate}%` : '-', sub: activity.tasksCompleted ? 'of completed tasks' : 'nothing completed yet' },
                   { label: 'Active mentees', value: `${activity.activeMentees}/${activity.totalMentees}`, sub: 'submitted or finished work' },
                   { label: 'Blockers', value: `${activity.blockersOpened} new`, sub: `${activity.blockersResolved} resolved` },
                 ].map((c) => (
@@ -358,14 +358,14 @@ export default function MentorReports() {
             )}
           </div>
 
-          {/* Current standing (snapshot — not period-scoped) */}
+          {/* Current standing (snapshot - not period-scoped) */}
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-2 px-1">Current standing</p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
                 { label: 'Avg progress', value: `${report.avgProgress}%`, sub: 'through their programs' },
                 { label: 'On-time delivery', value: `${report.avgOnTime}%`, sub: 'all-time, tasks on due date' },
-                { label: 'Work quality', value: report.avgRating ? `${report.avgRating}★` : '—', sub: report.avgRating ? 'avg task rating' : 'no ratings yet' },
+                { label: 'Work quality', value: report.avgRating ? `${report.avgRating}★` : '-', sub: report.avgRating ? 'avg task rating' : 'no ratings yet' },
                 { label: 'Needs attention', value: String(report.atRisk.length), sub: `of ${report.size} mentees` },
               ].map((c) => (
                 <div key={c.label} className="rounded-2xl bg-card border border-slate-200 px-4 py-4">
@@ -452,7 +452,7 @@ export default function MentorReports() {
             <h2 className="text-slate-900 mb-4 flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-red-500" />Needs attention</h2>
             {report.atRisk.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Check className="w-4 h-4 text-emerald-500" />Nobody’s flagged right now — nice work.
+                <Check className="w-4 h-4 text-emerald-500" />Nobody’s flagged right now - nice work.
               </div>
             ) : (
               <div className="space-y-2">

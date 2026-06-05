@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Assessment — an admin-built test attached (optionally) to a cohort's intake.
+   * Assessment - an admin-built test attached (optionally) to a cohort's intake.
    * It holds a set of mixed-type questions (MCQ auto-graded, text, file upload,
    * external link). Reusable across cohorts of the same program.
    */

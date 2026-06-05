@@ -20,12 +20,12 @@ function redisOptions() {
 }
 
 // Bull opens 3 Redis connections and runs two background timers:
-//   stalledInterval — scans active jobs for stalls (default: 5 s)
-//   guardInterval   — checks the delayed queue          (default: 5 s)
+//   stalledInterval - scans active jobs for stalls (default: 5 s)
+//   guardInterval   - checks the delayed queue          (default: 5 s)
 // On Upstash free tier (10 k commands/day) those defaults burn ~4 ops/5 s
 // continuously, even with zero jobs. We stretch both to 10 minutes.
 // Immediate jobs are still processed the instant they arrive because
-// the worker uses BRPOPLPUSH — not polling — to pick up waiting jobs.
+// the worker uses BRPOPLPUSH - not polling - to pick up waiting jobs.
 const FIVE_MINUTES = 5 * 60 * 1000;
 
 const inviteEmailQueue = new Queue('pathment:invite-emails', {
@@ -38,7 +38,7 @@ const inviteEmailQueue = new Queue('pathment:invite-emails', {
   defaultJobOptions: {
     attempts: 3,
     backoff: { type: 'exponential', delay: 10000 },
-    // Delete jobs from Redis as soon as they finish — no keys left behind.
+    // Delete jobs from Redis as soon as they finish - no keys left behind.
     removeOnComplete: true,
     removeOnFail: true,
   },

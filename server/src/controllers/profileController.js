@@ -273,7 +273,7 @@ await user.update({
         : user.languages
     });
 
-    // Timezone lives on user_settings — upsert it so the location form saves in one go.
+    // Timezone lives on user_settings - upsert it so the location form saves in one go.
     if (timezone !== undefined && timezone !== null && String(timezone).trim()) {
       const [settings] = await models.UserSettings.findOrCreate({ where: { userId }, defaults: { userId } });
       await settings.update({ timezone: String(timezone).trim() });

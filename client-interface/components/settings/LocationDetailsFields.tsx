@@ -17,7 +17,7 @@ interface Props {
 
 const FIELD = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm';
 
-// A reasonable timezone list — falls back gracefully if the runtime lacks Intl.supportedValuesOf.
+// A reasonable timezone list - falls back gracefully if the runtime lacks Intl.supportedValuesOf.
 function tzList(): string[] {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,7 @@ function tzList(): string[] {
 /**
  * Shared "Location & details" block for every role's Settings → Profile tab:
  * city, country, spoken languages (chips), and timezone (datalist of IANA zones).
- * Controlled — the parent owns the values and persists them via PUT /api/profile.
+ * Controlled - the parent owns the values and persists them via PUT /api/profile.
  */
 export function LocationDetailsFields({ value, onChange }: Props) {
   const [langDraft, setLangDraft] = useState('');

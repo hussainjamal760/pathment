@@ -140,7 +140,7 @@ export default function AdminRoadmapsPage() {
               {/* full step list */}
               <div className="mt-3 border-t border-slate-100 pt-2 flex-1">
                 {r.steps.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-2">No steps yet — edit to add some.</p>
+                  <p className="text-sm text-slate-400 py-2">No steps yet - edit to add some.</p>
                 ) : (
                   [...r.steps].sort((a, b) => a.taskOrder - b.taskOrder).map((s, i) => <StepLine key={s.id} step={s} n={i + 1} />)
                 )}
@@ -265,7 +265,7 @@ function EditDrawer({ roadmap, hub, onClose }: { roadmap: OrgRoadmap; hub: Retur
               <button onClick={() => setRemovedIds((prev) => [...prev, s.id])} aria-label="Remove step" className="p-1 text-slate-400 hover:text-red-600 shrink-0"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
-          {existing.length === 0 && newSteps.length === 0 && <p className="text-sm text-slate-400">No steps — add one below.</p>}
+          {existing.length === 0 && newSteps.length === 0 && <p className="text-sm text-slate-400">No steps - add one below.</p>}
         </div>
 
         {newSteps.length > 0 && (

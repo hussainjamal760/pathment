@@ -48,7 +48,7 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
       if (matches.length > 0) {
         setMatch(matches[0]);
       } else {
-        // Clan-placed mentees have no MentorMenteeMatch — resolve them via their
+        // Clan-placed mentees have no MentorMenteeMatch - resolve them via their
         // enrollment instead so the page works for the clan model.
         const enrRes: any = await enrollmentApi.getAll({ menteeId });
         const enrollments = enrRes?.data?.enrollments || enrRes?.data || [];
@@ -83,7 +83,7 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
       const result = (res as any)?.data?.result;
       if (result?.autoPromoted) {
         toast.success(
-          `Level complete! Mentee advanced to "${result.nextLevelName}" — awaiting new mentor match.`
+          `Level complete! Mentee advanced to "${result.nextLevelName}" - awaiting new mentor match.`
         );
       } else if (result?.hasNextLevel === false) {
         toast.success('Program completed! Well done.');
@@ -104,7 +104,7 @@ export function useMenteeDetailPage(menteeId: string): UseMenteeDetailPageReturn
     try {
       setCompletionLoading(true);
       await enrollmentApi.rejectCompletion(enrollment.id, rejectReason);
-      toast.success('Completion request rejected — mentee returned to active');
+      toast.success('Completion request rejected - mentee returned to active');
       setShowRejectModal(false);
       setRejectReason('');
       fetchMenteeDetails();

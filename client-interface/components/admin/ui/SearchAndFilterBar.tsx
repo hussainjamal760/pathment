@@ -59,7 +59,7 @@ export function SearchAndFilterBar({
           )}
         </div>
 
-        {/* Dynamic filter dropdowns — consistent, always anchored to the trigger. */}
+        {/* Dynamic filter dropdowns - consistent, always anchored to the trigger. */}
         {filters.map((filter, i) => (
           <SelectMenu
             key={i}

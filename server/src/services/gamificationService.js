@@ -329,7 +329,7 @@ class GamificationService {
   }
 
   /**
-   * Leaderboard ranked by points EARNED IN THE PERIOD — computed live from the
+   * Leaderboard ranked by points EARNED IN THE PERIOD - computed live from the
    * PointsHistory ledger so daily/weekly/monthly are actually different from
    * all-time (they previously all showed the same all-time rank).
    */

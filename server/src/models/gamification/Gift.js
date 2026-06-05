@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Gift — a redeemable item in the rewards catalog (swag, course credit, a
+   * Gift - a redeemable item in the rewards catalog (swag, course credit, a
    * 1:1, a conference ticket…). costXp is the headline price; stock null = ∞.
    */
   const Gift = sequelize.define('Gift', {

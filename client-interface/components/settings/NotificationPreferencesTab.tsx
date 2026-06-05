@@ -18,7 +18,7 @@ function Toggle({ checked, disabled, onChange }: { checked: boolean; disabled?: 
 }
 
 /**
- * Notification preferences that ACTUALLY gate email delivery — toggles map to
+ * Notification preferences that ACTUALLY gate email delivery - toggles map to
  * the server's `emailNotifications` keys (the notification matrix). Transactional
  * mail (password reset, account/invite) always sends and isn't shown here.
  * Shared across admin / mentor / mentee.
@@ -73,7 +73,7 @@ export function NotificationPreferencesTab({ role }: { role: AppRole }) {
           <Mail className="w-5 h-5 text-brand-600" />
           <div>
             <div className="text-slate-900 font-medium">Email notifications</div>
-            <div className="text-sm text-slate-600">Master switch — turn all of the below on or off.</div>
+            <div className="text-sm text-slate-600">Master switch - turn all of the below on or off.</div>
           </div>
         </div>
         <Toggle checked={masterOn} onChange={(v) => set('enabled', v)} />

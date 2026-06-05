@@ -1,6 +1,6 @@
 # Gamification
 
-**What it is:** the motivation layer — **points/XP**, **badges**, **challenges**,
+**What it is:** the motivation layer - **points/XP**, **badges**, **challenges**,
 **leaderboards**, and a **gift catalog** mentees redeem XP for.
 
 **Why it exists:** long programs need momentum. Points and badges reward consistent progress;

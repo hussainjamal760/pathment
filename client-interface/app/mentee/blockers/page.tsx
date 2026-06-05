@@ -93,7 +93,7 @@ export default function MenteeBlockers() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Flag className="w-5 h-5 text-brand-600" /> Blockers</h1>
-          <p className="text-slate-600">What&apos;s slowing you down — your mentor can see these and help you clear them.</p>
+          <p className="text-slate-600">What&apos;s slowing you down - your mentor can see these and help you clear them.</p>
         </div>
         <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> Add blocker
@@ -105,7 +105,7 @@ export default function MenteeBlockers() {
       ) : blockers.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-14 text-center">
           <span className="grid h-11 w-11 place-items-center rounded-xl border border-emerald-200 text-emerald-600 mx-auto mb-3"><CheckCircle2 className="w-6 h-6" /></span>
-          <p className="text-slate-700 font-medium">No blockers right now — clear runway.</p>
+          <p className="text-slate-700 font-medium">No blockers right now - clear runway.</p>
           <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">If anything starts to slow you down, log it here. Flagging early helps your mentor support you.</p>
         </div>
       ) : (
@@ -159,7 +159,7 @@ function AddBlockerModal({ tasks, onClose, onAdded }: { tasks: TaskOpt[]; onClos
       open
       onClose={onClose}
       title="Log a blocker"
-      subtitle="What's slowing you down — your mentor can see this and help."
+      subtitle="What's slowing you down - your mentor can see this and help."
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
@@ -178,7 +178,7 @@ function AddBlockerModal({ tasks, onClose, onAdded }: { tasks: TaskOpt[]; onClos
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1"><Link2 className="w-3.5 h-3.5 text-slate-400" />Which task? <span className="text-slate-400 font-normal">(optional)</span></label>
             <select value={taskId} onChange={(e) => setTaskId(e.target.value)} className={field}>
-              <option value="">General — not task-specific</option>
+              <option value="">General - not task-specific</option>
               {tasks.map((t) => <option key={t.id} value={t.id}>{t.title}</option>)}
             </select>
           </div>

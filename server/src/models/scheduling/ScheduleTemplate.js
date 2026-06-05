@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * ScheduleTemplate — a reusable day-shape: an ordered set of named time
+   * ScheduleTemplate - a reusable day-shape: an ordered set of named time
    * blocks (PURE STRUCTURE, no tasks/roadmaps). Org templates are inheritable;
    * mentors own their own. Assigning a template to a mentee seeds their
    * per-mentee Schedule (see MenteeSchedule), which is then filled per slot.

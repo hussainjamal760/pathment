@@ -377,11 +377,11 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                   </div>
                   <div>
                     <p className="text-orange-700 font-medium">Reason</p>
-                    <p className="text-orange-900">{pendingExtension.extensionReason || '—'}</p>
+                    <p className="text-orange-900">{pendingExtension.extensionReason || '-'}</p>
                   </div>
                   <div>
                     <p className="text-orange-700 font-medium">Current Due Date</p>
-                    <p className="text-orange-900">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '—'}</p>
+                    <p className="text-orange-900">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}</p>
                   </div>
                   {task.dueDate && pendingExtension.extensionDays && (
                     <div>
@@ -421,7 +421,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
               <div className="pt-2 border-t border-orange-200 space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-orange-800 mb-1">
-                    Override new due date <span className="text-orange-500 font-normal">(optional — leave blank to use +{pendingExtension.extensionDays} days)</span>
+                    Override new due date <span className="text-orange-500 font-normal">(optional - leave blank to use +{pendingExtension.extensionDays} days)</span>
                   </label>
                   <input
                     type="date"

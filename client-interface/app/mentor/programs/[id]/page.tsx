@@ -78,7 +78,7 @@ function ClanCard({ clan }: { clan: ProgramClanDetail }) {
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 mb-2">Mentees</p>
           {clan.mentees.length === 0 ? (
-            <p className="text-sm text-slate-500 py-2">No mentees placed in this clan yet — they'll appear here once enrolled.</p>
+            <p className="text-sm text-slate-500 py-2">No mentees placed in this clan yet - they'll appear here once enrolled.</p>
           ) : (
             <div className="grid sm:grid-cols-2 gap-2">
               {clan.mentees.map((m) => <PersonRow key={m.id} person={m} />)}

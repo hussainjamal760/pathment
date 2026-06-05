@@ -5,7 +5,7 @@
  *     User / MenteeProfile at registration (so the mentee never re-enters it).
  *     Keep these keys in sync with server/src/config/intakeProfileFields.js.
  *   - CUSTOM questions use a `q_`-prefixed key and just live in `responses` for
- *     triage — they never collide with a profile key.
+ *     triage - they never collide with a profile key.
  */
 
 export type IntakeFieldType =

@@ -17,7 +17,7 @@ export interface SubmitTaskTarget {
 }
 
 /**
- * In-context task submission — opens as the shared side Drawer right where the
+ * In-context task submission - opens as the shared side Drawer right where the
  * mentee is (no navigating away). Shows the same "what your mentor checks"
  * required/nice-to-have split they'll be graded on, then collects work.
  */
@@ -61,7 +61,7 @@ export function SubmitTaskDrawer({
         extensionRequested: false,
         timeSpentHours: timeSpent ? parseFloat(timeSpent) : undefined,
       });
-      toast.success(isResubmit ? 'Re-submitted — your mentor will take another look' : 'Submitted! Your mentor will review it shortly');
+      toast.success(isResubmit ? 'Re-submitted - your mentor will take another look' : 'Submitted! Your mentor will review it shortly');
       reset();
       onSubmitted?.();
       onClose();
@@ -79,7 +79,7 @@ export function SubmitTaskDrawer({
       open={open && !!task}
       onClose={onClose}
       title={`${isResubmit ? 'Re-submit' : 'Submit'} · ${task?.title ?? 'Task'}`}
-      subtitle="Share your work — link, notes, or files."
+      subtitle="Share your work - link, notes, or files."
       width="md"
       footer={
         <>
@@ -91,7 +91,7 @@ export function SubmitTaskDrawer({
       }
     >
       <div className="space-y-5">
-        {/* What passes — same bar the mentor grades against */}
+        {/* What passes - same bar the mentor grades against */}
         {criteria.length > 0 && (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <h3 className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-brand-500" />What your mentor checks</h3>

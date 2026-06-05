@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * AIConnection — an admin-configured AI provider key (bring-your-own-key).
+   * AIConnection - an admin-configured AI provider key (bring-your-own-key).
    * The raw key is stored encrypted (keyEncrypted) and never returned; the UI
    * only ever sees keyMasked (e.g. 'gsk_••••7f3a'). Feature→connection routing
    * lives in system_settings under 'ai.routing'.

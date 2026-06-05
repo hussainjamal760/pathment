@@ -110,7 +110,7 @@ class AuthService {
         throw new ConflictError(AUTH_MESSAGES.EMAIL_ALREADY_EXISTS);
       }
 
-      // Carry forward whatever the applicant already gave at intake — so they
+      // Carry forward whatever the applicant already gave at intake - so they
       // never re-type it. Map the linked application's answers onto the user +
       // mentee profile, and skip the onboarding steps they've effectively done.
       const application = await models.Application.findOne({ where: { inviteId: invite.id }, transaction });
@@ -133,7 +133,7 @@ class AuthService {
         ...userPatch,
         // Skip the profile step of onboarding when intake already captured it.
         onboardingStep: role === 'mentee' && coreProfileKnown ? 1 : 0,
-        // Email is already proven valid — invite was sent to this exact address
+        // Email is already proven valid - invite was sent to this exact address
         emailVerified: true,
         emailVerifiedAt: new Date(),
         status: 'active'
@@ -165,7 +165,7 @@ class AuthService {
 
       await models.UserSettings.create({ userId: user.id }, { transaction });
 
-      // The invite is the placement — enroll/place strictly from the token,
+      // The invite is the placement - enroll/place strictly from the token,
       // never from anything the registrant sent. Stale placement (program/clan
       // deleted after the invite was issued) degrades gracefully.
       if (role === 'mentee' && invite.programId) {

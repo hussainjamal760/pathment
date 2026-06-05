@@ -15,9 +15,9 @@ function timeAgo(iso: string): string {
 }
 
 /**
- * Shared announcement feed — pinned-first cards with audience labels + reactions.
+ * Shared announcement feed - pinned-first cards with audience labels + reactions.
  * Pin/delete controls appear only for announcements the viewer can manage
- * (`canManage` — admin sees all; authors see their own via the `mine` flag).
+ * (`canManage` - admin sees all; authors see their own via the `mine` flag).
  */
 export function AnnouncementFeed({
   announcements,

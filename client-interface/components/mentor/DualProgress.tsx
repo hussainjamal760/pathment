@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * DualProgress — shows absolute progress (raw output vs plan) alongside the
+ * DualProgress - shows absolute progress (raw output vs plan) alongside the
  * fairness-adjusted "relative" progress side by side. When the relative reads
  * meaningfully higher, the mentee is doing well given logged real constraints;
  * when they're about equal, output speaks for itself.
@@ -39,7 +39,7 @@ export function DualProgress({ absolute, relative, compact = false }: DualProgre
       <Bar label="Adjusted for constraints" value={relative} color="bg-emerald-500" />
       {!compact && gap >= 8 && (
         <p className="text-xs text-emerald-600">
-          +{gap} pts once logged constraints are counted — fighting to keep up.
+          +{gap} pts once logged constraints are counted - fighting to keep up.
         </p>
       )}
     </div>

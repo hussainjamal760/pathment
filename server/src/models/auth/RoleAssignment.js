@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * RoleAssignment — a user holds `role` at a `scope`. The persisted half of
+   * RoleAssignment - a user holds `role` at a `scope`. The persisted half of
    * scoped RBAC (most assignments are still derived at request time from
    * capabilities + clan memberships; this lets admins grant scoped roles
    * explicitly). See src/services/authzService.js + src/config/roles.js.

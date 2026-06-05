@@ -7,7 +7,7 @@ const clanService = require('./clanService');
 const clamp = (n) => Math.max(0, Math.min(100, Math.round(n)));
 
 /**
- * promotionService — the mentee→co-mentor pipeline. Readiness/willingness are
+ * promotionService - the mentee→co-mentor pipeline. Readiness/willingness are
  * computed from the mentee's real stats + working-style read, mirroring the
  * prototype's heuristic. Promotion grants the 'mentor' capability and an
  * optional co_mentor clan membership.

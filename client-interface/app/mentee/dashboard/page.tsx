@@ -168,7 +168,7 @@ function MenteeDashboardInner() {
         </div>
       ) : (
         <>
-          {/* No enrollment yet — placement is admin/invite-driven now */}
+          {/* No enrollment yet - placement is admin/invite-driven now */}
           {enrollments.length === 0 && (
             <div className="bg-linear-to-br from-brand-50 dark:from-brand-500/10 to-brand-50 dark:to-transparent border border-brand-200 rounded-2xl p-8 text-center">
               <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -177,12 +177,12 @@ function MenteeDashboardInner() {
               <h2 className="text-2xl font-bold text-brand-900 mb-3">You're all set up</h2>
               <p className="text-brand-700">
                 You haven't been placed in a program yet. Your program team will enroll you and
-                connect you with a mentor — this page will fill in as soon as that happens.
+                connect you with a mentor - this page will fill in as soon as that happens.
               </p>
             </div>
           )}
 
-          {/* Pending Completion — Awaiting Mentor Approval */}
+          {/* Pending Completion - Awaiting Mentor Approval */}
           {pendingCompletionEnrollments.length > 0 && (
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-6">
               <div className="flex items-start gap-4">
@@ -195,7 +195,7 @@ function MenteeDashboardInner() {
                     {pendingCompletionEnrollments.map((e) => (
                       <div key={e.id}>
                         <p className="text-orange-700 text-sm">
-                          You&apos;ve finished everything in <strong>{e.program?.name}</strong> — your mentor
+                          You&apos;ve finished everything in <strong>{e.program?.name}</strong> - your mentor
                           will review and confirm completion. Nothing more to do here.
                         </p>
                         {e.completionRejectionReason && (
@@ -211,7 +211,7 @@ function MenteeDashboardInner() {
             </div>
           )}
 
-          {/* Level Completed — Auto-promoted to pending_match */}
+          {/* Level Completed - Auto-promoted to pending_match */}
           {levelCompletedEnrollments.length > 0 && (
             <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
               <div className="flex items-start gap-4">
@@ -223,7 +223,7 @@ function MenteeDashboardInner() {
                   <div className="space-y-1">
                     {levelCompletedEnrollments.map((e) => (
                       <p key={e.id} className="text-green-700 text-sm">
-                        <strong>{e.program?.name}</strong> — the admin is assigning your next mentor.
+                        <strong>{e.program?.name}</strong> - the admin is assigning your next mentor.
                       </p>
                     ))}
                   </div>
@@ -280,7 +280,7 @@ function MenteeDashboardInner() {
             </div>
           )}
 
-          {/* Active Programs — one card per in-progress enrollment */}
+          {/* Active Programs - one card per in-progress enrollment */}
           {currentProgramEnrollments.length > 0 && (
             <div>
               <h2 className="text-slate-900 mb-4">
@@ -338,7 +338,7 @@ function MenteeDashboardInner() {
                       View Tasks
                     </Link>
                     <p className="mt-3 text-xs text-slate-500 text-center">
-                      Finish every task and your mentor will confirm completion — no request needed.
+                      Finish every task and your mentor will confirm completion - no request needed.
                     </p>
                   </div>
                 ))}
@@ -346,7 +346,7 @@ function MenteeDashboardInner() {
             </div>
           )}
 
-          {/* Completed Programs — Rate Your Mentor prompt */}
+          {/* Completed Programs - Rate Your Mentor prompt */}
           {completedEnrollments.length > 0 && (
             <div>
               <h2 className="text-slate-900 mb-4">Completed Programs 🎓</h2>

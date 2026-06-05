@@ -1,6 +1,6 @@
 import { apiClient } from './api-client';
 
-/** Cohorts — a program's intake batch/season. Admin-only. */
+/** Cohorts - a program's intake batch/season. Admin-only. */
 export const cohortApi = {
   list: (params?: { programId?: string; status?: string }) =>
     apiClient.get('/intake/cohorts', { params }),
@@ -16,7 +16,7 @@ export const cohortApi = {
   }) => apiClient.post('/intake/cohorts', data),
   update: (id: string, data: Record<string, unknown>) =>
     apiClient.patch(`/intake/cohorts/${id}`, data),
-  /** Turn the public self-serve intake link on (mints a slug) — returns { cohort, applyUrl }. */
+  /** Turn the public self-serve intake link on (mints a slug) - returns { cohort, applyUrl }. */
   enablePublicLink: (id: string) => apiClient.post(`/intake/cohorts/${id}/public-link`, {}),
   disablePublicLink: (id: string) => apiClient.delete(`/intake/cohorts/${id}/public-link`),
   /** Copy form + assessment config from another cohort. */
@@ -26,7 +26,7 @@ export const cohortApi = {
   ensureAssessment: (id: string) => apiClient.post(`/intake/cohorts/${id}/assessment`, {}),
 };
 
-/** Applications — intake records inside a cohort. Admin-only. */
+/** Applications - intake records inside a cohort. Admin-only. */
 export const applicationApi = {
   list: (cohortId: string, status?: string) =>
     apiClient.get(`/intake/cohorts/${cohortId}/applications`, { params: { status } }),

@@ -88,7 +88,7 @@ class ClanRequestsService {
 
   async createCrossClan(data, createdBy) {
     if (!data.kind) throw new ValidationError('kind is required');
-    // A cross-clan assignment must name WHO is helping and WHICH clan — otherwise
+    // A cross-clan assignment must name WHO is helping and WHICH clan - otherwise
     // it grants nothing (the authz engine derives co-mentor access from these).
     if (!data.userId) throw new ValidationError('Select the person who will help');
     if (!data.toClanId) throw new ValidationError('Select the clan they will help');
@@ -131,7 +131,7 @@ class ClanRequestsService {
     const byLine = creator ? ` by ${fullName(creator)}` : '';
     const pending = assignment.status === 'pending';
 
-    // 1) The helper — a request to accept (pending) or a heads-up (admin-assigned, active).
+    // 1) The helper - a request to accept (pending) or a heads-up (admin-assigned, active).
     await notificationOrchestrator.dispatch({
       eventKey: NOTIFICATION_EVENTS.CROSS_CLAN_ASSIGNED,
       recipients: [{ userId: helper.id }],
@@ -149,7 +149,7 @@ class ClanRequestsService {
       dedupe: { relatedEntityType: 'cross_clan_assignment', relatedEntityId: assignment.id }
     });
 
-    // 2) Admins, for oversight — only when a non-admin set it up. In-app only.
+    // 2) Admins, for oversight - only when a non-admin set it up. In-app only.
     if (!creator || creator.role !== 'admin') {
       const admins = await models.User.findAll({ where: { role: 'admin', status: 'active' }, attributes: ['id'] });
       if (admins.length) {

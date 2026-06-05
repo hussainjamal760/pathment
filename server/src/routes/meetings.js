@@ -7,7 +7,7 @@ const { authenticate, authorize } = require('../middlewares/auth');
  * 1:1 scheduling (mounted at /api/meetings).
  */
 
-// Availability — mentor publishes / lists / removes bookable slots.
+// Availability - mentor publishes / lists / removes bookable slots.
 router.post('/availability', authenticate, authorize(['mentor', 'admin']), schedulingController.publishSlot);
 router.get('/availability/mine', authenticate, authorize(['mentor', 'admin']), schedulingController.listMyAvailability);
 router.delete('/availability/:id', authenticate, authorize(['mentor', 'admin']), schedulingController.deleteSlot);

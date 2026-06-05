@@ -23,24 +23,24 @@ const PROFICIENCY_CLS: Record<string, string> = {
 
 /** "program_completed" → "Program Completed" */
 const formatStatus = (s: string | null | undefined): string => {
-  if (!s) return '—';
+  if (!s) return '-';
   return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
-/** Show "—" for zero/null ratings & percentages */
+/** Show "-" for zero/null ratings & percentages */
 const formatRate = (val: number | string | null | undefined): string => {
   const n = parseFloat(String(val ?? 0));
-  return n > 0 ? `${Math.round(n)}%` : '—';
+  return n > 0 ? `${Math.round(n)}%` : '-';
 };
 
 const formatRating = (val: number | string | null | undefined): string => {
   const n = parseFloat(String(val ?? 0));
-  return n > 0 ? n.toFixed(1) : '—';
+  return n > 0 ? n.toFixed(1) : '-';
 };
 
-/** "all" → "All Levels", null/undefined → "—", otherwise title-case */
+/** "all" → "All Levels", null/undefined → "-", otherwise title-case */
 const formatLevel = (l: string | null | undefined): string => {
-  if (!l) return '—';
+  if (!l) return '-';
   return l === 'all' ? 'All Levels' : l.replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
@@ -77,7 +77,7 @@ export default function AdminMentorProfilePage() {
   const initials = `${mentor.firstName?.[0] ?? ''}${mentor.lastName?.[0] ?? ''}`;
   const capacityPct = mp?.maxMentees ? Math.round(((mp.currentMenteeCount ?? 0) / mp.maxMentees) * 100) : 0;
 
-  // Deduplicate specializations — filter out any value that is just the org name
+  // Deduplicate specializations - filter out any value that is just the org name
   const specializations = (mp?.specialization ?? []).filter(
     (s) => s && s !== mp?.organization
   );
@@ -150,7 +150,7 @@ export default function AdminMentorProfilePage() {
             <h3 className="text-sm font-semibold text-slate-700 mb-4">Mentee Capacity</h3>
             <div className="flex items-end justify-between mb-2">
               <span className="text-2xl font-bold text-slate-900">{mp?.currentMenteeCount ?? 0}</span>
-              <span className="text-sm text-slate-500">of {mp?.maxMentees ?? '—'} max</span>
+              <span className="text-sm text-slate-500">of {mp?.maxMentees ?? '-'} max</span>
             </div>
             <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden mb-2">
               <div

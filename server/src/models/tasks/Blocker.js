@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Blocker — something concrete standing in a mentee's way, optionally tied to
+   * Blocker - something concrete standing in a mentee's way, optionally tied to
    * a specific assigned task so it stays relevant (not a floating to-do). Feeds
    * the mentor cockpit's openBlockers count and the risk/relative-progress read.
    */

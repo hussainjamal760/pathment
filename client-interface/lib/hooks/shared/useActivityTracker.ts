@@ -62,7 +62,7 @@ export function useActivityTracker() {
     const interval = setInterval(() => {
       if (tabFocusedAt === null) return;
       const seconds = flushSeconds();
-      console.log('[tracker] tick — seconds=%d', seconds);
+      console.log('[tracker] tick - seconds=%d', seconds);
       sendHeartbeat(seconds);
     }, FLUSH_INTERVAL_MS);
 
@@ -102,7 +102,7 @@ export function useActivityTracker() {
       window.removeEventListener('focus', handleFocus);
       console.log('[tracker] cleanup');
     };
-  }, []); // runs once per mount — cleanup handles the StrictMode second run correctly
+  }, []); // runs once per mount - cleanup handles the StrictMode second run correctly
 
   const trackEvent = useCallback(
     (

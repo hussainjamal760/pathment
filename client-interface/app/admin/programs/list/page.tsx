@@ -82,7 +82,7 @@ const TYPE_OPTIONS = [
 
 const SORT_OPTIONS: { value: ProgramSortBy; label: string }[] = [
   { value: 'createdAt',  label: 'Newest first' },
-  { value: 'name',       label: 'Name A–Z' },
+  { value: 'name',       label: 'Name A-Z' },
   { value: 'startDate',  label: 'Start date' },
 ];
 

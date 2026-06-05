@@ -16,7 +16,7 @@ const STATUS_TONE: Record<string, string> = {
 const statusLabel = (s: string) => s.replace(/_/g, ' ');
 
 /**
- * TracksPanel — mentor-curated personal lanes for one mentee. Inline create +
+ * TracksPanel - mentor-curated personal lanes for one mentee. Inline create +
  * rename, archive, per-track quick "+ task". Re-skinned to the current
  * indigo/slate design from the prototype's calm styling.
  */
@@ -49,7 +49,7 @@ export function TracksPanel({ menteeId }: { menteeId: string }) {
       ) : (
         <div className="space-y-2">
           {tracks.length === 0 && !creating && (
-            <p className="text-sm text-slate-500">No tracks yet — add a lane below to organize this mentee&apos;s work.</p>
+            <p className="text-sm text-slate-500">No tracks yet - add a lane below to organize this mentee&apos;s work.</p>
           )}
           {tracks.map((track) => (
             <TrackRow

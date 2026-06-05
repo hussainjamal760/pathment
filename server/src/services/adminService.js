@@ -45,7 +45,7 @@ class AdminService {
       };
     }
 
-    // mentor — placement is the clan they'll lead; program comes from the clan.
+    // mentor - placement is the clan they'll lead; program comes from the clan.
     if (!clanRow) throw new ValidationError('A clan is required when inviting a mentor');
     if (programRow && programRow.id !== clanRow.programId) {
       throw new ValidationError("The selected program does not match the clan's program");
@@ -533,7 +533,7 @@ class AdminService {
   }
 
   /**
-   * Suspend a user — sets status to 'suspended', immediately invalidates all sessions.
+   * Suspend a user - sets status to 'suspended', immediately invalidates all sessions.
    */
   async suspendUser(targetUserId, adminUserId) {
     if (targetUserId === adminUserId) {
@@ -553,7 +553,7 @@ class AdminService {
   }
 
   /**
-   * Unsuspend a user — restores status to 'active'.
+   * Unsuspend a user - restores status to 'active'.
    */
   async unsuspendUser(targetUserId, adminUserId) {
     const user = await models.User.findByPk(targetUserId);
@@ -641,7 +641,7 @@ class AdminService {
       clan: row.clanId ?? row.clan ?? null
     }));
 
-    // Memoize placement resolution — CSVs repeat the same program/clan often.
+    // Memoize placement resolution - CSVs repeat the same program/clan often.
     const placementCache = new Map();
     const resolvePlacement = async ({ role, program, clan }) => {
       const key = `${role}|${program || ''}|${clan || ''}`;
@@ -697,7 +697,7 @@ class AdminService {
         continue;
       }
 
-      // The invite is the placement — resolve/validate program+clan per role.
+      // The invite is the placement - resolve/validate program+clan per role.
       let placement;
       try {
         placement = await resolvePlacement({ role: row.role, program: row.program, clan: row.clan });

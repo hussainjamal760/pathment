@@ -61,7 +61,7 @@ const columns: DataTableColumn<MenteeListItem>[] = [
       const secondary = mp?.currentOccupation ? mp?.currentEducation : undefined;
       return (
         <div className="min-w-0">
-          <p className="text-sm text-slate-900 truncate">{primary ?? '—'}</p>
+          <p className="text-sm text-slate-900 truncate">{primary ?? '-'}</p>
           {secondary && (
             <p className="text-xs text-slate-500 mt-0.5 truncate">{secondary}</p>
           )}
@@ -117,7 +117,7 @@ const columns: DataTableColumn<MenteeListItem>[] = [
           {streak}d
         </span>
       ) : (
-        <span className="text-slate-400 text-sm">—</span>
+        <span className="text-slate-400 text-sm">-</span>
       );
     },
   },
@@ -135,7 +135,7 @@ const columns: DataTableColumn<MenteeListItem>[] = [
           })}
         </span>
       ) : (
-        <span className="text-slate-400">—</span>
+        <span className="text-slate-400">-</span>
       ),
   },
 ];
@@ -287,27 +287,27 @@ export default function AdminMenteesListPage() {
         <StatsCard
           icon={School}
           label="Total Mentees"
-          value={isLoading ? '—' : pagination.total}
+          value={isLoading ? '-' : pagination.total}
           colorClass="text-brand-600 bg-brand-50"
         />
         <StatsCard
           icon={BookOpen}
           label="Currently Enrolled"
-          value={isLoading ? '—' : enrolledCount}
+          value={isLoading ? '-' : enrolledCount}
           colorClass="text-blue-600 bg-blue-50"
           sub="on this page"
         />
         <StatsCard
           icon={CheckCircle2}
           label="Programs Completed"
-          value={isLoading ? '—' : completedPrograms}
+          value={isLoading ? '-' : completedPrograms}
           colorClass="text-green-600 bg-green-50"
           sub="on this page"
         />
         <StatsCard
           icon={Trophy}
           label="Total Points Earned"
-          value={isLoading ? '—' : totalPoints.toLocaleString()}
+          value={isLoading ? '-' : totalPoints.toLocaleString()}
           colorClass="text-amber-600 bg-amber-50"
           sub="on this page"
         />

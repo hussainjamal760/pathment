@@ -12,7 +12,7 @@ export interface MentorSpec {
   faqs: MentorSpecFaq[];
 }
 
-/** Mentor handbook — admin-authored org doc, read by mentors. */
+/** Mentor handbook - admin-authored org doc, read by mentors. */
 export const mentorSpecApi = {
   get: () => apiClient.get('/mentor-spec'),
   save: (spec: MentorSpec) => apiClient.put('/mentor-spec', { spec }),

@@ -35,7 +35,7 @@ const STATUS_TRANSITIONS: Record<ProgramStatus, { value: ProgramStatus; label: s
     { value: 'archived',  label: 'Archive',          description: 'Hide without publishing', confirm: 'Archive this draft program?' },
   ],
   published: [
-    { value: 'completed', label: 'Mark Completed',   description: 'Close program — no new enrollments', confirm: 'Mark as completed? Active enrollees may be affected.' },
+    { value: 'completed', label: 'Mark Completed',   description: 'Close program - no new enrollments', confirm: 'Mark as completed? Active enrollees may be affected.' },
     { value: 'archived',  label: 'Archive',           description: 'Disable enrollment & hide from mentees', confirm: 'Archive this program? Active enrollees may be affected.' },
   ],
   archived: [

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * AssessmentQuestion — one item in an assessment. `type` drives how it's
+   * AssessmentQuestion - one item in an assessment. `type` drives how it's
    * answered and whether it can be auto-graded:
    *   - mcq          single-choice; auto-graded vs correctOptionIds[0]
    *   - multi_select multiple-choice; auto-graded vs the correctOptionIds set

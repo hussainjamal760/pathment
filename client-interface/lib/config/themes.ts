@@ -1,6 +1,6 @@
 /**
  * Per-user accent "vibes". Each key maps to an `html[data-accent="<key>"]` block
- * in styles/globals.css that overrides ONLY the brand scale — so a preset can
+ * in styles/globals.css that overrides ONLY the brand scale - so a preset can
  * never break neutrals, status colors, or contrast. Ocean is the default and
  * lives on :root (no attribute needed).
  */

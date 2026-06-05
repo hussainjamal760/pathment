@@ -15,7 +15,7 @@ const REACTION_TYPES = ['cheers', 'celebrate', 'helpful', 'insightful'];
 // Points awarded by community activity (no-op for non-mentees, which have no profile).
 const POINTS = { KUDOS_RECEIVED: 15, ANSWER_ACCEPTED: 25 };
 
-// Community CONTRIBUTION score — a self-contained reputation computed from
+// Community CONTRIBUTION score - a self-contained reputation computed from
 // community activity (works for everyone, mentee or mentor, unlike the
 // mentee-only points engine). Powers the "Top contributors" leaderboard.
 const CONTRIB = { kudos: 15, answer: 25, post: 2, reaction: 3 };
@@ -29,7 +29,7 @@ const TIERS = [
 const tierFor = (points) => (TIERS.find((t) => points >= t.min) || TIERS[TIERS.length - 1]).name;
 
 /**
- * Community v2 — a scoped social + knowledge layer. Every read/write is gated
+ * Community v2 - a scoped social + knowledge layer. Every read/write is gated
  * by communitySpaceService so a member only ever sees the clan/cohort/program
  * spaces they belong to (plus the global lounge). Replaces the old flat feed.
  */
@@ -74,7 +74,7 @@ class CommunityService {
     try {
       await gamificationService.awardPoints(userId, amount, sourceType, sourceId, reason);
     } catch (e) {
-      // Non-mentees have no profile — that's expected; only log real errors.
+      // Non-mentees have no profile - that's expected; only log real errors.
       if (!/profile not found/i.test(e.message)) console.error('[Community] awardPoints failed:', e.message);
     }
   }
@@ -139,8 +139,8 @@ class CommunityService {
 
   /**
    * Top contributors for a space (or the global lounge). A real, role-agnostic
-   * reputation computed from community activity — kudos received, accepted
-   * answers, helpful reactions, and participation — so recognition is visible
+   * reputation computed from community activity - kudos received, accepted
+   * answers, helpful reactions, and participation - so recognition is visible
    * right where people earn it. period: 'week' | 'all'.
    */
   async getLeaderboard(user, { scopeType = 'global', scopeId = null, period = 'all', limit = 10 } = {}) {
@@ -465,7 +465,7 @@ class CommunityService {
 
     return reports.map((r) => {
       const t = r.targetType === 'post' ? postMap.get(r.targetId) : commentMap.get(r.targetId);
-      const preview = t ? `${t.title ? `${t.title} — ` : ''}${t.body || ''}`.slice(0, 240) : '(content removed)';
+      const preview = t ? `${t.title ? `${t.title} - ` : ''}${t.body || ''}`.slice(0, 240) : '(content removed)';
       return {
         id: r.id,
         targetType: r.targetType,

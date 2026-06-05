@@ -9,7 +9,7 @@ router.get('/stats', authenticate, requirePermission(PERMISSIONS.ANALYTICS_VIEW)
 router.get('/', authenticate, authorize(['admin', 'mentor', 'mentee']), enrollmentController.getEnrollments);
 router.get('/:id', authenticate, enrollmentController.getEnrollmentById);
 // Enrollment is invite-driven (placement on the invite) or admin-initiated.
-// Mentees can no longer self-enroll — there is no mentee browse/request path.
+// Mentees can no longer self-enroll - there is no mentee browse/request path.
 router.post('/', authenticate, requirePermission(PERMISSIONS.MENTEE_MANAGE), enrollmentController.createEnrollment);
 router.patch('/:id/status', authenticate, enrollmentController.updateEnrollmentStatus);
 router.post('/:id/approve', authenticate, requirePermission(PERMISSIONS.MENTEE_MANAGE), enrollmentController.approveEnrollment);

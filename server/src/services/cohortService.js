@@ -5,7 +5,7 @@ const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes');
 
 /**
- * cohortService — assembles a mentor's cohort for the Cockpit on real data,
+ * cohortService - assembles a mentor's cohort for the Cockpit on real data,
  * and computes the fairness signals (relativeProgress / momentum / risk) that
  * the new design leans on.
  *
@@ -75,7 +75,7 @@ class CohortService {
 
   computeOnTimeRate(tasks) {
     const completed = tasks.filter((t) => t.status === 'completed');
-    if (!completed.length) return 100; // nothing late yet — don't penalise
+    if (!completed.length) return 100; // nothing late yet - don't penalise
     const onTime = completed.filter((t) => !t.isLate).length;
     return Math.round((onTime / completed.length) * 100);
   }
@@ -130,7 +130,7 @@ class CohortService {
 
     // If they're behind but friction explains it, soften the message.
     if (level !== 'low' && gap >= 10 && behind >= 15) {
-      reasons.push('but logged real constraints — fighting to keep up');
+      reasons.push('but logged real constraints - fighting to keep up');
     }
 
     return { risk: level, riskReason: reasons.length ? capitalize(reasons.join(', ')) : null };
@@ -198,8 +198,8 @@ class CohortService {
       avatar: initialsOf(mentee.firstName, mentee.lastName),
       email: mentee.email,
       profilePictureUrl: mentee.profilePictureUrl || null,
-      program: enrollment?.program?.name || '—',
-      level: '—',
+      program: enrollment?.program?.name || '-',
+      level: '-',
       week,
       totalWeeks,
       absoluteProgress: absolute,
@@ -220,7 +220,7 @@ class CohortService {
    * Rich single-mentee profile for the mentor's mentee page: the computed row
    * plus full blockers/delays, tasks grouped by status, and a derived
    * (rule-based, real) summary + signals. The summary is an honest read of the
-   * mentee's actual stats — not a fabricated narrative — until the LLM-backed
+   * mentee's actual stats - not a fabricated narrative - until the LLM-backed
    * summary feature is wired in.
    */
   async getMenteeDetail(menteeId) {
@@ -353,7 +353,7 @@ class CohortService {
     if (!mentee) throw new NotFoundError('Mentee not found');
 
     const body = (message && message.trim())
-      || `Just checking in, ${mentee.firstName} — how's it going? Let me know if anything's blocking you.`;
+      || `Just checking in, ${mentee.firstName} - how's it going? Let me know if anything's blocking you.`;
 
     await notificationOrchestrator.dispatch({
       eventKey: NOTIFICATION_EVENTS.MENTOR_NUDGE,
@@ -371,7 +371,7 @@ class CohortService {
     return { sent: true };
   }
 
-  /** Set a mentee's working-style read (0–100 dims). */
+  /** Set a mentee's working-style read (0-100 dims). */
   async updatePersonality(menteeId, dims = {}) {
     const profile = await models.MenteeProfile.findOne({ where: { userId: menteeId } });
     if (!profile) throw new NotFoundError('Mentee profile not found');
@@ -479,7 +479,7 @@ class CohortService {
   /**
    * Period-scoped THROUGHPUT for the mentor's whole cohort over the last 7
    * (week) or 30 (month) days. Unlike the cohort snapshot (which is "now"),
-   * these numbers describe what actually happened inside the window — so the
+   * these numbers describe what actually happened inside the window - so the
    * Reports week/month toggle changes them for real.
    */
   async getPeriodActivity(mentorId, period = 'week') {
@@ -565,7 +565,7 @@ class CohortService {
       `On track: ${onTrack.length}; to watch: ${watch.length}; at risk: ${high.length}`,
       `Pending reviews: ${pending}; open blockers: ${openBlockers}`,
       `Top performers: ${top.map((m) => `${m.name} (${round(m.absoluteProgress)}% done, ${round(m.onTimeRate)}% on time)`).join('; ') || 'none'}`,
-      `Needs attention: ${[...high, ...watch].map((m) => `${m.name} — ${m.riskReason || m.risk}`).join('; ') || 'none'}`,
+      `Needs attention: ${[...high, ...watch].map((m) => `${m.name} - ${m.riskReason || m.risk}`).join('; ') || 'none'}`,
     ].join('\n');
 
     const system =
@@ -589,7 +589,7 @@ function buildSummary(row) {
   const first = (row.name || 'This mentee').split(' ')[0];
   const momentumWord = row.momentum === 'up' ? 'building' : row.momentum === 'down' ? 'slipping' : 'steady';
   const fairness = row.relativeProgress > row.absoluteProgress
-    ? ` Adjusted for logged constraints they read ${row.relativeProgress}% — doing better than raw output suggests.`
+    ? ` Adjusted for logged constraints they read ${row.relativeProgress}% - doing better than raw output suggests.`
     : '';
   const blockerNote = row.openBlockers
     ? ` ${row.openBlockers} open blocker${row.openBlockers > 1 ? 's' : ''} to clear.`
@@ -603,7 +603,7 @@ function buildSignals(row, counts, delays) {
   const acceptedExternal = (delays || []).filter((d) => d.accepted && d.category === 'external');
   if (acceptedExternal.length) {
     const days = acceptedExternal.reduce((n, d) => n + (d.days || 0), 0);
-    signals.push(`Logged ${days}d of accepted external friction — counted in their favour`);
+    signals.push(`Logged ${days}d of accepted external friction - counted in their favour`);
   }
   if (row.openBlockers) signals.push(`${row.openBlockers} open blocker${row.openBlockers > 1 ? 's' : ''}`);
   if (row.pendingApprovals) signals.push(`${row.pendingApprovals} submission${row.pendingApprovals > 1 ? 's' : ''} awaiting your review`);

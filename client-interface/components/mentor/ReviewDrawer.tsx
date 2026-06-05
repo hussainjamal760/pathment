@@ -10,9 +10,9 @@ import type { ApprovalItem } from '@/lib/hooks/mentor';
 type Decision = 'approved' | 'approved_notes' | 'changes' | 'rejected';
 
 const FEEDBACK_TEMPLATES = [
-  'Solid work — meets the bar.',
+  'Solid work - meets the bar.',
   'Good effort. A couple of things to tighten before this is done.',
-  'Nearly there — see the notes below.',
+  'Nearly there - see the notes below.',
   'Please address the points below and resubmit.',
 ];
 
@@ -155,7 +155,7 @@ export function ReviewDrawer({
           )}
         </div>
 
-        {/* Acceptance checklist — required gates approval */}
+        {/* Acceptance checklist - required gates approval */}
         {item.criteria.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">

@@ -28,7 +28,7 @@ router.post(
   adminController.createAdmin
 );
 
-// Create registration invite (invite.create — super_admin, intake_manager, program_admin)
+// Create registration invite (invite.create - super_admin, intake_manager, program_admin)
 router.post(
   '/invites',
   authenticate,

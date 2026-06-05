@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Insight — a mentor-logged observation about a mentee (outside the review
+   * Insight - a mentor-logged observation about a mentee (outside the review
    * flow), captured from 1:1s, text syncs, or observation. Feeds the mentee's
    * insight timeline (personality / analytical / issue / strength / general).
    */

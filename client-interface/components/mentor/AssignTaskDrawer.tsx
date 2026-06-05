@@ -23,7 +23,7 @@ const DUE_PRESETS: { label: string; days: number }[] = [
 export interface AssignDrawerMentee { id: string; name: string; level?: string; risk?: string }
 
 /**
- * AssignTaskDrawer — accessible right-side drawer to assign a custom task to one
+ * AssignTaskDrawer - accessible right-side drawer to assign a custom task to one
  * mentee (single) or many (bulk). Replaces the old broken /mentor/tasks?tab=create
  * navigation. Full fields + focus trap + Escape + ARIA, re-skinned indigo/slate.
  */
@@ -47,7 +47,7 @@ export function AssignTaskDrawer({
   const [roadmapId, setRoadmapId] = useState('');
   const [startStep, setStartStep] = useState(0);
   const selectedRoadmap = localRoadmaps.find((r) => r.id === roadmapId) || null;
-  // Mentees who already have the selected roadmap — can't be assigned it again.
+  // Mentees who already have the selected roadmap - can't be assigned it again.
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
   const [assigneesLoading, setAssigneesLoading] = useState(false);
 
@@ -228,7 +228,7 @@ export function AssignTaskDrawer({
           </div>
         ) : (
           <>
-            {/* Source tabs — custom task vs assign from a roadmap */}
+            {/* Source tabs - custom task vs assign from a roadmap */}
             <div className="px-6 pt-4">
               <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
                 {([['custom', 'Custom task', FileText], ['roadmap', 'From roadmap', Route]] as const).map(([key, label, Icon]) => (
@@ -307,7 +307,7 @@ export function AssignTaskDrawer({
                   <button type="button" onClick={() => setCriteria((c) => [...c, ''])} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add check</button>
                 </div>
                 <div className="space-y-2">
-                  {criteria.length === 0 && <p className="text-xs text-slate-400">No criteria yet — add checks the mentee must meet.</p>}
+                  {criteria.length === 0 && <p className="text-xs text-slate-400">No criteria yet - add checks the mentee must meet.</p>}
                   {criteria.map((c, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <input
@@ -331,7 +331,7 @@ export function AssignTaskDrawer({
                     {roadmapsLoading ? (
                       <div className="flex items-center gap-2 text-sm text-slate-400 py-2"><Loader2 className="w-4 h-4 animate-spin" />Loading your roadmaps…</div>
                     ) : localRoadmaps.length === 0 ? (
-                      <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 p-3">No roadmaps yet — create or import one on the Roadmaps page, then assign it here.</p>
+                      <p className="text-sm text-slate-500 rounded-lg border border-dashed border-slate-200 p-3">No roadmaps yet - create or import one on the Roadmaps page, then assign it here.</p>
                     ) : (
                       <div className="space-y-2">
                         {localRoadmaps.map((r) => (

@@ -2,7 +2,7 @@ const { models } = require('../db');
 const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes');
 
 /**
- * frictionService — blockers and delay events. These are the mentee-facing
+ * frictionService - blockers and delay events. These are the mentee-facing
  * "what's slowing you down" inputs that feed the cockpit and the fairness read.
  */
 class FrictionService {

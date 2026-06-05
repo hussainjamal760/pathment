@@ -1,11 +1,11 @@
 # Community
 
-**What it is:** a **scoped social feed** — posts, comments, reactions, kudos, and Q&A —
+**What it is:** a **scoped social feed** - posts, comments, reactions, kudos, and Q&A -
 visible within the space you belong to: your **clan**, your **cohort**, your **program**, or
 a **global** lounge. Plus moderation.
 
 **Why it exists:** mentorship is social. Peers learn from each other, celebrate wins, ask
-questions, and stay engaged — scoped so conversations are relevant and private to the right group.
+questions, and stay engaged - scoped so conversations are relevant and private to the right group.
 
 ## Data model
 `CommunityPost` (authorId, toId? for kudos, type `kudos|win|question|discussion|resource|meme|standup`,
@@ -26,9 +26,9 @@ status open/reviewed/dismissed). See [DATABASE.md §12](../DATABASE.md). Migrati
 - **Moderator / Admin:** anyone can **report** a post/comment; users with `community.moderate` review the report queue and resolve/dismiss.
 
 ## Rules & edge cases
-- Visibility is **membership-derived** — you can't see another clan's clan-space.
+- Visibility is **membership-derived** - you can't see another clan's clan-space.
 - Q&A posts track `resolved` + an accepted comment.
 - Reporting is open to all; acting on reports needs `community.moderate` (super_admin, moderator, program_admin).
 
 ## Related
-[Programs, Cohorts & Clans](./programs-cohorts-clans.md) (spaces) · [Gamification](./gamification.md) (kudos/engagement) · [Notifications & Email](./notifications-and-email.md) (mentions/replies/kudos — in-app)
+[Programs, Cohorts & Clans](./programs-cohorts-clans.md) (spaces) · [Gamification](./gamification.md) (kudos/engagement) · [Notifications & Email](./notifications-and-email.md) (mentions/replies/kudos - in-app)

@@ -14,7 +14,7 @@ export interface EmptyStateAction {
 export interface EmptyStateProps {
   title?: string;
   description?: string;
-  /** Custom icon element — defaults to FileX2 */
+  /** Custom icon element - defaults to FileX2 */
   icon?: ReactNode;
   /** Primary CTA */
   action?: EmptyStateAction;

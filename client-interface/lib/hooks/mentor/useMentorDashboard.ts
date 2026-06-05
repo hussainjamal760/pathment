@@ -60,7 +60,7 @@ export function useMentorDashboard(): UseMentorDashboardReturn {
       const res = await taskApi.getMentorTaskStats(user.id);
       setTaskStats(res?.data?.stats || null);
     } catch {
-      // non-critical — silently ignore
+      // non-critical - silently ignore
     } finally {
       setStatsLoading(false);
     }

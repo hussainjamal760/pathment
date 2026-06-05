@@ -115,7 +115,7 @@ class AssessmentService {
   async deleteAssessment(assessmentId) {
     const assessment = await models.Assessment.findByPk(assessmentId);
     if (!assessment) throw new NotFoundError('Assessment not found');
-    // Refuse to delete an assessment that's wired to a cohort — detach first.
+    // Refuse to delete an assessment that's wired to a cohort - detach first.
     const inUse = await models.Cohort.count({ where: { assessmentId } });
     if (inUse > 0) throw new ValidationError('Detach this assessment from its cohort(s) before deleting');
     await models.AssessmentQuestion.destroy({ where: { assessmentId } });
@@ -124,7 +124,7 @@ class AssessmentService {
   }
 
   // ── Applicant-facing (sanitized) ─────────────────────────────────────────────
-  /** The assessment as an applicant sees it — no points, no correct answers. */
+  /** The assessment as an applicant sees it - no points, no correct answers. */
   sanitizeForApplicant(assessmentJson) {
     return {
       id: assessmentJson.id,

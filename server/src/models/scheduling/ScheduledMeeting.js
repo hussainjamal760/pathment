@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * ScheduledMeeting — a booked 1:1 (or standup/review/pairing) between a
+   * ScheduledMeeting - a booked 1:1 (or standup/review/pairing) between a
    * mentor and a mentee, created when a mentee books an availability slot.
    */
   const ScheduledMeeting = sequelize.define('ScheduledMeeting', {

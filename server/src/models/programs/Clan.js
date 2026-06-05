@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * Clan — a mentor-led group of mentees inside a Program (the org runs one
+   * Clan - a mentor-led group of mentees inside a Program (the org runs one
    * Program per year; a Program contains many Clans/cohorts). A Clan owns its
    * mentors and mentees (via ClanMembership), optionally a level, and the
    * roadmaps its mentor authors or imports. Replaces 1:1 mentor matching:
@@ -50,7 +50,7 @@ module.exports = (sequelize, DataTypes) => {
         isIn: [['active', 'inactive', 'archived']]
       }
     },
-    // Operational health (RAG) — computed/rolled-up; nullable until evaluated.
+    // Operational health (RAG) - computed/rolled-up; nullable until evaluated.
     healthStatus: {
       type: DataTypes.STRING(10),
       allowNull: true,

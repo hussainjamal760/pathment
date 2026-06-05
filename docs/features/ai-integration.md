@@ -1,7 +1,7 @@
 # AI Integration (Bring-Your-Own Key)
 
 **What it is:** the platform's AI features (progress summaries, roadmap generation, adaptive
-recommendations, mentor-match scoring) run through **configurable provider keys** — an admin
+recommendations, mentor-match scoring) run through **configurable provider keys** - an admin
 sets org-wide keys, a mentor can add a personal key, and each feature resolves the right key
 (personal → org → env).
 
@@ -17,11 +17,11 @@ owner. See [DATABASE.md §12](../DATABASE.md). Migration 035/036.
 ## Backend
 - **`/api/ai-connections`** (admin + mentor): `GET /`, `POST /`, `DELETE /:id`, `POST /:id/test` (actually probes the provider to verify the key), `PUT /routing` (map features → a connection). Scope is derived: admins manage org keys, mentors manage personal keys.
 - **Resolution:** `aiConnectionService.resolveActiveConfig(feature, userId)` → personal routing for that feature → org routing → any connected org key → env fallback.
-- **Primitive:** `groqService` — `generateText({ feature, userId, … })` and `generateRoadmap` / `generateAdaptiveRecommendations` / `generateMatchingScore` / `batchGenerateMatchingScores`, all of which resolve a BYO key (feature + userId) and **fall back gracefully** to a heuristic/empty result if no key is available.
+- **Primitive:** `groqService` - `generateText({ feature, userId, … })` and `generateRoadmap` / `generateAdaptiveRecommendations` / `generateMatchingScore` / `batchGenerateMatchingScores`, all of which resolve a BYO key (feature + userId) and **fall back gracefully** to a heuristic/empty result if no key is available.
 - **Features using AI:** cohort/progress summaries (mentor's key, feature `summary`), mentor-match scoring (`matching`, org), roadmap generation (`roadmap`), adaptive recommendations (`adaptive`). The mentor "Reports" narrative also uses the text primitive.
 
 ## Frontend
-- **Admin / Mentor:** Settings → **AI Connections** tab (`components/settings/AIConnectionsTab.tsx`) — add a key, **Test** it (live probe with success/fail toast), delete, and route features to connections. Admins manage org-wide; mentors manage personal. (Mentees don't run AI features, so no key tab for them.)
+- **Admin / Mentor:** Settings → **AI Connections** tab (`components/settings/AIConnectionsTab.tsx`) - add a key, **Test** it (live probe with success/fail toast), delete, and route features to connections. Admins manage org-wide; mentors manage personal. (Mentees don't run AI features, so no key tab for them.)
 
 ## Role flows
 - **Admin:** adds org-wide provider keys, tests them, routes org features (e.g. matching) to a connection.

@@ -6,7 +6,7 @@ const taskService = require('./taskService');
 const ACTIVE_ENROLLMENT_STATUSES = ['active', 'matched', 'approved', 'pending_completion', 'level_completed'];
 
 /**
- * trackService — personal lanes for a mentee. Tasks belong to a track via
+ * trackService - personal lanes for a mentee. Tasks belong to a track via
  * AssignedTask.trackId; the mentor curates lanes from the mentee profile and
  * the mentee's This-Week view groups by track.
  */

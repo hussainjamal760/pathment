@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * DailyLogEntry — a mentee's daily check-in: which assigned tasks they
+   * DailyLogEntry - a mentee's daily check-in: which assigned tasks they
    * worked on that day + a short note. One entry per mentee per day (upserted);
    * past days can be backfilled. Simplified vs the prototype's slot-based log
    * (slot ticking depends on the deferred schedule-slot engine).

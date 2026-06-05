@@ -5,7 +5,7 @@
 mentor **accepts** a delay, it credits the mentee so they aren't punished for things outside
 their control.
 
-**Why it exists:** raw "% of tasks done" is unfair — someone hit by illness or a power
+**Why it exists:** raw "% of tasks done" is unfair - someone hit by illness or a power
 outage looks the same as someone who slacked. Accepted delays separate "couldn't" from
 "didn't," feeding a fairer *relative* progress used in insights.
 
@@ -20,7 +20,7 @@ job/health/connectivity/…, days, `accepted`, category external/scope/avoidance
 - Accepted delays contribute "credited" days that the **fairness lens** in [Analytics](./analytics-and-insights.md) uses to compute *relative* progress (absolute vs. credited).
 
 ## Frontend
-- **Mentee:** `/mentee/blockers` — log a blocker/delay with reason + severity.
+- **Mentee:** `/mentee/blockers` - log a blocker/delay with reason + severity.
 - **Mentor:** at-risk + cohort review surfaces blockers/delays; the mentor **accepts** genuine delays. `/mentor/at-risk`.
 - **Admin:** insights show the fairness impact org-wide.
 
@@ -30,7 +30,7 @@ job/health/connectivity/…, days, `accepted`, category external/scope/avoidance
 - **Admin:** uses the fairness lens to compare clans/mentees on credited (not just absolute) progress.
 
 ## Rules & edge cases
-- A delay only credits the mentee once a mentor **accepts** it (with a category — external/scope/avoidance).
+- A delay only credits the mentee once a mentor **accepts** it (with a category - external/scope/avoidance).
 - Blockers/delays can attach to a specific assigned task or stand alone.
 - This is the data behind "measured fairly" in the [Mentor Spec](./knowledge-library-and-mentor-spec.md).
 

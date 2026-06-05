@@ -7,7 +7,7 @@ import { scheduleApi, type ScheduleSlot } from '@/lib/services/schedule-api';
 const RECUR_LABEL: Record<string, string> = { daily: 'Daily', weekly: 'Weekly', once: '' };
 
 /**
- * Recurring rituals for the mentee's This-Week view — the repeating, no-approval
+ * Recurring rituals for the mentee's This-Week view - the repeating, no-approval
  * habits from their schedule (journaling, standup, reading). Lightweight: shows
  * what recurs and when; ticking happens in the Daily Log.
  */

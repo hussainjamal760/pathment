@@ -5,7 +5,7 @@ const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 
 /**
- * linearRoadmapService — the new design's linear roadmap flow for mentors:
+ * linearRoadmapService - the new design's linear roadmap flow for mentors:
  * author / import / assign roadmaps as an ordered list of steps, with
  * per-mentee progress and auto-advance on approval. Kept separate from the
  * legacy week-based roadmapService so the admin curriculum flow is untouched.
@@ -372,7 +372,7 @@ class LinearRoadmapService {
     const enrollment = await this._activeEnrollment(menteeId);
 
     let existing = await models.RoadmapProgress.findOne({ where: { roadmapId: nextId, menteeId } });
-    if (existing && !existing.completed) return null; // already active — don't disturb
+    if (existing && !existing.completed) return null; // already active - don't disturb
     if (existing) {
       existing.currentStep = 0; existing.completed = false; existing.slot = slot.id;
       if (enrollment) existing.enrollmentId = enrollment.id;
@@ -410,7 +410,7 @@ class LinearRoadmapService {
 
   /**
    * Auto-advance on approval: when a roadmap-linked task is approved, advance
-   * the mentee's progress and assign the next step. Safe to call always — it
+   * the mentee's progress and assign the next step. Safe to call always - it
    * no-ops for tasks that aren't part of a tracked roadmap.
    */
   async advanceOnApproval(menteeId, roadmapTaskId) {
@@ -424,7 +424,7 @@ class LinearRoadmapService {
     const currentIdx = steps.findIndex((s) => s.id === roadmapTaskId);
     if (currentIdx === -1) return null;
 
-    // Mentor of the completed assignment — reused for the next step / chained roadmap.
+    // Mentor of the completed assignment - reused for the next step / chained roadmap.
     const prevAssignment = await models.AssignedTask.findOne({
       where: { roadmapTaskId, menteeId },
       attributes: ['mentorId', 'enrollmentId']

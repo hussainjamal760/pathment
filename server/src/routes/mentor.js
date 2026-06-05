@@ -10,7 +10,7 @@ const { PERMISSIONS } = require('../config/permissions');
 const mentorOnly = [authenticate, authorize(['mentor', 'admin'])];
 
 /**
- * Mentor-area routes — scoped to the logged-in mentor (distinct from the
+ * Mentor-area routes - scoped to the logged-in mentor (distinct from the
  * admin-facing /mentors directory listing).
  */
 

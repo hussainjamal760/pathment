@@ -70,7 +70,7 @@ export default function MenteeOnboardingPage() {
     setLoading(true);
     try {
       await apiClient.post('/profile/complete-mentee', formData);
-      toast.success('Profile saved — let\'s add your skills.');
+      toast.success('Profile saved - let\'s add your skills.');
       if (updateUser) updateUser({ ...user, onboardingStep: 1 });
       router.push('/onboarding/skills');
     } catch (error: unknown) {

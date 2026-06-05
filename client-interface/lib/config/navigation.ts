@@ -59,7 +59,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
   // of this; see navPreferences.ts). Keep the highest-traffic items at the top.
   // Daily-driver items stay standalone at the top (and still float via adaptive
   // frecency); the rest are clustered into collapsible sections. Group parents use
-  // a synthetic `group:*` path — they only expand/collapse, they never navigate.
+  // a synthetic `group:*` path - they only expand/collapse, they never navigate.
   admin: [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', permission: 'analytics.view' },
     { path: '/admin/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
@@ -176,7 +176,7 @@ export function getNavigationLinks(role: UserRole): NavLink[] {
   return navigationConfig[role] || [];
 }
 
-/** A single navigable destination, flattened out of groups — used by the search palette. */
+/** A single navigable destination, flattened out of groups - used by the search palette. */
 export interface FlatNavItem {
   path: string;
   label: string;
@@ -190,7 +190,7 @@ export interface FlatNavItem {
 
 /**
  * Flatten a role's navigation (standalone links + every group child) into a single
- * list of destinations. Synthetic `group:*` parents are dropped — only real pages
+ * list of destinations. Synthetic `group:*` parents are dropped - only real pages
  * remain. Permission filtering is applied by the caller (same rules as the sidebar).
  */
 export function getFlatNavItems(role: UserRole): FlatNavItem[] {

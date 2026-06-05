@@ -155,10 +155,10 @@ const NOTIFICATION_MATRIX = {
 };
 
 /**
- * User-facing email notification categories — the emailable, NON-transactional
+ * User-facing email notification categories - the emailable, NON-transactional
  * events a person can toggle in Settings. Each `key` is the preferenceKey the
- * orchestrator checks in `emailNotifications`. (Transactional mail — password
- * reset, account welcome — is intentionally excluded; it always sends.)
+ * orchestrator checks in `emailNotifications`. (Transactional mail - password
+ * reset, account welcome - is intentionally excluded; it always sends.)
  */
 const EMAIL_PREFERENCE_CATEGORIES = [
   { group: 'Tasks', key: 'task_assigned', label: 'A task is assigned to me' },

@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * PromotionCandidate — a mentee nominated to become a co-mentor. Moves
+   * PromotionCandidate - a mentee nominated to become a co-mentor. Moves
    * nominated → interview → approved → promoted. Promotion grants the user the
    * 'mentor' platform capability and (optionally) a co_mentor ClanMembership.
    */

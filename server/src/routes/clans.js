@@ -21,11 +21,11 @@ router.get('/insights', authenticate, requirePermission(PERMISSIONS.ANALYTICS_VI
 // Clan detail.
 router.get('/:id', authenticate, clanController.getClan);
 
-// Create a clan — needs clan.create (super_admin, people_admin, or program_admin
+// Create a clan - needs clan.create (super_admin, people_admin, or program_admin
 // of the target program).
 router.post('/', authenticate, requirePermission(PERMISSIONS.CLAN_CREATE, (req) => ({ programId: req.body.programId })), clanController.createClan);
 
-// Update / manage members — needs clan.manage_members ON THIS CLAN. That's held
+// Update / manage members - needs clan.manage_members ON THIS CLAN. That's held
 // by admins and the clan's LEAD MENTOR (not co-mentors). This is how a lead
 // mentor adds a co-mentor / core-team member to their own clan.
 router.patch('/:id', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.updateClan);

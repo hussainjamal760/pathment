@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * DelayEvent — a logged reason a mentee fell behind (the fairness lens). The
+   * DelayEvent - a logged reason a mentee fell behind (the fairness lens). The
    * AI (or a mentor) categorizes it as external / scope / avoidance; accepted
    * external delays count in the mentee's favour when computing relative
    * progress, so someone fighting real constraints isn't punished.

@@ -128,7 +128,7 @@ export default function ApplyPage() {
         <ArrowLeft className="w-4 h-4" /> Back
       </Link>
 
-      <h1 className="mt-4 text-2xl font-semibold text-slate-900">Apply — {info.program?.name}</h1>
+      <h1 className="mt-4 text-2xl font-semibold text-slate-900">Apply - {info.program?.name}</h1>
       <p className="mt-1 text-slate-600">{info.cohort.name}</p>
       {info.assessment && (
         <p className="mt-3 text-sm rounded-lg bg-brand-50 dark:bg-brand-500/15 text-brand-800 px-3 py-2">

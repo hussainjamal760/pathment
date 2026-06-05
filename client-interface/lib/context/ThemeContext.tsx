@@ -47,7 +47,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const modeRef = useRef<ThemeMode>('light');
   const accentRef = useRef<AccentKey>(DEFAULT_ACCENT);
 
-  // Mount: read cached prefs, apply synchronously (no flash — provider gates
+  // Mount: read cached prefs, apply synchronously (no flash - provider gates
   // children on `mounted`), wire the OS listener, then reconcile with server.
   useEffect(() => {
     // Default to light ("white") unless the user has explicitly chosen otherwise.
@@ -90,7 +90,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
             applyToRoot(resolve(modeRef.current), data.colorTheme);
             localStorage.setItem(ACCENT_STORAGE_KEY, data.colorTheme);
           }
-        }).catch(() => { /* offline — cache wins */ });
+        }).catch(() => { /* offline - cache wins */ });
       }
     } catch { /* ignore */ }
 

@@ -304,7 +304,7 @@ class MessagingService {
     return sequelize.transaction(async (transaction) => {
       const { conversationId, messageText, subject, parentMessageId, relatedTaskId, relatedEnrollmentId } = payload;
 
-      // Lock only the conversation row (no joins — FOR UPDATE cannot be applied to nullable side of outer join in PG)
+      // Lock only the conversation row (no joins - FOR UPDATE cannot be applied to nullable side of outer join in PG)
       const conversation = await models.Conversation.findByPk(conversationId, {
         transaction,
         lock: transaction.LOCK.UPDATE
@@ -474,7 +474,7 @@ class MessagingService {
 
   /**
    * Mark every message addressed to this user (across all conversations) as
-   * delivered — called when the user connects. Returns the affected messages
+   * delivered - called when the user connects. Returns the affected messages
    * grouped by sender so the socket layer can flip the senders' ticks live.
    */
   async markDelivered(userId) {
@@ -489,7 +489,7 @@ class MessagingService {
   }
 
   /**
-   * Toggle a user's emoji reaction on a message (one per user — re-acting with a
+   * Toggle a user's emoji reaction on a message (one per user - re-acting with a
    * different emoji replaces it; re-acting with the same one removes it). Returns
    * the message's full reaction set + the conversation id for the socket emit.
    */

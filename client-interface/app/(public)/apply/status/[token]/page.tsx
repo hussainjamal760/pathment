@@ -226,7 +226,7 @@ export default function ApplicationStatusPage() {
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             Submit assessment
           </button>
-          <p className="mt-2 text-center text-xs text-slate-400">You can only submit once — review your answers first.</p>
+          <p className="mt-2 text-center text-xs text-slate-400">You can only submit once - review your answers first.</p>
         </div>
       )}
     </div>

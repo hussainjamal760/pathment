@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * AssessmentSubmission — an applicant's answers to an assessment. One row per
+   * AssessmentSubmission - an applicant's answers to an assessment. One row per
    * (assessment, application). Auto-graded items are scored on submit; manual
    * items are scored by an admin (`manualScore`), and `totalScore` is the sum.
    */

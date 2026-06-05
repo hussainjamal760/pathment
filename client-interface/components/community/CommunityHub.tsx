@@ -433,10 +433,10 @@ export default function CommunityHub() {
       </div>
 
       <div className="grid lg:grid-cols-[260px_1fr_280px] gap-6">
-        {/* Left — spaces */}
+        {/* Left - spaces */}
         <div className="space-y-4 order-1"><SpaceSwitcher hub={hub} /></div>
 
-        {/* Center — composer + feed */}
+        {/* Center - composer + feed */}
         <div className="space-y-4 order-3 lg:order-2">
           {/* Filters */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -471,14 +471,14 @@ export default function CommunityHub() {
           ) : hub.feed.length === 0 ? (
             <div className="bg-card rounded-2xl border border-slate-200 py-12 text-center">
               <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600">Nothing here yet — be the first to post in {hub.active?.name}.</p>
+              <p className="text-slate-600">Nothing here yet - be the first to post in {hub.active?.name}.</p>
             </div>
           ) : (
             hub.feed.map((p) => <PostCard key={p.id} post={p} canModerate={canModerate} hub={hub} />)
           )}
         </div>
 
-        {/* Right — context */}
+        {/* Right - context */}
         <div className="space-y-4 order-2 lg:order-3">
           {hub.shoutouts.length > 0 && (
             <div className="bg-card rounded-2xl border border-slate-200 p-5">
@@ -506,7 +506,7 @@ export default function CommunityHub() {
             </div>
           )}
 
-          {/* Top contributors — recognition right where it's earned */}
+          {/* Top contributors - recognition right where it's earned */}
           <div className="bg-card rounded-2xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-900 flex items-center gap-1.5"><Trophy className="w-4 h-4 text-amber-500" />Top contributors</h3>
@@ -520,7 +520,7 @@ export default function CommunityHub() {
               </div>
             </div>
             {hub.leaderboard.length === 0 ? (
-              <p className="text-sm text-slate-500">No contributions yet — give kudos or answer a question to get on the board.</p>
+              <p className="text-sm text-slate-500">No contributions yet - give kudos or answer a question to get on the board.</p>
             ) : (
               <div className="space-y-1">
                 {hub.leaderboard.map((r) => (
@@ -538,7 +538,7 @@ export default function CommunityHub() {
             )}
             {hub.myRank && !hub.leaderboard.some((r) => r.mine) && (
               <p className="mt-2 pt-2 border-t border-slate-100 text-xs text-slate-500">
-                You: <span className="font-medium text-slate-700">{hub.myRank.tier}</span> · {hub.myRank.points} pts{hub.myRank.rank ? ` · #${hub.myRank.rank}` : ''} — climb by giving kudos &amp; answering questions.
+                You: <span className="font-medium text-slate-700">{hub.myRank.tier}</span> · {hub.myRank.points} pts{hub.myRank.rank ? ` · #${hub.myRank.rank}` : ''} - climb by giving kudos &amp; answering questions.
               </p>
             )}
           </div>

@@ -1,9 +1,9 @@
-# Pathment — Database Schema & ER Diagrams
+# Pathment - Database Schema & ER Diagrams
 
 > **Audience:** new contributors and anyone who wants to understand how Pathment's
 > data fits together, zero to hero. This document is the single source of truth for
 > the data model. It is generated from the Sequelize models under
-> [`server/src/models/`](../server/src/models) — when you change a model, update the
+> [`server/src/models/`](../server/src/models) - when you change a model, update the
 > matching diagram here.
 
 The diagrams below use [Mermaid](https://mermaid.js.org/syntax/entityRelationshipDiagram.html),
@@ -56,7 +56,7 @@ about each table.
 
 ---
 
-## 2. The spine — core entities at a glance
+## 2. The spine - core entities at a glance
 
 This is the 20% of the schema that explains 80% of the product: how a person becomes
 a placed, enrolled mentee working through tasks inside a clan.
@@ -92,13 +92,13 @@ erDiagram
 
 **Read it as a life-cycle:**
 
-1. **Apply** — a person submits an `APPLICATION` into an open `COHORT` (of a `PROGRAM`).
-2. **Accept** — an admin accepts it, which issues a `REGISTRATION_INVITE` carrying the
+1. **Apply** - a person submits an `APPLICATION` into an open `COHORT` (of a `PROGRAM`).
+2. **Accept** - an admin accepts it, which issues a `REGISTRATION_INVITE` carrying the
    `programId` + optional `clanId` + `cohortId`.
-3. **Register** — the invite is consumed at sign-up, creating the `USER` (+ profile).
-4. **Place** — registration creates an `ENROLLMENT` (program + cohort) and a
+3. **Register** - the invite is consumed at sign-up, creating the `USER` (+ profile).
+4. **Place** - registration creates an `ENROLLMENT` (program + cohort) and a
    `CLAN_MEMBERSHIP` (the clan), linked together by `enrollmentId`.
-5. **Work** — the program's `ROADMAP` → `ROADMAP_TASK`s are handed out as
+5. **Work** - the program's `ROADMAP` → `ROADMAP_TASK`s are handed out as
    `ASSIGNED_TASK`s; the mentee files `TASK_SUBMISSION`s; the mentor leaves
    `TASK_FEEDBACK`. `ENROLLMENT` progress is recomputed from the assigned tasks.
 
@@ -555,7 +555,7 @@ erDiagram
 
 > `Enrollment` progress (`tasksTotal`, `tasksCompleted`, `overallProgressPercentage`,
 > `status`) is recomputed by `taskService.updateEnrollmentTaskStats` on every
-> assign/submit/review — it is the **single source of truth** for progress. Total counts
+> assign/submit/review - it is the **single source of truth** for progress. Total counts
 > live (non-cancelled) assigned tasks, not the template, so progress never shows a false 100%.
 
 ---
@@ -923,9 +923,9 @@ with `up`/`down`, run with `--rollback` to reverse). The latest is **043**. Nota
 | 030 | Private programs + invite placement |
 | 031 | Intake cohorts & applications |
 | 032 | Community v2 (scoped posts, reactions, reports) |
-| 035–036 | AI connections (bring-your-own-key) |
+| 035-036 | AI connections (bring-your-own-key) |
 | 037 | Program reviews |
-| 040–041 | User color theme + preferences |
+| 040-041 | User color theme + preferences |
 | 042 | Message delivery receipts + reactions |
 | 043 | Public intake links + assessments (cohort link/window/cap, applicant magic-link, assessment tables) |
 

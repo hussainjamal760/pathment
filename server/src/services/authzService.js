@@ -14,7 +14,7 @@ async function loadCustomRoles() {
 }
 function invalidateCustomRoles() { _customRoles = null; }
 
-// Built-in roles that constitute "admin area" access (org/program tier — NOT
+// Built-in roles that constitute "admin area" access (org/program tier - NOT
 // clan roles like lead_mentor). Used by hasAdminAccess().
 const ADMIN_TIER_ROLES = new Set(['super_admin', 'program_admin', 'intake_manager', 'people_admin', 'moderator', 'analyst']);
 
@@ -30,8 +30,8 @@ const grants = (key, perm, custom) => {
  * "does any held role grant permission P at a scope that COVERS this resource?"
  *
  * Assignments come from two places, unioned:
- *   1. DERIVED (no setup needed) — capabilities, clan memberships, cross-clan.
- *   2. EXPLICIT — rows in role_assignments (admin-granted scoped roles).
+ *   1. DERIVED (no setup needed) - capabilities, clan memberships, cross-clan.
+ *   2. EXPLICIT - rows in role_assignments (admin-granted scoped roles).
  *
  * A `resource` descriptor names the ids that locate it in the hierarchy:
  *   { orgWide?, programId?, clanId?, userId? }
@@ -39,7 +39,7 @@ const grants = (key, perm, custom) => {
  * covers its clanId; self covers the matching userId. Default deny.
  */
 class AuthzService {
-  /** All (role, scope) a user holds — derived + explicit, de-duplicated. */
+  /** All (role, scope) a user holds - derived + explicit, de-duplicated. */
   async getAssignments(user) {
     if (!user) return [];
     const custom = await loadCustomRoles();
@@ -110,7 +110,7 @@ class AuthzService {
     return assignments.some((a) => grants(a.role, permission, custom) && this._covers(a, resource));
   }
 
-  /** The set of permissions the user has for a resource — drives client UI. */
+  /** The set of permissions the user has for a resource - drives client UI. */
   async getEffectivePermissions(user, resource = null, opts = {}) {
     const custom = await loadCustomRoles();
     const assignments = opts.assignments || (await this.getAssignments(user));
@@ -122,7 +122,7 @@ class AuthzService {
   }
 
   /**
-   * The union of permissions a user has at ANY scope — for client UI gating
+   * The union of permissions a user has at ANY scope - for client UI gating
    * (show/hide nav & buttons) where the exact resource isn't known yet. The
    * server still enforces the precise scoped check on every request.
    */
@@ -138,7 +138,7 @@ class AuthzService {
   }
 
   /**
-   * Whether the user should be able to enter the admin area at all — i.e. they
+   * Whether the user should be able to enter the admin area at all - i.e. they
    * hold an ORG- or PROGRAM-scoped elevated role (not merely a clan role like a
    * lead mentor). Drives the client's admin entry point + section guard.
    */

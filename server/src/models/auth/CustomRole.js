@@ -1,6 +1,6 @@
 module.exports = (sequelize, DataTypes) => {
   /**
-   * CustomRole — an admin-defined permission bundle, layered on top of the
+   * CustomRole - an admin-defined permission bundle, layered on top of the
    * built-in roles (src/config/roles.js). Referenced by `key` from
    * role_assignments exactly like a built-in role. authzService merges these in.
    */

@@ -127,22 +127,22 @@ router.use('/roadmaps', linearRoadmapRoutes);
 // Mentor handbook (admin-authored org doc, read by mentors)
 router.use('/mentor-spec', mentorSpecRoutes);
 
-// Registration intake — cohorts + applications (admin)
+// Registration intake - cohorts + applications (admin)
 router.use('/intake', intakeRoutes);
 
 // Assessment authoring (admin)
 router.use('/assessments', assessmentRoutes);
 
-// Public, unauthenticated intake — program catalog + apply + applicant status
+// Public, unauthenticated intake - program catalog + apply + applicant status
 router.use('/public', publicRoutes);
 
-// IAM — scoped role grants + effective-permission lookup
+// IAM - scoped role grants + effective-permission lookup
 router.use('/access', accessRoutes);
 
-// AI connections — admin BYO provider keys + feature routing
+// AI connections - admin BYO provider keys + feature routing
 router.use('/ai-connections', aiConnectionRoutes);
 
-// Program reviews — anonymous mentee→mentor feedback at completion
+// Program reviews - anonymous mentee→mentor feedback at completion
 router.use('/program-reviews', programReviewRoutes);
 
 

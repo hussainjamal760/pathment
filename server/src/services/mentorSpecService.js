@@ -2,15 +2,15 @@ const { models } = require('../db');
 
 const CATEGORY = 'mentor_spec';
 
-/** Default org mentor handbook — seeded until an admin edits it. */
+/** Default org mentor handbook - seeded until an admin edits it. */
 const DEFAULT_SPEC = {
-  intro: 'How we mentor at Pathment — the principles, the responsibilities, the bar.',
+  intro: 'How we mentor at Pathment - the principles, the responsibilities, the bar.',
   principles: [
     { title: 'Guide, don’t gatekeep', body: 'Point the way and let mentees own the journey. Your read informs, it never decides for them.' },
-    { title: 'Measure fairly', body: 'Judge progress against each person’s real constraints — accepted friction counts in their favour.' },
+    { title: 'Measure fairly', body: 'Judge progress against each person’s real constraints - accepted friction counts in their favour.' },
     { title: 'Be consistent', body: 'Reliable, timely feedback beats occasional brilliance. Small steady touches keep momentum.' },
     { title: 'Make work concrete', body: 'Clear deliverables and acceptance criteria. Vague asks create vague results.' },
-    { title: 'Respect their time', body: 'Keep reviews fast and low-friction. Fast in, fast out — for them and for you.' },
+    { title: 'Respect their time', body: 'Keep reviews fast and low-friction. Fast in, fast out - for them and for you.' },
     { title: 'Close the loop', body: 'Every submission gets a decision and a reason. Silence is the worst feedback.' }
   ],
   responsibilities: [
@@ -25,7 +25,7 @@ const DEFAULT_SPEC = {
     'Keep personal information shared in 1:1s confidential.',
     'Give feedback on the work, not the person.',
     'Flag conflicts of interest to an admin.',
-    'No discrimination, harassment, or favouritism — ever.'
+    'No discrimination, harassment, or favouritism - ever.'
   ],
   time: [
     { value: '~3h', label: 'per week, typical' },
@@ -37,11 +37,11 @@ const DEFAULT_SPEC = {
     { q: 'What does “measured fairly” mean?', a: 'A mentee can log real constraints. When you accept a delay, it lifts their relative progress so they aren’t punished for things outside their control.' },
     { q: 'When should I escalate someone as at-risk?', a: 'Nudge early; escalate to an admin if someone goes silent for over a week.' },
     { q: 'How do roadmaps work?', a: 'Build (or import) an ordered set of steps and assign it. Approving a step automatically assigns the next one.' },
-    { q: 'Can a mentee become a co-mentor?', a: 'Yes — nominate them in Promotions. After an interview and approval, an admin finalises the promotion.' }
+    { q: 'Can a mentee become a co-mentor?', a: 'Yes - nominate them in Promotions. After an interview and approval, an admin finalises the promotion.' }
   ]
 };
 
-/** Mentor handbook — one admin-authored org document, read by all mentors. */
+/** Mentor handbook - one admin-authored org document, read by all mentors. */
 class MentorSpecService {
   async _row() {
     return models.OrgPolicy.findOne({ where: { category: CATEGORY } });

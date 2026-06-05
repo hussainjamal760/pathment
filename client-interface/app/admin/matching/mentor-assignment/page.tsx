@@ -61,7 +61,7 @@ export default function MentorAssignment() {
         backLabel="Back to Dashboard"
       />
 
-      {/* Clan-based placement banner — the preferred path */}
+      {/* Clan-based placement banner - the preferred path */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/60 dark:bg-brand-500/10 px-5 py-4">
         <div className="flex items-start gap-3 flex-1">
           <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
@@ -251,7 +251,7 @@ export default function MentorAssignment() {
                                 <option value="">Select mentor…</option>
                                 {allMentors.map((m: any) => (
                                   <option key={m.id} value={m.id}>
-                                    {m.firstName} {m.lastName}{m.mentorProfile?.title ? ` — ${m.mentorProfile.title}` : ''}
+                                    {m.firstName} {m.lastName}{m.mentorProfile?.title ? ` - ${m.mentorProfile.title}` : ''}
                                   </option>
                                 ))}
                               </select>

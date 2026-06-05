@@ -10,7 +10,7 @@ import { useNavPreferences } from '@/lib/hooks/shared';
 
 /**
  * Global quick-search / command palette (⌘K). Lists every page the current user
- * can actually open for their role — reusing the sidebar's permission rules — and
+ * can actually open for their role - reusing the sidebar's permission rules - and
  * lets them jump straight there by keyboard. Mounted once per role inside Navigation,
  * so it's available app-wide. Opens via ⌘K / Ctrl+K or the `pathment:open-search` event.
  */

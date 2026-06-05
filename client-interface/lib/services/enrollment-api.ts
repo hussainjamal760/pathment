@@ -2,7 +2,7 @@ import { apiClient } from './api-client';
 import { apiConfig } from '../config/api';
 
 export const enrollmentApi = {
-  // Get overall stats (not paginated — always full counts)
+  // Get overall stats (not paginated - always full counts)
   getStats: () => {
     return apiClient.get(`${apiConfig.endpoints.enrollments}/stats`);
   },

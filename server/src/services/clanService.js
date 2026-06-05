@@ -2,7 +2,7 @@ const { models, sequelize } = require('../db');
 const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors/errorTypes');
 
 /**
- * Clan service — clans are mentor-led groups inside a Program. A mentee is
+ * Clan service - clans are mentor-led groups inside a Program. A mentee is
  * placed into a clan (clan-based assignment, replacing 1:1 matching) and
  * inherits the clan's mentor(s). Membership roles are clan-scoped.
  */
@@ -164,7 +164,7 @@ class ClanService {
         await clan.save({ transaction });
       }
 
-      // Placing a mentee in a clan IS their placement — make sure they have an
+      // Placing a mentee in a clan IS their placement - make sure they have an
       // active enrollment in the clan's program so the mentee dashboard reflects
       // it and tasks (which require an enrollment) can be assigned to them.
       if (role === 'mentee') {
@@ -213,7 +213,7 @@ class ClanService {
   /**
    * Programs a mentor is responsible for (leads or co-mentors), each with the
    * clans they run inside it and roster counts. Powers the mentor "My Programs"
-   * view — mentors only ever see programs/clans they're actually assigned to.
+   * view - mentors only ever see programs/clans they're actually assigned to.
    */
   async getMentorPrograms(userId) {
     const memberships = await models.ClanMembership.findAll({

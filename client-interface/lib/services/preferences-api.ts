@@ -8,7 +8,7 @@ export const preferencesApi = {
   /** The notification prefs the server actually reads (emailNotifications). */
   getEmailNotifications: () =>
     apiClient.get<any>('/profile').then((r) => (r.data?.settings?.emailNotifications as Record<string, boolean>) || {}),
-  /** Persist into user_settings.emailNotifications — genuinely gates email delivery. */
+  /** Persist into user_settings.emailNotifications - genuinely gates email delivery. */
   updateNotifications: (emailNotifications: Record<string, boolean>) =>
     apiClient.patch('/profile/notifications', { emailNotifications }),
 };

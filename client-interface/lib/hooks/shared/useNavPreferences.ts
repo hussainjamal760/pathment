@@ -10,8 +10,8 @@ import type { UserRole } from '@/lib/types';
 
 /**
  * Sidebar pin/reorder + ADAPTIVE ordering for the current user+role. Reads the
- * static nav config, overlays the saved order + pinned set, and — when the user
- * hasn't manually reordered — floats the items they use most toward the top via
+ * static nav config, overlays the saved order + pinned set, and - when the user
+ * hasn't manually reordered - floats the items they use most toward the top via
  * a recency-weighted frequency (frecency) score. Usage is recorded on click but
  * the visible order is computed once per mount, so the menu never reshuffles
  * under the cursor mid-navigation (it adapts between sessions). Guards SSR with

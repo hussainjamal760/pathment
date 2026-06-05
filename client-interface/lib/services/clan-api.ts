@@ -1,12 +1,12 @@
 import { apiClient } from './api-client';
 
-/** Clans — mentor-led groups inside a program (admin management + assignment). */
+/** Clans - mentor-led groups inside a program (admin management + assignment). */
 export const clanApi = {
   list: (programId?: string, status?: string) =>
     apiClient.get('/clans', { params: { programId, status } }),
   /** Org-wide clan-health snapshot grouped by program (admin dashboard). */
   health: () => apiClient.get('/clans/health'),
-  /** Org insights — clan comparison + fairness lens (admin /admin/insights). */
+  /** Org insights - clan comparison + fairness lens (admin /admin/insights). */
   insights: () => apiClient.get('/clans/insights'),
   /** Programs the current mentor runs, with their clans + roster counts. */
   mentorPrograms: () => apiClient.get('/clans/mentor/programs'),

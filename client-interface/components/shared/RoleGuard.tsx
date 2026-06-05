@@ -25,8 +25,8 @@ export function RoleGuard({ children, allowedRoles, redirectTo = '/login', permi
   const [verifying, setVerifying] = useState(false);
 
   // A user may enter a section if any of their capabilities matches it (this is
-  // what lets an admin who is also a mentee open the mentee section), OR — for
-  // the admin section — if scoped RBAC grants them org/program admin access.
+  // what lets an admin who is also a mentee open the mentee section), OR - for
+  // the admin section - if scoped RBAC grants them org/program admin access.
   const roleMatch = !!user && allowedRoles.some((r) => availableRoles.includes(r));
   const adminAllowed = !!user && permitAdminArea && canAccessAdmin;
   const permitted = roleMatch || adminAllowed;
@@ -48,7 +48,7 @@ export function RoleGuard({ children, allowedRoles, redirectTo = '/login', permi
       return;
     }
     if (awaitingPerms) return; // hold until canAccessAdmin resolves
-    // Cached capabilities may be stale — refresh from the server once before redirecting.
+    // Cached capabilities may be stale - refresh from the server once before redirecting.
     if (!recheckedCaps) {
       setVerifying(true);
       refreshUser().finally(() => { setRecheckedCaps(true); setVerifying(false); });

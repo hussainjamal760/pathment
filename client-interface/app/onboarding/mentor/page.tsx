@@ -77,7 +77,7 @@ export default function MentorOnboardingPage() {
         yearsOfExperience: parseInt(formData.yearsOfExperience) || 0,
         maxMentees: parseInt(formData.maxMentees) || 5
       });
-      toast.success('Profile saved — let\'s add your skills.');
+      toast.success('Profile saved - let\'s add your skills.');
       if (updateUser) updateUser({ ...user, onboardingStep: 1 });
       router.push('/onboarding/skills');
     } catch (error: unknown) {

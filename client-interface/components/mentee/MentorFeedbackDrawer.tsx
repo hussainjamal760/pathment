@@ -24,7 +24,7 @@ const DIMENSIONS: { key: keyof ReviewDimensions; label: string; hint: string }[]
 
 /**
  * Anonymous, structured mentee→mentor feedback collected at program completion.
- * Per-dimension 1–5 stars + optional note + a would-recommend toggle. The copy
+ * Per-dimension 1-5 stars + optional note + a would-recommend toggle. The copy
  * makes the anonymity promise explicit so mentees answer honestly.
  */
 export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose, onSubmitted }: Props) {
@@ -76,7 +76,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
         reviewText: reviewText.trim() || undefined,
         wouldRecommend,
       });
-      toast.success('Thank you — your feedback is anonymous and helps the next mentee.');
+      toast.success('Thank you - your feedback is anonymous and helps the next mentee.');
       onSubmitted?.(enrollmentId);
       onClose();
     } catch (err) {
@@ -122,7 +122,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <p className="text-sm text-emerald-800">
               Your feedback is <strong>anonymous</strong>. Mentors only ever see combined averages
-              across several mentees — never who said what.
+              across several mentees - never who said what.
             </p>
           </div>
 

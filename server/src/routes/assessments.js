@@ -6,7 +6,7 @@ const { requirePermission } = require('../middlewares/authz');
 const { PERMISSIONS } = require('../config/permissions');
 
 // Assessment authoring requires assessment.author (super_admin, intake_manager,
-// program_admin). Org-scoped check — no per-resource scope needed here.
+// program_admin). Org-scoped check - no per-resource scope needed here.
 const canAuthor = [authenticate, requirePermission(PERMISSIONS.ASSESSMENT_AUTHOR)];
 
 router.get('/', ...canAuthor, assessmentController.listAssessments);
