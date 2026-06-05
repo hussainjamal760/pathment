@@ -16,6 +16,7 @@ import {
   SlidersHorizontal,
   Check,
   Settings,
+  HelpCircle,
 } from 'lucide-react';
 import { NavLink } from '@/lib/config/navigation';
 import { useNavPreferences } from '@/lib/hooks/shared';
@@ -281,7 +282,17 @@ export default function Navigation({ role }: NavigationProps) {
               <div className="text-slate-400 text-xs capitalize truncate">{role} portal</div>
             </div>
             <div className="ml-auto flex items-center gap-0.5 shrink-0">
-              {user?.id && <NotificationDrawer userId={user.id} apiBaseUrl={apiBaseUrl} />}
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('pathment:start-tour'))}
+                title="Take a tour"
+                aria-label="Take a tour"
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors"
+              >
+                <HelpCircle className="w-5 h-5" />
+              </button>
+              <span data-tour="notifications" className="inline-flex">
+                {user?.id && <NotificationDrawer userId={user.id} apiBaseUrl={apiBaseUrl} />}
+              </span>
               <Link
                 href={`/${role}/settings`}
                 title="Settings"
