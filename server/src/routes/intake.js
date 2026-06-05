@@ -15,6 +15,10 @@ router.patch('/cohorts/:id', ...adminOnly, intakeController.updateCohort);
 // Public intake link management
 router.post('/cohorts/:id/public-link', ...adminOnly, intakeController.enablePublicLink);
 router.delete('/cohorts/:id/public-link', ...adminOnly, intakeController.disablePublicLink);
+// Copy form + assessment config from another cohort
+router.post('/cohorts/:id/clone-intake', ...adminOnly, intakeController.cloneIntake);
+// Get-or-create this cohort's assessment (inline builder)
+router.post('/cohorts/:id/assessment', ...adminOnly, intakeController.ensureCohortAssessment);
 
 // ─── Applications (scoped to a cohort) ─────────────────────────────────────────
 router.get('/cohorts/:id/applications', ...adminOnly, intakeController.listApplications);

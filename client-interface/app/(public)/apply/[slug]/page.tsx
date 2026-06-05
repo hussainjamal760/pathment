@@ -142,38 +142,51 @@ export default function ApplyPage() {
           <Field label="Last name" value={form.lastName} onChange={(v) => setField('lastName', v)} />
         </div>
         <Field label="Email" type="email" required value={form.email} onChange={(v) => setField('email', v)} />
-        <Field label="Phone" value={form.phone} onChange={(v) => setField('phone', v)} />
 
-        {(info.formSchema || []).map((field) => (
-          <div key={field.key}>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              {field.label}{field.required && <span className="text-rose-500"> *</span>}
-            </label>
-            {field.type === 'textarea' ? (
-              <textarea
-                rows={3}
-                value={form[field.key] || ''}
-                onChange={(e) => setField(field.key, e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
-              />
-            ) : field.type === 'select' ? (
-              <select
-                value={form[field.key] || ''}
-                onChange={(e) => setField(field.key, e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
-              >
-                <option value="">Select…</option>
-                {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            ) : (
-              <input
-                value={form[field.key] || ''}
-                onChange={(e) => setField(field.key, e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
-              />
-            )}
-          </div>
-        ))}
+        {(info.formSchema || []).map((field) => {
+          const val = form[field.key] || '';
+          const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card';
+          const selected = val ? val.split(',').map((s) => s.trim()).filter(Boolean) : [];
+          const toggleCheckbox = (opt: string) => {
+            const next = selected.includes(opt) ? selected.filter((s) => s !== opt) : [...selected, opt];
+            setField(field.key, next.join(', '));
+          };
+          return (
+            <div key={field.key}>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {field.label}{field.required && <span className="text-rose-500"> *</span>}
+              </label>
+              {field.type === 'textarea' ? (
+                <textarea rows={3} value={val} onChange={(e) => setField(field.key, e.target.value)} className={inputCls} />
+              ) : field.type === 'select' ? (
+                <select value={val} onChange={(e) => setField(field.key, e.target.value)} className={inputCls}>
+                  <option value="">Select…</option>
+                  {(field.options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              ) : field.type === 'checkboxes' ? (
+                <div className="space-y-1.5">
+                  {(field.options || []).map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 text-sm text-slate-700">
+                      <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggleCheckbox(opt)} className="accent-brand-600" />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              ) : field.type === 'yes_no' ? (
+                <div className="flex gap-4 text-sm text-slate-700">
+                  {['Yes', 'No'].map((opt) => (
+                    <label key={opt} className="inline-flex items-center gap-2">
+                      <input type="radio" name={field.key} checked={val === opt} onChange={() => setField(field.key, opt)} className="accent-brand-600" />
+                      {opt}
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'} value={val} onChange={(e) => setField(field.key, e.target.value)} className={inputCls} />
+              )}
+            </div>
+          );
+        })}
 
         <button
           onClick={handleSubmit}

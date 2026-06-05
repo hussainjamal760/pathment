@@ -17,6 +17,7 @@ type InviteDetails = {
   expiresAt: string;
   program?: { id: string; name: string } | null;
   clan?: { id: string; name: string } | null;
+  applicant?: { firstName: string; lastName: string } | null;
 };
 
 export default function RegisterPage() {
@@ -70,7 +71,14 @@ export default function RegisterPage() {
         }
 
         setInviteDetails(invite);
-        setFormData((prev) => ({ ...prev, email: invite.email }));
+        // Prefill name from the original application so the applicant doesn't
+        // re-type what they already gave at intake.
+        setFormData((prev) => ({
+          ...prev,
+          email: invite.email,
+          firstName: prev.firstName || invite.applicant?.firstName || '',
+          lastName: prev.lastName || invite.applicant?.lastName || '',
+        }));
       } catch (error: any) {
         const message = extractApiErrorMessage(error, 'This invite is invalid or expired.');
         setInviteError(message);

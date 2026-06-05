@@ -131,6 +131,29 @@ class CohortIntakeService {
     return cohort;
   }
 
+  /**
+   * Copy the intake CONFIG (application form fields + attached assessment) from
+   * one cohort onto another — so a new season isn't rebuilt from scratch. Does
+   * NOT copy the public slug, status, window, or applications. Idempotent: same
+   * source → same result.
+   */
+  async cloneIntakeFrom(targetCohortId, sourceCohortId) {
+    if (targetCohortId === sourceCohortId) throw new ValidationError('Pick a different cohort to copy from');
+    const [target, source] = await Promise.all([
+      models.Cohort.findByPk(targetCohortId),
+      models.Cohort.findByPk(sourceCohortId)
+    ]);
+    if (!target) throw new NotFoundError('Cohort not found');
+    if (!source) throw new NotFoundError('Source cohort not found');
+
+    await target.update({
+      intakeFormSchema: source.intakeFormSchema || [],
+      assessmentId: source.assessmentId || null,
+      assessmentRequired: source.assessmentRequired || false
+    });
+    return target;
+  }
+
   buildApplyUrl(slug) {
     const base = (process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].replace(/\/$/, '');
     return `${base}/apply/${slug}`;

@@ -2,10 +2,11 @@
 
 import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Upload, Loader2, X, CheckCircle2, XCircle, FileSpreadsheet,
-  Mail, Phone, Check, Link2, Copy, Power, ClipboardCheck,
+  Mail, Phone, Check, Link2, Copy, Power, ClipboardCheck, Pencil, Eye, CopyPlus, FormInput,
 } from 'lucide-react';
 import {
   useCohortApplications,
@@ -14,6 +15,8 @@ import {
 } from '@/lib/hooks/admin';
 import { cohortApi, applicationApi } from '@/lib/services/intake-api';
 import { assessmentApi, type Assessment } from '@/lib/services/assessment-api';
+import { IntakeFormBuilder } from '@/components/admin/IntakeFormBuilder';
+import type { IntakeFormField } from '@/lib/config/intakeFields';
 
 const STATUS_TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -175,20 +178,32 @@ function ApplicationDrawer({
 
 /** Public self-serve intake link + attached assessment configuration. */
 function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort: any; onChange: () => void }) {
+  const router = useRouter();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [otherCohorts, setOtherCohorts] = useState<{ id: string; name: string }[]>([]);
   const [assessmentId, setAssessmentId] = useState<string>(cohort?.assessmentId || '');
   const [required, setRequired] = useState<boolean>(Boolean(cohort?.assessmentRequired));
   const [closesAt, setClosesAt] = useState<string>(cohort?.applyClosesAt ? String(cohort.applyClosesAt).slice(0, 10) : '');
   const [maxApps, setMaxApps] = useState<string>(cohort?.maxApplications != null ? String(cohort.maxApplications) : '');
+  const [formFields, setFormFields] = useState<IntakeFormField[]>(cohort?.intakeFormSchema || []);
+  const [showPreview, setShowPreview] = useState(false);
+  const [cloneFrom, setCloneFrom] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => { assessmentApi.list().then(setAssessments).catch(() => {}); }, []);
+  useEffect(() => {
+    cohortApi.list().then((res: any) => {
+      const list = (res?.data?.cohorts || []).filter((c: any) => c.id !== cohortId).map((c: any) => ({ id: c.id, name: c.name }));
+      setOtherCohorts(list);
+    }).catch(() => {});
+  }, [cohortId]);
   useEffect(() => {
     setAssessmentId(cohort?.assessmentId || '');
     setRequired(Boolean(cohort?.assessmentRequired));
     setClosesAt(cohort?.applyClosesAt ? String(cohort.applyClosesAt).slice(0, 10) : '');
     setMaxApps(cohort?.maxApplications != null ? String(cohort.maxApplications) : '');
-  }, [cohort?.assessmentId, cohort?.assessmentRequired, cohort?.applyClosesAt, cohort?.maxApplications]);
+    setFormFields(cohort?.intakeFormSchema || []);
+  }, [cohort?.assessmentId, cohort?.assessmentRequired, cohort?.applyClosesAt, cohort?.maxApplications, cohort?.intakeFormSchema]);
 
   const enabled = Boolean(cohort?.publicEnabled && cohort?.publicSlug);
   const applyUrl = cohort?.publicSlug && typeof window !== 'undefined' ? `${window.location.origin}/apply/${cohort.publicSlug}` : '';
@@ -212,10 +227,36 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
         assessmentRequired: required,
         applyClosesAt: closesAt ? new Date(closesAt).toISOString() : null,
         maxApplications: maxApps === '' ? null : Number(maxApps),
+        intakeFormSchema: formFields,
       });
       toast.success('Intake settings saved');
       onChange();
     } catch { toast.error('Could not save settings'); }
+    finally { setBusy(false); }
+  };
+
+  // Open the cohort's assessment in the builder — create + attach it first if
+  // there isn't one yet (one click, no separate "create then attach" dance).
+  const editAssessment = async () => {
+    setBusy(true);
+    try {
+      if (assessmentId) { router.push(`/admin/assessments/${assessmentId}`); return; }
+      const res: any = await cohortApi.ensureAssessment(cohortId);
+      const created = res?.data?.assessment;
+      if (created?.id) { onChange(); router.push(`/admin/assessments/${created.id}`); }
+    } catch { toast.error('Could not open the assessment'); }
+    finally { setBusy(false); }
+  };
+
+  const doClone = async () => {
+    if (!cloneFrom) return;
+    setBusy(true);
+    try {
+      await cohortApi.cloneIntake(cohortId, cloneFrom);
+      toast.success('Copied form + assessment from the selected cohort');
+      setCloneFrom('');
+      onChange();
+    } catch { toast.error('Could not copy intake'); }
     finally { setBusy(false); }
   };
 
@@ -261,10 +302,44 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
         </div>
       </div>
 
+      {/* Clone from another cohort */}
+      {otherCohorts.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
+          <CopyPlus className="w-4 h-4 text-slate-400" />
+          <span className="text-xs text-slate-600">Reuse setup from</span>
+          <select value={cloneFrom} onChange={(e) => setCloneFrom(e.target.value)} className="flex-1 min-w-40 border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500">
+            <option value="">another cohort…</option>
+            {otherCohorts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button onClick={doClone} disabled={!cloneFrom || busy} className="px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:bg-slate-100 disabled:opacity-50">Copy</button>
+        </div>
+      )}
+
+      {/* Application form builder */}
       <div className="border-t border-slate-100 pt-4">
-        <div className="flex items-center gap-2 mb-2">
-          <ClipboardCheck className="w-4 h-4 text-brand-600" />
-          <h3 className="text-sm font-medium text-slate-900">Assessment</h3>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <FormInput className="w-4 h-4 text-brand-600" />
+            <h3 className="text-sm font-medium text-slate-900">Application form</h3>
+          </div>
+          <button onClick={() => setShowPreview((v) => !v)} className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800">
+            <Eye className="w-3.5 h-3.5" /> {showPreview ? 'Hide preview' : 'Preview'}
+          </button>
+        </div>
+        <IntakeFormBuilder value={formFields} onChange={setFormFields} />
+        {showPreview && <ApplyFormPreview fields={formFields} assessment={assessmentId ? assessments.find((a) => a.id === assessmentId) : undefined} required={required} />}
+      </div>
+
+      {/* Assessment */}
+      <div className="border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-brand-600" />
+            <h3 className="text-sm font-medium text-slate-900">Assessment</h3>
+          </div>
+          <button onClick={editAssessment} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800">
+            {assessmentId ? <><Pencil className="w-3.5 h-3.5" /> Edit questions</> : <><Pencil className="w-3.5 h-3.5" /> Create &amp; build</>}
+          </button>
         </div>
         <div className="grid sm:grid-cols-2 gap-4 items-end">
           <div>
@@ -279,9 +354,7 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
             Required before review
           </label>
         </div>
-        {assessments.length === 0 && (
-          <p className="mt-2 text-xs text-slate-400">No assessments yet — <Link href="/admin/assessments" className="text-brand-600">create one</Link> first.</p>
-        )}
+        <p className="mt-2 text-xs text-slate-400">Build reusable assessments in the <Link href="/admin/assessments" className="text-brand-600">Assessments library</Link>, or create one for this cohort with “Create &amp; build”.</p>
       </div>
 
       <div className="flex justify-end">
@@ -289,6 +362,42 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
           {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save intake settings
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Read-only mock of exactly what an applicant will see on the apply page. */
+function ApplyFormPreview({ fields, assessment, required }: { fields: IntakeFormField[]; assessment?: Assessment; required: boolean }) {
+  const Row = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
+    <div>
+      <label className="block text-xs font-medium text-slate-600 mb-1">{label}{req && <span className="text-rose-500"> *</span>}</label>
+      {children}
+    </div>
+  );
+  const Box = () => <div className="h-8 rounded-lg border border-slate-200 bg-slate-50" />;
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-canvas p-4 space-y-3">
+      <p className="text-[11px] uppercase tracking-wide text-slate-400">Applicant sees</p>
+      <div className="grid grid-cols-2 gap-3">
+        <Row label="First name"><Box /></Row>
+        <Row label="Last name"><Box /></Row>
+      </div>
+      <Row label="Email" req><Box /></Row>
+      {fields.map((f) => (
+        <Row key={f.key} label={f.label || '(untitled)'} req={f.required}>
+          {f.type === 'textarea' ? <div className="h-14 rounded-lg border border-slate-200 bg-slate-50" />
+            : f.type === 'checkboxes' ? <div className="text-xs text-slate-500">{(f.options || []).map((o) => `☐ ${o}`).join('   ') || '☐ option'}</div>
+            : f.type === 'select' ? <div className="h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center px-2 text-xs text-slate-400">{(f.options || [])[0] || 'Select…'}</div>
+            : f.type === 'yes_no' ? <div className="text-xs text-slate-500">○ Yes &nbsp; ○ No</div>
+            : <Box />}
+        </Row>
+      ))}
+      {assessment && (
+        <p className="text-xs rounded-lg bg-brand-50 dark:bg-brand-500/15 text-brand-800 px-3 py-2">
+          + {required ? 'Required' : 'Optional'} assessment: <strong>{assessment.title}</strong> (after submitting)
+        </p>
+      )}
     </div>
   );
 }

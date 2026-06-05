@@ -16,6 +16,7 @@ const {
   hashToken
 } = require('../utils/jwt');
 const notificationOrchestrator = require('./notificationOrchestrator');
+const { mapResponsesToProfile } = require('../config/intakeProfileFields');
 
 class AuthService {
   async getActiveInviteByToken(inviteToken, transaction) {
@@ -53,9 +54,12 @@ class AuthService {
 
     // Surface the placement so the registration page can show (read-only)
     // which program/clan the person is joining.
-    const [program, clan] = await Promise.all([
+    const [program, clan, application] = await Promise.all([
       invite.programId ? models.Program.findByPk(invite.programId, { attributes: ['id', 'name'] }) : null,
-      invite.clanId ? models.Clan.findByPk(invite.clanId, { attributes: ['id', 'name'] }) : null
+      invite.clanId ? models.Clan.findByPk(invite.clanId, { attributes: ['id', 'name'] }) : null,
+      // If this invite came from an application, prefill the registrant's name
+      // so they don't re-type what they already gave at intake.
+      models.Application.findOne({ where: { inviteId: invite.id }, attributes: ['firstName', 'lastName'] })
     ]);
 
     return {
@@ -64,7 +68,8 @@ class AuthService {
       role: invite.role,
       expiresAt: invite.expiresAt,
       program: program ? { id: program.id, name: program.name } : null,
-      clan: clan ? { id: clan.id, name: clan.name } : null
+      clan: clan ? { id: clan.id, name: clan.name } : null,
+      applicant: application ? { firstName: application.firstName || '', lastName: application.lastName || '' } : null
     };
   }
 
@@ -105,14 +110,29 @@ class AuthService {
         throw new ConflictError(AUTH_MESSAGES.EMAIL_ALREADY_EXISTS);
       }
 
+      // Carry forward whatever the applicant already gave at intake — so they
+      // never re-type it. Map the linked application's answers onto the user +
+      // mentee profile, and skip the onboarding steps they've effectively done.
+      const application = await models.Application.findOne({ where: { inviteId: invite.id }, transaction });
+      const { userPatch, profilePatch } = application
+        ? mapResponsesToProfile(application.responses)
+        : { userPatch: {}, profilePatch: {} };
+      // The mentee-profile step is satisfied once we have any of the core fields.
+      const coreProfileKnown = ['currentEducation', 'currentOccupation', 'learningGoals', 'interests']
+        .some((k) => profilePatch[k] != null && (!Array.isArray(profilePatch[k]) || profilePatch[k].length));
+
       const user = await models.User.create({
-        firstName,
-        lastName,
+        firstName: firstName || application?.firstName || null,
+        lastName: lastName || application?.lastName || null,
         email: normalizedEmail,
         passwordHash: hashedPassword,
         role,
         phoneNumber,
         dateOfBirth,
+        // Pre-fill location/contact collected at intake (explicit form input wins).
+        ...userPatch,
+        // Skip the profile step of onboarding when intake already captured it.
+        onboardingStep: role === 'mentee' && coreProfileKnown ? 1 : 0,
         // Email is already proven valid — invite was sent to this exact address
         emailVerified: true,
         emailVerifiedAt: new Date(),
@@ -130,14 +150,16 @@ class AuthService {
       } else {
         await models.MenteeProfile.create({
           userId: user.id,
-            interests: [],                 
-  currentEducation: null,        
-  currentOccupation: null,       
-  priorExperience: null,         
-  preferredLearningStyle: 'visual', 
+          interests: [],
+          currentEducation: null,
+          currentOccupation: null,
+          priorExperience: null,
+          preferredLearningStyle: 'visual',
           learningGoals: [],
           currentLevel: 1,
-          totalPoints: 0
+          totalPoints: 0,
+          // Overlay anything the applicant already provided at intake.
+          ...profilePatch
         }, { transaction });
       }
 

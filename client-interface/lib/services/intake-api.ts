@@ -19,6 +19,11 @@ export const cohortApi = {
   /** Turn the public self-serve intake link on (mints a slug) — returns { cohort, applyUrl }. */
   enablePublicLink: (id: string) => apiClient.post(`/intake/cohorts/${id}/public-link`, {}),
   disablePublicLink: (id: string) => apiClient.delete(`/intake/cohorts/${id}/public-link`),
+  /** Copy form + assessment config from another cohort. */
+  cloneIntake: (id: string, sourceCohortId: string) =>
+    apiClient.post(`/intake/cohorts/${id}/clone-intake`, { sourceCohortId }),
+  /** Get-or-create this cohort's assessment (returns { assessment }). */
+  ensureAssessment: (id: string) => apiClient.post(`/intake/cohorts/${id}/assessment`, {}),
 };
 
 /** Applications — intake records inside a cohort. Admin-only. */

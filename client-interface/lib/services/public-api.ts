@@ -24,9 +24,10 @@ export interface PublicProgram {
 export interface IntakeFormField {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'select';
+  type: 'text' | 'textarea' | 'select' | 'checkboxes' | 'number' | 'date' | 'yes_no';
   required?: boolean;
   options?: string[];
+  profileKey?: string;
 }
 
 export interface ApplyInfo {

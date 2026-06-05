@@ -37,6 +37,27 @@ const disablePublicLink = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Public intake link disabled', { cohort }));
 });
 
+const cloneIntake = catchAsync(async (req, res) => {
+  const cohort = await cohortIntakeService.cloneIntakeFrom(req.params.id, req.body?.sourceCohortId);
+  res.status(200).json(successResponse('Intake configuration copied', { cohort }));
+});
+
+// Get-or-create the cohort's assessment so "create inline" is idempotent (a
+// double-click can't spawn duplicates) and the builder opens immediately.
+const ensureCohortAssessment = catchAsync(async (req, res) => {
+  const cohort = await cohortIntakeService.getCohort(req.params.id);
+  if (cohort.assessmentId) {
+    const existing = await assessmentService.getAssessment(cohort.assessmentId);
+    return res.status(200).json(successResponse('Assessment ready', { assessment: existing }));
+  }
+  const assessment = await assessmentService.createAssessment(
+    { title: `${cohort.name} — assessment`, programId: cohort.programId },
+    req.user.id
+  );
+  await cohortIntakeService.updateCohort(req.params.id, { assessmentId: assessment.id });
+  res.status(201).json(successResponse('Assessment created', { assessment }, 201));
+});
+
 // ─── Applications ──────────────────────────────────────────────────────────────
 
 const listApplications = catchAsync(async (req, res) => {
@@ -91,6 +112,8 @@ module.exports = {
   updateCohort,
   enablePublicLink,
   disablePublicLink,
+  cloneIntake,
+  ensureCohortAssessment,
   listApplications,
   getApplication,
   gradeAssessmentSubmission,
