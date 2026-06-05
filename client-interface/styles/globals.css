@@ -98,7 +98,10 @@
   /* Dark mode inverts the neutral scale by overriding Tailwind's OWN slate vars
      (reliable in v4): bg-slate-50 → dark surface, text-slate-900 → light text.
      The whole app flips with no component edits. */
-  --color-slate-50:#0f172a; --color-slate-100:#1e293b; --color-slate-200:#334155;
+  /* Low shades are ELEVATED surfaces that sit ON TOP of cards (#1e293b): a
+     bg-slate-50 box inside a card must read as a faint inset, not as the page
+     showing through. Hierarchy: canvas(#0b1120) < card(#1e293b) < these. */
+  --color-slate-50:#273345; --color-slate-100:#2f3b4e; --color-slate-200:#3a4659;
   --color-slate-300:#475569; --color-slate-400:#64748b; --color-slate-500:#94a3b8;
   --color-slate-600:#cbd5e1; --color-slate-700:#dde3ea; --color-slate-800:#e2e8f0;
   --color-slate-900:#f1f5f9; --color-slate-950:#f8fafc;
