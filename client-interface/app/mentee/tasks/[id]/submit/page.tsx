@@ -140,7 +140,7 @@ export default function TaskSubmission({ params }: PageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
       </div>
     );
   }
@@ -212,8 +212,8 @@ export default function TaskSubmission({ params }: PageProps) {
             </div>
             <p className="text-slate-600">{taskDescription}</p>
             {taskDeliverable && (
-              <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
-                <p className="text-sm text-indigo-900"><strong>Deliverable:</strong> {taskDeliverable}</p>
+              <div className="mt-3 p-3 bg-brand-50 border border-brand-200 rounded-lg">
+                <p className="text-sm text-brand-900"><strong>Deliverable:</strong> {taskDeliverable}</p>
               </div>
             )}
           </div>
@@ -222,7 +222,7 @@ export default function TaskSubmission({ params }: PageProps) {
               ? 'bg-red-100 text-red-700'
               : daysUntilDue <= 2
               ? 'bg-orange-100 text-orange-700'
-              : 'bg-indigo-100 text-indigo-700'
+              : 'bg-brand-100 text-brand-700'
           }`}>
             <div className="flex items-center gap-1">
               <Calendar className="w-4 h-4" />
@@ -237,7 +237,7 @@ export default function TaskSubmission({ params }: PageProps) {
           const optional = acceptanceCriteria.slice(reqCount);
           return (
             <div className="mt-6">
-              <h3 className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-indigo-500" />What your mentor checks</h3>
+              <h3 className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-brand-500" />What your mentor checks</h3>
               <p className="text-xs text-slate-500 mb-3">Required items must be met to pass — the rest make your work stronger.</p>
               <ul className="space-y-2">
                 {required.map((criterion: string, index: number) => (
@@ -271,7 +271,7 @@ export default function TaskSubmission({ params }: PageProps) {
                     href={resource.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-indigo-600 hover:underline flex items-center gap-2"
+                    className="text-sm text-brand-600 hover:underline flex items-center gap-2"
                   >
                     <LinkIcon className="w-4 h-4" />
                     {resource.title}
@@ -321,7 +321,7 @@ export default function TaskSubmission({ params }: PageProps) {
                           value={link}
                           onChange={(e) => updateLink(index, e.target.value)}
                           placeholder="https://github.com/username/project"
-                          className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full pl-10 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                         />
                       </div>
                       {links.length > 1 && (
@@ -338,7 +338,7 @@ export default function TaskSubmission({ params }: PageProps) {
                   <button
                     type="button"
                     onClick={addLink}
-                    className="text-sm text-indigo-600 hover:text-indigo-700"
+                    className="text-sm text-brand-600 hover:text-brand-700"
                   >
                     + Add another link
                   </button>
@@ -362,7 +362,7 @@ export default function TaskSubmission({ params }: PageProps) {
                       value={timeSpentHours}
                       onChange={(e) => setTimeSpentHours(e.target.value)}
                       placeholder="e.g. 3"
-                      className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
                   <span className="text-sm text-slate-500">hours</span>
@@ -397,7 +397,7 @@ export default function TaskSubmission({ params }: PageProps) {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -427,7 +427,7 @@ export default function TaskSubmission({ params }: PageProps) {
               <select
                 value={extensionDays}
                 onChange={(e) => setExtensionDays(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value={1}>1 day</option>
                 <option value={2}>2 days</option>
@@ -445,7 +445,7 @@ export default function TaskSubmission({ params }: PageProps) {
                 value={extensionReason}
                 onChange={(e) => setExtensionReason(e.target.value)}
                 placeholder="Explain why you need more time..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[120px]"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 min-h-[120px]"
               />
             </div>
 
@@ -461,7 +461,7 @@ export default function TaskSubmission({ params }: PageProps) {
                 type="button"
                 onClick={handleExtensionRequest}
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? 'Requesting...' : 'Request Extension'}
               </button>

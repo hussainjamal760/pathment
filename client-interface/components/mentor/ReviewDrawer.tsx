@@ -80,7 +80,7 @@ export function ReviewDrawer({
   const Criterion = ({ c, required: req }: { c: string; required?: boolean }) => (
     <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
       <input type="checkbox" checked={checked.has(c)} onChange={() => toggle(c)}
-        className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+        className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
       <span className="text-sm text-slate-700">{c}{req && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-rose-500 font-semibold">required</span>}</span>
     </label>
   );
@@ -147,7 +147,7 @@ export function ReviewDrawer({
             <div className="mt-2 space-y-1">
               {item.submissionUrls.map((u, i) => (
                 <a key={i} href={u} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 break-all">
+                  className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 break-all">
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />{u}
                 </a>
               ))}
@@ -159,7 +159,7 @@ export function ReviewDrawer({
         {item.criteria.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-indigo-500" />What passes</h3>
+              <h3 className="text-sm font-medium text-slate-700 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-brand-500" />What passes</h3>
               <span className="text-xs text-slate-400">{checked.size}/{item.criteria.length}</span>
             </div>
             {required.length > 0 && (
@@ -197,7 +197,7 @@ export function ReviewDrawer({
           <div className="flex flex-wrap gap-2">
             {FEEDBACK_TEMPLATES.map((t) => (
               <button key={t} onClick={() => addTemplate(t)}
-                className="px-2.5 py-1 rounded-full border border-slate-200 text-xs text-slate-600 hover:border-indigo-300 hover:text-indigo-700">
+                className="px-2.5 py-1 rounded-full border border-slate-200 text-xs text-slate-600 hover:border-brand-300 hover:text-brand-700">
                 {t}
               </button>
             ))}
@@ -212,7 +212,7 @@ export function ReviewDrawer({
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
             placeholder="What's good, what to change…"
-            className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+            className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           />
         </div>
       </div>

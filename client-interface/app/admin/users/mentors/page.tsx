@@ -257,7 +257,7 @@ export default function AdminMentorsListPage() {
         <div className="flex items-center gap-2">
           <Link
             href={`/admin/mentors/${row.id}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Profile
@@ -327,7 +327,7 @@ export default function AdminMentorsListPage() {
           icon={Star}
           label="Avg Rating"
           value={isLoading ? '—' : avgRating}
-          colorClass="text-indigo-600 bg-indigo-50"
+          colorClass="text-brand-600 bg-brand-50"
           sub="on this page"
         />
       </div>

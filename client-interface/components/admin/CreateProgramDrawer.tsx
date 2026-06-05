@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Plus, Check } from 'lucide-react';
 import { useProgramCreate } from '@/lib/hooks/admin';
 
-const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500';
 const labelCls = 'block text-sm font-medium text-slate-700 mb-1';
 
 /**
@@ -43,9 +43,9 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
     items.length > 0 ? (
       <div className="flex flex-wrap gap-2 mt-2">
         {items.map((it) => (
-          <span key={it} className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs">
+          <span key={it} className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs">
             {it}
-            <button type="button" onClick={() => onRemove(it)} className="text-indigo-500 hover:text-indigo-700" aria-label={`Remove ${it}`}><X className="w-3 h-3" /></button>
+            <button type="button" onClick={() => onRemove(it)} className="text-brand-500 hover:text-brand-700" aria-label={`Remove ${it}`}><X className="w-3 h-3" /></button>
           </span>
         ))}
       </div>
@@ -171,7 +171,7 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
 
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={handleCreateProgram} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={handleCreateProgram} disabled={loading} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Create program
           </button>
         </div>

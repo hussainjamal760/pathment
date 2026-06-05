@@ -71,7 +71,7 @@ export default function MentorApprovals() {
           <button
             onClick={runBulk}
             disabled={bulkBusy || selectedOnTime.length === 0}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors disabled:opacity-50 shrink-0"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 shrink-0"
           >
             {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />}
             Approve selected{selectedOnTime.length > 0 ? ` (${selectedOnTime.length})` : ''}
@@ -87,7 +87,7 @@ export default function MentorApprovals() {
               type="checkbox"
               readOnly
               checked={selectedOnTime.length === onTime.length && onTime.length > 0}
-              className="w-4 h-4 rounded border-slate-300 text-indigo-600"
+              className="w-4 h-4 rounded border-slate-300 text-brand-600"
             />
             Select all on-time ({onTime.length})
           </button>
@@ -99,12 +99,12 @@ export default function MentorApprovals() {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
         </div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : queue.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
@@ -120,14 +120,14 @@ export default function MentorApprovals() {
                   type="checkbox"
                   checked={selected.has(item.submissionId)}
                   onChange={() => toggle(item.submissionId)}
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 shrink-0"
+                  className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0"
                 />
               ) : (
                 <span className="w-4 shrink-0" />
               )}
 
-              <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                <span className="text-indigo-700 text-xs font-medium">{item.mentee?.avatar}</span>
+              <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+                <span className="text-brand-700 text-xs font-medium">{item.mentee?.avatar}</span>
               </div>
 
               <div className="min-w-0 flex-1">
@@ -147,7 +147,7 @@ export default function MentorApprovals() {
 
               <button
                 onClick={() => setReviewing(item)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-indigo-300 hover:text-indigo-700 shrink-0"
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
               >
                 Review <ChevronRight className="w-4 h-4" />
               </button>

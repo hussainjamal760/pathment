@@ -1,12 +1,13 @@
 'use client';
 
-import { Loader2, Save, User, Briefcase, Users, Bell, Shield, KeyRound, Sparkles } from 'lucide-react';
+import { Loader2, Save, User, Briefcase, Users, Bell, Shield, KeyRound, Sparkles, Palette } from 'lucide-react';
 import { useMentorSettings } from '@/lib/hooks/mentor';
 import { PageHeader, TabBar } from '@/components/admin/ui';
 import SecurityTab from '@/components/shared/SecurityTab';
 import AIConnectionsTab from '@/components/settings/AIConnectionsTab';
 import { LocationDetailsFields } from '@/components/settings/LocationDetailsFields';
 import { SkillsTab } from '@/components/settings/SkillsTab';
+import { AppearanceTab } from '@/components/settings/AppearanceTab';
 import type { Tab } from '@/components/admin/ui';
 
 export default function MentorSettings() {
@@ -32,7 +33,7 @@ export default function MentorSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -41,6 +42,7 @@ export default function MentorSettings() {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'mentor', label: 'Mentor Info', icon: Briefcase },
     { id: 'skills', label: 'Skills', icon: Sparkles },
+    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'availability', label: 'Availability', icon: Users },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'ai', label: 'AI Connections', icon: KeyRound },
@@ -74,7 +76,7 @@ export default function MentorSettings() {
                     type="text"
                     value={profileData.firstName}
                     onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
@@ -84,7 +86,7 @@ export default function MentorSettings() {
                     type="text"
                     value={profileData.lastName}
                     onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
@@ -104,7 +106,7 @@ export default function MentorSettings() {
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -115,7 +117,7 @@ export default function MentorSettings() {
                   value={profileData.bio}
                   onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
                   rows={4}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="Tell us about yourself..."
                 />
               </div>
@@ -130,7 +132,7 @@ export default function MentorSettings() {
               <button
                 onClick={handleProfileUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Changes
@@ -142,6 +144,9 @@ export default function MentorSettings() {
           {activeTab === 'skills' && (
             <SkillsTab blurb="Add the skills you bring as a mentor, with how strong you are at each. Mentees and admins see these on your profile." />
           )}
+
+          {/* Appearance Tab */}
+          {activeTab === 'appearance' && <AppearanceTab />}
 
           {/* Mentor Info Tab */}
           {activeTab === 'mentor' && (
@@ -155,7 +160,7 @@ export default function MentorSettings() {
                     type="text"
                     value={mentorProfile.title}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="e.g., Senior Software Engineer"
                   />
                 </div>
@@ -166,7 +171,7 @@ export default function MentorSettings() {
                     type="text"
                     value={mentorProfile.organization}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, organization: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="Company name"
                   />
                 </div>
@@ -177,7 +182,7 @@ export default function MentorSettings() {
                     type="number"
                     value={mentorProfile.yearsOfExperience}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, yearsOfExperience: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     min="0"
                   />
                 </div>
@@ -188,7 +193,7 @@ export default function MentorSettings() {
                     type="url"
                     value={mentorProfile.linkedinUrl}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, linkedinUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://linkedin.com/in/..."
                   />
                 </div>
@@ -199,7 +204,7 @@ export default function MentorSettings() {
                     type="url"
                     value={mentorProfile.githubUrl}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, githubUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://github.com/..."
                   />
                 </div>
@@ -210,7 +215,7 @@ export default function MentorSettings() {
                     type="url"
                     value={mentorProfile.portfolioUrl}
                     onChange={(e) => setMentorProfile({ ...mentorProfile, portfolioUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://..."
                   />
                 </div>
@@ -219,7 +224,7 @@ export default function MentorSettings() {
               <button
                 onClick={handleMentorProfileUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Changes
@@ -236,7 +241,7 @@ export default function MentorSettings() {
               </div>
 
               {/* Current Status Card */}
-              <div className="p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+              <div className="p-6 bg-gradient-to-br from-brand-50 to-brand-50 rounded-xl border border-brand-100">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <div className="text-slate-900 font-medium mb-1">Current Status</div>
@@ -255,7 +260,7 @@ export default function MentorSettings() {
                 
                 <div className="w-full bg-white rounded-full h-3 overflow-hidden">
                   <div 
-                    className="h-full bg-indigo-600 transition-all duration-300"
+                    className="h-full bg-brand-600 transition-all duration-300"
                     style={{ 
                       width: `${(availabilitySettings.currentMenteeCount / availabilitySettings.maxMentees) * 100}%` 
                     }}
@@ -281,7 +286,7 @@ export default function MentorSettings() {
                     })}
                     className="sr-only peer"
                   />
-                  <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                  <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
                 </label>
               </div>
 
@@ -301,7 +306,7 @@ export default function MentorSettings() {
                     })}
                     min="1"
                     max="50"
-                    className="w-32 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-32 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                   <span className="text-slate-600">mentees</span>
                 </div>
@@ -310,7 +315,7 @@ export default function MentorSettings() {
               <button
                 onClick={handleAvailabilityUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Availability Settings
@@ -348,7 +353,7 @@ export default function MentorSettings() {
                         })}
                         className="sr-only peer"
                       />
-                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
                     </label>
                   </div>
                 ))}
@@ -357,7 +362,7 @@ export default function MentorSettings() {
               <button
                 onClick={handleNotificationUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Notification Settings

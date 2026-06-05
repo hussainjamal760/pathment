@@ -354,7 +354,7 @@ export default function EnrollmentOverviewPage() {
             <button
               onClick={() => handlePromoteToNextLevel(id)}
               disabled={busy}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs rounded-lg transition-colors disabled:opacity-50"
             >
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <TrendingUp className="w-3 h-3" />}
               Promote
@@ -380,7 +380,7 @@ export default function EnrollmentOverviewPage() {
   const tableColumns = [...columns, actionColumn];
 
   const statCards = [
-    { label: 'Total Enrollments', value: pagination.total,      icon: Users,     color: 'text-indigo-600 bg-indigo-50' },
+    { label: 'Total Enrollments', value: pagination.total,      icon: Users,     color: 'text-brand-600 bg-brand-50' },
     { label: 'Active / Matched',      value: stats.active,            icon: UserCheck, color: 'text-green-600 bg-green-50'   },
     { label: 'Pending Completion',     value: stats.pendingCompletion, icon: Hourglass, color: 'text-amber-600 bg-amber-50'   },
     { label: 'Pending Match',          value: stats.pendingMatch,      icon: Clock,     color: 'text-blue-600 bg-blue-50'     },

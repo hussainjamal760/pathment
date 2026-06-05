@@ -60,7 +60,7 @@ const STATUS_CLS: Record<string, string> = {
   published: 'bg-green-100 text-green-700',
   active:    'bg-green-100 text-green-700',
   draft:     'bg-amber-100 text-amber-700',
-  completed: 'bg-indigo-100 text-indigo-700',
+  completed: 'bg-brand-100 text-brand-700',
   archived:  'bg-slate-100 text-slate-600',
 };
 
@@ -112,7 +112,7 @@ export default function ProgramListPage() {
         actions={
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-colors text-sm font-medium"
+            className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Create Program
@@ -165,7 +165,7 @@ export default function ProgramListPage() {
               }}
               className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 sortBy === o.value
-                  ? 'bg-indigo-100 text-indigo-700'
+                  ? 'bg-brand-100 text-brand-700'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -218,7 +218,7 @@ export default function ProgramListPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <Link
                         href={`/admin/programs/${program.id}`}
-                        className="text-base font-semibold text-slate-900 hover:text-indigo-600 transition-colors"
+                        className="text-base font-semibold text-slate-900 hover:text-brand-600 transition-colors"
                       >
                         {program.name}
                       </Link>
@@ -244,7 +244,7 @@ export default function ProgramListPage() {
                     {program.tags && program.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mb-3">
                         {program.tags.map((tag: string) => (
-                          <span key={tag} className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium">
+                          <span key={tag} className="px-2.5 py-1 bg-brand-50 text-brand-700 rounded-full text-xs font-medium">
                             {tag}
                           </span>
                         ))}
@@ -255,7 +255,7 @@ export default function ProgramListPage() {
                     <div className="flex items-center gap-3">
                       <div className="flex-1 max-w-xs h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-indigo-500 rounded-full transition-all"
+                          className="h-full bg-brand-500 rounded-full transition-all"
                           style={{ width: `${program.completion || 0}%` }}
                         />
                       </div>

@@ -15,13 +15,13 @@ export default function AdminInsights() {
   const { insights, loading, error, refetch } = useOrgInsights();
 
   if (loading) {
-    return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+    return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   }
   if (error || !insights) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
         <p className="text-slate-600 mb-3">{error || 'No insights available.'}</p>
-        <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+        <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
       </div>
     );
   }
@@ -34,17 +34,17 @@ export default function AdminInsights() {
       <PageHeader title="Insights" subtitle="Outcomes, fairness and clan comparisons across the org" />
 
       {/* Fairness digest — the org's headline story */}
-      <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 flex flex-wrap items-start gap-3">
-        <span className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-          <Scale className="w-5 h-5 text-indigo-600" />
+      <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-5 flex flex-wrap items-start gap-3">
+        <span className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
+          <Scale className="w-5 h-5 text-brand-600" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">Fairness lens</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Fairness lens</p>
           <p className="mt-1 text-sm leading-relaxed text-slate-700">
             <strong className="text-slate-900">{kpis.clans - kpis.clansRed} of {kpis.clans} clans healthy</strong>
             {kpis.clansRed > 0 ? <> · {redClans.slice(0, 3).join(', ')}{redClans.length > 3 ? ` +${redClans.length - 3}` : ''} need attention</> : <> · none in the red</>}.
             {' '}Org relative progress runs{' '}
-            <strong className="text-indigo-700 tabular-nums">{gap >= 0 ? `${gap} pts above` : `${Math.abs(gap)} pts below`}</strong>{' '}
+            <strong className="text-brand-700 tabular-nums">{gap >= 0 ? `${gap} pts above` : `${Math.abs(gap)} pts below`}</strong>{' '}
             absolute — friction is being logged, not papered over.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default function AdminInsights() {
                     <td className="px-4 py-3 text-right tabular-nums text-slate-600">{c.memberCount}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-slate-900">{c.avgCompletion}%</td>
                     <td className={`px-4 py-3 text-right tabular-nums ${c.avgOnTime < 60 ? 'text-red-600' : 'text-slate-900'}`}>{c.avgOnTime}%</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-indigo-700">{c.avgRelative}%</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-brand-700">{c.avgRelative}%</td>
                     <td className="px-4 py-3 text-right tabular-nums text-slate-600">{c.extensions}</td>
                     <td className={`px-4 py-3 text-right tabular-nums ${c.openBlockers >= 5 ? 'text-red-600' : 'text-slate-600'}`}>{c.openBlockers}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
@@ -122,12 +122,12 @@ export default function AdminInsights() {
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-slate-400 rounded-full" style={{ width: `${fairness.avgAbsolute}%` }} /></div>
             </div>
             <div>
-              <div className="mb-1 flex items-center justify-between text-xs text-slate-500"><span>Relative (fair)</span><span className="tabular-nums font-medium text-indigo-700">{fairness.avgRelative}%</span></div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${fairness.avgRelative}%` }} /></div>
+              <div className="mb-1 flex items-center justify-between text-xs text-slate-500"><span>Relative (fair)</span><span className="tabular-nums font-medium text-brand-700">{fairness.avgRelative}%</span></div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${fairness.avgRelative}%` }} /></div>
             </div>
           </div>
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            The cohort runs <strong className="text-indigo-700 tabular-nums">{Math.abs(gap)} pts</strong> {gap >= 0 ? 'higher' : 'lower'} on
+            The cohort runs <strong className="text-brand-700 tabular-nums">{Math.abs(gap)} pts</strong> {gap >= 0 ? 'higher' : 'lower'} on
             relative progress — the friction layer is doing visible work.
           </p>
         </div>
@@ -148,10 +148,10 @@ export default function AdminInsights() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="w-3 shrink-0 text-[9px] uppercase text-slate-400">R</span>
-                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-indigo-500 rounded-full" style={{ width: `${m.relative}%` }} /></div>
+                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${m.relative}%` }} /></div>
                     </div>
                   </div>
-                  <div className={`w-10 shrink-0 text-right text-[11px] tabular-nums ${m.gap > 0 ? 'text-indigo-600' : 'text-slate-400'}`}>
+                  <div className={`w-10 shrink-0 text-right text-[11px] tabular-nums ${m.gap > 0 ? 'text-brand-600' : 'text-slate-400'}`}>
                     {m.gap >= 0 ? '+' : ''}{m.gap}
                   </div>
                 </div>

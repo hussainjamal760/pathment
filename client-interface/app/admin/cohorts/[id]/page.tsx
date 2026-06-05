@@ -101,10 +101,10 @@ function ApplicationDrawer({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Assessment score</label>
-                  <input type="number" min={0} max={100} step="0.5" value={score} onChange={(e) => setScore(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <input type="number" min={0} max={100} step="0.5" value={score} onChange={(e) => setScore(e.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 </div>
                 <div className="flex items-end">
-                  <select value={app.status} onChange={(e) => run(() => onUpdate(app.id, { status: e.target.value }))} disabled={busy} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <select value={app.status} onChange={(e) => run(() => onUpdate(app.id, { status: e.target.value }))} disabled={busy} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
                     <option value="pending">Pending</option>
                     <option value="assessment_sent">Assessment sent</option>
                     <option value="under_review">Under review</option>
@@ -114,12 +114,12 @@ function ApplicationDrawer({
               </div>
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Reviewer notes</label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
               </div>
               <button
                 onClick={() => run(() => onUpdate(app.id, { assessmentScore: score === '' ? undefined : Number(score), reviewerNotes: notes }))}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-700"
+                className="inline-flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700"
               >
                 <Check className="w-4 h-4" /> Save review
               </button>
@@ -202,7 +202,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
               <select
                 value={cohort.status}
                 onChange={(e) => cohortApi.update(id, { status: e.target.value }).then(refetch).catch(() => toast.error('Failed to update status'))}
-                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
                 <option value="planning">Planning</option>
                 <option value="open">Open</option>
@@ -211,7 +211,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
                 <option value="completed">Completed</option>
               </select>
             )}
-            <button onClick={() => fileRef.current?.click()} disabled={importing} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-indigo-400">
+            <button onClick={() => fileRef.current?.click()} disabled={importing} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:bg-brand-400">
               {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} Import CSV
             </button>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); if (fileRef.current) fileRef.current.value = ''; }} />
@@ -225,7 +225,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
           <button
             key={t.key}
             onClick={() => setStatusFilter(t.key)}
-            className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${statusFilter === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+            className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${statusFilter === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
           >
             {t.label}
           </button>
@@ -233,7 +233,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : applications.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <FileSpreadsheet className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -264,7 +264,7 @@ export default function CohortReviewPage({ params }: { params: Promise<{ id: str
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell text-slate-600">{a.assessmentScore != null ? a.assessmentScore : '—'}</td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-indigo-600 text-xs font-medium">Review</span>
+                    <span className="text-brand-600 text-xs font-medium">Review</span>
                   </td>
                 </tr>
               ))}

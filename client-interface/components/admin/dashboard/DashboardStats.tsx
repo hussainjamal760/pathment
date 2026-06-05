@@ -19,7 +19,7 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         icon={BookOpen}
         label="Total Programs"
         value={stats?.totalPrograms ?? 0}
-        colorClass="text-indigo-600 bg-indigo-50"
+        colorClass="text-brand-600 bg-brand-50"
       />
       <StatsCard
         icon={Users}

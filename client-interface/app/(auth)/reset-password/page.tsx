@@ -77,10 +77,10 @@ export default function ResetPasswordPage() {
     <div className="space-y-6">
       {/* Logo & Header */}
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4">
           <span className="text-white text-2xl">P</span>
         </div>
-        <h1 className="text-indigo-900 mb-2">
+        <h1 className="text-brand-900 mb-2">
           {step === 'email' && 'Reset your password'}
           {step === 'sent' && 'Check your email'}
           {step === 'password' && 'Create new password'}
@@ -115,7 +115,7 @@ export default function ResetPasswordPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   placeholder="you@example.com"
                   required
                   disabled={loading}
@@ -126,7 +126,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+              className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
             >
               {loading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Sending...</>
@@ -171,7 +171,7 @@ export default function ResetPasswordPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   placeholder="••••••••"
                   required
                   disabled={loading}
@@ -195,7 +195,7 @@ export default function ResetPasswordPage() {
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   placeholder="••••••••"
                   required
                   disabled={loading}
@@ -213,7 +213,7 @@ export default function ResetPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+              className="w-full bg-brand-600 hover:bg-brand-700 disabled:opacity-60 disabled:cursor-not-allowed text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
             >
               {loading ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Resetting...</>
@@ -240,7 +240,7 @@ export default function ResetPasswordPage() {
 
             <button
               onClick={() => router.push('/login')}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+              className="w-full bg-brand-600 hover:bg-brand-700 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
             >
               Continue to Login
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -251,7 +251,7 @@ export default function ResetPasswordPage() {
         {/* Back to Login */}
         {step === 'email' && (
           <div className="mt-6 text-center">
-            <Link href="/login" className="text-indigo-600 hover:text-indigo-700 text-sm inline-flex items-center gap-2">
+            <Link href="/login" className="text-brand-600 hover:text-brand-700 text-sm inline-flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" />
               Back to login
             </Link>

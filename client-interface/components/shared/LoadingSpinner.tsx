@@ -33,7 +33,7 @@ export function LoadingSpinner({
           className
         )}
       >
-        <Loader2 className={cn('animate-spin text-indigo-600', sizeClasses[size])} />
+        <Loader2 className={cn('animate-spin text-brand-600', sizeClasses[size])} />
         {message && (
           <p className="text-sm text-slate-600">{message}</p>
         )}
@@ -49,7 +49,7 @@ export function LoadingSpinner({
         className
       )}
     >
-      <Loader2 className={cn('animate-spin text-indigo-600', sizeClasses[size])} />
+      <Loader2 className={cn('animate-spin text-brand-600', sizeClasses[size])} />
       {message && (
         <span className="text-sm text-slate-600">{message}</span>
       )}

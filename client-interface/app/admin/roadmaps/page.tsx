@@ -18,7 +18,7 @@ const EFFORTS: { key: string; label: string; hint: string }[] = [
 
 interface ProgramOpt { id: string; name: string }
 
-const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 /* A draft step in the editor (no id yet). */
 interface DraftStep { title: string; type: string; effort: string; dueOffsetDays?: number; description?: string; criteria?: string }
@@ -44,20 +44,20 @@ function StepEditorRow({ index, step, onChange, onRemove, removable }: {
         {removable && <button onClick={onRemove} aria-label="Remove step" className="p-1.5 text-slate-400 hover:text-red-600 shrink-0"><Trash2 className="w-4 h-4" /></button>}
       </div>
       <div className="flex flex-wrap items-center gap-2 pl-8">
-        <select value={step.type} onChange={(e) => onChange({ ...step, type: e.target.value })} className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <select value={step.type} onChange={(e) => onChange({ ...step, type: e.target.value })} className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-brand-500">
           {TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t]}</option>)}
         </select>
         {/* segmented effort */}
         <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
           {EFFORTS.map((ef) => (
             <button key={ef.key} type="button" title={ef.hint} onClick={() => onChange({ ...step, effort: ef.key })}
-              className={`px-2.5 py-1.5 text-xs font-medium ${step.effort === ef.key ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{ef.label}</button>
+              className={`px-2.5 py-1.5 text-xs font-medium ${step.effort === ef.key ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{ef.label}</button>
           ))}
         </div>
         <div className="inline-flex items-center gap-1 text-sm">
           <span className="text-slate-400 text-xs">Due +</span>
           <input type="number" min={0} value={step.dueOffsetDays ?? ''} onChange={(e) => onChange({ ...step, dueOffsetDays: e.target.value === '' ? undefined : Number(e.target.value) })}
-            className="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            className="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           <span className="text-slate-400 text-xs">days</span>
         </div>
       </div>
@@ -101,17 +101,17 @@ export default function AdminRoadmapsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Route className="w-5 h-5 text-indigo-600" /> Org Roadmaps</h1>
+          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Route className="w-5 h-5 text-brand-600" /> Org Roadmaps</h1>
           <p className="text-slate-600 text-sm">Author the shared roadmap library. Mentors import published roadmaps and assign them to mentees.</p>
         </div>
         <button onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> New roadmap
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : roadmaps.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <Route className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -134,7 +134,7 @@ export default function AdminRoadmapsPage() {
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span className="tabular-nums">{r.steps.length} step{r.steps.length === 1 ? '' : 's'}</span>
-                {r.skillTags?.slice(0, 3).map((t) => <span key={t} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded">{t}</span>)}
+                {r.skillTags?.slice(0, 3).map((t) => <span key={t} className="px-2 py-0.5 bg-brand-50 text-brand-700 rounded">{t}</span>)}
               </div>
 
               {/* full step list */}
@@ -216,7 +216,7 @@ function CreateDrawer({ programs, onClose, onCreate }: {
       <StepsSection steps={steps} setSteps={setSteps} />
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" checked={published} onChange={(e) => setPublishedFlag(e.target.checked)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+        <input type="checkbox" checked={published} onChange={(e) => setPublishedFlag(e.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
         Publish immediately (mentors can import it)
       </label>
     </DrawerShell>
@@ -279,11 +279,11 @@ function EditDrawer({ roadmap, hub, onClose }: { roadmap: OrgRoadmap; hub: Retur
           </div>
         )}
         <button onClick={() => setNewSteps((prev) => [...prev, blankStep()])}
-          className="mt-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add step</button>
+          className="mt-2 text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add step</button>
       </div>
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input type="checkbox" checked={published} onChange={(e) => setPublishedFlag(e.target.checked)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+        <input type="checkbox" checked={published} onChange={(e) => setPublishedFlag(e.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
         Published (mentors can import it)
       </label>
     </DrawerShell>
@@ -296,7 +296,7 @@ function StepsSection({ steps, setSteps }: { steps: DraftStep[]; setSteps: Dispa
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium text-slate-700">Steps</span>
-        <button onClick={() => setSteps((s) => [...s, blankStep()])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add step</button>
+        <button onClick={() => setSteps((s) => [...s, blankStep()])} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add step</button>
       </div>
       <div className="space-y-2">
         {steps.map((s, i) => (
@@ -332,7 +332,7 @@ function DrawerShell({ title, onClose, onSave, saving, saveLabel, children }: {
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">{children}</div>
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={onSave} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={onSave} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {saveLabel}
           </button>
         </div>

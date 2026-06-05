@@ -78,6 +78,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(20),
       defaultValue: 'light'
     },
+    colorTheme: {
+      type: DataTypes.STRING(20),
+      defaultValue: 'ocean',
+      field: 'color_theme'
+    },
     language: {
       type: DataTypes.STRING(10),
       defaultValue: 'en'

@@ -94,9 +94,9 @@ export default function MenteeDailyLog() {
           return (
             <button key={d.key} onClick={() => setActiveKey(d.key)}
               className={`shrink-0 rounded-xl border px-3 py-2 text-center transition-colors ${
-                active ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'
+                active ? 'border-brand-400 bg-brand-50' : 'border-slate-200 hover:border-slate-300'
               }`}>
-              <div className={`text-xs font-medium ${active ? 'text-indigo-700' : 'text-slate-700'}`}>{d.label}</div>
+              <div className={`text-xs font-medium ${active ? 'text-brand-700' : 'text-slate-700'}`}>{d.label}</div>
               <div className="text-[11px] text-slate-400 flex items-center gap-1 justify-center">
                 {d.sub}{logged && <Check className="w-3 h-3 text-emerald-500" />}
               </div>
@@ -106,7 +106,7 @@ export default function MenteeDailyLog() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
           {/* Rituals / slots for this day */}
@@ -116,10 +116,10 @@ export default function MenteeDailyLog() {
               <div className="space-y-1.5">
                 {daySlots.map((s) => (
                   <label key={s.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                    <input type="checkbox" checked={slotsDone.has(s.id)} onChange={() => toggleSlot(s.id)} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    <input type="checkbox" checked={slotsDone.has(s.id)} onChange={() => toggleSlot(s.id)} className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                     <span className="text-slate-400 text-xs w-20 shrink-0">{s.time}</span>
                     <span className="text-sm text-slate-700">{s.recurring?.title || s.label}</span>
-                    {s.kind === 'roadmap' && <Route className="w-3.5 h-3.5 text-indigo-400" />}
+                    {s.kind === 'roadmap' && <Route className="w-3.5 h-3.5 text-brand-400" />}
                     {s.kind === 'recurring' && <Repeat className="w-3.5 h-3.5 text-emerald-400" />}
                   </label>
                 ))}
@@ -128,7 +128,7 @@ export default function MenteeDailyLog() {
           )}
 
           <div className="flex items-center gap-2">
-            <CalendarCheck className="w-4 h-4 text-indigo-500" />
+            <CalendarCheck className="w-4 h-4 text-brand-500" />
             <h2 className="text-slate-900">What did you work on?</h2>
           </div>
 
@@ -139,7 +139,7 @@ export default function MenteeDailyLog() {
               {activeTasks.map((t: any) => (
                 <label key={t.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
                   <input type="checkbox" checked={tasksDone.has(t.id)} onChange={() => toggle(t.id)}
-                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                   <span className="text-sm text-slate-700">{taskTitle(t)}</span>
                 </label>
               ))}
@@ -150,12 +150,12 @@ export default function MenteeDailyLog() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Reflection <span className="text-slate-400 font-normal">(optional)</span></label>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3}
               placeholder="How did today go? Anything you got stuck on?"
-              className="w-full border border-slate-300 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              className="w-full border border-slate-300 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
 
           <div className="flex justify-end">
             <button onClick={onSave} disabled={saving}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+              className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Save log
             </button>
           </div>

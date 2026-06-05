@@ -33,7 +33,7 @@ export default function FeedbackView({ params }: PageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -95,7 +95,7 @@ export default function FeedbackView({ params }: PageProps) {
                   <Sparkles className="w-3 h-3" /> Custom
                 </span>
               ) : (
-                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium flex items-center gap-1">
+                <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded text-xs font-medium flex items-center gap-1">
                   <BookOpen className="w-3 h-3" /> Roadmap
                 </span>
               )}
@@ -131,8 +131,8 @@ export default function FeedbackView({ params }: PageProps) {
         {/* Points earned */}
         {task.pointsAwarded != null && (
           <div className="mt-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-indigo-500" />
-            <span className="text-sm font-semibold text-indigo-700">
+            <Award className="w-5 h-5 text-brand-500" />
+            <span className="text-sm font-semibold text-brand-700">
               {task.pointsAwarded} points earned
             </span>
           </div>
@@ -184,7 +184,7 @@ export default function FeedbackView({ params }: PageProps) {
           {latestFeedback.comments && (
             <div className="p-5 bg-slate-50 rounded-xl mb-6">
               <h3 className="text-slate-900 mb-3 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-indigo-500" />
+                <MessageSquare className="w-4 h-4 text-brand-500" />
                 Mentor Feedback
               </h3>
               <div className="text-slate-700 text-sm leading-relaxed whitespace-pre-line">
@@ -267,7 +267,7 @@ export default function FeedbackView({ params }: PageProps) {
                       href={link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm"
+                      className="flex items-center gap-2 text-brand-600 hover:text-brand-700 text-sm"
                     >
                       <ExternalLink className="w-4 h-4" />
                       {link}
@@ -290,7 +290,7 @@ export default function FeedbackView({ params }: PageProps) {
       <div className="flex gap-4">
         <button
           onClick={() => router.push('/mentee/tasks')}
-          className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+          className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors"
         >
           View All Tasks
         </button>

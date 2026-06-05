@@ -72,7 +72,7 @@ export function SubmitTaskDrawer({
     }
   };
 
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <Drawer
@@ -84,7 +84,7 @@ export function SubmitTaskDrawer({
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving || !canSubmit} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving || !canSubmit} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}{isResubmit ? 'Re-submit' : 'Submit'}
           </button>
         </>
@@ -94,7 +94,7 @@ export function SubmitTaskDrawer({
         {/* What passes — same bar the mentor grades against */}
         {criteria.length > 0 && (
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <h3 className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-indigo-500" />What your mentor checks</h3>
+            <h3 className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1.5"><ShieldCheck className="w-4 h-4 text-brand-500" />What your mentor checks</h3>
             <p className="text-xs text-slate-500 mb-2">Required items must be met to pass.</p>
             <ul className="space-y-1.5">
               {required.map((c, i) => (
@@ -134,7 +134,7 @@ export function SubmitTaskDrawer({
                 )}
               </div>
             ))}
-            <button type="button" onClick={() => setLinks((prev) => [...prev, ''])} className="text-sm text-indigo-600 hover:text-indigo-700">+ Add another link</button>
+            <button type="button" onClick={() => setLinks((prev) => [...prev, ''])} className="text-sm text-brand-600 hover:text-brand-700">+ Add another link</button>
           </div>
         </div>
 

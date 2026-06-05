@@ -49,7 +49,7 @@ export function MentorFeedbackCard() {
   if (loading) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+        <Loader2 className="w-5 h-5 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -58,7 +58,7 @@ export function MentorFeedbackCard() {
 
   const header = (
     <div className="flex items-center gap-2 mb-4">
-      <MessageSquareHeart className="w-5 h-5 text-indigo-600" />
+      <MessageSquareHeart className="w-5 h-5 text-brand-600" />
       <h2 className="text-slate-900">Your mentee feedback</h2>
     </div>
   );
@@ -110,7 +110,7 @@ export function MentorFeedbackCard() {
             <div key={key} className="flex items-center gap-3">
               <span className="w-28 text-sm text-slate-600 shrink-0">{LABELS[key] ?? key}</span>
               <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
               </div>
               <span className="w-10 text-right text-sm text-slate-500 shrink-0">{d ? d.average.toFixed(1) : '—'}</span>
             </div>

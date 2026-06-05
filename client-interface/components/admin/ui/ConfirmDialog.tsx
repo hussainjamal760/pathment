@@ -31,7 +31,7 @@ export function ConfirmDialog({
   const confirmCls =
     variant === 'danger'
       ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-      : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500';
+      : 'bg-brand-600 hover:bg-brand-700 focus:ring-brand-500';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

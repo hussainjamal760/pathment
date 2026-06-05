@@ -46,7 +46,7 @@ export default function MentorAssignment() {
   if (loading && programs.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -62,10 +62,10 @@ export default function MentorAssignment() {
       />
 
       {/* Clan-based placement banner — the preferred path */}
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50/60 px-5 py-4">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50/60 px-5 py-4">
         <div className="flex items-start gap-3 flex-1">
-          <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-            <Users className="w-4 h-4 text-indigo-600" />
+          <div className="w-9 h-9 rounded-xl bg-brand-100 flex items-center justify-center shrink-0">
+            <Users className="w-4 h-4 text-brand-600" />
           </div>
           <div>
             <p className="text-sm font-medium text-slate-900">Placement is now clan-based</p>
@@ -74,28 +74,28 @@ export default function MentorAssignment() {
             </p>
           </div>
         </div>
-        <Link href="/admin/clans" className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+        <Link href="/admin/clans" className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
           Manage clans <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
 
       {/* AI Matching Banner */}
       {showAISuggestions && (
-        <div className="bg-linear-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-6 mb-8">
+        <div className="bg-linear-to-r from-brand-50 to-brand-50 border border-brand-200 rounded-2xl p-6 mb-8">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center shrink-0">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <h2 className="text-indigo-900 mb-2">AI Matching Enabled</h2>
-              <p className="text-indigo-700 text-sm mb-4">
+              <h2 className="text-brand-900 mb-2">AI Matching Enabled</h2>
+              <p className="text-brand-700 text-sm mb-4">
                 Our AI analyzes mentee backgrounds, skills, and learning goals to suggest the best mentor matches
                 based on expertise, availability, and teaching style compatibility.
               </p>
               <button
                 onClick={handleAutoMatch}
                 disabled={autoMatching || enrollments.length === 0}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center gap-2"
               >
                 {autoMatching ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Matching…</>
@@ -104,7 +104,7 @@ export default function MentorAssignment() {
                 )}
               </button>
             </div>
-            <button onClick={() => setShowAISuggestions(false)} className="text-indigo-600 hover:text-indigo-700">
+            <button onClick={() => setShowAISuggestions(false)} className="text-brand-600 hover:text-brand-700">
               ✕
             </button>
           </div>
@@ -117,7 +117,7 @@ export default function MentorAssignment() {
         <select
           value={selectedProgram}
           onChange={(e) => setSelectedProgram(e.target.value)}
-          className="w-full md:w-96 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          className="w-full md:w-96 px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
           disabled={loading}
         >
           {programs.map((program) => (
@@ -130,7 +130,7 @@ export default function MentorAssignment() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
         </div>
       ) : enrollments.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
@@ -173,7 +173,7 @@ export default function MentorAssignment() {
                           {((profile?.learningGoals?.length > 0) || (profile?.interests?.length > 0)) && (
                             <div className="flex flex-wrap gap-2">
                               {profile?.learningGoals?.map((goal: string, idx: number) => (
-                                <span key={`goal-${idx}`} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">{goal}</span>
+                                <span key={`goal-${idx}`} className="px-2 py-1 bg-brand-50 text-brand-700 rounded text-xs">{goal}</span>
                               ))}
                               {profile?.interests?.map((interest: string, idx: number) => (
                                 <span key={`interest-${idx}`} className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-xs">{interest}</span>
@@ -184,17 +184,17 @@ export default function MentorAssignment() {
                       </div>
 
                       {topSuggestion ? (
-                        <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl">
+                        <div className="p-4 bg-brand-50 border border-brand-200 rounded-xl">
                           <div className="flex items-center gap-2 mb-3">
-                            <Sparkles className="w-4 h-4 text-indigo-600" />
-                            <span className="text-indigo-900 text-sm">
+                            <Sparkles className="w-4 h-4 text-brand-600" />
+                            <span className="text-brand-900 text-sm">
                               AI Recommended Match
                             </span>
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-indigo-200 rounded-full flex items-center justify-center">
-                                <span className="text-indigo-700 text-sm">
+                              <div className="w-10 h-10 bg-brand-200 rounded-full flex items-center justify-center">
+                                <span className="text-brand-700 text-sm">
                                   {topSuggestion.mentor?.firstName?.[0]}{topSuggestion.mentor?.lastName?.[0]}
                                 </span>
                               </div>
@@ -208,7 +208,7 @@ export default function MentorAssignment() {
                             <button
                               onClick={() => handleCreateMatch(enrollment.id, topSuggestion.mentor.id)}
                               disabled={matching === enrollment.id}
-                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                             >
                               {matching === enrollment.id ? (
                                 <><Loader2 className="w-4 h-4 animate-spin" /> Assigning…</>
@@ -246,7 +246,7 @@ export default function MentorAssignment() {
                               <select
                                 value={overrides[enrollment.id]?.mentorId || ''}
                                 onChange={(e) => patchOverride(enrollment.id, { mentorId: e.target.value })}
-                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
                               >
                                 <option value="">Select mentor…</option>
                                 {allMentors.map((m: any) => (
@@ -298,7 +298,7 @@ export default function MentorAssignment() {
                     value={mentorSearch}
                     onChange={(e) => setMentorSearch(e.target.value)}
                     placeholder="Search by name or email…"
-                    className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-56"
+                    className="pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent w-56"
                   />
                 </div>
               </div>
@@ -306,7 +306,7 @@ export default function MentorAssignment() {
               <div className="divide-y divide-slate-200">
                 {mentorsLoading ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                    <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
                   </div>
                 ) : allMentors.length === 0 ? (
                   <div className="p-12 text-center">

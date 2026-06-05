@@ -20,7 +20,7 @@ function MomentumIcon({ momentum }: { momentum: CohortMomentum }) {
 
 function scoreColor(s: number): string {
   if (s >= 75) return 'bg-emerald-500';
-  if (s >= 50) return 'bg-indigo-500';
+  if (s >= 50) return 'bg-brand-500';
   if (s >= 30) return 'bg-amber-500';
   return 'bg-red-500';
 }
@@ -43,11 +43,11 @@ export default function MentorScores() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : ranked.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
@@ -57,7 +57,7 @@ export default function MentorScores() {
       ) : (
         <>
           <div className="bg-white rounded-2xl border border-slate-200 px-5 py-4 flex items-center gap-3">
-            <Gauge className="w-5 h-5 text-indigo-500" />
+            <Gauge className="w-5 h-5 text-brand-500" />
             <span className="text-sm text-slate-600">Cohort average</span>
             <span className="ml-auto text-lg font-semibold text-slate-900 tabular-nums">{avg}</span>
           </div>
@@ -67,8 +67,8 @@ export default function MentorScores() {
               <button key={r.m.id} onClick={() => router.push(`/mentor/mentees/${r.m.id}`)}
                 className="w-full text-left flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors group">
                 <span className="w-6 text-center text-sm font-semibold text-slate-400 tabular-nums">{i + 1}</span>
-                <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-                  <span className="text-indigo-700 text-xs font-medium">{r.m.avatar}</span>
+                <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-brand-700 text-xs font-medium">{r.m.avatar}</span>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -80,7 +80,7 @@ export default function MentorScores() {
                   </div>
                 </div>
                 <span className="text-lg font-semibold text-slate-900 tabular-nums shrink-0">{r.score}</span>
-                <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 shrink-0" />
+                <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-brand-500 shrink-0" />
               </button>
             ))}
           </div>

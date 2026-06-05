@@ -25,7 +25,7 @@ function ClanCard({ clan }: { clan: ClanHealthCard }) {
   return (
     <Link
       href={`/admin/clans?clan=${clan.id}`}
-      className={`group block rounded-2xl border border-slate-200 border-l-4 ${meta.border} bg-white p-5 hover:shadow-sm hover:border-indigo-300 transition-all`}
+      className={`group block rounded-2xl border border-slate-200 border-l-4 ${meta.border} bg-white p-5 hover:shadow-sm hover:border-brand-300 transition-all`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -78,8 +78,8 @@ function ProgramGroup({ program }: { program: ProgramHealth }) {
     <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-            <BookOpen className="w-4 h-4 text-indigo-600" />
+          <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0">
+            <BookOpen className="w-4 h-4 text-brand-600" />
           </div>
           <div className="min-w-0">
             <h2 className="text-slate-900 font-medium truncate">{program.name}</h2>
@@ -93,7 +93,7 @@ function ProgramGroup({ program }: { program: ProgramHealth }) {
         </div>
         <Link
           href={program.id === 'unassigned' ? '/admin/clans' : `/admin/programs/${program.id}`}
-          className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1 shrink-0"
+          className="text-sm text-brand-600 hover:text-brand-700 flex items-center gap-1 shrink-0"
         >
           View <ArrowUpRight className="w-3.5 h-3.5" />
         </Link>
@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
           <p className="text-slate-600">How every clan is tracking, program by program.</p>
         </div>
         <Link href="/admin/programs/list?create=1">
-          <button className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl transition-colors">
+          <button className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl transition-colors">
             <Plus className="w-4 h-4" />
             Create program
           </button>
@@ -133,7 +133,7 @@ export default function AdminDashboardPage() {
 
       {/* KPI strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <StatsCard icon={Users} label="Active mentees" value={kpis?.activeMentees ?? '…'} colorClass="text-indigo-600 bg-indigo-50" />
+        <StatsCard icon={Users} label="Active mentees" value={kpis?.activeMentees ?? '…'} colorClass="text-brand-600 bg-brand-50" />
         <StatsCard icon={Gauge} label="Avg completion" value={kpis ? `${kpis.avgCompletion}%` : '…'} colorClass="text-emerald-600 bg-emerald-50" />
         <StatsCard icon={Clock} label="Avg on-time" value={kpis ? `${kpis.avgOnTime}%` : '…'} colorClass="text-sky-600 bg-sky-50" />
         <StatsCard icon={AlertTriangle} label="At risk" value={kpis?.atRisk ?? '…'} colorClass="text-rose-600 bg-rose-50" />
@@ -174,18 +174,18 @@ export default function AdminDashboardPage() {
       {/* Programs → clans */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
         </div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : programs.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <Users2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-600">No clans yet — create a program and form clans to see their health here.</p>
-          <Link href="/admin/clans" className="mt-3 inline-block text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+          <Link href="/admin/clans" className="mt-3 inline-block text-brand-600 hover:text-brand-700 text-sm font-medium">
             Go to Clans
           </Link>
         </div>

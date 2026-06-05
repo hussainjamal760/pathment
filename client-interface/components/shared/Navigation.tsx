@@ -129,7 +129,7 @@ export default function Navigation({ role }: NavigationProps) {
             onClick={() => switchRole(r)}
             className={`flex-1 text-xs font-medium capitalize px-2 py-1.5 rounded-lg transition-all duration-150 ${
               r === role
-                ? 'bg-white text-indigo-700 shadow-sm'
+                ? 'bg-white text-brand-700 shadow-sm'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -152,7 +152,7 @@ export default function Navigation({ role }: NavigationProps) {
         onClick={() => { recordUsage(link.path); onNavigate?.(); }}
         className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group ${
           isActive
-            ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+            ? 'bg-brand-600 text-white shadow-sm shadow-brand-200'
             : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
         }`}
       >
@@ -179,11 +179,11 @@ export default function Navigation({ role }: NavigationProps) {
           onClick={() => toggleGroup(link.path)}
           className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 group ${
             isGroupActive && !isOpen
-              ? 'bg-indigo-50 text-indigo-700'
+              ? 'bg-brand-50 text-brand-700'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
           }`}
         >
-          <Icon className={`w-4.5 h-4.5 shrink-0 ${isGroupActive && !isOpen ? 'text-indigo-500' : 'text-slate-400 group-hover:text-slate-600'}`} />
+          <Icon className={`w-4.5 h-4.5 shrink-0 ${isGroupActive && !isOpen ? 'text-brand-500' : 'text-slate-400 group-hover:text-slate-600'}`} />
           <span className="text-sm font-medium flex-1 text-left">{link.label}</span>
           <ChevronDown
             className={`w-4 h-4 shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -207,7 +207,7 @@ export default function Navigation({ role }: NavigationProps) {
                   onClick={() => { recordUsage(child.path); onNavigate?.(); }}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 group ${
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-200'
+                      ? 'bg-brand-600 text-white shadow-sm shadow-brand-200'
                       : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                   }`}
                 >
@@ -231,7 +231,7 @@ export default function Navigation({ role }: NavigationProps) {
         <Icon className="w-4 h-4 text-slate-400 shrink-0" />
         <span className="text-sm font-medium text-slate-700 flex-1 truncate">{link.label}</span>
         <button onClick={() => togglePin(link.path)} title={isPinned ? 'Unpin' : 'Pin to top'}
-          className={`p-1 rounded ${isPinned ? 'text-indigo-600' : 'text-slate-300 hover:text-slate-500'}`}>
+          className={`p-1 rounded ${isPinned ? 'text-brand-600' : 'text-slate-300 hover:text-slate-500'}`}>
           <Pin className="w-3.5 h-3.5" fill={isPinned ? 'currentColor' : 'none'} />
         </button>
         <button onClick={() => moveUp(link.path)} title="Move up" className="p-1 text-slate-400 hover:text-slate-700"><ArrowUp className="w-3.5 h-3.5" /></button>
@@ -258,7 +258,7 @@ export default function Navigation({ role }: NavigationProps) {
           <button onClick={reset} className="text-[11px] text-slate-400 hover:text-slate-600">Reset</button>
         )}
         <button onClick={toggleEdit} title={isEditing ? 'Done' : 'Customize'}
-          className={`p-1 rounded-lg ${isEditing ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
+          className={`p-1 rounded-lg ${isEditing ? 'text-brand-600 bg-brand-50' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
           {isEditing ? <Check className="w-3.5 h-3.5" /> : <SlidersHorizontal className="w-3.5 h-3.5" />}
         </button>
       </div>
@@ -273,7 +273,7 @@ export default function Navigation({ role }: NavigationProps) {
 
           {/* Logo + quick actions (notifications & settings, always visible) */}
           <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-100">
-            <div className="flex items-center justify-center w-9 h-9 bg-indigo-600 rounded-xl shadow-sm shadow-indigo-200 shrink-0">
+            <div className="flex items-center justify-center w-9 h-9 bg-brand-600 rounded-xl shadow-sm shadow-brand-200 shrink-0">
               <span className="text-white font-bold text-sm">P</span>
             </div>
             <div className="min-w-0">
@@ -286,7 +286,7 @@ export default function Navigation({ role }: NavigationProps) {
                 href={`/${role}/settings`}
                 title="Settings"
                 aria-label="Settings"
-                className={`p-2 rounded-xl transition-colors ${pathname.startsWith(`/${role}/settings`) ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                className={`p-2 rounded-xl transition-colors ${pathname.startsWith(`/${role}/settings`) ? 'bg-brand-50 text-brand-700' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
               >
                 <Settings className="w-5 h-5" />
               </Link>
@@ -322,7 +322,7 @@ export default function Navigation({ role }: NavigationProps) {
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-100 z-60">
         <div className="flex items-center justify-between px-4 py-3.5">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-9 h-9 bg-indigo-600 rounded-xl shadow-sm shadow-indigo-200">
+            <div className="flex items-center justify-center w-9 h-9 bg-brand-600 rounded-xl shadow-sm shadow-brand-200">
               <span className="text-white font-bold text-sm">P</span>
             </div>
             <div>

@@ -62,7 +62,7 @@ export function GenerateConfirmModal({
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-4 py-2 bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-indigo-400 disabled:to-purple-400 text-white rounded-lg text-sm transition-colors flex items-center gap-2 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-linear-to-r from-brand-600 to-brand-600 hover:from-brand-700 hover:to-brand-700 disabled:from-brand-400 disabled:to-brand-400 text-white rounded-lg text-sm transition-colors flex items-center gap-2 disabled:cursor-not-allowed"
           >
             {isLoading ? (
               <>

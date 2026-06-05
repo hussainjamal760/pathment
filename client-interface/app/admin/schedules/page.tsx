@@ -9,7 +9,7 @@ interface OrgTemplate { id: string; name: string; description?: string | null; b
 interface DraftBlock { label: string; time: string; days: string; bookable: boolean }
 
 const DAY_OPTS = ['everyday', 'weekdays', 'weekends'];
-const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 const blankBlock = (): DraftBlock => ({ label: '', time: '', days: 'weekdays', bookable: false });
 
 export default function AdminSchedulesPage() {
@@ -35,16 +35,16 @@ export default function AdminSchedulesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-indigo-600" /> Org Schedule Templates</h1>
+          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-brand-600" /> Org Schedule Templates</h1>
           <p className="text-slate-600 text-sm">Author day-shape templates (standups, study blocks, rituals). Mentors import these and fill each slot with a roadmap or recurring task for their mentees.</p>
         </div>
-        <button onClick={() => setEditing('new')} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+        <button onClick={() => setEditing('new')} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> New template
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : templates.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
           <CalendarClock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
@@ -61,7 +61,7 @@ export default function AdminSchedulesPage() {
                   {t.description && <p className="text-slate-500 text-sm mt-0.5 line-clamp-2">{t.description}</p>}
                 </div>
                 <div className="flex gap-1 shrink-0">
-                  <button onClick={() => setEditing(t)} aria-label="Edit" className="p-1.5 text-slate-400 hover:text-indigo-600"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => setEditing(t)} aria-label="Edit" className="p-1.5 text-slate-400 hover:text-brand-600"><Pencil className="w-4 h-4" /></button>
                   <button onClick={() => remove(t.id)} disabled={busy === t.id} aria-label="Delete" className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
@@ -133,7 +133,7 @@ function TemplateDrawer({ template, onClose, onSaved }: { template: OrgTemplate 
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-slate-700">Time blocks</span>
-              <button onClick={() => setBlocks((b) => [...b, blankBlock()])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add block</button>
+              <button onClick={() => setBlocks((b) => [...b, blankBlock()])} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add block</button>
             </div>
             <div className="space-y-2">
               {blocks.map((b, i) => (
@@ -143,12 +143,12 @@ function TemplateDrawer({ template, onClose, onSaved }: { template: OrgTemplate 
                     {blocks.length > 1 && <button onClick={() => setBlocks((prev) => prev.filter((_, j) => j !== i))} aria-label="Remove" className="p-1.5 text-slate-400 hover:text-red-600 shrink-0"><Trash2 className="w-4 h-4" /></button>}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <input value={b.time} onChange={(e) => setBlock(i, { time: e.target.value })} placeholder="Time (e.g. 9:00 AM)" className="flex-1 min-w-[120px] border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                    <select value={b.days} onChange={(e) => setBlock(i, { days: e.target.value })} className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <input value={b.time} onChange={(e) => setBlock(i, { time: e.target.value })} placeholder="Time (e.g. 9:00 AM)" className="flex-1 min-w-[120px] border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                    <select value={b.days} onChange={(e) => setBlock(i, { days: e.target.value })} className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-brand-500">
                       {DAY_OPTS.map((d) => <option key={d} value={d}>{d}</option>)}
                     </select>
                     <label className="inline-flex items-center gap-1.5 text-sm text-slate-600">
-                      <input type="checkbox" checked={b.bookable} onChange={(e) => setBlock(i, { bookable: e.target.checked })} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      <input type="checkbox" checked={b.bookable} onChange={(e) => setBlock(i, { bookable: e.target.checked })} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                       Bookable
                     </label>
                   </div>
@@ -159,7 +159,7 @@ function TemplateDrawer({ template, onClose, onSaved }: { template: OrgTemplate 
         </div>
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{template ? 'Save' : 'Create template'}
           </button>
         </div>

@@ -79,7 +79,7 @@ export default function VerifyEmailPage() {
     <div className="space-y-6">
       {/* Logo */}
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4">
           <span className="text-white text-2xl">P</span>
         </div>
       </div>
@@ -89,13 +89,13 @@ export default function VerifyEmailPage() {
         {/* Icon */}
         <div className="flex justify-center mb-6">
           {status === 'pending' && (
-            <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
-              <Mail className="w-10 h-10 text-indigo-600" />
+            <div className="w-20 h-20 bg-brand-100 rounded-full flex items-center justify-center">
+              <Mail className="w-10 h-10 text-brand-600" />
             </div>
           )}
           {status === 'verifying' && (
-            <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center">
-              <RotateCw className="w-10 h-10 text-indigo-600 animate-spin" />
+            <div className="w-20 h-20 bg-brand-100 rounded-full flex items-center justify-center">
+              <RotateCw className="w-10 h-10 text-brand-600 animate-spin" />
             </div>
           )}
           {status === 'success' && (
@@ -156,7 +156,7 @@ export default function VerifyEmailPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
-                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
 
@@ -164,14 +164,14 @@ export default function VerifyEmailPage() {
             <div className="text-center">
               {resendCountdown > 0 ? (
                 <p className="text-slate-600 text-sm">
-                  Resend verification email in <span className="text-indigo-600">{resendCountdown}s</span>
+                  Resend verification email in <span className="text-brand-600">{resendCountdown}s</span>
                 </p>
               ) : (
                 <button
                   type="button"
                   onClick={handleResend}
                   disabled={resending}
-                  className="text-indigo-600 hover:text-indigo-700 disabled:text-indigo-300 text-sm inline-flex items-center gap-2"
+                  className="text-brand-600 hover:text-brand-700 disabled:text-brand-300 text-sm inline-flex items-center gap-2"
                 >
                   <RotateCw className={`w-4 h-4 ${resending ? 'animate-spin' : ''}`} />
                   Resend verification email

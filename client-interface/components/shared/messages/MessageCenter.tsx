@@ -273,7 +273,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
   if (isBootstrapping) {
     return (
       <div className="h-[70vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -326,14 +326,14 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                     onClick={() => setSelectedConversationId(conversation.id)}
                     className={`w-full text-left p-4 transition-colors ${
                       selectedConversationId === conversation.id
-                        ? 'bg-indigo-50'
+                        ? 'bg-brand-50'
                         : 'hover:bg-slate-50'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-slate-900 truncate">{title}</p>
                       {conversation.unreadCount > 0 && (
-                        <span className="min-w-5 h-5 px-1 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center">
+                        <span className="min-w-5 h-5 px-1 rounded-full bg-brand-600 text-white text-xs flex items-center justify-center">
                           {conversation.unreadCount}
                         </span>
                       )}
@@ -350,14 +350,14 @@ export default function MessageCenter({ role }: MessageCenterProps) {
 
         <div className="xl:col-span-8 bg-white border border-slate-200 rounded-2xl flex flex-col overflow-hidden xl:h-full min-h-0">
           <div className="p-4 border-b border-slate-200 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-indigo-600" />
+            <MessageSquare className="w-4 h-4 text-brand-600" />
             <h2 className="text-slate-900 truncate">{selectedTitle}</h2>
           </div>
 
           <div className="flex-1 min-h-0 p-4 overflow-y-auto space-y-3 bg-slate-50">
             {isMessagesLoading ? (
               <div className="h-full flex items-center justify-center">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
               </div>
             ) : messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-slate-500 text-sm">
@@ -372,7 +372,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                       key={message.id}
                       className={`max-w-[80%] rounded-2xl px-4 py-3 ${
                         mine
-                          ? 'ml-auto bg-indigo-600 text-white'
+                          ? 'ml-auto bg-brand-600 text-white'
                           : 'bg-white border border-slate-200 text-slate-800'
                       }`}
                     >
@@ -407,12 +407,12 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                 rows={2}
                 placeholder="Type a message..."
                 disabled={!selectedConversationId || isSending}
-                className="flex-1 resize-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="flex-1 resize-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!selectedConversationId || !composer.trim() || isSending}
-                className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-50 inline-flex items-center gap-2"
+                className="h-10 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-lg disabled:opacity-50 inline-flex items-center gap-2"
               >
                 {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Send

@@ -37,7 +37,7 @@ const TASK_STATUS_META: Record<string, { label: string; cls: string }> = {
   assigned: { label: 'Assigned', cls: 'bg-slate-100 text-slate-600' },
   not_started: { label: 'Not started', cls: 'bg-slate-100 text-slate-600' },
   in_progress: { label: 'In progress', cls: 'bg-sky-100 text-sky-700' },
-  submitted: { label: 'Submitted', cls: 'bg-indigo-100 text-indigo-700' },
+  submitted: { label: 'Submitted', cls: 'bg-brand-100 text-brand-700' },
   revision_needed: { label: 'Changes requested', cls: 'bg-amber-100 text-amber-700' },
   completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
   cancelled: { label: 'Cancelled', cls: 'bg-slate-100 text-slate-400' },
@@ -186,7 +186,7 @@ export default function CohortReview() {
     return () => window.removeEventListener('keydown', onKey);
   }, [go, skip, approve, requestChanges, mark, pending, focus, reviewing, assigning]);
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   if (!cohort.length) return (
     <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center max-w-2xl">
       <p className="text-slate-600">No mentees to review yet.</p>
@@ -209,7 +209,7 @@ export default function CohortReview() {
           <button onClick={() => setShowHelp(true)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100" title="Shortcuts"><Keyboard className="w-4 h-4" /></button>
           <button onClick={() => go(-1)} disabled={idx === 0} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-40 inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" />Prev</button>
           <button onClick={skip} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1"><SkipForward className="w-4 h-4" />Skip</button>
-          <button onClick={() => go(1)} disabled={idx === cohort.length - 1} className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-40 inline-flex items-center gap-1">Next<ChevronRight className="w-4 h-4" /></button>
+          <button onClick={() => go(1)} disabled={idx === cohort.length - 1} className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-40 inline-flex items-center gap-1">Next<ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
 
@@ -239,7 +239,7 @@ export default function CohortReview() {
           {/* Mentee card */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center shrink-0"><span className="text-indigo-700 font-semibold">{mentee!.avatar}</span></div>
+              <div className="w-12 h-12 bg-brand-100 rounded-full flex items-center justify-center shrink-0"><span className="text-brand-700 font-semibold">{mentee!.avatar}</span></div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold text-slate-900 truncate">{mentee!.name}</h2>
@@ -248,7 +248,7 @@ export default function CohortReview() {
                 </div>
                 <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '—'} · {mentee!.onTimeRate}% on-time</div>
               </div>
-              <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-0.5 shrink-0">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
+              <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5 shrink-0">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
             </div>
             <div className="mt-4"><DualProgress absolute={mentee!.absoluteProgress} relative={mentee!.relativeProgress} compact /></div>
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}
@@ -257,10 +257,10 @@ export default function CohortReview() {
           {/* Assigned work — everything currently on this mentee's plate */}
           <div className="bg-white rounded-2xl border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-              <ListTodo className="w-4 h-4 text-indigo-500" />
+              <ListTodo className="w-4 h-4 text-brand-500" />
               <h3 className="text-slate-900 font-medium">Assigned work</h3>
               {tasks.length > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{tasks.length}</span>}
-              <button onClick={() => setAssigning(true)} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"><Plus className="w-3.5 h-3.5" />Assign</button>
+              <button onClick={() => setAssigning(true)} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"><Plus className="w-3.5 h-3.5" />Assign</button>
             </div>
             <div className="p-4">
               {tasksLoading ? (
@@ -306,7 +306,7 @@ export default function CohortReview() {
           {/* Submissions to review */}
           <div className="bg-white rounded-2xl border border-slate-200">
             <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4 text-indigo-500" />
+              <ClipboardCheck className="w-4 h-4 text-brand-500" />
               <h3 className="text-slate-900 font-medium">To review</h3>
               {pending.length > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{pending.length}</span>}
             </div>
@@ -317,7 +317,7 @@ export default function CohortReview() {
                 <div className="space-y-2">
                   {pending.map((item, i) => (
                     <div key={item.submissionId} onClick={() => setFocus(i)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${i === focus ? 'border-indigo-300 bg-indigo-50/40' : 'border-slate-200'}`}>
+                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${i === focus ? 'border-brand-300 bg-brand-50/40' : 'border-slate-200'}`}>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
@@ -332,7 +332,7 @@ export default function CohortReview() {
                       <button onClick={(e) => { e.stopPropagation(); requestChanges(item); }} disabled={busy === item.submissionId}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-300 text-amber-700 text-xs font-medium hover:bg-amber-50 disabled:opacity-50">Changes</button>
                       <button onClick={(e) => { e.stopPropagation(); setReviewing(item); }}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-indigo-300">Review</button>
+                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-brand-300">Review</button>
                     </div>
                   ))}
                 </div>
@@ -349,7 +349,7 @@ export default function CohortReview() {
             <div className="flex gap-2">
               {(['present', 'absent', 'excused'] as Attendance[]).map((s) => (
                 <button key={s} onClick={() => mark(s)}
-                  className={`flex-1 px-2 py-1.5 rounded-lg border text-xs font-medium capitalize transition-colors ${attendance[mentee!.id] === s ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                  className={`flex-1 px-2 py-1.5 rounded-lg border text-xs font-medium capitalize transition-colors ${attendance[mentee!.id] === s ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                   {s}
                 </button>
               ))}
@@ -360,8 +360,8 @@ export default function CohortReview() {
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
             <h3 className="font-semibold text-slate-900 mb-2">Quick note</h3>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="A coaching note…"
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            <button onClick={sendNote} disabled={busy === 'note' || !note.trim()} className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50">
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <button onClick={sendNote} disabled={busy === 'note' || !note.trim()} className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">
               {busy === 'note' ? <Loader2 className="w-4 h-4 animate-spin" /> : noteSent ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}{noteSent ? 'Logged' : 'Log note'}
             </button>
           </div>
@@ -370,7 +370,7 @@ export default function CohortReview() {
           <div className="bg-white rounded-2xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" />Open blockers</h3>
-              <button onClick={() => setShowAddBlocker(true)} title="Log a blocker" className="p-1 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-slate-100"><Plus className="w-4 h-4" /></button>
+              <button onClick={() => setShowAddBlocker(true)} title="Log a blocker" className="p-1 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-slate-100"><Plus className="w-4 h-4" /></button>
             </div>
             {blockers.length === 0 ? (
               <p className="text-sm text-slate-500">None open.</p>
@@ -415,7 +415,7 @@ export default function CohortReview() {
         footer={
           <>
             <button onClick={() => setShowAddBlocker(false)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-            <button onClick={addBlocker} disabled={busy === 'add-blocker' || !bTitle.trim()} className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+            <button onClick={addBlocker} disabled={busy === 'add-blocker' || !bTitle.trim()} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
               {busy === 'add-blocker' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log blocker
             </button>
           </>
@@ -424,17 +424,17 @@ export default function CohortReview() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">What&apos;s blocking them?</label>
-            <textarea value={bTitle} onChange={(e) => setBTitle(e.target.value)} rows={2} placeholder="e.g. Stuck on async patterns" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus />
+            <textarea value={bTitle} onChange={(e) => setBTitle(e.target.value)} rows={2} placeholder="e.g. Stuck on async patterns" className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" autoFocus />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-            <select value={bCat} onChange={(e) => setBCat(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select value={bCat} onChange={(e) => setBCat(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-brand-500">
               {['technical', 'knowledge', 'access', 'personal'].map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Severity</label>
-            <select value={bSev} onChange={(e) => setBSev(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <select value={bSev} onChange={(e) => setBSev(e.target.value)} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm capitalize focus:outline-none focus:ring-2 focus:ring-brand-500">
               {['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>

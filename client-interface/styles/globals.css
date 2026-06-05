@@ -4,13 +4,28 @@
 
 :root {
   --font-size: 16px;
+  /* Brand scale — default "Ocean" (Action Blue). Per-user accents override these
+     under html[data-accent="..."] below; nothing else needs to change. */
+  --brand-50: #eef4ff;
+  --brand-100: #dbe7ff;
+  --brand-200: #bdd3ff;
+  --brand-300: #90b4ff;
+  --brand-400: #5a8bff;
+  --brand-500: #0066ff;
+  --brand-600: #0052d6;
+  --brand-700: #0a44a8;
+  --brand-800: #0a367e;
+  --brand-900: #0a2a5e;
+  --brand-950: #07193a;
+  /* Warm off-white canvas the editorial layout sits on (cards stay white). */
+  --canvas: #fafafa;
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
   --card: #ffffff;
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #030213;
+  --primary: var(--brand-600);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
@@ -78,9 +93,57 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  --canvas: oklch(0.205 0 0);
+}
+
+/* ── Per-user accent presets ("vibes") ───────────────────────────────────────
+   Each overrides ONLY the brand scale, so neutrals/status/contrast are never
+   affected. Keys match lib/config/themes.ts. Default (Ocean) lives on :root. */
+html[data-accent='emerald'] {
+  --brand-50:#ecfdf5; --brand-100:#d1fae5; --brand-200:#a7f3d0; --brand-300:#6ee7b7; --brand-400:#34d399;
+  --brand-500:#10b981; --brand-600:#059669; --brand-700:#047857; --brand-800:#065f46; --brand-900:#064e3b; --brand-950:#022c22;
+}
+html[data-accent='violet'] {
+  --brand-50:#f5f3ff; --brand-100:#ede9fe; --brand-200:#ddd6fe; --brand-300:#c4b5fd; --brand-400:#a78bfa;
+  --brand-500:#8b5cf6; --brand-600:#7c3aed; --brand-700:#6d28d9; --brand-800:#5b21b6; --brand-900:#4c1d95; --brand-950:#2e1065;
+}
+html[data-accent='sunset'] {
+  --brand-50:#fff7ed; --brand-100:#ffedd5; --brand-200:#fed7aa; --brand-300:#fdba74; --brand-400:#fb923c;
+  --brand-500:#f97316; --brand-600:#ea580c; --brand-700:#c2410c; --brand-800:#9a3412; --brand-900:#7c2d12; --brand-950:#431407;
+}
+html[data-accent='rose'] {
+  --brand-50:#fff1f2; --brand-100:#ffe4e6; --brand-200:#fecdd3; --brand-300:#fda4af; --brand-400:#fb7185;
+  --brand-500:#f43f5e; --brand-600:#e11d48; --brand-700:#be123c; --brand-800:#9f1239; --brand-900:#881337; --brand-950:#4c0519;
+}
+html[data-accent='sky'] {
+  --brand-50:#ecfeff; --brand-100:#cffafe; --brand-200:#a5f3fc; --brand-300:#67e8f9; --brand-400:#22d3ee;
+  --brand-500:#06b6d4; --brand-600:#0891b2; --brand-700:#0e7490; --brand-800:#155e75; --brand-900:#164e63; --brand-950:#083344;
+}
+html[data-accent='amber'] {
+  --brand-50:#fffbeb; --brand-100:#fef3c7; --brand-200:#fde68a; --brand-300:#fcd34d; --brand-400:#fbbf24;
+  --brand-500:#f59e0b; --brand-600:#d97706; --brand-700:#b45309; --brand-800:#92400e; --brand-900:#78350f; --brand-950:#451a03;
+}
+html[data-accent='graphite'] {
+  --brand-50:#f8fafc; --brand-100:#f1f5f9; --brand-200:#e2e8f0; --brand-300:#cbd5e1; --brand-400:#94a3b8;
+  --brand-500:#64748b; --brand-600:#475569; --brand-700:#334155; --brand-800:#1e293b; --brand-900:#0f172a; --brand-950:#020617;
 }
 
 @theme inline {
+  /* Brand utilities: bg-/text-/border-/ring-/from-/to-/via-/stroke-brand-* */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-brand-950: var(--brand-950);
+  --color-canvas: var(--canvas);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -107,10 +170,13 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Tighter, editorial radius scale (was 6–14px). */
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 10px;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -127,10 +193,16 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: var(--canvas);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Tabular numerals for data (counts, %, ratings). */
+  .tnum { font-variant-numeric: tabular-nums; }
 }
 
 @layer base {

@@ -8,7 +8,7 @@ import type { Track } from '@/lib/services/tracks-api';
 
 const STATUS_TONE: Record<string, string> = {
   assigned: 'bg-slate-100 text-slate-600',
-  in_progress: 'bg-indigo-50 text-indigo-700',
+  in_progress: 'bg-brand-50 text-brand-700',
   submitted: 'bg-amber-50 text-amber-700',
   changes_requested: 'bg-orange-50 text-orange-700',
   completed: 'bg-green-50 text-green-700',
@@ -38,7 +38,7 @@ export function TracksPanel({ menteeId }: { menteeId: string }) {
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-indigo-600" />
+          <Layers className="w-4 h-4 text-brand-600" />
           <h3 className="text-slate-900 font-semibold">Tracks</h3>
         </div>
         <span className="text-xs text-slate-400 tabular-nums">{tracks.length}</span>
@@ -73,13 +73,13 @@ export function TracksPanel({ menteeId }: { menteeId: string }) {
             onBlur={commitCreate}
             onKeyDown={(e) => { if (e.key === 'Enter') commitCreate(); if (e.key === 'Escape') { setDraft(''); setCreating(false); } }}
             placeholder="Track name…"
-            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         ) : (
           <button
             onClick={() => setCreating(true)}
             disabled={busy}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-brand-400 hover:text-brand-600 disabled:opacity-50"
           >
             <Plus className="w-4 h-4" /> Add track
           </button>
@@ -133,7 +133,7 @@ function TrackRow({
             onChange={(e) => setName(e.target.value)}
             onBlur={commitRename}
             onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setName(track.name); setEditing(false); } }}
-            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
         ) : (
           <button onClick={() => setOpen((v) => !v)} className="min-w-0 flex-1 truncate text-left text-sm font-medium text-slate-800">
@@ -143,7 +143,7 @@ function TrackRow({
         <span className="text-xs text-slate-400 tabular-nums">{track.tasks.length}</span>
         {!editing && (
           <>
-            <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-indigo-600" aria-label="Rename"><Pencil className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setEditing(true)} className="text-slate-400 hover:text-brand-600" aria-label="Rename"><Pencil className="w-3.5 h-3.5" /></button>
             <button onClick={onArchive} className="text-slate-400 hover:text-amber-600" aria-label="Archive"><Archive className="w-3.5 h-3.5" /></button>
             <button onClick={onRemove} className="text-slate-400 hover:text-red-600" aria-label="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
           </>
@@ -171,13 +171,13 @@ function TrackRow({
               onBlur={commitTask}
               onKeyDown={(e) => { if (e.key === 'Enter') commitTask(); if (e.key === 'Escape') { setTaskTitle(''); setAddingTask(false); } }}
               placeholder="Task title…"
-              className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
           ) : (
             <button
               onClick={() => setAddingTask(true)}
               disabled={busy}
-              className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-indigo-600 disabled:opacity-50"
+              className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-brand-600 disabled:opacity-50"
             >
               <Plus className="w-3 h-3" /> task
             </button>

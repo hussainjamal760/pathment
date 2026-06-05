@@ -7,7 +7,7 @@ export default function MenteeLayout({ children }: { children: React.ReactNode }
   return (
     <RoleGuard allowedRoles={['mentee']}>
       <OnboardingGuard>
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-canvas">
           <ActivityTrackerMount />
           <Navigation role="mentee" />
           <main className="lg:pl-64 pt-14 lg:pt-0">

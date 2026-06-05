@@ -40,7 +40,7 @@ function DailyBars({ sessions }: { sessions: DailySession[] }) {
                 {fmt(s.activeMinutes || 0)}
               </span>
               <div
-                className="w-full rounded-t-sm bg-indigo-500 transition-all"
+                className="w-full rounded-t-sm bg-brand-500 transition-all"
                 style={{ height: `${Math.max(pct, 2)}%`, minHeight: '2px', maxHeight: '100%' }}
               />
             </div>
@@ -125,7 +125,7 @@ export function ActivityCard({
               onClick={() => onDaysChange(d)}
               className={`px-2.5 py-1 text-xs rounded-lg transition-colors ${
                 days === d
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'text-slate-500 hover:bg-slate-100'
               }`}
             >
@@ -147,7 +147,7 @@ export function ActivityCard({
 
       {loading ? (
         <div className="h-24 flex items-center justify-center">
-          <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <>
@@ -167,7 +167,7 @@ export function ActivityCard({
               icon={Clock}
               label="Platform time"
               value={fmt(summary?.todayActiveMinutes ?? 0)}
-              color="bg-indigo-50 text-indigo-600"
+              color="bg-brand-50 text-brand-600"
             />
             <Stat
               icon={CalendarCheck}
@@ -198,7 +198,7 @@ export function ActivityCard({
               <ul className="space-y-1.5">
                 {recentEvents.slice(0, 5).map((e, i) => (
                   <li key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shrink-0" />
                     <span>{eventLabel(e.eventType)}</span>
                     <span className="ml-auto text-slate-400">
                       {new Date(e.createdAt).toLocaleTimeString([], {

@@ -119,7 +119,7 @@ function PasswordChangeForm({ onClose, onSubmit }: PasswordChangeFormProps) {
                 type={showCurrentPassword ? 'text' : 'password'}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Enter your current password"
               />
               <button
@@ -139,7 +139,7 @@ function PasswordChangeForm({ onClose, onSubmit }: PasswordChangeFormProps) {
                 type={showNewPassword ? 'text' : 'password'}
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Enter new password"
               />
               <button
@@ -159,7 +159,7 @@ function PasswordChangeForm({ onClose, onSubmit }: PasswordChangeFormProps) {
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-4 pr-12 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Confirm new password"
               />
               <button
@@ -183,7 +183,7 @@ function PasswordChangeForm({ onClose, onSubmit }: PasswordChangeFormProps) {
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:bg-brand-400 flex items-center justify-center gap-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
               Change Password
@@ -286,7 +286,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
 
             <button
               onClick={() => setStep('verify')}
-              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="w-full px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors"
             >
               I&apos;ve Scanned the Code
             </button>
@@ -311,7 +311,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
               onChange={(e) => setVerifyToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
               maxLength={6}
               placeholder="000000"
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center text-2xl tracking-widest"
+              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 text-center text-2xl tracking-widest"
             />
 
             <div className="flex gap-2">
@@ -324,7 +324,7 @@ function Setup2FAForm({ onClose, onSetupComplete }: Setup2FAFormProps) {
               <button
                 onClick={handleVerify}
                 disabled={loading}
-                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 transition-colors"
+                className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 disabled:bg-brand-400 transition-colors"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify & Enable'}
               </button>
@@ -415,7 +415,7 @@ export default function SecurityTab({ showAuditLogs = false }: SecurityTabProps)
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -441,7 +441,7 @@ export default function SecurityTab({ showAuditLogs = false }: SecurityTabProps)
           </p>
           <button
             onClick={() => setPasswordModalOpen(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors"
           >
             Change Password
           </button>
@@ -479,7 +479,7 @@ export default function SecurityTab({ showAuditLogs = false }: SecurityTabProps)
             {!twoFactorStatus?.enabled ? (
               <button
                 onClick={() => setSetup2FAModalOpen(true)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors"
               >
                 Enable 2FA
               </button>

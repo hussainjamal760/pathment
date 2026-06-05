@@ -46,7 +46,7 @@ export function OneOnOneDrawer({
     finally { setSaving(false); }
   };
 
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -73,7 +73,7 @@ export function OneOnOneDrawer({
               {SENTIMENTS.map((s) => (
                 <button key={s.key} onClick={() => setSentiment(s.key)}
                   className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                    sentiment === s.key ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+                    sentiment === s.key ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}>
                   {s.label}
                 </button>
@@ -99,7 +99,7 @@ export function OneOnOneDrawer({
 
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Save 1:1
           </button>
         </div>

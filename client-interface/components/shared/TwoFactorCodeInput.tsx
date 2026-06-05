@@ -94,8 +94,8 @@ export function TwoFactorCodeInput({
             {/* Header */}
             <div className="mb-6 text-center">
               <div className="mb-4 flex justify-center">
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 rounded-full">
-                  <ShieldAlert className="w-6 h-6 text-indigo-600" />
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-brand-100 rounded-full">
+                  <ShieldAlert className="w-6 h-6 text-brand-600" />
                 </div>
               </div>
               <Dialog.Title className="text-xl font-semibold text-slate-900">
@@ -137,7 +137,7 @@ export function TwoFactorCodeInput({
                       value={code[index] || ''}
                       onChange={(e) => handleDigitInput(index, e.target.value)}
                       onKeyDown={(e) => handleKeyDown(index, e)}
-                      className="w-12 h-12 text-center text-xl font-semibold border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      className="w-12 h-12 text-center text-xl font-semibold border-2 border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition-all"
                       disabled={loading}
                     />
                   ))}
@@ -148,7 +148,7 @@ export function TwoFactorCodeInput({
               <button
                 type="submit"
                 disabled={loading || code.length !== 6}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

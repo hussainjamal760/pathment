@@ -33,7 +33,7 @@ class ProfileController {
           model: models.UserSettings,
           as: 'settings',
           required: false,
-          attributes: ['timezone', 'language']
+          attributes: ['timezone', 'language', 'theme', 'colorTheme']
         }
       ]
     });
@@ -280,6 +280,32 @@ await user.update({
     }
 
     res.json(successResponse(PROFILE_MESSAGES.PROFILE_UPDATED, user));
+  });
+
+  /**
+   * Get the user's appearance prefs (accent + light/dark) for cross-device sync.
+   * GET /api/profile/appearance
+   */
+  getAppearance = catchAsync(async (req, res) => {
+    const settings = await models.UserSettings.findOne({ where: { userId: req.user.id }, attributes: ['theme', 'colorTheme'] });
+    res.json(successResponse('Appearance retrieved', {
+      theme: settings?.theme || 'light',
+      colorTheme: settings?.colorTheme || 'ocean',
+    }));
+  });
+
+  /**
+   * Update the user's appearance prefs.
+   * PATCH /api/profile/appearance  { colorTheme?, theme? }
+   */
+  updateAppearance = catchAsync(async (req, res) => {
+    const { colorTheme, theme } = req.body;
+    const [settings] = await models.UserSettings.findOrCreate({ where: { userId: req.user.id }, defaults: { userId: req.user.id } });
+    const patch = {};
+    if (typeof colorTheme === 'string' && colorTheme.trim()) patch.colorTheme = colorTheme.trim().slice(0, 20);
+    if (theme === 'light' || theme === 'dark') patch.theme = theme;
+    if (Object.keys(patch).length) await settings.update(patch);
+    res.json(successResponse('Appearance updated', { theme: settings.theme, colorTheme: settings.colorTheme }));
   });
 
   /**

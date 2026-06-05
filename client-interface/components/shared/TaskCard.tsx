@@ -82,7 +82,7 @@ export function TaskCard({
                   <Sparkles className="w-3 h-3" /> Custom
                 </span>
               ) : (
-                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs font-medium flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-brand-100 text-brand-700 rounded text-xs font-medium flex items-center gap-1">
                   <BookOpen className="w-3 h-3" /> Roadmap
                 </span>
               )}
@@ -157,7 +157,7 @@ export function TaskCard({
               </div>
             )}
             {pointsAwarded != null && (
-              <span className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium">
+              <span className="px-3 py-1 bg-brand-50 text-brand-700 rounded-lg text-sm font-medium">
                 +{pointsAwarded} pts
               </span>
             )}

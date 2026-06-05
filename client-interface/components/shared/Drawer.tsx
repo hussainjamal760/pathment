@@ -89,7 +89,7 @@ export function Drawer({ open, onClose, title, subtitle, width = 'md', footer, c
           <button
             onClick={() => onCloseRef.current()}
             aria-label="Close"
-            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0"
+            className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 shrink-0"
           >
             <X className="w-5 h-5" />
           </button>

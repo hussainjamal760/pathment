@@ -101,10 +101,10 @@ export default function LoginPage() {
     <div className="space-y-6">
       {/* Logo & Header */}
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4">
           <span className="text-white text-2xl">P</span>
         </div>
-        <h1 className="text-indigo-900 mb-2">Welcome back to Pathment</h1>
+        <h1 className="text-brand-900 mb-2">Welcome back to Pathment</h1>
         <p className="text-slate-600">Sign in to continue your journey</p>
       </div>
 
@@ -141,7 +141,7 @@ export default function LoginPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 placeholder="you@example.com"
                 required
               />
@@ -152,7 +152,7 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="block text-slate-700 text-sm">Password</label>
-              <Link href="/reset-password" className="text-indigo-600 hover:text-indigo-700 text-sm">
+              <Link href="/reset-password" className="text-brand-600 hover:text-brand-700 text-sm">
                 Forgot?
               </Link>
             </div>
@@ -162,7 +162,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 placeholder="••••••••"
                 required
               />
@@ -181,7 +181,7 @@ export default function LoginPage() {
             <input
               type="checkbox"
               id="remember"
-              className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+              className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
             />
             <label htmlFor="remember" className="ml-2 text-slate-700 text-sm">
               Remember me for 30 days
@@ -192,7 +192,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+            className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2 group"
           >
             {loading ? (
               'Signing in...'
@@ -209,7 +209,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-slate-600 text-sm">
             Don't have an account?{' '}
-            <Link href="/register" className="text-indigo-600 hover:text-indigo-700">
+            <Link href="/register" className="text-brand-600 hover:text-brand-700">
               Sign up
             </Link>
           </p>

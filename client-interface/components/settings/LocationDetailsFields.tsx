@@ -15,7 +15,7 @@ interface Props {
   onChange: (patch: Partial<LocationDetails>) => void;
 }
 
-const FIELD = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm';
+const FIELD = 'w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500 text-sm';
 
 // A reasonable timezone list — falls back gracefully if the runtime lacks Intl.supportedValuesOf.
 function tzList(): string[] {
@@ -53,7 +53,7 @@ export function LocationDetailsFields({ value, onChange }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
-        <MapPin className="w-4 h-4 text-indigo-500" />
+        <MapPin className="w-4 h-4 text-brand-500" />
         <h3 className="text-sm font-semibold text-slate-900">Location & details</h3>
       </div>
 
@@ -76,11 +76,11 @@ export function LocationDetailsFields({ value, onChange }: Props) {
 
       <div>
         <label className="block text-slate-700 mb-2 text-sm font-medium inline-flex items-center gap-1.5"><LanguagesIcon className="w-3.5 h-3.5 text-slate-400" />Languages</label>
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-indigo-500">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 focus-within:ring-2 focus-within:ring-brand-500">
           {value.languages.map((l) => (
-            <span key={l} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium">
+            <span key={l} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium">
               {l}
-              <button type="button" onClick={() => onChange({ languages: value.languages.filter((x) => x !== l) })} aria-label={`Remove ${l}`} className="hover:text-indigo-900"><X className="w-3 h-3" /></button>
+              <button type="button" onClick={() => onChange({ languages: value.languages.filter((x) => x !== l) })} aria-label={`Remove ${l}`} className="hover:text-brand-900"><X className="w-3 h-3" /></button>
             </span>
           ))}
           <input

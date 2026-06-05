@@ -130,7 +130,7 @@ export default function ProgramDetails() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -141,7 +141,7 @@ export default function ProgramDetails() {
         <p className="text-slate-600 mb-4">Program not found</p>
         <Link
           href="/admin/programs/list"
-          className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700"
+          className="inline-flex items-center gap-2 text-brand-600 hover:text-brand-700"
         >
           <ArrowLeft className="w-5 h-5" />
           Back to Programs
@@ -190,7 +190,7 @@ export default function ProgramDetails() {
             {program.tags && program.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {program.tags.map((tag: string, idx: number) => (
-                  <span key={idx} className="px-3 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-sm">
+                  <span key={idx} className="px-3 py-1 bg-brand-50 text-brand-700 rounded-lg text-sm">
                     {tag}
                   </span>
                 ))}
@@ -223,8 +223,8 @@ export default function ProgramDetails() {
                       )}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 text-left transition-colors"
                     >
-                      <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
-                        <LinkIcon className="w-4 h-4 text-indigo-600" />
+                      <div className="w-8 h-8 bg-brand-100 rounded-lg flex items-center justify-center shrink-0">
+                        <LinkIcon className="w-4 h-4 text-brand-600" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-700">Mentor Program Link</p>
@@ -243,8 +243,8 @@ export default function ProgramDetails() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-2xl p-6 border border-slate-200">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <Users className="w-5 h-5 text-indigo-600" />
+            <div className="w-10 h-10 bg-brand-100 rounded-xl flex items-center justify-center">
+              <Users className="w-5 h-5 text-brand-600" />
             </div>
             <span className="text-slate-600 text-sm">Enrollments</span>
           </div>
@@ -295,7 +295,7 @@ export default function ProgramDetails() {
                 onClick={() => setActiveTab(tab.id as 'overview' | 'enrollments')}
                 className={`pb-3 border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'border-indigo-600 text-indigo-600'
+                    ? 'border-brand-600 text-brand-600'
                     : 'border-transparent text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -339,7 +339,7 @@ export default function ProgramDetails() {
                 <h2 className="text-slate-900">Curriculum</h2>
                 <Link
                   href="/admin/roadmaps"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors"
                 >
                   <Route className="w-4 h-4" />
                   Author roadmaps
@@ -367,7 +367,7 @@ export default function ProgramDetails() {
         <div className="space-y-6">
           {loadingEnrollments ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
             </div>
           ) : enrollments.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
@@ -427,7 +427,7 @@ export default function ProgramDetails() {
                 <h3 className="text-slate-900 mb-4">All Enrollments ({enrollments.length})</h3>
                 <div className="space-y-2">
                   {enrollments.map((enrollment: any) => (
-                    <div key={enrollment.id} className="p-4 border border-slate-200 rounded-xl hover:border-indigo-300 transition-colors">
+                    <div key={enrollment.id} className="p-4 border border-slate-200 rounded-xl hover:border-brand-300 transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
@@ -439,7 +439,7 @@ export default function ProgramDetails() {
                               enrollment.status === 'approved' ? 'bg-blue-100 text-blue-700' :
                               enrollment.status === 'pending_match' ? 'bg-purple-100 text-purple-700' :
                               enrollment.status === 'matched' ? 'bg-green-100 text-green-700' :
-                              enrollment.status === 'active' ? 'bg-indigo-100 text-indigo-700' :
+                              enrollment.status === 'active' ? 'bg-brand-100 text-brand-700' :
                               enrollment.status === 'rejected' ? 'bg-red-100 text-red-700' :
                               'bg-slate-100 text-slate-700'
                             }`}>
@@ -449,7 +449,7 @@ export default function ProgramDetails() {
                           <div className="text-slate-600 text-sm mt-1">{enrollment.mentee?.email}</div>
                         </div>
                         {enrollment.clan?.name ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium shrink-0">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 text-xs font-medium shrink-0">
                             <Users2 className="w-3.5 h-3.5" />{enrollment.clan.name}
                           </span>
                         ) : (

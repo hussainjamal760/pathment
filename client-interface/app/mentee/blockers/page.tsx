@@ -92,16 +92,16 @@ export default function MenteeBlockers() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Flag className="w-5 h-5 text-indigo-600" /> Blockers</h1>
+          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Flag className="w-5 h-5 text-brand-600" /> Blockers</h1>
           <p className="text-slate-600">What&apos;s slowing you down — your mentor can see these and help you clear them.</p>
         </div>
-        <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+        <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> Add blocker
         </button>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>
+        <div className="flex justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>
       ) : blockers.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-14 text-center">
           <span className="grid h-11 w-11 place-items-center rounded-xl border border-emerald-200 text-emerald-600 mx-auto mb-3"><CheckCircle2 className="w-6 h-6" /></span>
@@ -140,7 +140,7 @@ function AddBlockerModal({ tasks, onClose, onAdded }: { tasks: TaskOpt[]; onClos
   const [severity, setSeverity] = useState<Blocker['severity']>('medium');
   const [taskId, setTaskId] = useState('');
   const [saving, setSaving] = useState(false);
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   const submit = async () => {
     if (!title.trim()) { toast.error('Describe what is blocking you'); return; }
@@ -152,7 +152,7 @@ function AddBlockerModal({ tasks, onClose, onAdded }: { tasks: TaskOpt[]; onClos
     } catch { toast.error('Could not log blocker'); } finally { setSaving(false); }
   };
 
-  const seg = (active: boolean) => `px-3 py-1.5 rounded-lg border text-sm font-medium capitalize ${active ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`;
+  const seg = (active: boolean) => `px-3 py-1.5 rounded-lg border text-sm font-medium capitalize ${active ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`;
 
   return (
     <Drawer
@@ -163,7 +163,7 @@ function AddBlockerModal({ tasks, onClose, onAdded }: { tasks: TaskOpt[]; onClos
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log blocker
           </button>
         </>

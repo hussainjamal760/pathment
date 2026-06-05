@@ -9,20 +9,20 @@ import { Sparkles } from 'lucide-react';
  */
 export function AISummaryPanel({ summary, signals }: { summary: string; signals: string[] }) {
   return (
-    <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6">
+    <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-6">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-indigo-600" />
+        <div className="w-7 h-7 rounded-lg bg-brand-100 flex items-center justify-center">
+          <Sparkles className="w-4 h-4 text-brand-600" />
         </div>
         <h3 className="font-semibold text-slate-900">Summary</h3>
-        <span className="text-xs text-indigo-500 ml-auto">based on the signals below</span>
+        <span className="text-xs text-brand-500 ml-auto">based on the signals below</span>
       </div>
       <p className="text-sm leading-relaxed text-slate-700">{summary}</p>
       {signals?.length > 0 && (
         <ul className="mt-4 space-y-1.5">
           {signals.map((s, i) => (
             <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-              <span className="mt-1.5 w-1 h-1 rounded-full bg-indigo-400 shrink-0" />
+              <span className="mt-1.5 w-1 h-1 rounded-full bg-brand-400 shrink-0" />
               {s}
             </li>
           ))}

@@ -51,11 +51,11 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
   return (
     <button
       onClick={onOpen}
-      className="group text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-indigo-300 hover:shadow-sm transition-all"
+      className="group text-left bg-white rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all"
     >
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-          <span className="text-indigo-700 font-medium text-sm">{m.avatar}</span>
+        <div className="w-11 h-11 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+          <span className="text-brand-700 font-medium text-sm">{m.avatar}</span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -83,7 +83,7 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
 
       <div className="flex flex-wrap items-center gap-1.5">
         {m.pendingApprovals > 0 && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium">
             <ClipboardCheck className="w-3 h-3" />{m.pendingApprovals} to review
           </span>
         )}
@@ -103,7 +103,7 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center justify-end text-xs font-medium text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="mt-3 flex items-center justify-end text-xs font-medium text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity">
         Open full story <ArrowUpRight className="ml-0.5 w-3.5 h-3.5" />
       </div>
     </button>
@@ -151,7 +151,7 @@ export default function MentorCockpit() {
           </button>
           <button
             onClick={() => router.push('/mentor/review')}
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
           >
             <ClipboardCheck className="w-4 h-4" />
             Start weekly review
@@ -170,7 +170,7 @@ export default function MentorCockpit() {
 
       {/* Stat chips */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <StatsCard icon={ClipboardCheck} label="Awaiting review" value={totals?.pendingApprovals ?? '…'} colorClass="text-indigo-600 bg-indigo-50" />
+        <StatsCard icon={ClipboardCheck} label="Awaiting review" value={totals?.pendingApprovals ?? '…'} colorClass="text-brand-600 bg-brand-50" />
         <StatsCard icon={AlertTriangle} label="Need attention" value={totals?.atRisk ?? '…'} colorClass="text-red-600 bg-red-50" />
         <StatsCard icon={Flag} label="Open blockers" value={totals?.openBlockers ?? '…'} colorClass="text-amber-600 bg-amber-50" />
         <StatsCard icon={Users} label="Cohort on-time" value={totals ? `${totals.onTimeRate}%` : '…'} colorClass="text-emerald-600 bg-emerald-50" />
@@ -190,7 +190,7 @@ export default function MentorCockpit() {
             onClick={() => setFilter(f.key)}
             className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${
               filter === f.key
-                ? 'border-indigo-600 text-indigo-700'
+                ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -202,12 +202,12 @@ export default function MentorCockpit() {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
         </div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : list.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">

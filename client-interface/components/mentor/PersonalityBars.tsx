@@ -44,7 +44,7 @@ export function PersonalityBars({
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-slate-900">Working style</h3>
         {onSave && !editing && (
-          <button onClick={() => setEditing(true)} className="text-xs text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1">
+          <button onClick={() => setEditing(true)} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-1">
             <Pencil className="w-3.5 h-3.5" />{hasAny ? 'Edit' : 'Set'}
           </button>
         )}
@@ -60,12 +60,12 @@ export function PersonalityBars({
               </div>
               <input type="range" min={0} max={100} value={draft[d.key]}
                 onChange={(e) => setDraft((p) => ({ ...p, [d.key]: Number(e.target.value) }))}
-                className="w-full accent-indigo-600" />
+                className="w-full accent-brand-600" />
             </div>
           ))}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => setEditing(false)} className="px-3 py-1.5 border border-slate-200 text-slate-700 rounded-lg text-xs hover:bg-slate-50">Cancel</button>
-            <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
+            <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs inline-flex items-center gap-1.5 disabled:opacity-50">
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}Save
             </button>
           </div>
@@ -83,7 +83,7 @@ export function PersonalityBars({
                   <span className="text-xs font-semibold text-slate-700 tabular-nums">{v ?? '—'}</span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${v ?? 0}%` }} />
+                  <div className="h-full rounded-full bg-brand-500" style={{ width: `${v ?? 0}%` }} />
                 </div>
               </div>
             );

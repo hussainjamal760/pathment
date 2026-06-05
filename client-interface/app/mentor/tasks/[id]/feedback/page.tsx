@@ -64,7 +64,7 @@ export default function FeedbackProvision({ params }: PageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
+        <Loader2 className="w-12 h-12 animate-spin text-brand-600" />
       </div>
     );
   }

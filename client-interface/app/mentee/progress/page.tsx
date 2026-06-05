@@ -28,7 +28,7 @@ function MyRoadmapsSection() {
   return (
     <div className="bg-white rounded-2xl border border-slate-200">
       <div className="px-6 py-5 border-b border-slate-200 flex items-center gap-2">
-        <Route className="w-4 h-4 text-indigo-600" /><h2 className="text-slate-900">Your roadmaps</h2>
+        <Route className="w-4 h-4 text-brand-600" /><h2 className="text-slate-900">Your roadmaps</h2>
       </div>
       <div className="p-6 space-y-5">
         {roadmaps.map((r) => (
@@ -46,7 +46,7 @@ function MyRoadmapsSection() {
               </span>
             </div>
             <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-              <div className={`h-full rounded-full ${r.completed ? 'bg-green-500' : 'bg-indigo-500'}`} style={{ width: `${r.percent}%` }} />
+              <div className={`h-full rounded-full ${r.completed ? 'bg-green-500' : 'bg-brand-500'}`} style={{ width: `${r.percent}%` }} />
             </div>
           </div>
         ))}
@@ -59,13 +59,13 @@ export default function MenteeProgress() {
   const { progress, loading, error, refetch } = useMyProgress();
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   }
   if (error || !progress) {
     return (
       <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center max-w-3xl">
         <p className="text-slate-600 mb-3">{error || 'No progress data yet — once you start tasks this fills in.'}</p>
-        {error && <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>}
+        {error && <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>}
       </div>
     );
   }

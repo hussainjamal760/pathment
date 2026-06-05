@@ -44,7 +44,7 @@ export default function AdminClanRequests() {
   };
 
   const pendingCount = requests.filter((r) => r.status === 'pending').length;
-  const field = 'border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   const TABS: { key: Tab; label: string; count?: number }[] = [
     { key: 'requests', label: 'Change requests', count: pendingCount },
@@ -62,18 +62,18 @@ export default function AdminClanRequests() {
       <div className="flex flex-wrap items-center gap-0 border-b border-slate-200">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${tab === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+            className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors ${tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
             {t.label}{t.count ? <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs">{t.count}</span> : null}
           </button>
         ))}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : (
         <>
@@ -122,7 +122,7 @@ export default function AdminClanRequests() {
                   </select>
                 </div>
                 <input value={ccNote} onChange={(e) => setCcNote(e.target.value)} placeholder="Note (who / which clans)" className={`${field} flex-1 min-w-48`} />
-                <button onClick={addCross} disabled={busy === 'cc'} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
+                <button onClick={addCross} disabled={busy === 'cc'} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
                   {busy === 'cc' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Add
                 </button>
               </div>
@@ -132,7 +132,7 @@ export default function AdminClanRequests() {
                 <div className="space-y-2">
                   {crossClan.map((c) => (
                     <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
-                      <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">{CROSS_KINDS.find((k) => k.key === c.kind)?.label ?? c.kind}</span>
+                      <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium">{CROSS_KINDS.find((k) => k.key === c.kind)?.label ?? c.kind}</span>
                       <p className="text-sm text-slate-700 flex-1 min-w-0 truncate">{c.note || c.user || '—'}</p>
                       <button onClick={() => act(c.id, () => clanRequestsApi.removeCrossClan(c.id), 'Removed')} disabled={busy === c.id} className="text-slate-400 hover:text-red-500 shrink-0"><Trash2 className="w-4 h-4" /></button>
                     </div>
@@ -152,7 +152,7 @@ export default function AdminClanRequests() {
                 </div>
                 <textarea value={pBody} onChange={(e) => setPBody(e.target.value)} rows={2} placeholder="Policy text" className={`${field} w-full resize-none`} />
                 <div className="flex justify-end">
-                  <button onClick={addPolicy} disabled={busy === 'pol'} className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
+                  <button onClick={addPolicy} disabled={busy === 'pol'} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
                     {busy === 'pol' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Add policy
                   </button>
                 </div>
@@ -164,7 +164,7 @@ export default function AdminClanRequests() {
                   {policies.map((p) => (
                     <div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-4">
                       <div className="flex items-start gap-2">
-                        <Shield className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                        <Shield className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-slate-900">{p.title}{p.category ? <span className="text-xs text-slate-400 font-normal"> · {p.category}</span> : null}</p>
                           <p className="text-sm text-slate-600 mt-0.5">{p.body}</p>

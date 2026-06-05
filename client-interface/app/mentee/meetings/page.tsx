@@ -69,23 +69,23 @@ export default function MenteeMeetings() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : (
         <>
           {/* Next 1:1 — the one thing that matters most */}
           {next && (
-            <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5">
+            <div className="rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-white p-5">
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex flex-col items-center justify-center text-white shrink-0">
+                <div className="w-12 h-12 rounded-2xl bg-brand-600 flex flex-col items-center justify-center text-white shrink-0">
                   <CalendarClock className="w-5 h-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">Your next 1:1</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-brand-600">Your next 1:1</p>
                   <p className="text-base font-semibold text-slate-900 mt-0.5">{next.day} · {next.time}</p>
                   <p className="text-sm text-slate-500">
                     With {next.mentor?.firstName} {next.mentor?.lastName} · {next.durationMins} min
@@ -107,7 +107,7 @@ export default function MenteeMeetings() {
           {/* Book a 1:1 — mentor card with slots grouped by day */}
           <section className="bg-white rounded-2xl border border-slate-200">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-slate-900 flex items-center gap-2"><CalendarPlus className="w-4 h-4 text-indigo-500" />Book a 1:1</h2>
+              <h2 className="text-slate-900 flex items-center gap-2"><CalendarPlus className="w-4 h-4 text-brand-500" />Book a 1:1</h2>
               {totalOpenSlots > 0 && <span className="text-xs text-slate-400">{totalOpenSlots} open time{totalOpenSlots === 1 ? '' : 's'}</span>}
             </div>
             <div className="p-6 space-y-6">
@@ -125,8 +125,8 @@ export default function MenteeMeetings() {
                   return (
                     <div key={b.mentor.id}>
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                          <span className="text-indigo-700 text-sm font-semibold">{initialsOf(b.mentor.name)}</span>
+                        <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
+                          <span className="text-brand-700 text-sm font-semibold">{initialsOf(b.mentor.name)}</span>
                         </div>
                         <div>
                           <h3 className="text-sm font-semibold text-slate-900">{b.mentor.name}</h3>
@@ -146,7 +146,7 @@ export default function MenteeMeetings() {
                               <div className="flex flex-wrap gap-2">
                                 {slots.map((s) => (
                                   <button key={s.id} onClick={() => { setBooking(s); setBookingMentor(b.mentor.name); setAgenda(''); }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-700 transition-colors">
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 transition-colors">
                                     <Clock className="w-3.5 h-3.5 text-slate-400" />{s.time}
                                     <span className="text-slate-400">· {s.durationMins}m</span>
                                   </button>
@@ -170,7 +170,7 @@ export default function MenteeMeetings() {
               <div className="divide-y divide-slate-100">
                 {laterUpcoming.map((m) => (
                   <div key={m.id} className="flex items-center gap-3 px-6 py-3.5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0"><CalendarClock className="w-4 h-4 text-indigo-500" /></div>
+                    <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0"><CalendarClock className="w-4 h-4 text-brand-500" /></div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-slate-900">{m.day} · {m.time}</p>
                       <p className="text-xs text-slate-500">With {m.mentor?.firstName} · {m.durationMins}m{m.agenda ? ` · ${m.agenda}` : ''}</p>
@@ -231,7 +231,7 @@ export default function MenteeMeetings() {
         footer={
           <>
             <button onClick={() => setBooking(null)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Back</button>
-            <button onClick={confirmBook} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+            <button onClick={confirmBook} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Confirm booking
             </button>
           </>
@@ -240,7 +240,7 @@ export default function MenteeMeetings() {
         <label className="block text-sm font-medium text-slate-700 mb-1.5">What would you like to cover? <span className="text-slate-400 font-normal">(optional)</span></label>
         <textarea value={agenda} onChange={(e) => setAgenda(e.target.value)} rows={4}
           placeholder="e.g. I'm stuck on the JWT refresh flow and want to review my approach"
-          className="w-full border border-slate-300 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" autoFocus />
+          className="w-full border border-slate-300 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" autoFocus />
         <p className="mt-2 text-xs text-slate-400">Sharing an agenda helps your mentor prepare and makes the most of your time.</p>
       </Drawer>
 

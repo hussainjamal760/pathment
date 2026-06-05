@@ -43,7 +43,7 @@ export function InsightsPanel({
     finally { setSaving(false); }
   };
 
-  const field = 'border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm bg-white capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm bg-white capitalize focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200">
@@ -64,9 +64,9 @@ export function InsightsPanel({
           </div>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2}
             placeholder="What did you notice?"
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
           <div className="flex justify-end">
-            <button onClick={submit} disabled={saving} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
+            <button onClick={submit} disabled={saving} className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log insight
             </button>
           </div>

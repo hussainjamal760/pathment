@@ -8,13 +8,15 @@ import {
   Shield,
   Loader2,
   Save,
-  Sparkles
+  Sparkles,
+  Palette
 } from 'lucide-react';
 import { useMenteeSettings } from '@/lib/hooks/mentee';
 import { PageHeader, TabBar } from '@/components/admin/ui';
 import SecurityTab from '@/components/shared/SecurityTab';
 import { LocationDetailsFields } from '@/components/settings/LocationDetailsFields';
 import { SkillsTab } from '@/components/settings/SkillsTab';
+import { AppearanceTab } from '@/components/settings/AppearanceTab';
 import type { Tab } from '@/components/admin/ui';
 
 export default function MenteeSettings() {
@@ -40,7 +42,7 @@ export default function MenteeSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -49,6 +51,7 @@ export default function MenteeSettings() {
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'mentee', label: 'Learning Info', icon: GraduationCap },
     { id: 'skills', label: 'Skills', icon: Sparkles },
+    { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'preferences', label: 'Preferences', icon: Target },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'security', label: 'Security', icon: Shield },
@@ -81,7 +84,7 @@ export default function MenteeSettings() {
                     type="text"
                     value={profileData.firstName}
                     onChange={(e) => setProfileData({ ...profileData, firstName: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
@@ -91,7 +94,7 @@ export default function MenteeSettings() {
                     type="text"
                     value={profileData.lastName}
                     onChange={(e) => setProfileData({ ...profileData, lastName: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
 
@@ -111,7 +114,7 @@ export default function MenteeSettings() {
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
               </div>
@@ -122,7 +125,7 @@ export default function MenteeSettings() {
                   value={profileData.bio}
                   onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
                   rows={4}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="Tell us about yourself..."
                 />
               </div>
@@ -137,7 +140,7 @@ export default function MenteeSettings() {
               <button
                 onClick={handleProfileUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Changes
@@ -150,6 +153,9 @@ export default function MenteeSettings() {
             <SkillsTab blurb="Add the skills you have or are building. Your mentor sees these to tailor support." />
           )}
 
+          {/* Appearance Tab */}
+          {activeTab === 'appearance' && <AppearanceTab />}
+
           {/* Mentee Info Tab */}
           {activeTab === 'mentee' && (
             <div className="space-y-6">
@@ -161,7 +167,7 @@ export default function MenteeSettings() {
                   value={menteeProfile.learningGoals}
                   onChange={(e) => setMenteeProfile({ ...menteeProfile, learningGoals: e.target.value })}
                   rows={4}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="What do you want to achieve through this mentorship?"
                 />
               </div>
@@ -172,7 +178,7 @@ export default function MenteeSettings() {
                   value={menteeProfile.priorExperience}
                   onChange={(e) => setMenteeProfile({ ...menteeProfile, priorExperience: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="Describe your relevant experience..."
                 />
               </div>
@@ -184,7 +190,7 @@ export default function MenteeSettings() {
                     type="text"
                     value={menteeProfile.currentEducation}
                     onChange={(e) => setMenteeProfile({ ...menteeProfile, currentEducation: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="e.g., BS Computer Science"
                   />
                 </div>
@@ -195,7 +201,7 @@ export default function MenteeSettings() {
                     type="text"
                     value={menteeProfile.currentOccupation}
                     onChange={(e) => setMenteeProfile({ ...menteeProfile, currentOccupation: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="e.g., Student, Junior Developer"
                   />
                 </div>
@@ -206,7 +212,7 @@ export default function MenteeSettings() {
                     type="url"
                     value={menteeProfile.linkedinUrl}
                     onChange={(e) => setMenteeProfile({ ...menteeProfile, linkedinUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://linkedin.com/in/..."
                   />
                 </div>
@@ -217,7 +223,7 @@ export default function MenteeSettings() {
                     type="url"
                     value={menteeProfile.githubUrl}
                     onChange={(e) => setMenteeProfile({ ...menteeProfile, githubUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://github.com/..."
                   />
                 </div>
@@ -228,7 +234,7 @@ export default function MenteeSettings() {
                     type="url"
                     value={menteeProfile.portfolioUrl}
                     onChange={(e) => setMenteeProfile({ ...menteeProfile, portfolioUrl: e.target.value })}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                     placeholder="https://..."
                   />
                 </div>
@@ -237,7 +243,7 @@ export default function MenteeSettings() {
               <button
                 onClick={handleMenteeProfileUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Changes
@@ -258,7 +264,7 @@ export default function MenteeSettings() {
                 <select
                   value={learningPreferences.preferredLearningStyle}
                   onChange={(e) => setLearningPreferences({ ...learningPreferences, preferredLearningStyle: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="visual">Visual (Videos, diagrams)</option>
                   <option value="reading">Reading/Writing (Articles, notes)</option>
@@ -280,7 +286,7 @@ export default function MenteeSettings() {
                     ...learningPreferences, 
                     timeCommitment: parseInt(e.target.value) 
                   })}
-                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-brand-600"
                 />
                 <div className="flex justify-between text-xs text-slate-500 mt-1">
                   <span>1 hr</span>
@@ -294,7 +300,7 @@ export default function MenteeSettings() {
                 <select
                   value={learningPreferences.preferredSchedule}
                   onChange={(e) => setLearningPreferences({ ...learningPreferences, preferredSchedule: e.target.value })}
-                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                 >
                   <option value="flexible">Flexible - I can adjust my schedule</option>
                   <option value="weekdays">Weekdays only</option>
@@ -306,7 +312,7 @@ export default function MenteeSettings() {
               <button
                 onClick={handleLearningPreferencesUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Preferences
@@ -345,7 +351,7 @@ export default function MenteeSettings() {
                         })}
                         className="sr-only peer"
                       />
-                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-1 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-1 after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
                     </label>
                   </div>
                 ))}
@@ -354,7 +360,7 @@ export default function MenteeSettings() {
               <button
                 onClick={handleNotificationUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-xl transition-colors"
+                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
               >
                 {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 Save Notification Settings

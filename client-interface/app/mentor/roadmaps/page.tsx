@@ -69,12 +69,12 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Name</label>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Backend Foundations"
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Program</label>
             <select value={programId} onChange={(e) => setProgramId(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white">
               <option value="">{progLoading ? 'Loading…' : 'Select a program'}</option>
               {programs.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
@@ -82,12 +82,12 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Skill tags <span className="text-slate-400 font-normal">(comma-separated)</span></label>
             <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="node, express, sql"
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-slate-700">Steps (in order)</label>
-              <button onClick={addStep} className="text-indigo-600 hover:text-indigo-700 text-sm inline-flex items-center gap-1"><Plus className="w-4 h-4" />Add step</button>
+              <button onClick={addStep} className="text-brand-600 hover:text-brand-700 text-sm inline-flex items-center gap-1"><Plus className="w-4 h-4" />Add step</button>
             </div>
             <div className="space-y-3">
               {steps.map((s, i) => (
@@ -100,25 +100,25 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
                     )}
                   </div>
                   <input value={s.title} onChange={(e) => setStep(i, { title: e.target.value })} placeholder="Step title"
-                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-brand-500" />
                   <div className="flex flex-wrap gap-2">
                     <select value={s.type} onChange={(e) => setStep(i, { type: e.target.value })}
-                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white capitalize focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white capitalize focus:outline-none focus:ring-2 focus:ring-brand-500">
                       {STEP_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                     <select value={s.effort} onChange={(e) => setStep(i, { effort: e.target.value })}
                       title="Effort"
-                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm bg-white uppercase focus:outline-none focus:ring-2 focus:ring-brand-500">
                       {EFFORTS.map((ef) => <option key={ef} value={ef}>{ef}</option>)}
                     </select>
                     <input type="number" min={1} value={s.dueOffsetDays}
                       onChange={(e) => setStep(i, { dueOffsetDays: e.target.value })}
                       placeholder="due +days"
-                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-brand-500" />
                   </div>
                   <textarea value={s.criteria} onChange={(e) => setStep(i, { criteria: e.target.value })} rows={2}
                     placeholder="Acceptance criteria, one per line"
-                    className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
                 </div>
               ))}
             </div>
@@ -126,7 +126,7 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
         </div>
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={save} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={save} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Create roadmap
           </button>
         </div>
@@ -182,7 +182,7 @@ function AssignDrawer({ roadmap, onClose, onAssigned }: { roadmap: LinearRoadmap
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Start at step</label>
             <select value={startStep} onChange={(e) => setStartStep(Number(e.target.value))}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
               {roadmap.steps.map((s, i) => <option key={s.id} value={i}>{i + 1}. {s.title}</option>)}
             </select>
             <p className="text-xs text-slate-400 mt-1">Skip steps they already know.</p>
@@ -198,7 +198,7 @@ function AssignDrawer({ roadmap, onClose, onAssigned }: { roadmap: LinearRoadmap
                 {cohort.map((m) => (
                   <label key={m.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
                     <input type="checkbox" checked={selected.has(m.id)} onChange={() => toggle(m.id)}
-                      className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
                     <span className="text-sm text-slate-700">{m.name}</span>
                   </label>
                 ))}
@@ -208,7 +208,7 @@ function AssignDrawer({ roadmap, onClose, onAssigned }: { roadmap: LinearRoadmap
         </div>
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={assign} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={assign} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Assign{selected.size > 0 ? ` (${selected.size})` : ''}
           </button>
         </div>
@@ -277,23 +277,23 @@ export default function MentorRoadmaps() {
           <p className="text-slate-600">Build a sequence of steps, then assign it — approving a step advances the mentee automatically.</p>
         </div>
         <button onClick={() => setCreating(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" />New roadmap
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : (
         <>
           {/* My roadmaps */}
           <section>
-            <h2 className="text-slate-900 mb-4 flex items-center gap-2"><Route className="w-4 h-4 text-indigo-500" />My roadmaps</h2>
+            <h2 className="text-slate-900 mb-4 flex items-center gap-2"><Route className="w-4 h-4 text-brand-500" />My roadmaps</h2>
             {local.length === 0 ? (
               <div className="bg-white rounded-2xl border border-slate-200 py-10 text-center">
                 <p className="text-slate-600 text-sm">No roadmaps yet — create one or import from your organization below.</p>
@@ -303,7 +303,7 @@ export default function MentorRoadmaps() {
                 {local.map((r) => (
                   <RoadmapCard key={r.id} r={r} action={
                     <button onClick={() => setAssigning(r)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 shrink-0">
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium hover:bg-brand-100 shrink-0">
                       <Users className="w-3.5 h-3.5" />Assign
                     </button>
                   } />
@@ -320,7 +320,7 @@ export default function MentorRoadmaps() {
                 {org.map((r) => (
                   <RoadmapCard key={r.id} r={r} action={
                     <button onClick={() => onImport(r.id)} disabled={importingId === r.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium hover:border-indigo-300 disabled:opacity-50 shrink-0">
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium hover:border-brand-300 disabled:opacity-50 shrink-0">
                       {importingId === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}Import
                     </button>
                   } />

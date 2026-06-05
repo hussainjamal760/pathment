@@ -33,14 +33,14 @@ const DEFAULT_CONFIG: Record<string, BadgeConfig> = {
   approved:            { label: 'Approved',            className: 'bg-blue-100 text-blue-700',     icon: <Clock className="w-3 h-3" /> },
   pending_match:       { label: 'Pending Match',       className: 'bg-blue-100 text-blue-700',     icon: <Clock className="w-3 h-3" /> },
   pending_completion:  { label: 'Pending Completion',  className: 'bg-orange-100 text-orange-700', icon: <Clock className="w-3 h-3" /> },
-  level_completed:     { label: 'Level Completed',     className: 'bg-indigo-100 text-indigo-700', icon: <CheckCircle2 className="w-3 h-3" /> },
-  program_completed:   { label: 'Program Completed',   className: 'bg-indigo-100 text-indigo-700', icon: <CheckCircle2 className="w-3 h-3" /> },
+  level_completed:     { label: 'Level Completed',     className: 'bg-brand-100 text-brand-700', icon: <CheckCircle2 className="w-3 h-3" /> },
+  program_completed:   { label: 'Program Completed',   className: 'bg-brand-100 text-brand-700', icon: <CheckCircle2 className="w-3 h-3" /> },
   rejected:            { label: 'Rejected',            className: 'bg-red-100 text-red-700',       icon: <XCircle className="w-3 h-3" /> },
   dropped:             { label: 'Dropped',             className: 'bg-red-100 text-red-700',       icon: <XCircle className="w-3 h-3" /> },
   // Program
   published:           { label: 'Published',           className: 'bg-green-100 text-green-700' },
   draft:               { label: 'Draft',               className: 'bg-amber-100 text-amber-700' },
-  completed:           { label: 'Completed',           className: 'bg-indigo-100 text-indigo-700' },
+  completed:           { label: 'Completed',           className: 'bg-brand-100 text-brand-700' },
   archived:            { label: 'Archived',            className: 'bg-slate-100 text-slate-600' },
   // Task
   assigned:            { label: 'Assigned',            className: 'bg-blue-100 text-blue-700',     icon: <AlertCircle className="w-3 h-3" /> },

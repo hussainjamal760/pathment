@@ -26,7 +26,7 @@ export default function AdminAnnouncements() {
     clanApi.list().then((r: any) => setClans((r?.data?.clans ?? r?.clans ?? []).map((c: any) => ({ id: c.id, name: c.name })))).catch(() => {});
   }, []);
 
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
   const needsTarget = audience === 'program' || audience === 'clan';
   const targets = audience === 'program' ? programs : clans;
 
@@ -46,19 +46,19 @@ export default function AdminAnnouncements() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-slate-900 mb-2 flex items-center gap-2"><Megaphone className="w-5 h-5 text-indigo-600" /> Announcements</h1>
+        <h1 className="text-slate-900 mb-2 flex items-center gap-2"><Megaphone className="w-5 h-5 text-brand-600" /> Announcements</h1>
         <p className="text-slate-600">Broadcast to everyone, a role, a program, or a clan — one source of truth.</p>
       </div>
 
       {/* Composer */}
       <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-3">
-        <div className="flex items-center gap-2"><Send className="w-4 h-4 text-indigo-500" /><h2 className="text-slate-900">New announcement</h2></div>
+        <div className="flex items-center gap-2"><Send className="w-4 h-4 text-brand-500" /><h2 className="text-slate-900">New announcement</h2></div>
         <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className={field} />
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={3} placeholder="What do people need to know?" className={`${field} resize-none`} />
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-sm text-slate-600">To</label>
           <select value={audience} onChange={(e) => { setAudience(e.target.value as AnnouncementAudience); setTargetId(''); }}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
             <option value="all">Everyone</option>
             <option value="mentors">All mentors</option>
             <option value="mentees">All mentees</option>
@@ -67,12 +67,12 @@ export default function AdminAnnouncements() {
           </select>
           {needsTarget && (
             <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="">{`Select a ${audience}…`}</option>
               {targets.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           )}
-          <button onClick={post} disabled={posting} className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+          <button onClick={post} disabled={posting} className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}Post
           </button>
         </div>

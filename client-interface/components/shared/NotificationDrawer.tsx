@@ -56,7 +56,7 @@ const isNonMessageNotification = (notification: { type?: string }): boolean => {
 
 // Per-type icon + tint so notifications are scannable at a glance.
 const TYPE_ICON: Record<string, { Icon: typeof Bell; cls: string }> = {
-  task: { Icon: ListTodo, cls: 'bg-indigo-50 text-indigo-600' },
+  task: { Icon: ListTodo, cls: 'bg-brand-50 text-brand-600' },
   feedback: { Icon: MessageSquare, cls: 'bg-violet-50 text-violet-600' },
   badge: { Icon: Award, cls: 'bg-amber-50 text-amber-600' },
   milestone: { Icon: Trophy, cls: 'bg-emerald-50 text-emerald-600' },
@@ -295,7 +295,7 @@ export default function NotificationDrawer({
           showLabel ? 'w-full flex items-center gap-3 px-3 py-2.5 text-left' : 'p-2'
         } ${
           isOpen
-            ? 'bg-indigo-50 text-indigo-700'
+            ? 'bg-brand-50 text-brand-700'
             : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'
         }`}
         aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
@@ -364,7 +364,7 @@ export default function NotificationDrawer({
                       key={notification.id}
                       className={`group px-4 py-3 cursor-pointer transition-colors ${
                         notification.status === 'unread'
-                          ? 'bg-indigo-50 hover:bg-indigo-100'
+                          ? 'bg-brand-50 hover:bg-brand-100'
                           : 'bg-white hover:bg-slate-50'
                       }`}
                       onClick={() => handleNotificationClick(notification)}
@@ -385,13 +385,13 @@ export default function NotificationDrawer({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-slate-900 truncate">{notification.title}</p>
-                            {notification.status === 'unread' && <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />}
+                            {notification.status === 'unread' && <span className="w-2 h-2 rounded-full bg-brand-600 shrink-0" />}
                           </div>
                           <p className="mt-1 text-xs text-slate-600 line-clamp-2">{toNotificationMessageText(notification.message)}</p>
                           <div className="mt-2 flex items-center gap-2">
                             <p className="text-xs text-slate-400">{formatTime(notification.createdAt)}</p>
                             {notification.actionUrl && notification.actionLabel && (
-                              <span className="inline-flex items-center gap-0.5 text-xs font-medium text-indigo-600">
+                              <span className="inline-flex items-center gap-0.5 text-xs font-medium text-brand-600">
                                 · {notification.actionLabel} <ChevronRight className="w-3 h-3" />
                               </span>
                             )}
@@ -404,7 +404,7 @@ export default function NotificationDrawer({
                                 e.stopPropagation();
                                 handleMarkRead(notification.id);
                               }}
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-100 rounded"
+                              className="p-1.5 text-slate-400 hover:text-brand-600 hover:bg-brand-100 rounded"
                               aria-label="Mark notification read"
                             >
                               <Check className="w-4 h-4" />
@@ -441,7 +441,7 @@ export default function NotificationDrawer({
                     router.push(notificationsPath);
                     setIsOpen(false);
                   }}
-                  className="px-3 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                  className="px-3 py-2 text-sm font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors"
                 >
                   View all
                 </button>

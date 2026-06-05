@@ -65,7 +65,7 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
   under_review:     { label: 'Under review',    className: 'bg-blue-100 text-blue-700' },
   revision_needed:  { label: 'Changes needed',  className: 'bg-orange-100 text-orange-700' },
   changes_requested:{ label: 'Changes needed',  className: 'bg-orange-100 text-orange-700' },
-  in_progress:      { label: 'In progress',     className: 'bg-indigo-100 text-indigo-700' },
+  in_progress:      { label: 'In progress',     className: 'bg-brand-100 text-brand-700' },
   assigned:         { label: 'Assigned',        className: 'bg-slate-100 text-slate-600' },
   not_started:      { label: 'Not started',     className: 'bg-slate-100 text-slate-600' },
   completed:        { label: 'Completed',       className: 'bg-green-100 text-green-700' },
@@ -152,7 +152,7 @@ export default function MenteeDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -162,7 +162,7 @@ export default function MenteeDetail() {
       <div className="text-center py-12">
         <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
         <p className="text-slate-600">Mentee not found</p>
-        <Link href="/mentor/mentees" className="text-indigo-600 hover:text-indigo-700 text-sm mt-2 inline-block">
+        <Link href="/mentor/mentees" className="text-brand-600 hover:text-brand-700 text-sm mt-2 inline-block">
           Back to Mentees
         </Link>
       </div>
@@ -198,8 +198,8 @@ export default function MenteeDetail() {
         </Link>
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-              <span className="text-indigo-700 text-xl font-semibold">
+            <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-brand-700 text-xl font-semibold">
                 {mentee?.firstName?.[0]}{mentee?.lastName?.[0]}
               </span>
             </div>
@@ -224,7 +224,7 @@ export default function MenteeDetail() {
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => router.push(`/mentor/messages?participantId=${menteeId}`)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors flex items-center gap-2"
             >
               <MessageSquare className="w-4 h-4" />Message
             </button>
@@ -311,7 +311,7 @@ export default function MenteeDetail() {
           </div>
           <button
             onClick={() => setAssigningTask(true)}
-            className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-1"
+            className="text-brand-600 hover:text-brand-700 text-sm flex items-center gap-1"
           >
             <Plus className="w-4 h-4" />Assign task
           </button>
@@ -337,7 +337,7 @@ export default function MenteeDetail() {
                         <button
                           key={t.id}
                           onClick={() => router.push(`/mentor/tasks/${t.id}`)}
-                          className="w-full text-left flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-indigo-200 transition-colors"
+                          className="w-full text-left flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-200 transition-colors"
                         >
                           <span className="text-sm font-medium text-slate-900 truncate">{t.title}</span>
                           <div className="flex items-center gap-2 shrink-0">
@@ -422,7 +422,7 @@ export default function MenteeDetail() {
                         </span>
                       ) : (
                         <button onClick={() => onAcceptDelay(d.id)} disabled={frictionBusy === d.id}
-                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg disabled:opacity-50">
+                          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg disabled:opacity-50">
                           {frictionBusy === d.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}Accept
                         </button>
                       )}
@@ -449,7 +449,7 @@ export default function MenteeDetail() {
           <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-slate-900">1:1 notes</h2>
             <button onClick={() => setLoggingOneOnOne(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100">
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100">
               <Plus className="w-4 h-4" />Log 1:1
             </button>
           </div>
@@ -541,7 +541,7 @@ export default function MenteeDetail() {
               <div className="flex items-center gap-2 text-slate-600 text-sm mb-2"><Target className="w-4 h-4" />Goals</div>
               <div className="flex flex-wrap gap-2">
                 {profile.learningGoals.map((g: string, i: number) => (
-                  <span key={i} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded text-xs">{g}</span>
+                  <span key={i} className="px-2 py-1 bg-brand-50 text-brand-700 rounded text-xs">{g}</span>
                 ))}
               </div>
             </div>
@@ -623,7 +623,7 @@ export default function MenteeDetail() {
               onChange={(e) => setRejectReason(e.target.value)}
               placeholder="e.g. Final project submission is still outstanding..."
               rows={4}
-              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none mb-4"
+              className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none mb-4"
             />
             <div className="flex gap-3 justify-end">
               <button onClick={() => { setShowRejectModal(false); setRejectReason(''); }}

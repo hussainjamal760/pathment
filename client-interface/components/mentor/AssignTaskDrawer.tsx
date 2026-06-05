@@ -189,10 +189,10 @@ export function AssignTaskDrawer({
     }
   };
 
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
   const pill = (active: boolean) =>
     `px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${
-      active ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
+      active ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'
     }`;
 
   return (
@@ -224,7 +224,7 @@ export function AssignTaskDrawer({
             <p className="text-slate-500 text-sm mt-1">
               {mode === 'bulk' ? `${done} mentee${done === 1 ? '' : 's'} notified.` : `${mentee?.name ?? 'Mentee'} has a new task.`}
             </p>
-            <button onClick={onClose} className="mt-6 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm">Done</button>
+            <button onClick={onClose} className="mt-6 px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm">Done</button>
           </div>
         ) : (
           <>
@@ -233,7 +233,7 @@ export function AssignTaskDrawer({
               <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
                 {([['custom', 'Custom task', FileText], ['roadmap', 'From roadmap', Route]] as const).map(([key, label, Icon]) => (
                   <button key={key} type="button" onClick={() => setSource(key)} aria-pressed={source === key}
-                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${source === key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                    className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${source === key ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                     <Icon className="w-4 h-4" />{label}
                   </button>
                 ))}
@@ -304,7 +304,7 @@ export function AssignTaskDrawer({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-sm font-medium text-slate-700">Acceptance criteria</span>
-                  <button type="button" onClick={() => setCriteria((c) => [...c, ''])} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add check</button>
+                  <button type="button" onClick={() => setCriteria((c) => [...c, ''])} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add check</button>
                 </div>
                 <div className="space-y-2">
                   {criteria.length === 0 && <p className="text-xs text-slate-400">No criteria yet — add checks the mentee must meet.</p>}
@@ -336,9 +336,9 @@ export function AssignTaskDrawer({
                       <div className="space-y-2">
                         {localRoadmaps.map((r) => (
                           <button key={r.id} type="button" onClick={() => { setRoadmapId(r.id); setStartStep(0); }}
-                            className={`w-full text-left rounded-xl border p-3 transition-colors ${roadmapId === r.id ? 'border-indigo-400 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                            className={`w-full text-left rounded-xl border p-3 transition-colors ${roadmapId === r.id ? 'border-brand-400 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                             <div className="flex items-center gap-2">
-                              <Route className="w-4 h-4 text-indigo-500 shrink-0" />
+                              <Route className="w-4 h-4 text-brand-500 shrink-0" />
                               <span className="text-sm font-medium text-slate-900 truncate">{r.name}</span>
                               <span className="ml-auto text-xs text-slate-400 shrink-0">{r.steps.length} step{r.steps.length === 1 ? '' : 's'}</span>
                             </div>
@@ -378,7 +378,7 @@ export function AssignTaskDrawer({
                       {blockedCount > 0 && <span className="ml-1 text-xs text-amber-600">· {blockedCount} already assigned</span>}
                     </span>
                     <div className="flex gap-3 text-xs">
-                      <button type="button" onClick={() => setSelected(new Set(cohort.map((m) => m.id)))} className="text-indigo-600 hover:text-indigo-700">Select all</button>
+                      <button type="button" onClick={() => setSelected(new Set(cohort.map((m) => m.id)))} className="text-brand-600 hover:text-brand-700">Select all</button>
                       <button type="button" onClick={() => setSelected(new Set())} className="text-slate-500 hover:text-slate-700">Clear</button>
                     </div>
                   </div>
@@ -392,7 +392,7 @@ export function AssignTaskDrawer({
                       const blocked = blockSet.has(m.id);
                       return (
                         <label key={m.id} className={`flex items-center gap-3 px-3 py-2 ${blocked ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-50 cursor-pointer'}`}>
-                          <input type="checkbox" disabled={blocked} checked={!blocked && selected.has(m.id)} onChange={() => toggleMentee(m.id)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed" />
+                          <input type="checkbox" disabled={blocked} checked={!blocked && selected.has(m.id)} onChange={() => toggleMentee(m.id)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500 disabled:cursor-not-allowed" />
                           <span className="min-w-0 flex-1 truncate text-sm text-slate-700">{m.name}</span>
                           {blocked
                             ? <span className="text-[11px] font-medium text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md shrink-0">Assigned</span>
@@ -407,7 +407,7 @@ export function AssignTaskDrawer({
 
             <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
               <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-              <button onClick={submit} disabled={!canSubmit || saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+              <button onClick={submit} disabled={!canSubmit || saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 {source === 'roadmap'
                   ? (mode === 'bulk' ? `Assign roadmap to ${targetCount}` : 'Assign roadmap')

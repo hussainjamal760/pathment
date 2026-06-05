@@ -104,7 +104,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            className="px-4 py-2 text-sm bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors disabled:opacity-50 inline-flex items-center gap-2"
           >
             {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
             {alreadyReviewed ? 'Update feedback' : 'Submit feedback'}
@@ -114,7 +114,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
     >
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+          <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -141,7 +141,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
                       type="button"
                       onClick={() => setScore(d.key, n)}
                       aria-label={`${d.label}: ${n} of 5`}
-                      className="p-1 rounded-lg hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition-colors"
+                      className="p-1 rounded-lg hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 transition-colors"
                     >
                       <Star
                         className={`w-6 h-6 ${
@@ -195,7 +195,7 @@ export function MentorFeedbackDrawer({ open, enrollmentId, programName, onClose,
               rows={4}
               maxLength={4000}
               placeholder="What worked well, what could be better…"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
             />
           </div>
         </div>

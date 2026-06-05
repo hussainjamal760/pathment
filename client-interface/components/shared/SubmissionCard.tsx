@@ -89,7 +89,7 @@ export function SubmissionCard({
           {/* Attachments */}
           <div className="flex flex-wrap gap-3">
             {hasLinks && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm">
+              <div className="flex items-center gap-2 px-3 py-2 bg-brand-50 text-brand-700 rounded-lg text-sm">
                 <ExternalLink className="w-4 h-4" />
                 Project Links
               </div>
@@ -107,7 +107,7 @@ export function SubmissionCard({
         <div className="flex lg:flex-col gap-2">
           <Link
             href={reviewHref}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm transition-colors flex items-center gap-2 justify-center whitespace-nowrap"
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm transition-colors flex items-center gap-2 justify-center whitespace-nowrap"
           >
             <MessageSquare className="w-4 h-4" />
             Review & Feedback

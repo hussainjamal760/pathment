@@ -127,18 +127,18 @@ export default function SkillsOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-brand-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-600 rounded-2xl mb-4">
             <Star className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-indigo-900 mb-2">Add Your Skills</h1>
+          <h1 className="text-3xl font-bold text-brand-900 mb-2">Add Your Skills</h1>
           <p className="text-slate-600">Help us understand your expertise and match you better</p>
           <div className="flex items-center justify-center gap-2 mt-4">
-            <div className="w-8 h-2 bg-indigo-600 rounded-full"></div>
-            <div className="w-8 h-2 bg-indigo-600 rounded-full"></div>
+            <div className="w-8 h-2 bg-brand-600 rounded-full"></div>
+            <div className="w-8 h-2 bg-brand-600 rounded-full"></div>
             <div className="w-8 h-2 bg-slate-200 rounded-full"></div>
           </div>
         </div>
@@ -146,7 +146,7 @@ export default function SkillsOnboardingPage() {
         {/* Initial Loading State */}
         {initialLoading && (
           <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-12 text-center">
-            <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+            <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
             <p className="text-slate-600">Loading skills...</p>
           </div>
         )}
@@ -164,7 +164,7 @@ export default function SkillsOnboardingPage() {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={loadData}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors flex items-center gap-2"
+                className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors flex items-center gap-2"
               >
                 <span>Try Again</span>
               </button>
@@ -192,7 +192,7 @@ export default function SkillsOnboardingPage() {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={handleSkip}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+                className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-colors"
               >
                 Continue to Dashboard
               </button>
@@ -209,15 +209,15 @@ export default function SkillsOnboardingPage() {
             <h3 className="font-semibold text-slate-900 mb-4">Selected Skills ({selectedSkills.length})</h3>
             <div className="space-y-3">
               {selectedSkills.map((userSkill) => (
-                <div key={userSkill.skillId} className="flex items-center gap-4 p-3 bg-indigo-50 rounded-xl">
-                  <span className="flex-1 font-medium text-indigo-900">{getSkillName(userSkill.skillId)}</span>
+                <div key={userSkill.skillId} className="flex items-center gap-4 p-3 bg-brand-50 rounded-xl">
+                  <span className="flex-1 font-medium text-brand-900">{getSkillName(userSkill.skillId)}</span>
                   
                   <div className="flex items-center gap-2">
                     <label className="text-sm text-slate-600">Level:</label>
                     <select
                       value={userSkill.proficiencyLevel}
                       onChange={(e) => updateSkillLevel(userSkill.skillId, 'proficiencyLevel', parseInt(e.target.value))}
-                      className="px-3 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="px-3 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                     >
                       <option value={1}>Beginner</option>
                       <option value={2}>Elementary</option>
@@ -235,7 +235,7 @@ export default function SkillsOnboardingPage() {
                       max="50"
                       value={userSkill.yearsOfExperience}
                       onChange={(e) => updateSkillLevel(userSkill.skillId, 'yearsOfExperience', parseInt(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-16 px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                     />
                   </div>
 
@@ -261,14 +261,14 @@ export default function SkillsOnboardingPage() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Search skills..."
               />
             </div>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {categories.map((cat) => (
                 <option key={cat} value={cat}>
@@ -288,7 +288,7 @@ export default function SkillsOnboardingPage() {
                   onClick={() => toggleSkill(skill.id)}
                   className={`p-3 rounded-xl border-2 text-left transition-all ${
                     isSelected
-                      ? 'border-indigo-600 bg-indigo-50'
+                      ? 'border-brand-600 bg-brand-50'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
@@ -297,7 +297,7 @@ export default function SkillsOnboardingPage() {
                       <div className="font-medium text-slate-900">{skill.name}</div>
                       <div className="text-xs text-slate-500 mt-1">{skill.category}</div>
                     </div>
-                    {isSelected && <CheckCircle2 className="w-5 h-5 text-indigo-600" />}
+                    {isSelected && <CheckCircle2 className="w-5 h-5 text-brand-600" />}
                   </div>
                 </button>
               );
@@ -322,7 +322,7 @@ export default function SkillsOnboardingPage() {
           <button
             onClick={handleSubmit}
             disabled={loading || selectedSkills.length === 0}
-            className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-4 rounded-xl transition-colors flex items-center justify-center gap-2 group"
+            className="flex-1 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white py-4 rounded-xl transition-colors flex items-center justify-center gap-2 group"
           >
             {loading ? (
               <>

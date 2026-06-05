@@ -63,7 +63,7 @@ export function RecentActivity({ pendingMatches = [] }: RecentActivityProps) {
             <div className="px-6 py-4 border-t border-slate-200">
               <Link
                 href="/admin/matching/mentor-assignment"
-                className="block text-center text-indigo-600 hover:text-indigo-700 text-sm font-medium"
+                className="block text-center text-brand-600 hover:text-brand-700 text-sm font-medium"
               >
                 Assign Mentors
               </Link>

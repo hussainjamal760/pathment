@@ -21,7 +21,7 @@ function MiniBar({ sessions }: { sessions: { date: string; activeMinutes: number
         <div
           key={s.date}
           title={`${s.date}: ${fmt(s.activeMinutes)}`}
-          className="w-2 rounded-t-sm bg-indigo-400"
+          className="w-2 rounded-t-sm bg-brand-400"
           style={{ height: `${Math.max(Math.round(((s.activeMinutes || 0) / max) * 100), 4)}%` }}
         />
       ))}
@@ -55,7 +55,7 @@ export default function AdminActivityPage() {
               onClick={() => setDays(d)}
               className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
                 days === d
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'text-slate-500 border border-slate-200 hover:bg-slate-50'
               }`}
             >
@@ -67,7 +67,7 @@ export default function AdminActivityPage() {
 
       {loading && !overview ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-7 h-7 animate-spin text-indigo-500" />
+          <Loader2 className="w-7 h-7 animate-spin text-brand-500" />
         </div>
       ) : (
         <>
@@ -78,7 +78,7 @@ export default function AdminActivityPage() {
                 icon: Users,
                 label: 'Active today',
                 value: overview?.platform.activeToday ?? 0,
-                color: 'text-indigo-600 bg-indigo-50',
+                color: 'text-brand-600 bg-brand-50',
               },
               {
                 icon: CalendarCheck,
@@ -120,7 +120,7 @@ export default function AdminActivityPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search mentees…"
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
               <span className="text-xs text-slate-400">{filtered.length} mentees</span>
@@ -147,7 +147,7 @@ export default function AdminActivityPage() {
                       <tr key={m.user.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-xs shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold text-xs shrink-0">
                               {m.user.firstName[0]}{m.user.lastName[0]}
                             </div>
                             <div>

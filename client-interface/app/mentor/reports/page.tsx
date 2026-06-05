@@ -42,7 +42,7 @@ function nextStep(m: CohortMentee): string {
 // Literal class strings (no runtime concatenation) so Tailwind keeps them.
 const HEALTH_BANDS = [
   { min: 78, label: 'Healthy', tone: 'text-emerald-700', stroke: 'stroke-emerald-500', soft: 'bg-emerald-50 border-emerald-200' },
-  { min: 58, label: 'Steady', tone: 'text-indigo-700', stroke: 'stroke-indigo-500', soft: 'bg-indigo-50 border-indigo-200' },
+  { min: 58, label: 'Steady', tone: 'text-brand-700', stroke: 'stroke-brand-500', soft: 'bg-brand-50 border-brand-200' },
   { min: 40, label: 'Needs attention', tone: 'text-amber-700', stroke: 'stroke-amber-500', soft: 'bg-amber-50 border-amber-200' },
   { min: 0, label: 'At risk', tone: 'text-red-700', stroke: 'stroke-red-500', soft: 'bg-red-50 border-red-200' },
 ] as const;
@@ -53,8 +53,8 @@ function Avatar({ m }: { m: CohortMentee }) {
     // eslint-disable-next-line @next/next/no-img-element
     <img src={m.profilePictureUrl} alt={m.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
   ) : (
-    <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-      <span className="text-indigo-700 text-xs font-semibold">{m.avatar}</span>
+    <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+      <span className="text-brand-700 text-xs font-semibold">{m.avatar}</span>
     </div>
   );
 }
@@ -211,13 +211,13 @@ export default function MentorReports() {
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl">
             {(['week', 'month'] as const).map((p) => (
               <button key={p} onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${period === p ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-colors ${period === p ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
                 {p}
               </button>
             ))}
           </div>
           <button onClick={draftWithAI} disabled={!report || aiLoading}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
             {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {aiLoading ? 'Drafting…' : 'Draft with AI'}
           </button>
@@ -234,11 +234,11 @@ export default function MentorReports() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : !report ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
@@ -256,10 +256,10 @@ export default function MentorReports() {
 
           {/* AI-drafted narrative (editable) */}
           {aiDraft !== null && (
-            <div className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5">
+            <div className="rounded-2xl border border-brand-200 bg-brand-50/40 p-5">
               <div className="no-print flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  <Sparkles className="w-4 h-4 text-brand-600" />
                   <h2 className="font-semibold text-slate-900">AI draft</h2>
                   <span className="text-xs text-slate-400">editable</span>
                 </div>
@@ -269,7 +269,7 @@ export default function MentorReports() {
                     {aiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}Regenerate
                   </button>
                   <button onClick={copyDraft}
-                    className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors">
                     <Copy className="w-3.5 h-3.5" />Copy
                   </button>
                 </div>
@@ -333,11 +333,11 @@ export default function MentorReports() {
           {/* Period-scoped throughput — driven by the week/month toggle */}
           <div className="bg-white rounded-2xl border border-slate-200 p-6">
             <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="text-slate-900 flex items-center gap-2"><Activity className="w-4 h-4 text-indigo-500" />This {period}</h2>
+              <h2 className="text-slate-900 flex items-center gap-2"><Activity className="w-4 h-4 text-brand-500" />This {period}</h2>
               <span className="text-xs text-slate-400">{activity ? `last ${activity.days} days` : ''}</span>
             </div>
             {activityLoading ? (
-              <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-indigo-400" /></div>
+              <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-brand-400" /></div>
             ) : !activity ? (
               <p className="text-sm text-slate-400">Couldn’t load activity for this window.</p>
             ) : (
@@ -380,7 +380,7 @@ export default function MentorReports() {
           {/* Momentum + Open work */}
           <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-slate-200 p-6">
-              <h2 className="text-slate-900 mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-indigo-500" />Momentum</h2>
+              <h2 className="text-slate-900 mb-4 flex items-center gap-2"><Activity className="w-4 h-4 text-brand-500" />Momentum</h2>
               <div className="space-y-3">
                 {[
                   { label: 'Rising', n: report.rising, cls: 'bg-emerald-500' },
@@ -402,13 +402,13 @@ export default function MentorReports() {
               <h2 className="text-slate-900 mb-4">Open work</h2>
               <div className="space-y-3">
                 <Link href="/mentor/review" className="flex items-center gap-3 group">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4 text-indigo-600" /></div>
+                  <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center shrink-0"><ClipboardCheck className="w-4 h-4 text-brand-600" /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-slate-700">Pending reviews</p>
                     <p className="text-xs text-slate-400">awaiting your feedback</p>
                   </div>
                   <span className="text-lg font-semibold text-slate-900 tabular-nums">{report.pending}</span>
-                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors" />
+                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-brand-500 transition-colors" />
                 </Link>
                 <Link href="/mentor/dashboard" className="flex items-center gap-3 group">
                   <div className="w-9 h-9 rounded-xl bg-orange-50 flex items-center justify-center shrink-0"><Flag className="w-4 h-4 text-orange-600" /></div>
@@ -441,7 +441,7 @@ export default function MentorReports() {
                     <span>{pct(m.onTimeRate)} on time</span>
                     {m.avgRating > 0 && <span className="inline-flex items-center gap-0.5 text-amber-600"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{m.avgRating}</span>}
                   </div>
-                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-500 transition-colors shrink-0" />
+                  <ArrowUpRight className="w-4 h-4 text-slate-300 group-hover:text-brand-500 transition-colors shrink-0" />
                 </Link>
               ))}
             </div>
@@ -471,12 +471,12 @@ export default function MentorReports() {
                       {m.riskReason && <p className="text-xs text-slate-500 mt-0.5">{m.riskReason}</p>}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-slate-400">
                         <span>{pct(m.absoluteProgress)} progress</span>
-                        {m.pendingApprovals > 0 && <span className="text-indigo-600">{m.pendingApprovals} to review</span>}
+                        {m.pendingApprovals > 0 && <span className="text-brand-600">{m.pendingApprovals} to review</span>}
                         {m.openBlockers > 0 && <span className="text-orange-600">{m.openBlockers} blocker{m.openBlockers > 1 ? 's' : ''}</span>}
                         <span>last active {m.lastActive}</span>
                       </div>
                     </div>
-                    <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-slate-600 group-hover:text-indigo-600 shrink-0 mt-0.5">
+                    <span className="hidden sm:inline-flex items-center gap-1 text-xs font-medium text-slate-600 group-hover:text-brand-600 shrink-0 mt-0.5">
                       {nextStep(m)} <ArrowUpRight className="w-3.5 h-3.5" />
                     </span>
                   </Link>
@@ -491,7 +491,7 @@ export default function MentorReports() {
             <ol className="space-y-2.5">
               {report.actions.map((a, i) => (
                 <li key={i} className="flex items-start gap-3 text-sm text-slate-700">
-                  <span className="w-5 h-5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                  <span className="w-5 h-5 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
                   {a}
                 </li>
               ))}

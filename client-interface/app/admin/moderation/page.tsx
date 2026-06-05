@@ -26,14 +26,14 @@ export default function AdminModerationPage() {
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-slate-900 mb-1 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-indigo-600" /> Moderation
+            <ShieldAlert className="w-5 h-5 text-brand-600" /> Moderation
           </h1>
           <p className="text-slate-600">Review content members flagged across community spaces.</p>
         </div>
         <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1">
           {STATUS_TABS.map((t) => (
             <button key={t.key} onClick={() => setStatus(t.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === t.key ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${status === t.key ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50'}`}>
               {t.label}
             </button>
           ))}
@@ -41,7 +41,7 @@ export default function AdminModerationPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-indigo-500" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-500" /></div>
       ) : reports.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <ShieldAlert className="w-10 h-10 text-slate-300 mx-auto mb-3" />

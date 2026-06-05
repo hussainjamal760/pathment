@@ -3,7 +3,7 @@ import React from 'react';
 interface ProgressBarProps {
   /** 0–100 */
   value: number;
-  /** Tailwind bg class for the filled bar, default: 'bg-indigo-500' */
+  /** Tailwind bg class for the filled bar, default: 'bg-brand-500' */
   color?: string;
   showLabel?: boolean;
   size?: 'xs' | 'sm' | 'md';
@@ -19,7 +19,7 @@ const SIZE_H: Record<string, string> = {
 
 export function ProgressBar({
   value,
-  color = 'bg-indigo-500',
+  color = 'bg-brand-500',
   showLabel = true,
   size = 'sm',
   sub,

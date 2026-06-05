@@ -46,7 +46,7 @@ export function SearchAndFilterBar({
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={placeholder}
-            className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent placeholder:text-slate-400"
+            className="w-full pl-10 pr-10 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent placeholder:text-slate-400"
           />
           {search && (
             <button
@@ -64,7 +64,7 @@ export function SearchAndFilterBar({
             key={i}
             value={filter.value}
             onChange={(e) => filter.onChange(e.target.value)}
-            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-slate-700 appearance-none bg-white"
+            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent text-slate-700 appearance-none bg-white"
           >
             {filter.options.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -80,7 +80,7 @@ export function SearchAndFilterBar({
           {activeChips.map((chip, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-medium"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-50 text-brand-700 rounded-full text-xs font-medium"
             >
               {chip.label}
               <button onClick={chip.onRemove}><X className="w-3 h-3" /></button>

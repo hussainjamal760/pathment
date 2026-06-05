@@ -30,14 +30,14 @@ const RANK_STYLE = [
   { ring: 'bg-slate-100 text-slate-600 ring-2 ring-slate-300', bar: 'bg-slate-400' },
   { ring: 'bg-orange-100 text-orange-700 ring-2 ring-orange-300', bar: 'bg-orange-400' },
 ];
-const rankStyle = (i: number) => RANK_STYLE[i] || { ring: 'bg-slate-50 text-slate-400', bar: 'bg-indigo-400' };
+const rankStyle = (i: number) => RANK_STYLE[i] || { ring: 'bg-slate-50 text-slate-400', bar: 'bg-brand-400' };
 
 function Avatar({ m, size = 'md' }: { m: CohortMentee; size?: 'md' | 'lg' }) {
   const dim = size === 'lg' ? 'w-14 h-14 text-base' : 'w-9 h-9 text-xs';
   return m.profilePictureUrl
     // eslint-disable-next-line @next/next/no-img-element
     ? <img src={m.profilePictureUrl} alt={m.name} className={`${dim} rounded-full object-cover shrink-0`} />
-    : <div className={`${dim} bg-indigo-100 rounded-full flex items-center justify-center shrink-0`}><span className="text-indigo-700 font-semibold">{m.avatar}</span></div>;
+    : <div className={`${dim} bg-brand-100 rounded-full flex items-center justify-center shrink-0`}><span className="text-brand-700 font-semibold">{m.avatar}</span></div>;
 }
 
 export default function MentorLeaderboard() {
@@ -61,7 +61,7 @@ export default function MentorLeaderboard() {
         <h1 className="text-slate-900 mb-1">Cohort standings</h1>
         <p className="text-slate-600">Ranked by fair progress — no vanity points.</p>
         <div className="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 border border-slate-200 px-3.5 py-2.5 max-w-xl">
-          <Info className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
           <p className="text-xs text-slate-500 leading-relaxed">
             <span className="font-medium text-slate-700">Fair progress</span> credits output for logged, accepted blockers — so effort against real constraints counts, not just raw completion.
           </p>
@@ -72,7 +72,7 @@ export default function MentorLeaderboard() {
         <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-xl w-fit">
           {['all', ...programs].map((p) => (
             <button key={p} onClick={() => setProgram(p)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${program === p ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${program === p ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
               {p === 'all' ? 'All clans' : p}
             </button>
           ))}
@@ -80,11 +80,11 @@ export default function MentorLeaderboard() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : ranked.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">

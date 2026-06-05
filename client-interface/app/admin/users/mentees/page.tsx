@@ -48,7 +48,7 @@ const columns: DataTableColumn<MenteeListItem>[] = [
         firstName={row.firstName}
         lastName={row.lastName}
         email={row.email}
-        colorClass="bg-indigo-100 text-indigo-700"
+        colorClass="bg-brand-100 text-brand-700"
       />
     ),
   },
@@ -99,7 +99,7 @@ const columns: DataTableColumn<MenteeListItem>[] = [
             <span className="font-medium">{tasks}</span>
             <span className="text-slate-400 ml-1 text-xs">tasks done</span>
           </p>
-          <p className="text-indigo-600 text-xs font-medium">
+          <p className="text-brand-600 text-xs font-medium">
             {points.toLocaleString()} pts · Lvl {level}
           </p>
         </div>
@@ -237,7 +237,7 @@ export default function AdminMenteesListPage() {
         <div className="flex items-center gap-2">
           <Link
             href={`/admin/enrollment/overview`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
             title={`View enrollments for ${name}`}
           >
             <ExternalLink className="w-3.5 h-3.5" />
@@ -288,7 +288,7 @@ export default function AdminMenteesListPage() {
           icon={School}
           label="Total Mentees"
           value={isLoading ? '—' : pagination.total}
-          colorClass="text-indigo-600 bg-indigo-50"
+          colorClass="text-brand-600 bg-brand-50"
         />
         <StatsCard
           icon={BookOpen}

@@ -95,10 +95,10 @@ function MenteeDashboardInner() {
       {heroTask && (
         <Link
           href={`/mentee/tasks/${heroTask.id}`}
-          className="block rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 p-6 hover:border-indigo-400 transition-colors"
+          className="block rounded-2xl border border-brand-200 bg-gradient-to-br from-brand-50 to-brand-50 p-6 hover:border-brand-400 transition-colors"
         >
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Next up</span>
+            <span className="text-xs font-medium text-brand-600 uppercase tracking-wide">Next up</span>
             {isLate(heroTask) && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs">
                 <Clock className="w-3 h-3" />overdue
@@ -110,7 +110,7 @@ function MenteeDashboardInner() {
             {heroTask.roadmapTask?.type && <span className="capitalize">{heroTask.roadmapTask.type}</span>}
             {heroTask.dueDate && (<><span className="text-slate-300">·</span><span>Due {new Date(heroTask.dueDate).toLocaleDateString()}</span></>)}
           </div>
-          <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700">
+          <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700">
             Open task <ArrowRight className="w-4 h-4" />
           </span>
         </Link>
@@ -127,7 +127,7 @@ function MenteeDashboardInner() {
         <div className="bg-white rounded-2xl border border-slate-200">
           <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
             <h2 className="text-slate-900">This week</h2>
-            <Link href="/mentee/tasks" className="text-indigo-600 hover:text-indigo-700 text-sm flex items-center gap-1">
+            <Link href="/mentee/tasks" className="text-brand-600 hover:text-brand-700 text-sm flex items-center gap-1">
               All tasks <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -164,18 +164,18 @@ function MenteeDashboardInner() {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
         </div>
       ) : (
         <>
           {/* No enrollment yet — placement is admin/invite-driven now */}
           {enrollments.length === 0 && (
-            <div className="bg-linear-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-8 text-center">
-              <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="bg-linear-to-br from-brand-50 to-brand-50 border border-brand-200 rounded-2xl p-8 text-center">
+              <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <BookOpen className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-indigo-900 mb-3">You're all set up</h2>
-              <p className="text-indigo-700">
+              <h2 className="text-2xl font-bold text-brand-900 mb-3">You're all set up</h2>
+              <p className="text-brand-700">
                 You haven't been placed in a program yet. Your program team will enroll you and
                 connect you with a mentor — this page will fill in as soon as that happens.
               </p>
@@ -321,7 +321,7 @@ function MenteeDashboardInner() {
                             {total > 0 && (
                               <>
                                 <span className="flex items-center gap-1.5">
-                                  <ListTodo className="w-4 h-4 text-indigo-600" />
+                                  <ListTodo className="w-4 h-4 text-brand-600" />
                                   {total} program tasks
                                 </span>
                               </>
@@ -333,7 +333,7 @@ function MenteeDashboardInner() {
 
                     <Link
                       href="/mentee/tasks"
-                      className="block w-full text-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm transition-colors"
+                      className="block w-full text-center px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm transition-colors"
                     >
                       View Tasks
                     </Link>
@@ -376,7 +376,7 @@ function MenteeDashboardInner() {
                       ) : (
                         <button
                           onClick={() => openFeedback(e.id, e.program?.name || 'this program')}
-                          className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-xl text-sm transition-colors"
+                          className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-brand-50 hover:bg-brand-100 border border-brand-200 text-brand-700 rounded-xl text-sm transition-colors"
                         >
                           <MessageSquareHeart className="w-4 h-4" />
                           Leave feedback
@@ -407,7 +407,7 @@ function MenteeDashboardInner() {
                             enrollment.status === 'approved'           ? 'bg-blue-100 text-blue-700' :
                             enrollment.status === 'pending_match'      ? 'bg-purple-100 text-purple-700' :
                             enrollment.status === 'matched'            ? 'bg-green-100 text-green-700' :
-                            enrollment.status === 'active'             ? 'bg-indigo-100 text-indigo-700' :
+                            enrollment.status === 'active'             ? 'bg-brand-100 text-brand-700' :
                             enrollment.status === 'pending_completion' ? 'bg-orange-100 text-orange-700' :
                             enrollment.status === 'level_completed'    ? 'bg-teal-100 text-teal-700' :
                             enrollment.status === 'program_completed'  ? 'bg-green-100 text-green-700' :
@@ -444,7 +444,7 @@ function MenteeDashboardInner() {
 
 export default function MenteeDashboard() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>}>
       <MenteeDashboardInner />
     </Suspense>
   );

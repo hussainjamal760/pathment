@@ -53,8 +53,8 @@ function RiskCard({ m, onNudge, onOpen, nudging }: {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
       <div className="flex items-start gap-3">
-        <div className="w-11 h-11 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-          <span className="text-indigo-700 font-medium text-sm">{m.avatar}</span>
+        <div className="w-11 h-11 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+          <span className="text-brand-700 font-medium text-sm">{m.avatar}</span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -80,19 +80,19 @@ function RiskCard({ m, onNudge, onOpen, nudging }: {
         <button
           onClick={onNudge}
           disabled={nudging}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 disabled:opacity-50"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium hover:bg-brand-100 disabled:opacity-50"
         >
           {nudging ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bell className="w-3.5 h-3.5" />}Nudge
         </button>
         <button
           onClick={() => router.push(`/mentor/messages?participantId=${m.id}`)}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium hover:border-indigo-300"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium hover:border-brand-300"
         >
           <MessageSquare className="w-3.5 h-3.5" />Message
         </button>
         <button
           onClick={onOpen}
-          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-700"
+          className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"
         >
           Open profile <ArrowUpRight className="w-3.5 h-3.5" />
         </button>
@@ -139,11 +139,11 @@ export default function MentorAtRisk() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : error ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">
           <p className="text-slate-600 mb-3">{error}</p>
-          <button onClick={refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+          <button onClick={refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
         </div>
       ) : totalAtRisk === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 py-16 text-center">

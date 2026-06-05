@@ -14,7 +14,7 @@ const DURATIONS = [15, 30, 45, 60];
 const SLOT_DAYS = ['everyday', 'weekdays', 'weekends'];
 const TASK_TYPES = ['reading', 'discussion', 'video', 'quiz', 'assignment', 'project'];
 const RECURRENCES = ['daily', 'weekly', 'once'];
-const field = 'border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 // ───────────────────────── Templates tab ─────────────────────────
 interface DraftBlock { label: string; time: string; days: string; bookable: boolean }
@@ -46,7 +46,7 @@ function TemplatesTab() {
   return (
     <div className="space-y-6">
       <div className="flex justify-end">
-        <button onClick={() => setCreating((c) => !c)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Plus className="w-4 h-4" />New template</button>
+        <button onClick={() => setCreating((c) => !c)} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"><Plus className="w-4 h-4" />New template</button>
       </div>
 
       {creating && (
@@ -54,22 +54,22 @@ function TemplatesTab() {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name (e.g. Org Standard Day)" className={`${field} w-full`} />
           <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" className={`${field} w-full`} />
           <div className="space-y-2">
-            <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-700">Blocks (the day's structure)</span><button onClick={addBlock} className="text-indigo-600 text-sm inline-flex items-center gap-1"><Plus className="w-4 h-4" />Add block</button></div>
+            <div className="flex items-center justify-between"><span className="text-sm font-medium text-slate-700">Blocks (the day's structure)</span><button onClick={addBlock} className="text-brand-600 text-sm inline-flex items-center gap-1"><Plus className="w-4 h-4" />Add block</button></div>
             {blocks.map((b, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-slate-200">
                 <input value={b.label} onChange={(e) => setBlock(i, { label: e.target.value })} placeholder="Label (e.g. Core work)" className={`${field} flex-1 min-w-36`} />
                 <input value={b.time} onChange={(e) => setBlock(i, { time: e.target.value })} placeholder="Time" className={`${field} w-28`} />
                 <select value={b.days} onChange={(e) => setBlock(i, { days: e.target.value })} className={`${field} capitalize`}>{SLOT_DAYS.map((d) => <option key={d} value={d}>{d}</option>)}</select>
-                <label className="text-xs text-slate-500 inline-flex items-center gap-1"><input type="checkbox" checked={b.bookable} onChange={(e) => setBlock(i, { bookable: e.target.checked })} className="rounded border-slate-300 text-indigo-600" />bookable</label>
+                <label className="text-xs text-slate-500 inline-flex items-center gap-1"><input type="checkbox" checked={b.bookable} onChange={(e) => setBlock(i, { bookable: e.target.checked })} className="rounded border-slate-300 text-brand-600" />bookable</label>
                 {blocks.length > 1 && <button onClick={() => removeBlock(i)} className="text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>}
               </div>
             ))}
           </div>
-          <div className="flex justify-end"><button onClick={create} disabled={busy === 'create'} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm inline-flex items-center gap-2 disabled:opacity-50">{busy === 'create' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Create</button></div>
+          <div className="flex justify-end"><button onClick={create} disabled={busy === 'create'} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-2 disabled:opacity-50">{busy === 'create' ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Create</button></div>
         </div>
       )}
 
-      {loading ? <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div> : (
+      {loading ? <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div> : (
         <>
           <section>
             <h3 className="text-slate-900 font-medium mb-3">My templates</h3>
@@ -83,7 +83,7 @@ function TemplatesTab() {
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{t.blocks.length} block{t.blocks.length === 1 ? '' : 's'}</p>
                     <ol className="mt-2 space-y-0.5">{t.blocks.slice(0, 5).map((b) => <li key={b.id} className="text-xs text-slate-500 truncate">{b.time} · {b.label}</li>)}</ol>
-                    <button onClick={() => setAssignFor(t)} className="mt-3 w-full px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100 inline-flex items-center justify-center gap-1.5"><Users className="w-4 h-4" />Assign</button>
+                    <button onClick={() => setAssignFor(t)} className="mt-3 w-full px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-sm font-medium hover:bg-brand-100 inline-flex items-center justify-center gap-1.5"><Users className="w-4 h-4" />Assign</button>
                   </div>
                 ))}
               </div>
@@ -99,7 +99,7 @@ function TemplatesTab() {
                     <h4 className="font-medium text-slate-900">{t.name}</h4>
                     <p className="text-xs text-slate-500 mt-0.5">{t.blocks.length} blocks</p>
                     <button onClick={async () => { setBusy(t.id); try { await scheduleApi.importTemplate(t.id); toast.success('Imported'); refetch(); } catch { toast.error('Failed'); } finally { setBusy(null); } }} disabled={busy === t.id}
-                      className="mt-3 w-full px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:border-indigo-300 inline-flex items-center justify-center gap-1.5">{busy === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}Import</button>
+                      className="mt-3 w-full px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:border-brand-300 inline-flex items-center justify-center gap-1.5">{busy === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}Import</button>
                   </div>
                 ))}
               </div>
@@ -131,13 +131,13 @@ function AssignModal({ template, cohort, onClose }: { template: ScheduleTemplate
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={assign} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Assign{sel.size ? ` (${sel.size})` : ''}</button>
+          <button onClick={assign} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Assign{sel.size ? ` (${sel.size})` : ''}</button>
         </>
       }
     >
       <div className="space-y-1">
         {cohort.length === 0 ? <p className="text-sm text-slate-500">No mentees.</p> : cohort.map((m) => (
-          <label key={m.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"><input type="checkbox" checked={sel.has(m.id)} onChange={() => toggle(m.id)} className="rounded border-slate-300 text-indigo-600" /><span className="text-sm text-slate-700">{m.name}</span></label>
+          <label key={m.id} className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer"><input type="checkbox" checked={sel.has(m.id)} onChange={() => toggle(m.id)} className="rounded border-slate-300 text-brand-600" /><span className="text-sm text-slate-700">{m.name}</span></label>
         ))}
       </div>
     </Drawer>
@@ -188,7 +188,7 @@ function FillTab() {
       </div>
 
       {!menteeId ? <p className="text-sm text-slate-500">Pick a mentee to fill their slots.</p>
-        : loading ? <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-indigo-600" /></div>
+        : loading ? <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
         : slots.length === 0 ? <p className="text-sm text-slate-500">No schedule assigned yet — assign a template first.</p>
         : (
           <div className="space-y-3">
@@ -203,11 +203,11 @@ function FillTab() {
 
                 {s.kind === 'roadmap' && (
                   <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 space-y-2">
-                    <div className="flex items-center gap-2"><Route className="w-4 h-4 text-indigo-500" /><span className="text-xs font-medium text-slate-600">Roadmap chain (in order)</span></div>
+                    <div className="flex items-center gap-2"><Route className="w-4 h-4 text-brand-500" /><span className="text-xs font-medium text-slate-600">Roadmap chain (in order)</span></div>
                     <div className="flex flex-wrap gap-1.5">
                       {(s.roadmapChain || []).map((rid, i) => {
                         const rm = local.find((r) => r.id === rid);
-                        return <span key={rid} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs">{i + 1}. {rm?.name || 'Roadmap'}<button onClick={() => patchSlot(s.id, { roadmapChain: s.roadmapChain.filter((x) => x !== rid) })}><X className="w-3 h-3" /></button></span>;
+                        return <span key={rid} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 text-xs">{i + 1}. {rm?.name || 'Roadmap'}<button onClick={() => patchSlot(s.id, { roadmapChain: s.roadmapChain.filter((x) => x !== rid) })}><X className="w-3 h-3" /></button></span>;
                       })}
                     </div>
                     <select value="" onChange={(e) => { if (e.target.value) patchSlot(s.id, { roadmapChain: [...(s.roadmapChain || []), e.target.value] }); }} className={`${field} w-full`}>
@@ -219,7 +219,7 @@ function FillTab() {
 
                 {s.kind === 'recurring' && (
                   <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 space-y-2">
-                    <div className="flex items-center gap-2"><Repeat className="w-4 h-4 text-indigo-500" /><span className="text-xs font-medium text-slate-600">Recurring ritual</span></div>
+                    <div className="flex items-center gap-2"><Repeat className="w-4 h-4 text-brand-500" /><span className="text-xs font-medium text-slate-600">Recurring ritual</span></div>
                     <input value={s.recurring?.title || ''} onChange={(e) => patchSlot(s.id, { recurring: { title: e.target.value, type: s.recurring?.type || 'discussion', recurrence: s.recurring?.recurrence || 'daily' } })} placeholder="Title (e.g. Mindset talk)" className={`${field} w-full`} />
                     <div className="flex gap-2">
                       <select value={s.recurring?.type || 'discussion'} onChange={(e) => patchSlot(s.id, { recurring: { title: s.recurring?.title || '', type: e.target.value, recurrence: s.recurring?.recurrence || 'daily' } })} className={`${field} capitalize`}>{TASK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}</select>
@@ -229,7 +229,7 @@ function FillTab() {
                 )}
 
                 <div className="flex justify-end mt-3">
-                  <button onClick={() => save(s)} disabled={busy === s.id} className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">{busy === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Save slot</button>
+                  <button onClick={() => save(s)} disabled={busy === s.id} className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">{busy === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Save slot</button>
                 </div>
               </div>
             ))}
@@ -274,18 +274,18 @@ function AvailabilityTab() {
   };
   const upcoming = meetings.filter((m) => m.status === 'scheduled');
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>;
-  if (error) return <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center"><p className="text-slate-600 mb-3">{error}</p><button onClick={refetch} className="text-indigo-600 text-sm font-medium">Try again</button></div>;
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>;
+  if (error) return <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center"><p className="text-slate-600 mb-3">{error}</p><button onClick={refetch} className="text-brand-600 text-sm font-medium">Try again</button></div>;
 
   return (
     <div className="space-y-6">
       <section className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
-        <h3 className="text-slate-900 font-medium flex items-center gap-2"><CalendarClock className="w-4 h-4 text-indigo-500" />My 1:1 availability</h3>
+        <h3 className="text-slate-900 font-medium flex items-center gap-2"><CalendarClock className="w-4 h-4 text-brand-500" />My 1:1 availability</h3>
         <div className="flex flex-wrap items-end gap-3">
           <div><label className="block text-xs text-slate-500 mb-1">Date</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={field} /></div>
           <div><label className="block text-xs text-slate-500 mb-1">Time</label><input value={time} onChange={(e) => setTime(e.target.value)} className={`${field} w-28`} /></div>
           <div><label className="block text-xs text-slate-500 mb-1">Duration</label><select value={duration} onChange={(e) => setDuration(Number(e.target.value))} className={field}>{DURATIONS.map((d) => <option key={d} value={d}>{d} min</option>)}</select></div>
-          <button onClick={publish} disabled={adding} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium disabled:opacity-50">{adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Publish slot</button>
+          <button onClick={publish} disabled={adding} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium disabled:opacity-50">{adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Publish slot</button>
         </div>
         {availability.length === 0 ? <p className="text-sm text-slate-500">No slots published.</p> : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -307,7 +307,7 @@ function AvailabilityTab() {
             <div className="space-y-2">
               {upcoming.map((m) => (
                 <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-200">
-                  <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center shrink-0"><span className="text-indigo-700 text-xs font-medium">{m.mentee?.firstName?.[0]}{m.mentee?.lastName?.[0]}</span></div>
+                  <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0"><span className="text-brand-700 text-xs font-medium">{m.mentee?.firstName?.[0]}{m.mentee?.lastName?.[0]}</span></div>
                   <div className="min-w-0 flex-1"><p className="text-sm font-medium text-slate-900">{m.mentee?.firstName} {m.mentee?.lastName}</p><div className="flex items-center gap-2 text-xs text-slate-500"><Clock className="w-3 h-3" />{m.day} · {m.time} · {m.durationMins}m</div>{m.agenda && <p className="text-xs text-slate-500 mt-0.5 truncate">{m.agenda}</p>}</div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <button onClick={() => markDone(m.id)} disabled={busyId === m.id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 disabled:opacity-50"><Check className="w-3.5 h-3.5" />Done</button>
@@ -341,7 +341,7 @@ function AvailabilityTab() {
           rows={4}
           maxLength={1000}
           placeholder="e.g. Something urgent came up — let's rebook for later this week."
-          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
         />
         <p className="mt-2 text-xs text-slate-400">A short reason helps your mentee understand and rebook. The slot is freed so they can book again.</p>
       </Drawer>
@@ -366,7 +366,7 @@ export default function MentorSchedules() {
       </div>
       <div className="flex flex-wrap items-center gap-0 border-b border-slate-200">
         {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${tab === t.key ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+          <button key={t.key} onClick={() => setTab(t.key)} className={`-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors inline-flex items-center gap-1.5 ${tab === t.key ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
             <t.icon className="w-4 h-4" />{t.label}
           </button>
         ))}

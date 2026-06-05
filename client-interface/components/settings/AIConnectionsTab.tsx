@@ -30,13 +30,13 @@ const STATUS_META: Record<AIKeyStatus, { label: string; cls: string; Icon: typeo
   untested: { label: 'Untested', cls: 'bg-slate-100 text-slate-500', Icon: Circle },
 };
 
-const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 export default function AIConnectionsTab() {
   const { connections, routing, loading, busyId, addKey, removeKey, testKey, setRoute } = useAIConnections();
   const [adding, setAdding] = useState(false);
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>;
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-8">
@@ -44,10 +44,10 @@ export default function AIConnectionsTab() {
       <section>
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-slate-900 flex items-center gap-2"><KeyRound className="w-5 h-5 text-indigo-600" /> AI connections</h2>
+            <h2 className="text-slate-900 flex items-center gap-2"><KeyRound className="w-5 h-5 text-brand-600" /> AI connections</h2>
             <p className="text-slate-500 text-sm mt-0.5">Bring your own provider keys. Keys are encrypted and only ever shown masked.</p>
           </div>
-          <button onClick={() => setAdding(true)} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+          <button onClick={() => setAdding(true)} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
             <Plus className="w-4 h-4" /> Add key
           </button>
         </div>
@@ -100,7 +100,7 @@ export default function AIConnectionsTab() {
                 value={routing[f.key] ?? ''}
                 onChange={(e) => setRoute(f.key, e.target.value || null)}
                 disabled={connections.length === 0}
-                className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-[160px] disabled:opacity-50"
+                className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-w-[160px] disabled:opacity-50"
               >
                 <option value="">Off</option>
                 {connections.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -141,7 +141,7 @@ function AddKeyModal({ onClose, onAdd }: { onClose: () => void; onAdd: (d: { pro
       footer={
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving || !label.trim() || !key.trim()} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving || !label.trim() || !key.trim()} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Add key
           </button>
         </>

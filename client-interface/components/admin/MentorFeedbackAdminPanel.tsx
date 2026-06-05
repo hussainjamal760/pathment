@@ -58,7 +58,7 @@ export function MentorFeedbackAdminPanel({ mentorId }: { mentorId: string }) {
       </div>
 
       {loading ? (
-        <div className="px-6 py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-indigo-600" /></div>
+        <div className="px-6 py-10 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-600" /></div>
       ) : !data || data.summary.total === 0 ? (
         <div className="px-6 py-10 text-center"><p className="text-sm text-slate-400">No feedback collected yet</p></div>
       ) : (

@@ -160,7 +160,7 @@ Never share these codes with anyone.`;
                   </button>
                   <button
                     onClick={handleDownloadCodes}
-                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Download
@@ -186,7 +186,7 @@ Never share these codes with anyone.`;
               </div>
             ) : loading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
               </div>
             ) : (
               <div className="space-y-4">
@@ -196,7 +196,7 @@ Never share these codes with anyone.`;
                 <button
                   onClick={handleRegenerateBackupCodes}
                   disabled={regenerating}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:bg-indigo-400"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors disabled:bg-brand-400"
                 >
                   {regenerating ? (
                     <>

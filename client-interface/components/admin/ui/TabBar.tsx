@@ -37,7 +37,7 @@ export function TabBar({
               onClick={() => onChange(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 active
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-brand-600 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
@@ -67,14 +67,14 @@ export function TabBar({
             onClick={() => onChange(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px ${
               active
-                ? 'border-indigo-600 text-indigo-600'
+                ? 'border-brand-600 text-brand-600'
                 : 'border-transparent text-slate-500 hover:text-slate-900 hover:border-slate-300'
             }`}
           >
             {Icon && <Icon className="w-4 h-4" />}
             {tab.label}
             {tab.count !== undefined && (
-              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${active ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${active ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-600'}`}>
                 {tab.count}
               </span>
             )}

@@ -35,7 +35,7 @@ export function DualProgress({ absolute, relative, compact = false }: DualProgre
   const gap = Math.round(relative - absolute);
   return (
     <div className="space-y-2.5">
-      <Bar label="Progress" value={absolute} color="bg-indigo-500" />
+      <Bar label="Progress" value={absolute} color="bg-brand-500" />
       <Bar label="Adjusted for constraints" value={relative} color="bg-emerald-500" />
       {!compact && gap >= 8 && (
         <p className="text-xs text-emerald-600">

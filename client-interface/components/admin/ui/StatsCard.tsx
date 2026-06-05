@@ -9,7 +9,7 @@ interface StatsCardProps {
   sub?: string;
   /**
    * Tailwind classes for the icon container background + icon colour.
-   * e.g. 'text-indigo-600 bg-indigo-50'  (default)
+   * e.g. 'text-brand-600 bg-brand-50'  (default)
    */
   colorClass?: string;
 }
@@ -19,7 +19,7 @@ export function StatsCard({
   label,
   value,
   sub,
-  colorClass = 'text-indigo-600 bg-indigo-50',
+  colorClass = 'text-brand-600 bg-brand-50',
 }: StatsCardProps) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5">

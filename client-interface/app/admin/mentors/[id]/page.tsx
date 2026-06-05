@@ -17,7 +17,7 @@ import { MentorFeedbackAdminPanel } from '@/components/admin/MentorFeedbackAdmin
 const PROFICIENCY_CLS: Record<string, string> = {
   beginner:     'bg-slate-100 text-slate-600',
   intermediate: 'bg-blue-100 text-blue-700',
-  advanced:     'bg-indigo-100 text-indigo-700',
+  advanced:     'bg-brand-100 text-brand-700',
   expert:       'bg-purple-100 text-purple-700',
 };
 
@@ -52,7 +52,7 @@ export default function AdminMentorProfilePage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -65,7 +65,7 @@ export default function AdminMentorProfilePage() {
         </div>
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Mentor not found</h2>
         <p className="text-slate-500 text-sm mb-6">{error ?? 'This mentor profile does not exist.'}</p>
-        <Link href="/admin/users/mentors" className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 text-sm font-medium">
+        <Link href="/admin/users/mentors" className="inline-flex items-center gap-2 text-brand-600 hover:text-brand-700 text-sm font-medium">
           <ArrowLeft className="w-4 h-4" />
           Back to Mentors
         </Link>
@@ -120,24 +120,24 @@ export default function AdminMentorProfilePage() {
 
             {/* Contact + links */}
             <div className="space-y-3">
-              <a href={`mailto:${mentor.email}`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-indigo-600 transition-colors">
+              <a href={`mailto:${mentor.email}`} className="flex items-center gap-3 text-sm text-slate-600 hover:text-brand-600 transition-colors">
                 <Mail className="w-4 h-4 text-slate-400 shrink-0" />
                 {mentor.email}
               </a>
               {mp?.linkedinUrl && (
-                <a href={mp.linkedinUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-indigo-600 transition-colors">
+                <a href={mp.linkedinUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-brand-600 transition-colors">
                   <Linkedin className="w-4 h-4 text-slate-400 shrink-0" />
                   LinkedIn Profile
                 </a>
               )}
               {mp?.githubUrl && (
-                <a href={mp.githubUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-indigo-600 transition-colors">
+                <a href={mp.githubUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-brand-600 transition-colors">
                   <Github className="w-4 h-4 text-slate-400 shrink-0" />
                   GitHub Profile
                 </a>
               )}
               {mp?.portfolioUrl && (
-                <a href={mp.portfolioUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-indigo-600 transition-colors">
+                <a href={mp.portfolioUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 text-sm text-slate-600 hover:text-brand-600 transition-colors">
                   <Globe className="w-4 h-4 text-slate-400 shrink-0" />
                   Portfolio
                 </a>
@@ -186,7 +186,7 @@ export default function AdminMentorProfilePage() {
                 <p className="text-sm text-slate-500 mb-2">Preferred Level</p>
                 <div className="flex flex-wrap gap-1.5">
                   {mp.preferredMenteeLevel.map((l) => (
-                    <span key={l} className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-xs font-medium">
+                    <span key={l} className="px-2 py-1 bg-brand-50 text-brand-700 rounded-lg text-xs font-medium">
                       {formatLevel(l)}
                     </span>
                   ))}
@@ -201,7 +201,7 @@ export default function AdminMentorProfilePage() {
 
           {/* Stats grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatsCard icon={Users}        label="Active Mentees"  value={activeMatches.length}              colorClass="text-indigo-600 bg-indigo-50" />
+            <StatsCard icon={Users}        label="Active Mentees"  value={activeMatches.length}              colorClass="text-brand-600 bg-brand-50" />
             <StatsCard icon={TrendingUp}   label="Success Rate"    value={formatRate(mp?.successRate)}       colorClass="text-green-600 bg-green-50" />
             <StatsCard icon={Star}         label="Avg Rating"      value={formatRating(mp?.avgFeedbackRating)} colorClass="text-amber-600 bg-amber-50" />
             <StatsCard icon={CheckCircle2} label="Tasks Reviewed"  value={mp?.totalTasksReviewed ?? 0}       colorClass="text-purple-600 bg-purple-50" />
@@ -284,7 +284,7 @@ export default function AdminMentorProfilePage() {
                       <div className="flex items-center gap-3 shrink-0">
                         <div className="text-right hidden sm:block">
                           <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                            <div className="h-full bg-brand-500 rounded-full" style={{ width: `${pct}%` }} />
                           </div>
                           <p className="text-[11px] text-slate-400 mt-1">{pct}% progress</p>
                         </div>

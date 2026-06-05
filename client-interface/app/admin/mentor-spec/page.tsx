@@ -6,7 +6,7 @@ import { Compass, Plus, Trash2, Loader2, Save } from 'lucide-react';
 import { useMentorSpec } from '@/lib/hooks/shared/useMentorSpec';
 import type { MentorSpec } from '@/lib/services/mentor-spec-api';
 
-const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
 /** Admin editor for the org mentor handbook (read-only for mentors at /mentor/spec). */
 export default function AdminMentorSpecPage() {
@@ -17,7 +17,7 @@ export default function AdminMentorSpecPage() {
   useEffect(() => { if (spec && !draft) setDraft(structuredClone(spec)); }, [spec, draft]);
 
   if (loading || !draft) {
-    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+    return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   }
 
   const set = (patch: Partial<MentorSpec>) => setDraft((d) => ({ ...(d as MentorSpec), ...patch }));
@@ -30,10 +30,10 @@ export default function AdminMentorSpecPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Compass className="w-5 h-5 text-indigo-600" /> Mentor handbook</h1>
+          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><Compass className="w-5 h-5 text-brand-600" /> Mentor handbook</h1>
           <p className="text-slate-600 text-sm">The org-wide handbook every mentor reads under Mentor Spec. Edit it here.</p>
         </div>
-        <button onClick={submit} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 shrink-0">
+        <button onClick={submit} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 shrink-0">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
         </button>
       </div>
@@ -82,7 +82,7 @@ function Section({ title, onAdd, children }: { title: string; onAdd?: () => void
     <div className="bg-white rounded-2xl border border-slate-200 p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-slate-900 font-semibold text-sm">{title}</h2>
-        {onAdd && <button onClick={onAdd} className="text-xs font-medium text-indigo-600 hover:text-indigo-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add</button>}
+        {onAdd && <button onClick={onAdd} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" /> Add</button>}
       </div>
       <div className="space-y-3">{children}</div>
     </div>

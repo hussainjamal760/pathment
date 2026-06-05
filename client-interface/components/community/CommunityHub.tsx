@@ -30,11 +30,11 @@ function MentionPicker({ people, value, onChange }: { people: CommunityPerson[];
           <>
             <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
             <div className="absolute left-0 mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-lg z-20 p-2">
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people…" className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search people…" className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-brand-500" />
               <div className="max-h-44 overflow-y-auto space-y-0.5">
                 {filtered.length === 0 && <p className="text-xs text-slate-400 px-1 py-2">No one to mention.</p>}
                 {filtered.map((p) => (
-                  <button key={p.id} type="button" onClick={() => toggle(p.id)} className={`w-full text-left px-2 py-1.5 rounded-lg text-sm flex items-center justify-between ${value.includes(p.id) ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'}`}>
+                  <button key={p.id} type="button" onClick={() => toggle(p.id)} className={`w-full text-left px-2 py-1.5 rounded-lg text-sm flex items-center justify-between ${value.includes(p.id) ? 'bg-brand-50 text-brand-700' : 'hover:bg-slate-50 text-slate-700'}`}>
                     {p.name}{value.includes(p.id) && <Check className="w-3.5 h-3.5" />}
                   </button>
                 ))}
@@ -46,7 +46,7 @@ function MentionPicker({ people, value, onChange }: { people: CommunityPerson[];
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {selected.map((p) => (
-            <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-700">
+            <span key={p.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-brand-50 text-brand-700">
               @{p.name}<button type="button" onClick={() => toggle(p.id)}><X className="w-3 h-3" /></button>
             </span>
           ))}
@@ -60,7 +60,7 @@ const TYPE_META: Record<PostType, { label: string; icon: typeof Trophy; cls: str
   kudos:      { label: 'Kudos',      icon: PartyPopper,    cls: 'bg-pink-100 text-pink-700' },
   win:        { label: 'Win',        icon: Trophy,         cls: 'bg-emerald-100 text-emerald-700' },
   question:   { label: 'Question',   icon: HelpCircle,     cls: 'bg-blue-100 text-blue-700' },
-  discussion: { label: 'Discussion', icon: MessagesSquare, cls: 'bg-indigo-100 text-indigo-700' },
+  discussion: { label: 'Discussion', icon: MessagesSquare, cls: 'bg-brand-100 text-brand-700' },
   resource:   { label: 'Resource',   icon: BookOpen,       cls: 'bg-violet-100 text-violet-700' },
   meme:       { label: 'Meme',       icon: Smile,          cls: 'bg-amber-100 text-amber-700' },
   standup:    { label: 'Standup',    icon: Sunrise,        cls: 'bg-slate-100 text-slate-700' },
@@ -69,7 +69,7 @@ const TYPE_META: Record<PostType, { label: string; icon: typeof Trophy; cls: str
 const REACTIONS: { key: ReactionType; icon: typeof Heart; label: string; on: string }[] = [
   { key: 'cheers',     icon: Heart,     label: 'Cheers',     on: 'border-pink-300 bg-pink-50 text-pink-700' },
   { key: 'celebrate',  icon: PartyPopper, label: 'Celebrate', on: 'border-amber-300 bg-amber-50 text-amber-700' },
-  { key: 'helpful',    icon: ThumbsUp,  label: 'Helpful',    on: 'border-indigo-300 bg-indigo-50 text-indigo-700' },
+  { key: 'helpful',    icon: ThumbsUp,  label: 'Helpful',    on: 'border-brand-300 bg-brand-50 text-brand-700' },
   { key: 'insightful', icon: Lightbulb, label: 'Insightful', on: 'border-violet-300 bg-violet-50 text-violet-700' },
 ];
 
@@ -88,8 +88,8 @@ function timeAgo(iso: string) {
 }
 
 const Avatar = ({ text }: { text: string }) => (
-  <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center shrink-0">
-    <span className="text-indigo-700 text-xs font-medium">{text}</span>
+  <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+    <span className="text-brand-700 text-xs font-medium">{text}</span>
   </div>
 );
 
@@ -147,7 +147,7 @@ function Thread({ post, canModerate, people, onChanged }: { post: CommunityPost;
                 <p className="text-sm text-slate-700 mt-0.5 whitespace-pre-wrap">{c.body}</p>
               </div>
               <div className="flex items-center gap-3 mt-1 ml-1 text-xs text-slate-400">
-                {!c.parentId && <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)} className="hover:text-indigo-600">Reply</button>}
+                {!c.parentId && <button onClick={() => setReplyTo(replyTo === c.id ? null : c.id)} className="hover:text-brand-600">Reply</button>}
                 {canAccept && !c.accepted && <button onClick={() => accept(c.id)} className="hover:text-emerald-600">Accept answer</button>}
                 {(c.mine || canModerate) && <button onClick={() => remove(c.id)} className="hover:text-red-600">Delete</button>}
               </div>
@@ -163,9 +163,9 @@ function Thread({ post, canModerate, people, onChanged }: { post: CommunityPost;
             onChange={(e) => setBody(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
             placeholder={replyTo ? 'Write a threaded reply…' : 'Write a reply…'}
-            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
           />
-          <button onClick={submit} disabled={busy || !body.trim()} className="inline-flex items-center justify-center w-9 h-9 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg shrink-0">
+          <button onClick={submit} disabled={busy || !body.trim()} className="inline-flex items-center justify-center w-9 h-9 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-lg shrink-0">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
@@ -182,8 +182,8 @@ function PostCard({ post, canModerate, hub }: { post: CommunityPost; canModerate
   const meta = TYPE_META[post.type] ?? TYPE_META.discussion;
 
   return (
-    <div className={`bg-white rounded-2xl border p-5 ${post.pinned ? 'border-indigo-200 ring-1 ring-indigo-100' : 'border-slate-200'}`}>
-      {post.pinned && <div className="flex items-center gap-1 text-xs font-medium text-indigo-600 mb-2"><Pin className="w-3.5 h-3.5" />Pinned</div>}
+    <div className={`bg-white rounded-2xl border p-5 ${post.pinned ? 'border-brand-200 ring-1 ring-brand-100' : 'border-slate-200'}`}>
+      {post.pinned && <div className="flex items-center gap-1 text-xs font-medium text-brand-600 mb-2"><Pin className="w-3.5 h-3.5" />Pinned</div>}
       <div className="flex items-center gap-2.5">
         <Avatar text={post.author.avatar} />
         <div className="min-w-0">
@@ -232,7 +232,7 @@ function PostCard({ post, canModerate, hub }: { post: CommunityPost; canModerate
       <p className={`mt-2 text-slate-700 ${post.type === 'meme' ? 'text-base' : 'text-sm'} whitespace-pre-wrap`}>{post.body}</p>
 
       {post.linkUrl && (
-        <a href={post.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:underline break-all">
+        <a href={post.linkUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 text-sm text-brand-600 hover:underline break-all">
           <Link2 className="w-3.5 h-3.5 shrink-0" />{post.linkUrl}
         </a>
       )}
@@ -327,7 +327,7 @@ function Composer({ hub }: { hub: ReturnType<typeof useCommunityHub> }) {
     if (okPost) { setTitle(''); setBody(''); setToId(''); setTags(''); setLinkUrl(''); setMentions([]); setFiles([]); setShowAttach(false); }
   };
 
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
@@ -336,7 +336,7 @@ function Composer({ hub }: { hub: ReturnType<typeof useCommunityHub> }) {
           const m = TYPE_META[t];
           return (
             <button key={t} onClick={() => setType(t)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${type === t ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${type === t ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
               <m.icon className="w-4 h-4" />{m.label}
             </button>
           );
@@ -375,10 +375,10 @@ function Composer({ hub }: { hub: ReturnType<typeof useCommunityHub> }) {
 
       <div className="flex items-center gap-2 flex-wrap">
         {hub.people.length > 0 && <MentionPicker people={hub.people} value={mentions} onChange={setMentions} />}
-        <button type="button" onClick={() => setShowAttach((s) => !s)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm ${showAttach || files.length ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+        <button type="button" onClick={() => setShowAttach((s) => !s)} className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm ${showAttach || files.length ? 'border-brand-300 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
           <Paperclip className="w-4 h-4" />Attach{files.length ? ` (${files.length})` : ''}
         </button>
-        <button onClick={submit} disabled={posting} className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+        <button onClick={submit} disabled={posting} className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
           {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}Post
         </button>
       </div>
@@ -399,8 +399,8 @@ function SpaceSwitcher({ hub }: { hub: ReturnType<typeof useCommunityHub> }) {
           const active = s.key === hub.activeKey;
           return (
             <button key={s.key} onClick={() => hub.setActiveKey(s.key)}
-              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-colors ${active ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'}`}>
-              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-indigo-600' : 'text-slate-400'}`} />
+              className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left transition-colors ${active ? 'bg-brand-50 text-brand-700' : 'hover:bg-slate-50 text-slate-700'}`}>
+              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-brand-600' : 'text-slate-400'}`} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium truncate">{s.name}</span>
                 <span className="block text-[11px] text-slate-400 truncate">{s.subtitle}</span>
@@ -421,7 +421,7 @@ export default function CommunityHub() {
   const canModerate = Boolean(hub.active?.isModerator);
 
   if (hub.loadingSpaces) {
-    return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>;
+    return <div className="flex items-center justify-center py-24"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   }
 
   return (
@@ -447,12 +447,12 @@ export default function CommunityHub() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {FILTER_TYPES.map((t) => (
               <button key={t ?? 'all'} onClick={() => hub.setTypeFilter(t)}
-                className={`px-3 py-1 rounded-full text-xs font-medium border ${hub.typeFilter === t ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                className={`px-3 py-1 rounded-full text-xs font-medium border ${hub.typeFilter === t ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
                 {t ? TYPE_META[t].label : 'All'}
               </button>
             ))}
             {hub.tagFilter && (
-              <button onClick={() => hub.setTagFilter(null)} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border border-indigo-300 bg-indigo-50 text-indigo-700">
+              <button onClick={() => hub.setTagFilter(null)} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border border-brand-300 bg-brand-50 text-brand-700">
                 <Hash className="w-3 h-3" />{hub.tagFilter} ✕
               </button>
             )}
@@ -461,11 +461,11 @@ export default function CommunityHub() {
           <Composer hub={hub} />
 
           {hub.loadingFeed ? (
-            <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-indigo-600" /></div>
+            <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>
           ) : hub.error ? (
             <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center">
               <p className="text-slate-600 mb-3">{hub.error}</p>
-              <button onClick={hub.refetch} className="text-indigo-600 hover:text-indigo-700 text-sm font-medium">Try again</button>
+              <button onClick={hub.refetch} className="text-brand-600 hover:text-brand-700 text-sm font-medium">Try again</button>
             </div>
           ) : hub.feed.length === 0 ? (
             <div className="bg-white rounded-2xl border border-slate-200 py-12 text-center">
@@ -512,7 +512,7 @@ export default function CommunityHub() {
               <div className="flex gap-1 text-xs">
                 {(['week', 'all'] as const).map((p) => (
                   <button key={p} onClick={() => hub.setLbPeriod(p)}
-                    className={`px-2 py-0.5 rounded-md ${hub.lbPeriod === p ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    className={`px-2 py-0.5 rounded-md ${hub.lbPeriod === p ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-500 hover:bg-slate-50'}`}>
                     {p === 'week' ? 'This week' : 'All time'}
                   </button>
                 ))}
@@ -523,11 +523,11 @@ export default function CommunityHub() {
             ) : (
               <div className="space-y-1">
                 {hub.leaderboard.map((r) => (
-                  <div key={r.userId} className={`flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg ${r.mine ? 'bg-indigo-50' : ''}`}>
+                  <div key={r.userId} className={`flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg ${r.mine ? 'bg-brand-50' : ''}`}>
                     <span className={`w-5 text-center text-xs font-semibold tabular-nums shrink-0 ${r.rank <= 3 ? 'text-amber-500' : 'text-slate-400'}`}>{r.rank}</span>
-                    <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0"><span className="text-indigo-700 text-[11px] font-medium">{r.avatar}</span></div>
+                    <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center shrink-0"><span className="text-brand-700 text-[11px] font-medium">{r.avatar}</span></div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm text-slate-800 truncate">{r.name}{r.mine && <span className="text-indigo-500"> · you</span>}</p>
+                      <p className="text-sm text-slate-800 truncate">{r.name}{r.mine && <span className="text-brand-500"> · you</span>}</p>
                       <p className="text-[11px] text-slate-400">{r.tier}</p>
                     </div>
                     <span className="text-sm font-semibold text-slate-900 tabular-nums shrink-0">{r.points}</span>

@@ -26,17 +26,17 @@ export default function AdminRewardsPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><GiftIcon className="w-5 h-5 text-indigo-600" /> Rewards catalog</h1>
+          <h1 className="text-slate-900 mb-1 flex items-center gap-2"><GiftIcon className="w-5 h-5 text-brand-600" /> Rewards catalog</h1>
           <p className="text-slate-600 text-sm">Configure the gifts mentees can redeem with earned points. Mentors redeem these for their mentees.</p>
         </div>
         <button onClick={() => setEditing('new')}
-          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 shrink-0">
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
           <Plus className="w-4 h-4" /> New gift
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-indigo-600" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2 grid gap-4 sm:grid-cols-2">
@@ -48,20 +48,20 @@ export default function AdminRewardsPage() {
             )}
             {gifts.map((g) => (
               <div key={g.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col">
-                <div className="relative h-32 bg-gradient-to-br from-indigo-50 to-slate-100 flex items-center justify-center">
+                <div className="relative h-32 bg-gradient-to-br from-brand-50 to-slate-100 flex items-center justify-center">
                   {g.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={g.imageUrl} alt={g.name} className="w-full h-full object-cover" />
                   ) : (
-                    <GiftIcon className="w-10 h-10 text-indigo-300" />
+                    <GiftIcon className="w-10 h-10 text-brand-300" />
                   )}
-                  <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-white/90 backdrop-blur text-indigo-700 text-xs font-semibold tabular-nums shadow-sm">{g.costXp} pts</span>
+                  <span className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-white/90 backdrop-blur text-brand-700 text-xs font-semibold tabular-nums shadow-sm">{g.costXp} pts</span>
                 </div>
                 <div className="p-4 flex flex-col flex-1">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-slate-900 font-semibold">{g.name}</h3>
                     <div className="flex gap-1 shrink-0">
-                      <button onClick={() => setEditing(g)} aria-label="Edit" className="p-1.5 text-slate-400 hover:text-indigo-600"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => setEditing(g)} aria-label="Edit" className="p-1.5 text-slate-400 hover:text-brand-600"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => removeGift(g.id)} disabled={busy === g.id} aria-label="Remove" className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-50"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
@@ -105,7 +105,7 @@ function GiftDrawer({ gift, onClose, onSaved }: { gift: Gift | null; onClose: ()
   const [imageUrl, setImageUrl] = useState<string | null>(gift?.imageUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500';
+  const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
   const onPickImage = async (file?: File) => {
     if (!file) return;
@@ -172,7 +172,7 @@ function GiftDrawer({ gift, onClose, onSaved }: { gift: Gift | null; onClose: ()
           </div>
           <div>
             <label className="flex items-center gap-2 text-sm text-slate-700 mb-2">
-              <input type="checkbox" checked={unlimited} onChange={(e) => setUnlimited(e.target.checked)} className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              <input type="checkbox" checked={unlimited} onChange={(e) => setUnlimited(e.target.checked)} className="rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
               Unlimited stock
             </label>
             {!unlimited && (
@@ -182,7 +182,7 @@ function GiftDrawer({ gift, onClose, onSaved }: { gift: Gift | null; onClose: ()
         </div>
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+          <button onClick={submit} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}{gift ? 'Save' : 'Add gift'}
           </button>
         </div>

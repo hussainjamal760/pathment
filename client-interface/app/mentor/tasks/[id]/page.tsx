@@ -52,7 +52,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600" />
       </div>
     );
   }
@@ -93,7 +93,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                   <Sparkles className="w-3 h-3" /> Custom
                 </span>
               ) : (
-                <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium flex items-center gap-1">
+                <span className="px-2 py-1 bg-brand-100 text-brand-700 rounded text-xs font-medium flex items-center gap-1">
                   <BookOpen className="w-3 h-3" /> Roadmap
                 </span>
               )}
@@ -180,8 +180,8 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
             )}
             {task.pointsAwarded != null && (
               <div className="flex items-center gap-2">
-                <Award className="w-5 h-5 text-indigo-500" />
-                <span className="text-sm font-semibold text-indigo-700">{task.pointsAwarded} points awarded</span>
+                <Award className="w-5 h-5 text-brand-500" />
+                <span className="text-sm font-semibold text-brand-700">{task.pointsAwarded} points awarded</span>
               </div>
             )}
           </div>
@@ -234,7 +234,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                     href={resource.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-2"
+                    className="text-sm text-brand-600 hover:text-brand-800 hover:underline flex items-center gap-2"
                   >
                     <LinkIcon className="w-4 h-4" />
                     {resource.title}
@@ -251,7 +251,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
       {task.submissions && task.submissions.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-500" />
+            <FileText className="w-5 h-5 text-brand-500" />
             Mentee Submission
             {task.submissions.length > 1 && (
               <span className="text-xs text-slate-500 font-normal ml-1">(v{latestSubmission?.version})</span>
@@ -284,7 +284,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-indigo-600 hover:underline flex items-center gap-2"
+                          className="text-sm text-brand-600 hover:underline flex items-center gap-2"
                         >
                           <ExternalLink className="w-4 h-4" />
                           {url}
@@ -311,13 +311,13 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
       {feedback.length > 0 && (
         <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4">
           <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-indigo-500" />
+            <MessageSquare className="w-5 h-5 text-brand-500" />
             Feedback Given
           </h2>
           {feedback.map((fb: any, index: number) => (
-            <div key={fb.id || index} className="p-4 bg-indigo-50 border border-indigo-200 rounded-lg space-y-3">
+            <div key={fb.id || index} className="p-4 bg-brand-50 border border-brand-200 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-indigo-900">
+                <p className="text-sm font-medium text-brand-900">
                   {fb.action === 'approve' || fb.action === 'approved' ? 'Approved' : fb.action === 'request_revision' ? 'Revision Requested' : 'Reviewed'}
                 </p>
                 {fb.rating != null && (
@@ -336,7 +336,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                 )}
               </div>
               {fb.comments && (
-                <p className="text-sm text-indigo-800">{fb.comments}</p>
+                <p className="text-sm text-brand-800">{fb.comments}</p>
               )}
               {fb.strengths && (
                 <div>
@@ -494,7 +494,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
         {canReview && !cancellingTask && (
           <button
             onClick={() => router.push(`/mentor/tasks/${task.id}/feedback`)}
-            className="ml-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+            className="ml-auto px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors flex items-center gap-2"
           >
             <Send className="w-4 h-4" />
             Review Submission
