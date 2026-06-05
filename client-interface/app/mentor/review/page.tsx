@@ -66,6 +66,7 @@ export default function CohortReview() {
   const [assigning, setAssigning] = useState(false);
 
   const mentee: CohortMentee | undefined = cohort[idx];
+  const menteeId = mentee?.id;
   const pending = useMemo(
     () => queue.filter((q) => q.mentee?.id === mentee?.id),
     [queue, mentee?.id]
@@ -86,12 +87,25 @@ export default function CohortReview() {
     }
   }, [mentee?.id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The mentee's assigned work, grouped by status (their "day").
+  // The mentee's assigned work, grouped by status (their "day"). 'submitted'
+  // tasks live in the "To review" queue below, so exclude them here.
+  const dayTasks = useMemo(() => tasks.filter((t) => t.status !== 'submitted'), [tasks]);
   const taskGroups = useMemo(() => {
     const by: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
-    tasks.forEach((t) => { const k = t.status || 'assigned'; (by[k] = by[k] || []).push(t); });
+    dayTasks.forEach((t) => { const k = t.status || 'assigned'; (by[k] = by[k] || []).push(t); });
     return TASK_STATUS_ORDER.filter((s) => by[s]?.length).map((s) => ({ status: s, items: by[s] }));
-  }, [tasks]);
+  }, [dayTasks]);
+
+  // Latest mentor note + rating for a task, surfaced on reviewed/changes rows.
+  const reviewOf = (t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    const fb = t.submissions?.[0]?.feedback;
+    if (!fb) return { note: null as string | null, rating: null as number | null };
+    const note = t.status === 'revision_needed'
+      ? (fb.revisionNotes || fb.feedbackText || null)
+      : t.status === 'completed' ? (fb.feedbackText || null) : null;
+    const r = Number(fb.rating);
+    return { note, rating: t.status === 'completed' && Number.isFinite(r) && r > 0 ? r : null };
+  };
 
   const go = useCallback((delta: number) => {
     setIdx((i) => Math.max(0, Math.min(cohort.length - 1, i + delta)));
@@ -102,30 +116,32 @@ export default function CohortReview() {
     go(1);
   }, [mentee, go]);
 
-  const refresh = async () => {
+  // Refresh the queue + the CURRENT mentee's tasks. Keyed on the live mentee so
+  // actions never refetch a stale/previous mentee (the old bug).
+  const refresh = useCallback(async () => {
     await refetchQueue();
-    if (user?.id && mentee) {
-      try { const r: any = await taskApi.getMentorTasks(user.id, { menteeId: mentee.id }); setTasks(r?.data?.tasks ?? []); } catch { /* keep prior */ }
+    if (user?.id && menteeId) {
+      try { const r: any = await taskApi.getMentorTasks(user.id, { menteeId }); setTasks(r?.data?.tasks ?? []); } catch { /* keep prior */ }
     }
-  };
+  }, [refetchQueue, user?.id, menteeId]);
 
   const approve = useCallback(async (item: ApprovalItem) => {
     try {
       setBusy(item.submissionId);
       await submissionService.reviewSubmission(item.submissionId, { rating: 5, feedbackText: 'Approved.', isApproved: true, decision: 'approved' });
-      toast.success('Approved');
+      toast.success('Approved — marked complete');
       await refresh();
     } catch { toast.error('Could not approve'); } finally { setBusy(null); }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refresh]);
 
   const requestChanges = useCallback(async (item: ApprovalItem) => {
     try {
       setBusy(item.submissionId);
       await submissionService.reviewSubmission(item.submissionId, { rating: 3, feedbackText: 'Please take another pass.', isApproved: false, decision: 'changes', revisionNotes: 'Please take another pass.' });
-      toast.success('Changes requested');
+      toast.success('Changes requested — sent back to the mentee');
       await refresh();
     } catch { toast.error('Could not update'); } finally { setBusy(null); }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [refresh]);
 
   const mark = useCallback((status: Attendance) => {
     if (mentee) setAttendance((a) => ({ ...a, [mentee.id]: status }));
@@ -259,13 +275,13 @@ export default function CohortReview() {
             <div className="px-5 py-4 border-b border-slate-200 flex items-center gap-2">
               <ListTodo className="w-4 h-4 text-brand-500" />
               <h3 className="text-slate-900 font-medium">Assigned work</h3>
-              {tasks.length > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{tasks.length}</span>}
+              {dayTasks.length > 0 && <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-xs rounded-full">{dayTasks.length}</span>}
               <button onClick={() => setAssigning(true)} className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700"><Plus className="w-3.5 h-3.5" />Assign</button>
             </div>
             <div className="p-4">
               {tasksLoading ? (
                 <div className="flex justify-center py-4"><Loader2 className="w-5 h-5 animate-spin text-slate-400" /></div>
-              ) : tasks.length === 0 ? (
+              ) : dayTasks.length === 0 ? (
                 <p className="text-sm text-slate-500 px-1 py-2">Nothing assigned yet — use Assign to give {mentee!.name.split(' ')[0]} their first task.</p>
               ) : (
                 <div className="space-y-4">
@@ -281,16 +297,26 @@ export default function CohortReview() {
                           {g.items.map((t: any) => { /* eslint-disable-line @typescript-eslint/no-explicit-any */
                             const due = t.dueDate ? new Date(t.dueDate) : null;
                             const overdue = due && t.status !== 'completed' && due.getTime() < Date.now();
+                            const { note, rating } = reviewOf(t);
                             return (
-                              <div key={t.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200">
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm text-slate-900 truncate">{t.roadmapTask?.title || t.title || 'Task'}</p>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                                    {t.roadmapTask?.type && <span className="capitalize">{t.roadmapTask.type}</span>}
-                                    {due && <span className={overdue ? 'text-red-600 inline-flex items-center gap-1' : ''}>{overdue && <Clock className="w-3 h-3" />}due {due.toLocaleDateString()}</span>}
+                              <div key={t.id} className="p-2.5 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm text-slate-900 truncate">{t.roadmapTask?.title || t.title || 'Task'}</p>
+                                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                                      {t.roadmapTask?.type && <span className="capitalize">{t.roadmapTask.type}</span>}
+                                      {due && <span className={overdue ? 'text-red-600 inline-flex items-center gap-1' : ''}>{overdue && <Clock className="w-3 h-3" />}due {due.toLocaleDateString()}</span>}
+                                      {rating != null && <span className="inline-flex items-center gap-0.5 text-amber-600"><CheckCircle2 className="w-3 h-3" />{rating}★</span>}
+                                    </div>
                                   </div>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${meta.cls}`}>{meta.label}</span>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${meta.cls}`}>{meta.label}</span>
+                                {note && (
+                                  <p className={`mt-1.5 text-xs rounded-lg px-2.5 py-1.5 ${t.status === 'revision_needed' ? 'bg-amber-50 text-amber-800 dark:bg-amber-500/10 dark:text-amber-300' : 'text-slate-500'}`}>
+                                    {t.status === 'revision_needed' && <span className="font-medium">Your note: </span>}“{note}”
+                                    {t.status === 'revision_needed' && <span className="text-amber-600/80"> · awaiting resubmission</span>}
+                                  </p>
+                                )}
                               </div>
                             );
                           })}
@@ -316,24 +342,23 @@ export default function CohortReview() {
               ) : (
                 <div className="space-y-2">
                   {pending.map((item, i) => (
-                    <div key={item.submissionId} onClick={() => setFocus(i)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${i === focus ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/10/40 dark:bg-brand-500/10' : 'border-slate-200'}`}>
+                    <button key={item.submissionId} onClick={() => { setFocus(i); setReviewing(item); }}
+                      className={`group w-full text-left flex items-center gap-3 p-3 rounded-xl border transition-colors ${i === focus ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/15' : 'border-slate-200 hover:border-brand-300'}`}>
+                      <span className="w-9 h-9 rounded-xl bg-brand-50 dark:bg-brand-500/15 flex items-center justify-center shrink-0">
+                        <ClipboardCheck className="w-4 h-4 text-brand-600" />
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           {item.type && <span className="capitalize">{item.type}</span>}
+                          {typeof item.version === 'number' && item.version > 1 && <span>v{item.version}</span>}
                           {item.isLate && <span className="inline-flex items-center gap-1 text-red-600"><Clock className="w-3 h-3" />late</span>}
                         </div>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); approve(item); }} disabled={busy === item.submissionId}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-600 hover:bg-green-700 text-white text-xs font-medium disabled:opacity-50">
-                        {busy === item.submissionId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}Approve
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); requestChanges(item); }} disabled={busy === item.submissionId}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-amber-300 text-amber-700 text-xs font-medium hover:bg-amber-50 disabled:opacity-50">Changes</button>
-                      <button onClick={(e) => { e.stopPropagation(); setReviewing(item); }}
-                        className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-brand-300">Review</button>
-                    </div>
+                      <span className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 group-hover:bg-brand-700 text-white text-xs font-medium">
+                        Review &amp; decide <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
+                    </button>
                   ))}
                 </div>
               )}
