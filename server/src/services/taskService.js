@@ -525,49 +525,31 @@ class TaskService {
     const enrollment = await models.Enrollment.findByPk(enrollmentId);
     if (!enrollment) return null;
 
-    // Assigned tasks for stats (completed count, points, ratings)
+    // Progress is measured against the mentee's ACTUAL workload — every
+    // non-cancelled task assigned to this enrollment — and completed is the done
+    // subset of that SAME set. This keeps completed ⊆ total, so the bar can never
+    // read 100% while real tasks are still outstanding (the old base-roadmap +
+    // custom heuristic undercounted tasks assigned from non-base/local roadmaps,
+    // which falsely hit 100% and prematurely triggered completion).
     const assignedTasks = await models.AssignedTask.findAll({
       where: { enrollmentId }
     });
+    const liveTasks = assignedTasks.filter(t => t.status !== 'cancelled');
 
-    const tasksCompleted = assignedTasks.filter(t => t.status === 'completed').length;
+    const tasksTotal = liveTasks.length;
+    const tasksCompleted = liveTasks.filter(t => t.status === 'completed').length;
 
-    const totalPointsEarned = assignedTasks
+    const totalPointsEarned = liveTasks
       .filter(t => t.status === 'completed')
       .reduce((sum, t) => sum + (t.pointsAwarded || 0), 0);
 
-    const ratings = assignedTasks
+    const ratings = liveTasks
       .filter(t => t.finalRating !== null)
       .map(t => parseFloat(t.finalRating));
 
     const avgTaskRating = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
       : null;
-
-    // Total tasks = live COUNT of RoadmapTask rows for every base roadmap in the program
-    // (the Roadmap.total_tasks column is never updated when tasks are added, so we count directly).
-    // Tasks link to their roadmap directly via roadmap_id (weeks were removed).
-    // PLUS any non-cancelled custom tasks assigned to this specific enrollment.
-    const roadmapTasksTotal = await models.RoadmapTask.count({
-      include: [{
-        model: models.Roadmap,
-        as: 'roadmap',
-        required: true,
-        where: { programId: enrollment.programId, isBaseRoadmap: true }
-      }]
-    });
-
-    // Count non-cancelled custom tasks assigned to this enrollment so that
-    // assigning a custom task immediately reduces the progress percentage.
-    const customTasksTotal = await models.AssignedTask.count({
-      where: {
-        enrollmentId,
-        isCustomTask: true,
-        status: { [Op.notIn]: ['cancelled'] }
-      }
-    });
-
-    const tasksTotal = roadmapTasksTotal + customTasksTotal;
 
     // Percentage against the full program — grows steadily as work is done
     const overallProgressPercentage = tasksTotal > 0

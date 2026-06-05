@@ -381,6 +381,19 @@ class SubmissionService {
 
     await task.update(updateData);
 
+    // Auto-advance a roadmap chain FIRST (assign the next step) so the stats
+    // recompute below counts it — otherwise approving the last-assigned step
+    // would momentarily read 100% and flag the enrollment ready-to-complete
+    // before the next step appears.
+    if (isApproved) {
+      try {
+        const linearRoadmapService = require('./linearRoadmapService');
+        await linearRoadmapService.advanceOnApproval(task.menteeId, task.roadmapTaskId);
+      } catch (err) {
+        console.error('Roadmap auto-advance failed (non-fatal):', err.message);
+      }
+    }
+
     // Update enrollment task stats so tasksCompleted/tasksTotal/overallProgressPercentage stay current
     const taskService = require('./taskService');
     await taskService.updateEnrollmentTaskStats(task.enrollmentId);
@@ -420,18 +433,6 @@ class SubmissionService {
 
     // Update mentor stats
     await this.updateMentorReviewStats(mentorId);
-
-    // Linear-roadmap auto-advance: if this approved task is a tracked roadmap
-    // step, advance the mentee's progress and assign the next step. Guarded so
-    // a failure here never blocks the review itself.
-    if (isApproved) {
-      try {
-        const linearRoadmapService = require('./linearRoadmapService');
-        await linearRoadmapService.advanceOnApproval(task.menteeId, task.roadmapTaskId);
-      } catch (err) {
-        console.error('Roadmap auto-advance failed (non-fatal):', err.message);
-      }
-    }
 
     const reviewedSubmission = await this.getSubmissionById(submissionId);
 
