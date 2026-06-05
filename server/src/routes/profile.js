@@ -64,6 +64,13 @@ router.patch('/appearance', profileController.updateAppearance);
 router.patch('/preferences', profileController.updatePreferences);
 
 /**
+ * @route   PATCH /api/profile/notifications
+ * @desc    Update notification channel prefs the orchestrator actually reads
+ * @access  Private
+ */
+router.patch('/notifications', profileController.updateNotificationPreferences);
+
+/**
  * @route   PATCH /api/profile/mentor/availability
  * @desc    Update mentor availability settings (isAcceptingMentees, maxMentees)
  * @access  Private (Mentor only)

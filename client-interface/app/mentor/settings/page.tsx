@@ -8,6 +8,7 @@ import AIConnectionsTab from '@/components/settings/AIConnectionsTab';
 import { LocationDetailsFields } from '@/components/settings/LocationDetailsFields';
 import { SkillsTab } from '@/components/settings/SkillsTab';
 import { AppearanceTab } from '@/components/settings/AppearanceTab';
+import { NotificationPreferencesTab } from '@/components/settings/NotificationPreferencesTab';
 import type { Tab } from '@/components/admin/ui';
 
 export default function MentorSettings() {
@@ -324,51 +325,7 @@ export default function MentorSettings() {
           )}
 
           {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-slate-900 mb-2">Notification Preferences</h2>
-                <p className="text-slate-600">Choose what notifications you want to receive</p>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  { key: 'emailNotifications', label: 'Email Notifications', description: 'Receive notifications via email' },
-                  { key: 'taskReminders', label: 'Task Reminders', description: 'Get reminders for pending task reviews' },
-                  { key: 'menteeMessages', label: 'Mentee Messages', description: 'Notifications when mentees send messages' },
-                  { key: 'weeklyReports', label: 'Weekly Reports', description: 'Receive weekly summary of your mentorship activities' }
-                ].map((notification) => (
-                  <div key={notification.key} className="flex items-center justify-between p-6 border border-slate-200 rounded-xl">
-                    <div>
-                      <div className="text-slate-900 font-medium mb-1">{notification.label}</div>
-                      <div className="text-sm text-slate-600">{notification.description}</div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notificationSettings[notification.key as keyof typeof notificationSettings]}
-                        onChange={(e) => setNotificationSettings({ 
-                          ...notificationSettings, 
-                          [notification.key]: e.target.checked 
-                        })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[4px] after:bg-card after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-brand-600"></div>
-                    </label>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={handleNotificationUpdate}
-                disabled={saving}
-                className="flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-xl transition-colors"
-              >
-                {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                Save Notification Settings
-              </button>
-            </div>
-          )}
+          {activeTab === 'notifications' && <NotificationPreferencesTab />}
 
           {/* Security Tab */}
           {activeTab === 'ai' && (

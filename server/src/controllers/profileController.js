@@ -326,6 +326,32 @@ await user.update({
   });
 
   /**
+   * Update the notification channel preferences that ACTUALLY gate delivery.
+   * PATCH /api/profile/notifications { emailNotifications?: {...}, pushNotifications?: {...} }
+   * Merges into the user_settings columns the notification orchestrator reads,
+   * so toggling a category here genuinely turns its emails on/off.
+   */
+  updateNotificationPreferences = catchAsync(async (req, res) => {
+    const { emailNotifications, pushNotifications } = req.body || {};
+    const [settings] = await models.UserSettings.findOrCreate({ where: { userId: req.user.id }, defaults: { userId: req.user.id } });
+
+    const patch = {};
+    if (emailNotifications && typeof emailNotifications === 'object') {
+      const current = settings.emailNotifications && typeof settings.emailNotifications === 'object' ? settings.emailNotifications : {};
+      patch.emailNotifications = { ...current, ...emailNotifications };
+    }
+    if (pushNotifications && typeof pushNotifications === 'object') {
+      const current = settings.pushNotifications && typeof settings.pushNotifications === 'object' ? settings.pushNotifications : {};
+      patch.pushNotifications = { ...current, ...pushNotifications };
+    }
+    if (Object.keys(patch).length) await settings.update(patch);
+    res.json(successResponse('Notification preferences saved', {
+      emailNotifications: settings.emailNotifications,
+      pushNotifications: settings.pushNotifications
+    }));
+  });
+
+  /**
    * Update mentor availability settings
    * PATCH /api/profile/mentor/availability
    */

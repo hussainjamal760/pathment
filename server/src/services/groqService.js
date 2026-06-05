@@ -50,7 +50,8 @@ class GroqService {
    * Generate roadmap using Groq AI
    */
   async generateRoadmap(params) {
-    const ai = await this._resolve();
+    // Honour the caller's BYO key (personal → org → env) for the 'roadmap' feature.
+    const ai = await this._resolve(params?.feature || 'roadmap', params?.userId || null);
     if (!ai.enabled) {
       throw new ValidationError('AI is not configured. Add a provider key in Settings → AI Connections.');
     }
@@ -335,7 +336,7 @@ CRITICAL RULES:
    * Generate adaptive recommendations
    */
   async generateAdaptiveRecommendations(params) {
-    const ai = await this._resolve();
+    const ai = await this._resolve(params?.feature || 'adaptive', params?.userId || null);
     if (!ai.enabled) {
       return { recommendations: [], confidence: 0 };
     }
@@ -411,8 +412,8 @@ Output as JSON:
   /**
    * Generate mentor-mentee matching score
    */
-  async generateMatchingScore(mentorProfile, menteeProfile, programRequirements) {
-    const ai = await this._resolve();
+  async generateMatchingScore(mentorProfile, menteeProfile, programRequirements, opts = {}) {
+    const ai = await this._resolve('matching', opts.userId || null);
     if (!ai.enabled) {
       // Fallback to simple rule-based matching
       return this.calculateBasicMatchScore(mentorProfile, menteeProfile);
@@ -482,8 +483,8 @@ Output as JSON:
    * Returns an array of { mentorId, score, breakdown, reasoning, strengths, concerns }.
    * Falls back to calculateBasicMatchScore per mentor when AI is unavailable.
    */
-  async batchGenerateMatchingScores(mentors, menteeProfile, programRequirements) {
-    const ai = await this._resolve();
+  async batchGenerateMatchingScores(mentors, menteeProfile, programRequirements, opts = {}) {
+    const ai = await this._resolve('matching', opts.userId || null);
     if (!ai.enabled || mentors.length === 0) {
       return mentors.map(m => ({
         mentorId: m.id,

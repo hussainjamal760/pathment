@@ -6,8 +6,13 @@ const { NOTIFICATION_EVENTS, NOTIFICATION_MATRIX } = require('../config/notifica
 
 class NotificationOrchestrator {
   isNotificationEmailEnabled() {
-    const raw = String(process.env.EMAIL_NOTIFICATION_EMAILS_ENABLED || 'false').trim().toLowerCase();
-    return raw === '1' || raw === 'true' || raw === 'yes';
+    const raw = String(process.env.EMAIL_NOTIFICATION_EMAILS_ENABLED || '').trim().toLowerCase();
+    // Explicit kill-switch wins either way.
+    if (raw === '0' || raw === 'false' || raw === 'no') return false;
+    if (raw === '1' || raw === 'true' || raw === 'yes') return true;
+    // Default: ON when Resend is configured (e.g. the Pro plan), OFF otherwise —
+    // so important notification emails work out of the box without extra config.
+    return Boolean(process.env.RESEND_API_KEY);
   }
 
   getDisabledEmailEvents() {
