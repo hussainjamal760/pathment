@@ -170,6 +170,8 @@ class ScheduleTemplateService {
 
     if (slot.kind === 'roadmap') {
       slot.roadmapChain = Array.isArray(patch.roadmapChain) ? patch.roadmapChain : (slot.roadmapChain || []);
+      // Which step of the FIRST roadmap to start the mentee at (skip known steps).
+      slot.startStep = Number.isInteger(patch.startStep) ? Math.max(0, patch.startStep) : (slot.startStep || 0);
       slot.recurring = null;
     } else if (slot.kind === 'recurring') {
       slot.recurring = patch.recurring || slot.recurring || null;
@@ -190,7 +192,7 @@ class ScheduleTemplateService {
     let chainStarted = null;
     if (slot.kind === 'roadmap' && mentorId && Array.isArray(slot.roadmapChain) && slot.roadmapChain.length) {
       try {
-        const started = await linearRoadmapService.startChainHead(mentorId, menteeId, slot.id, slot.roadmapChain);
+        const started = await linearRoadmapService.startChainHead(mentorId, menteeId, slot.id, slot.roadmapChain, slot.startStep || 0);
         if (started) chainStarted = slot.roadmapChain[0];
       } catch (_) { /* slot config still saved; start is best-effort */ }
     }

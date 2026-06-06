@@ -538,12 +538,12 @@ class LinearRoadmapService {
   }
 
   /** Start the head roadmap of a slot's chain (used when a roadmap slot is filled). */
-  async startChainHead(mentorId, menteeId, slotId, roadmapChain) {
+  async startChainHead(mentorId, menteeId, slotId, roadmapChain, startStep = 0) {
     if (!Array.isArray(roadmapChain) || !roadmapChain.length) return null;
     const headId = roadmapChain[0];
     const existing = await models.RoadmapProgress.findOne({ where: { roadmapId: headId, menteeId } });
     if (existing) return null; // already started
-    return this.assignToMentee(mentorId, headId, menteeId, 0, slotId);
+    return this.assignToMentee(mentorId, headId, menteeId, Math.max(0, Number(startStep) || 0), slotId);
   }
 
   async bulkAssign(mentorId, roadmapId, menteeIds = [], startStep = 0) {

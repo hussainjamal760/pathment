@@ -231,7 +231,7 @@ function FillTab() {
   const applyAll = async (slot: ScheduleSlot) => {
     try {
       setBusy(slot.id + ':all');
-      const r: any = await scheduleApi.applySlotToAll(slot.id, { kind: slot.kind, roadmapChain: slot.roadmapChain, recurring: slot.recurring });
+      const r: any = await scheduleApi.applySlotToAll(slot.id, { kind: slot.kind, roadmapChain: slot.roadmapChain, startStep: slot.startStep, recurring: slot.recurring });
       toast.success(`Applied "${slot.label}" to ${r?.data?.applied ?? 0} mentee${(r?.data?.applied ?? 0) === 1 ? '' : 's'}`);
     } catch { toast.error('Could not apply to all'); } finally { setBusy(null); }
   };
@@ -249,7 +249,7 @@ function FillTab() {
   const save = async (slot: ScheduleSlot) => {
     try {
       setBusy(slot.id);
-      const res: any = await scheduleApi.updateSlot(menteeId, slot.id, { kind: slot.kind, roadmapChain: slot.roadmapChain, recurring: slot.recurring });
+      const res: any = await scheduleApi.updateSlot(menteeId, slot.id, { kind: slot.kind, roadmapChain: slot.roadmapChain, startStep: slot.startStep, recurring: slot.recurring });
       const startedId = res?.data?.slot?.chainStarted;
       if (startedId) {
         const rm = local.find((r) => r.id === startedId);
@@ -313,6 +313,21 @@ function FillTab() {
                       <option value="">+ Add roadmap to chain</option>
                       {local.filter((r) => !(s.roadmapChain || []).includes(r.id)).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
+                    {/* Starting step of the FIRST roadmap in the chain (skip steps they know). */}
+                    {(() => {
+                      const head = local.find((r) => r.id === (s.roadmapChain || [])[0]);
+                      const steps = head?.steps || [];
+                      if (steps.length <= 1) return null;
+                      return (
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Start &ldquo;{head?.name}&rdquo; at step</label>
+                          <select value={String(s.startStep ?? 0)} onChange={(e) => patchSlot(s.id, { startStep: Number(e.target.value) })} className={`${field} w-full`}>
+                            {steps.map((st, i) => <option key={st.id || i} value={i}>{i + 1}. {st.title}</option>)}
+                          </select>
+                          <p className="text-xs text-slate-400 mt-1">Skip steps they already know — applies to the first roadmap in the chain.</p>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 
