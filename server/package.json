@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon --watch src --exec node src/index.js",
-    "db:create": "node scripts/createTables.js",
     "db:sync": "node scripts/syncDatabase.js",
     "db:sync:alter": "node scripts/syncDatabase.js --alter",
     "db:reset": "node scripts/resetDatabase.js",
