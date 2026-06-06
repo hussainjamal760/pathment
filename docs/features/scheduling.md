@@ -27,6 +27,16 @@ config). See [DATABASE.md §10](../DATABASE.md).
 - **Mentee:** opens "My Mentor," picks an open slot, books it; sees their cadence.
 - **Admin:** maintains org schedule templates mentors import.
 
+## Timezones (migration 051)
+A US-hosted server with PK/IN users means "2:00 PM" is meaningless without a zone. So:
+- Slots & meetings store a true UTC instant **`starts_at`** + the authoring **`timezone`**
+  (computed server-side from the mentor's wall-clock via `utils/timezone.js`, DST-correct).
+  Schedule templates / mentee schedules carry a `timezone` for their recurring blocks.
+- The client renders every instant in the **viewer's** zone with a label (`lib/utils/datetime.ts`,
+  e.g. "2:00 PM PKT"); the user's zone is captured once on login (`/profile/detect-timezone`).
+- Task **deadlines** are stored as end-of-day in the *mentee's* timezone (not UTC midnight).
+- Rule of thumb: store the UTC instant, render local. See article 17.
+
 ## Rules & edge cases
 - A slot is single-use (`taken`/`takenBy`); booking marks it taken and creates a meeting.
 - Cancelling a meeting requires a reason, which is shown to the other party + emailed (see [Notifications](./notifications-and-email.md) - `meeting_cancelled`).

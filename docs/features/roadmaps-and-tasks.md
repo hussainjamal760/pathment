@@ -34,6 +34,20 @@ inlineFeedback, checkedCriteria). `Track` (per-mentee personal lanes). See [DATA
 - **Mentor:** builds or imports a roadmap, **assigns** it (or single tasks) to mentees; reviews submissions in Approvals/Cohort Review and leaves a decision + feedback (approve / approve-with-notes / request changes / reject); approving advances the mentee to the next step.
 - **Mentee:** sees assigned tasks (with deliverable + acceptance criteria), works them, submits (versioned, with files/links), can request an extension; receives feedback and either completes or revises.
 
+## Chaining (auto-progression)
+Roadmaps link into a **reusable directed graph** (`roadmap_links`, migration 053) — define
+"after A comes B" once on the roadmaps, not per mentee.
+- **Author:** mentor Roadmaps page → a card's **"Next"** button → `ChainDrawer` (multi-select).
+  One pick = a linear chain; several = a branch. API: `mentorApi.getRoadmapLinks/setRoadmapLinks`
+  (`/mentor/roadmaps/:id/links`), admin-org via `/roadmaps/org/:id/links`.
+- **Advance:** when a mentee completes a roadmap, `linearRoadmapService._advanceChain` resolves
+  the outgoing links — **1 edge + auto on → auto-assign next + notify mentor (`ROADMAP_ADVANCED`);
+  several edges or auto off → notify the mentor to pick** (no silent assign). `manualAdvance`
+  assigns any roadmap (pick-from-branch / skip).
+- **Guardrails:** the graph is a **DAG** (`setNextLinks` rejects self-links/cycles);
+  auto-assign is idempotent; `enrollments.auto_advance_roadmaps` (default true) is the per-mentee
+  off switch. `condition` on a link is reserved for future score/choice gating.
+
 ## Rules & edge cases
 - Submissions are **versioned**; feedback attaches to a version; "request changes" bumps a revision.
 - Enrollment progress counts **live (non-cancelled) assigned tasks**, never the template - so completion can't falsely read 100%.

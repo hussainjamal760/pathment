@@ -558,6 +558,27 @@ erDiagram
 > assign/submit/review - it is the **single source of truth** for progress. Total counts
 > live (non-cancelled) assigned tasks, not the template, so progress never shows a false 100%.
 
+### Roadmap chaining (`roadmap_links`, migration 053)
+
+Roadmaps form a **directed graph** of "what comes next", authored once and reused:
+
+```
+ROADMAP_LINK {
+  uuid id PK
+  uuid fromRoadmapId FK
+  uuid toRoadmapId FK
+  int  position
+  jsonb condition   "reserved for score/choice gating; null = always"
+}
+```
+
+When a mentee finishes a roadmap (`RoadmapProgress.completed`), `linearRoadmapService._advanceChain`
+resolves the outgoing links: **one edge + `enrollments.auto_advance_roadmaps` on → auto-assign
+the next** (and notify the mentor via `ROADMAP_ADVANCED`); **several edges, or auto-off → notify
+the mentor to pick** (no silent auto-assign). The graph is kept a **DAG** — `setNextLinks` rejects
+self-links and cycles. `enrollments.auto_advance_roadmaps` (BOOLEAN, default true) is the per-mentee
+off switch; mentors can also `manualAdvance` to any roadmap (pick-from-branch / skip).
+
 ---
 
 ## 8. Messaging (`models/messaging/`)
@@ -906,7 +927,14 @@ erDiagram
 ```
 
 > Other system tables not drawn (no foreign-key relationships, or singletons):
-> `Document`, `OrgPolicy`, `EmailQueue`, `ScheduledJob`, `SystemSettings`.
+> `Document`, `OrgPolicy`, `EmailQueue`, `SuppressedEmail`, `ScheduledJob`, `SystemSettings`.
+
+> **`EmailQueue` is a real queue, not just a log** (migration 052): `status`
+> (`pending → sending → sent | dead`), `attempt_count`/`max_attempts`, `next_attempt_at`
+> (backoff), `idempotency_key` (unique), `error_category`, `provider_message_id`. Processed by
+> `workers/emailWorker.js`. **`SuppressedEmail`** (email, reason `bounce|complaint|manual`) is
+> populated by the Resend webhook (`POST /webhooks/resend`); the worker refuses to send to a
+> suppressed address. See [Notifications & Email](./features/notifications-and-email.md).
 
 ---
 
@@ -914,7 +942,7 @@ erDiagram
 
 Schema changes are idempotent, numbered scripts in
 [`server/scripts/migrations/`](../server/scripts/migrations) (`NNN_description.js`, each
-with `up`/`down`, run with `--rollback` to reverse). The latest is **043**. Notable ones:
+with `up`/`down`, run with `--rollback` to reverse). The latest is **053**. Notable ones:
 
 | # | What it added |
 | --- | --- |
@@ -928,6 +956,16 @@ with `up`/`down`, run with `--rollback` to reverse). The latest is **043**. Nota
 | 040-041 | User color theme + preferences |
 | 042 | Message delivery receipts + reactions |
 | 043 | Public intake links + assessments (cohort link/window/cap, applicant magic-link, assessment tables) |
+| 044 | Role assignments (scoped RBAC grants) |
+| 047 | Cross-clan cover (consent-first co-mentor grants) |
+| 050 | Cohort-review attendance on meeting notes |
+| 051 | Scheduling timezones (`starts_at`/`timezone` on slots & meetings; `timezone` on templates/mentee schedules) |
+| 052 | Email-queue resilience (retry/backoff, DLQ, idempotency, `provider_message_id`) + `suppressed_emails` |
+| 053 | Roadmap chaining (`roadmap_links` graph + `enrollments.auto_advance_roadmaps`) |
+
+> **First deploy note:** `npm run db:sync` builds the full schema from the models in one
+> shot (the models already encode every migration's end state), so a brand-new database does
+> **not** need to replay these. The numbered migrations are for evolving an *existing* DB.
 
 Run all pending migrations against your DB with the project's migration runner (see
 [`server/DATABASE_SETUP.md`](../server/DATABASE_SETUP.md)).

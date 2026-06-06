@@ -137,12 +137,15 @@ program membership - a person sees the org's content only once they're placed.
 
 ## 6. Background jobs & email
 
-- **Bull + Redis (Upstash)** power async work - notably bulk CSV invite emails
-  (`queues/` enqueue, `workers/` process). Bootstrapped in `server/src/index.js`.
-- **Email** goes through a notification orchestrator → `emailService` (Resend). Outbound
-  mail can also be staged in the `email_queue` table.
-- **Scheduled jobs** (`scheduled_jobs` table) refresh analytics rollups and run periodic
-  maintenance.
+- **Email is a Postgres-backed queue** (`email_queue` + `workers/emailWorker.js`, started in
+  `server/src/index.js`). Everything enqueues via `emailService.enqueue` (the notification
+  orchestrator no longer sends inline); the worker polls due rows and delivers via Resend with
+  **categorised retry + backoff**, a **dead-letter** (`status='dead'`) state, **idempotency**, a
+  **suppression list** (`suppressed_emails`, fed by the Resend bounce/complaint webhook at
+  `POST /webhooks/resend`), and an admin view at `/admin/emails`. This was a deliberate move
+  off Bull/Redis so volume stays inside the Upstash command budget (see article 18).
+- **Scheduled work** runs in-process: `notificationScheduler` (deadline reminders, weekly
+  digests) + the email-worker poll loop; `scheduled_jobs` table backs periodic maintenance.
 
 ---
 
