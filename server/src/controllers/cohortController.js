@@ -125,4 +125,16 @@ const removeCollaborator = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Collaborator removed', result));
 });
 
-module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator };
+/** POST /api/mentor/mentee/:id/attendance  { status } — cohort-review attendance. */
+const setAttendance = catchAsync(async (req, res) => {
+  const result = await cohortService.setAttendance(req.params.id, req.user.id, req.body.status);
+  res.status(200).json(successResponse('Attendance saved', result));
+});
+
+/** GET /api/mentor/review/attendance — today's attendance map for this mentor. */
+const getReviewAttendance = catchAsync(async (req, res) => {
+  const attendance = await cohortService.getTodayAttendance(req.user.id);
+  res.status(200).json(successResponse('Attendance', { attendance }));
+});
+
+module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance };

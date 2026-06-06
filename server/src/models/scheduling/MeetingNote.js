@@ -87,6 +87,12 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'attributed_to_id'
     },
+    // Cohort-review attendance for this mentee/session (present|absent|excused).
+    attendance: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      validate: { isIn: [['present', 'absent', 'excused']] }
+    },
     createdBy: {
       type: DataTypes.UUID,
       allowNull: true,

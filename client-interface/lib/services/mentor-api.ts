@@ -37,6 +37,11 @@ export const mentorApi = {
   removeCollaborator: (menteeId: string, collaboratorId: string) =>
     apiClient.delete(`/mentor/mentee/${menteeId}/collaborators/${collaboratorId}`),
 
+  // Cohort-review attendance (persists per mentee per day; survives refresh).
+  setAttendance: (menteeId: string, status: 'present' | 'absent' | 'excused') =>
+    apiClient.post(`/mentor/mentee/${menteeId}/attendance`, { status }),
+  getReviewAttendance: () => apiClient.get<{ data: { attendance: Record<string, 'present' | 'absent' | 'excused'> } }>('/mentor/review/attendance'),
+
   // Approvals queue (pending reviews across the cohort) + bulk approve.
   getApprovals: () => apiClient.get('/mentor/approvals'),
   bulkApprove: (submissionIds: string[]) => apiClient.post('/mentor/approvals/bulk', { submissionIds }),

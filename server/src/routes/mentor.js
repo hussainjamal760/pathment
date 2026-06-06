@@ -28,6 +28,8 @@ router.get('/mentee/:id', authenticate, authorize(['mentor', 'admin']), cohortCo
 router.patch('/mentee/:id/personality', mentorOnly, cohortController.updatePersonality);
 router.post('/mentee/:id/insights', mentorOnly, cohortController.addInsight);
 router.post('/mentee/:id/notes', mentorOnly, cohortController.logMeetingNote);
+router.post('/mentee/:id/attendance', mentorOnly, cohortController.setAttendance);
+router.get('/review/attendance', authenticate, authorize(['mentor', 'admin']), cohortController.getReviewAttendance);
 router.post('/mentee/:id/collaborators', mentorOnly, cohortController.addCollaborator);
 router.delete('/mentee/:id/collaborators/:collaboratorId', mentorOnly, cohortController.removeCollaborator);
 

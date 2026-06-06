@@ -519,6 +519,43 @@ class CohortService {
     return Object.keys(out).length ? out : null;
   }
 
+  /**
+   * Record cohort-review attendance for a mentee TODAY, idempotently: one 'review'
+   * note per mentor+mentee per day carries the attendance, so re-marking just
+   * updates it (and it shows on the mentee's timeline). Returns { menteeId, attendance }.
+   */
+  async setAttendance(menteeId, mentorId, status) {
+    if (!['present', 'absent', 'excused'].includes(status)) throw new ValidationError('invalid attendance status');
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const existing = await models.MeetingNote.findOne({
+      where: { mentorId, menteeId, kind: 'review', date: { [Op.gte]: start } },
+      order: [['date', 'DESC']]
+    });
+    if (existing) {
+      existing.attendance = status;
+      await existing.save();
+    } else {
+      await models.MeetingNote.create({
+        menteeId, mentorId, kind: 'review',
+        summary: `Cohort review - marked ${status}`,
+        sentiment: 'neutral', attendance: status, createdBy: mentorId
+      });
+    }
+    return { menteeId, attendance: status };
+  }
+
+  /** Today's attendance map { menteeId: status } for this mentor's review session. */
+  async getTodayAttendance(mentorId) {
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const rows = await models.MeetingNote.findAll({
+      where: { mentorId, kind: 'review', date: { [Op.gte]: start }, attendance: { [Op.ne]: null } },
+      attributes: ['menteeId', 'attendance']
+    });
+    const map = {};
+    rows.forEach((r) => { map[r.menteeId] = r.attendance; });
+    return map;
+  }
+
   /** Log a mentor insight/observation about a mentee. */
   async addInsight(menteeId, { kind, note, source }, createdBy) {
     if (!note || !note.trim()) throw new ValidationError('note is required');

@@ -15,6 +15,7 @@ import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
 import { frictionApi } from '@/lib/services/friction-api';
 import { DualProgress } from '@/components/mentor/DualProgress';
+import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { Drawer } from '@/components/shared/Drawer';
@@ -53,6 +54,7 @@ export default function CohortReview() {
   const [idx, setIdx] = useState(0);
   const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [tasksLoading, setTasksLoading] = useState(false);
+  const [profile, setProfile] = useState<any>(null); // full mentee profile (aiSummary/signals) for the current mentee
   const [attendance, setAttendance] = useState<Record<string, Attendance>>({});
   const [deferred, setDeferred] = useState<Set<string>>(new Set());
   const [seen, setSeen] = useState<Set<string>>(new Set());
@@ -72,12 +74,21 @@ export default function CohortReview() {
     [queue, mentee?.id]
   );
 
-  // Load open blockers + assigned tasks for the current mentee; reset state.
+  // Restore today's attendance once so marks survive a refresh mid-session.
+  useEffect(() => {
+    mentorApi.getReviewAttendance()
+      .then((r: any) => setAttendance(r?.data?.attendance ?? {}))
+      .catch(() => {});
+  }, []);
+
+  // Load open blockers + assigned tasks + the full profile (state/summary) for
+  // the current mentee; reset state.
   useEffect(() => {
     if (!mentee) return;
-    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]);
+    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]); setProfile(null);
     setSeen((s) => new Set(s).add(mentee.id));
     frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {});
+    mentorApi.getMenteeProfile(mentee.id).then((r: any) => setProfile(r?.data?.profile ?? r?.data ?? null)).catch(() => setProfile(null));
     if (user?.id) {
       setTasksLoading(true);
       taskApi.getMentorTasks(user.id, { menteeId: mentee.id })
@@ -144,7 +155,9 @@ export default function CohortReview() {
   }, [refresh]);
 
   const mark = useCallback((status: Attendance) => {
-    if (mentee) setAttendance((a) => ({ ...a, [mentee.id]: status }));
+    if (!mentee) return;
+    setAttendance((a) => ({ ...a, [mentee.id]: status })); // instant
+    mentorApi.setAttendance(mentee.id, status).catch(() => toast.error('Could not save attendance')); // persist
   }, [mentee]);
 
   const sendNote = async () => {
@@ -269,6 +282,11 @@ export default function CohortReview() {
             <div className="mt-4"><DualProgress absolute={mentee!.absoluteProgress} relative={mentee!.relativeProgress} compact /></div>
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}
           </div>
+
+          {/* State of this mentee - same read as the profile (AI summary + signals). */}
+          {profile?.aiSummary && (
+            <AISummaryPanel summary={profile.aiSummary} signals={profile.aiSignals || []} />
+          )}
 
           {/* Assigned work - everything currently on this mentee's plate */}
           <div className="bg-card rounded-2xl border border-slate-200">
@@ -423,7 +441,14 @@ export default function CohortReview() {
               <div className="flex justify-between"><span className="text-slate-300">Attendance marked</span><span>{Object.keys(attendance).length}</span></div>
               <div className="flex justify-between"><span className="text-slate-300">Deferred</span><span>{deferred.size}</span></div>
             </div>
-            <button onClick={() => router.push('/mentor/dashboard')}
+            <button onClick={() => {
+                const vals = Object.values(attendance);
+                const present = vals.filter((v) => v === 'present').length;
+                const absent = vals.filter((v) => v === 'absent').length;
+                const excused = vals.filter((v) => v === 'excused').length;
+                toast.success(`Review complete - ${present} present, ${absent} absent, ${excused} excused`);
+                router.push('/mentor/dashboard');
+              }}
               className={`mt-4 w-full px-3 py-2 rounded-xl text-sm font-medium ${allSeen ? 'bg-card text-slate-900 hover:bg-slate-100' : 'bg-card/10 text-white/70'}`}>
               {allSeen ? 'Finish review' : 'Finish (some unseen)'}
             </button>
