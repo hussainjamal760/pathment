@@ -48,7 +48,7 @@ export default function ClanTeamPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-slate-900 mb-2 inline-flex items-center gap-2"><Users2 className="w-6 h-6 text-brand-600" /> Clan Team</h1>
-        <p className="text-slate-600">Manage the people who help run your clan - add co-mentors and core-team members. Mentees are placed by admins.</p>
+        <p className="text-slate-600">Manage your clan - add or remove mentees, co-mentors, and core-team members.</p>
       </div>
 
       <PendingCoverInvites />
@@ -87,7 +87,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   useEffect(load, [load]);
 
   const remove = async (userId: string, label: string) => {
-    if (!confirm(`Remove ${label} from the team?`)) return;
+    if (!confirm(`Remove ${label} from this clan? They'll be unassigned and can be placed again.`)) return;
     try { await clanApi.removeMember(clanId, userId); toast.success('Removed'); load(); }
     catch (e) { toast.error(extractApiErrorMessage(e, 'Could not remove')); }
   };
@@ -101,7 +101,8 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   const lead = members.filter((m) => m.role === 'lead_mentor');
   const co = members.filter((m) => m.role === 'co_mentor');
   const core = members.filter((m) => m.role === 'core_team');
-  const menteeCount = members.filter((m) => m.role === 'mentee').length;
+  const mentees = members.filter((m) => m.role === 'mentee');
+  const menteeCount = mentees.length;
 
   const Person = ({ m, removable }: { m: Member; removable: boolean }) => (
     <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
@@ -152,8 +153,9 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
         <Section icon={<Crown className="w-3.5 h-3.5" />} title="Lead mentor" items={lead} removable={false} />
         <Section icon={<Shield className="w-3.5 h-3.5" />} title="Co-mentors" items={co} removable />
         <Section icon={<Users2 className="w-3.5 h-3.5" />} title="Core team" items={core} removable />
-        {co.length === 0 && core.length === 0 && (
-          <p className="text-sm text-slate-400">No co-mentors or core-team members yet.</p>
+        <Section icon={<HeartHandshake className="w-3.5 h-3.5" />} title={`Mentees (${menteeCount})`} items={mentees} removable />
+        {co.length === 0 && core.length === 0 && mentees.length === 0 && (
+          <p className="text-sm text-slate-400">No members yet.</p>
         )}
       </div>
 

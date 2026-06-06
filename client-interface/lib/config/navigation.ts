@@ -111,6 +111,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
   ],
   mentor: [
     { path: '/mentor/dashboard', icon: LayoutDashboard, label: 'Cockpit' },
+    { path: '/mentor/review', icon: CalendarRange, label: 'Cohort Review' },
     { path: '/mentor/messages', icon: MessageSquare, label: 'Messages', hasBadge: true },
     {
       path: 'group:mentees', icon: Users2, label: 'My Mentees',
@@ -118,7 +119,6 @@ export const navigationConfig: Record<string, NavLink[]> = {
         { path: '/mentor/mentees', icon: Users2, label: 'My Mentees' },
         { path: '/mentor/clan-team', icon: ShieldCheck, label: 'Clan Team' },
         { path: '/mentor/approvals', icon: ClipboardCheck, label: 'Approvals' },
-        { path: '/mentor/review', icon: CalendarRange, label: 'Cohort Review' },
         { path: '/mentor/at-risk', icon: AlertTriangle, label: 'At-risk' },
         { path: '/mentor/promotions', icon: TrendingUp, label: 'Promotions' },
       ],
