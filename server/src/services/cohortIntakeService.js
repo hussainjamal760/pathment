@@ -55,19 +55,34 @@ class CohortIntakeService {
     return cohort;
   }
 
+  /** Validate date ordering + positive capacities. Throws on bad config. */
+  _validateCohortConfig({ startDate, endDate, applyOpensAt, applyClosesAt, capacity, maxApplications }) {
+    const day = (d) => (d ? new Date(d) : null);
+    const s = day(startDate), e = day(endDate), ao = day(applyOpensAt), ac = day(applyClosesAt);
+    if (s && e && s > e) throw new ValidationError('Start date must be on or before the end date');
+    if (ao && ac && ao > ac) throw new ValidationError('Applications must open on or before they close');
+    if (capacity != null && capacity !== '' && (!Number.isInteger(Number(capacity)) || Number(capacity) < 1)) {
+      throw new ValidationError('Capacity must be a whole number ≥ 1');
+    }
+    if (maxApplications != null && maxApplications !== '' && (!Number.isInteger(Number(maxApplications)) || Number(maxApplications) < 1)) {
+      throw new ValidationError('Max applications must be a whole number ≥ 1');
+    }
+  }
+
   async createCohort(data, createdBy) {
     const { programId, name } = data;
     if (!programId || !name) throw new ValidationError('programId and name are required');
 
     const program = await models.Program.findByPk(programId);
     if (!program) throw new NotFoundError('Program not found');
+    this._validateCohortConfig(data);
 
     return models.Cohort.create({
       programId,
       name: name.trim(),
       description: data.description || null,
       status: data.status || 'planning',
-      capacity: data.capacity ?? null,
+      capacity: (data.capacity ?? '') === '' ? null : Number(data.capacity),
       startDate: data.startDate || null,
       endDate: data.endDate || null,
       createdBy
@@ -89,10 +104,32 @@ class CohortIntakeService {
       if (data[key] !== undefined) patch[key] = data[key];
     }
 
+    // Validate ordering/capacity against the MERGED config (so updating one date
+    // is checked against the other's existing value).
+    this._validateCohortConfig({
+      startDate: patch.startDate ?? cohort.startDate,
+      endDate: patch.endDate ?? cohort.endDate,
+      applyOpensAt: patch.applyOpensAt ?? cohort.applyOpensAt,
+      applyClosesAt: patch.applyClosesAt ?? cohort.applyClosesAt,
+      capacity: patch.capacity ?? cohort.capacity,
+      maxApplications: patch.maxApplications ?? cohort.maxApplications,
+    });
+
     // Validate an attached assessment exists and is usable.
+    const finalAssessmentId = patch.assessmentId !== undefined ? patch.assessmentId : cohort.assessmentId;
+    const finalRequired = patch.assessmentRequired !== undefined ? patch.assessmentRequired : cohort.assessmentRequired;
     if (patch.assessmentId) {
       const assessment = await models.Assessment.findByPk(patch.assessmentId);
       if (!assessment) throw new ValidationError('Attached assessment not found');
+    }
+    // A REQUIRED assessment must be published (and therefore non-empty) — you
+    // can't gate applicants behind a draft/empty assessment.
+    if (finalRequired && finalAssessmentId) {
+      const assessment = await models.Assessment.findByPk(finalAssessmentId);
+      if (!assessment) throw new ValidationError('Attached assessment not found');
+      if (assessment.status !== 'published') {
+        throw new ValidationError('Publish the assessment before marking it required for this cohort');
+      }
     }
     await cohort.update(patch);
     return cohort;

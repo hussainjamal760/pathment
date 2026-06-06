@@ -40,16 +40,34 @@ class AssessmentService {
     return json;
   }
 
+  /** Shared field validation for create/update. Throws on bad numeric fields. */
+  _validateMeta(data) {
+    if (data.title !== undefined && (!data.title || !String(data.title).trim())) {
+      throw new ValidationError('A title is required');
+    }
+    if (data.passingScore !== undefined && data.passingScore !== null && data.passingScore !== '') {
+      const n = Number(data.passingScore);
+      if (!Number.isFinite(n) || n < 0) throw new ValidationError('Passing score must be a number ≥ 0');
+    }
+    if (data.timeLimitMins !== undefined && data.timeLimitMins !== null && data.timeLimitMins !== '') {
+      const n = Number(data.timeLimitMins);
+      if (!Number.isInteger(n) || n < 1) throw new ValidationError('Time limit must be a whole number of minutes ≥ 1');
+    }
+  }
+
   async createAssessment(data, createdBy) {
+    this._validateMeta(data);
     if (!data.title || !data.title.trim()) throw new ValidationError('A title is required');
     return models.Assessment.create({
       title: data.title.trim(),
       description: data.description || null,
       instructions: data.instructions || null,
       programId: data.programId || null,
-      passingScore: data.passingScore ?? null,
-      timeLimitMins: data.timeLimitMins ?? null,
-      status: data.status === 'published' ? 'published' : 'draft',
+      passingScore: (data.passingScore ?? '') === '' ? null : Number(data.passingScore),
+      timeLimitMins: (data.timeLimitMins ?? '') === '' ? null : Number(data.timeLimitMins),
+      // A brand-new assessment has no questions yet, so it cannot be published.
+      // Publishing is a deliberate step after adding at least one question.
+      status: 'draft',
       createdBy
     });
   }
@@ -57,11 +75,17 @@ class AssessmentService {
   async updateAssessment(assessmentId, data) {
     const assessment = await models.Assessment.findByPk(assessmentId);
     if (!assessment) throw new NotFoundError('Assessment not found');
+    this._validateMeta(data);
     const allowed = ['title', 'description', 'instructions', 'programId', 'passingScore', 'timeLimitMins', 'status'];
     const patch = {};
     for (const key of allowed) if (data[key] !== undefined) patch[key] = data[key];
     if (patch.status && !['draft', 'published', 'archived'].includes(patch.status)) {
       throw new ValidationError('Invalid status');
+    }
+    // An assessment can't go live with zero questions — there'd be nothing to answer.
+    if (patch.status === 'published') {
+      const count = await models.AssessmentQuestion.count({ where: { assessmentId } });
+      if (count === 0) throw new ValidationError('Add at least one question before publishing this assessment');
     }
     await assessment.update(patch);
     return assessment;
@@ -106,6 +130,12 @@ class AssessmentService {
         config: q.config && typeof q.config === 'object' ? q.config : {}
       };
     });
+
+    // Don't let a LIVE assessment be stripped to zero questions (back-door to a
+    // published-but-empty assessment). Unpublish it first.
+    if (rows.length === 0 && assessment.status === 'published') {
+      throw new ValidationError('A published assessment must keep at least one question — set it back to draft first');
+    }
 
     await models.AssessmentQuestion.destroy({ where: { assessmentId } });
     if (rows.length) await models.AssessmentQuestion.bulkCreate(rows);

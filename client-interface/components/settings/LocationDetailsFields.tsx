@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type KeyboardEvent } from 'react';
 import { MapPin, Globe, Languages as LanguagesIcon, X } from 'lucide-react';
+import { SelectMenu } from '@/components/shared/SelectMenu';
 
 export interface LocationDetails {
   city: string;
@@ -70,8 +71,14 @@ export function LocationDetailsFields({ value, onChange }: Props) {
 
       <div>
         <label className="block text-slate-700 mb-2 text-sm font-medium inline-flex items-center gap-1.5"><Globe className="w-3.5 h-3.5 text-slate-400" />Timezone</label>
-        <input list="tz-options" value={value.timezone} onChange={(e) => onChange({ timezone: e.target.value })} placeholder="e.g. Asia/Karachi" className={FIELD} />
-        <datalist id="tz-options">{zones.map((z) => <option key={z} value={z} />)}</datalist>
+        <SelectMenu
+          value={value.timezone}
+          onChange={(tz) => onChange({ timezone: tz })}
+          options={zones.map((z) => ({ value: z, label: z.replace(/_/g, ' ') }))}
+          placeholder="e.g. Asia/Karachi"
+          ariaLabel="Timezone"
+          searchable
+        />
       </div>
 
       <div>

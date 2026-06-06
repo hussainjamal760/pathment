@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronDown, ChevronUp, Plus, Trash2, UserCheck } from 'lucide-react';
+import { Dropdown } from '@/components/shared/Dropdown';
 
 import {
   CUSTOM_FIELD_TYPES,
@@ -106,27 +107,33 @@ export function IntakeFormBuilder({
 
       <div className="flex flex-wrap gap-2 pt-1">
         {availableProfile.length > 0 && (
-          <details className="relative">
-            <summary className="list-none cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:bg-brand-50/40">
-              <Plus className="w-3.5 h-3.5" /> Profile field
-            </summary>
-            <div className="absolute z-10 mt-1 w-56 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-card shadow-lg p-1">
-              {availableProfile.map((p) => (
-                <button key={p.key} type="button" onClick={() => addProfile(p.key)} className="w-full text-left px-3 py-1.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100">{p.label}</button>
-              ))}
-            </div>
-          </details>
-        )}
-        <details className="relative">
-          <summary className="list-none cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:bg-brand-50/40">
-            <Plus className="w-3.5 h-3.5" /> Custom question
-          </summary>
-          <div className="absolute z-10 mt-1 w-48 rounded-xl border border-slate-200 bg-card shadow-lg p-1">
-            {CUSTOM_FIELD_TYPES.map((t) => (
-              <button key={t.type} type="button" onClick={() => addCustom(t.type)} className="w-full text-left px-3 py-1.5 rounded-lg text-sm text-slate-700 hover:bg-slate-100">{t.label}</button>
+          <Dropdown
+            width="w-56"
+            menuClassName="max-h-72 overflow-y-auto p-1"
+            trigger={({ toggle }) => (
+              <button type="button" onClick={toggle} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 hover:border-brand-300 hover:bg-brand-50/40">
+                <Plus className="w-3.5 h-3.5" /> Profile field
+              </button>
+            )}
+          >
+            {(close) => availableProfile.map((p) => (
+              <button key={p.key} type="button" onClick={() => { addProfile(p.key); close(); }} className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">{p.label}</button>
             ))}
-          </div>
-        </details>
+          </Dropdown>
+        )}
+        <Dropdown
+          width="w-48"
+          menuClassName="max-h-72 overflow-y-auto p-1"
+          trigger={({ toggle }) => (
+            <button type="button" onClick={toggle} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 hover:border-brand-300 hover:bg-brand-50/40">
+              <Plus className="w-3.5 h-3.5" /> Custom question
+            </button>
+          )}
+        >
+          {(close) => CUSTOM_FIELD_TYPES.map((t) => (
+            <button key={t.type} type="button" onClick={() => { addCustom(t.type); close(); }} className="w-full text-left px-3 py-2 rounded-lg text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800">{t.label}</button>
+          ))}
+        </Dropdown>
       </div>
     </div>
   );

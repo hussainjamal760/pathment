@@ -7,6 +7,7 @@ import { apiConfig } from '@/lib/config/api';
 import { preferencesApi } from '@/lib/services/preferences-api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { validateProfileFields } from '@/lib/utils/validation';
 import { toast } from 'sonner';
 
 export interface MentorProfileData {
@@ -157,6 +158,8 @@ export function useMentorSettings(): UseMentorSettingsReturn {
   }, [fetchSettings]);
 
   const handleProfileUpdate = useCallback(async () => {
+    const invalid = validateProfileFields(profileData);
+    if (invalid) { toast.error(invalid); return; }
     try {
       setSaving(true);
       await apiClient.put(apiConfig.endpoints.profile, profileData);

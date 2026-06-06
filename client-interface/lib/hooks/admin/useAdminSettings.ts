@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { validateProfileFields } from '@/lib/utils/validation';
 import { preferencesApi } from '@/lib/services/preferences-api';
 import { toast } from 'sonner';
 
@@ -129,6 +130,8 @@ export function useAdminSettings(): UseAdminSettingsReturn {
   }, [fetchSettings]);
 
   const handleProfileUpdate = useCallback(async () => {
+    const invalid = validateProfileFields(profileData);
+    if (invalid) { toast.error(invalid); return; }
     try {
       setSaving(true);
       await apiClient.put(apiConfig.endpoints.profile, profileData);

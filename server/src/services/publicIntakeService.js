@@ -107,6 +107,18 @@ class PublicIntakeService {
     const email = String(data.email || '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) throw new ValidationError('A valid email is required');
 
+    // Enforce required intake fields server-side (the client checks too, but a
+    // direct API call must not be able to skip them).
+    const schema = Array.isArray(cohort.intakeFormSchema) ? cohort.intakeFormSchema : [];
+    const responses = data.responses && typeof data.responses === 'object' ? data.responses : {};
+    for (const field of schema) {
+      if (!field || !field.required) continue;
+      const top = { firstName: data.firstName, lastName: data.lastName, phone: data.phone };
+      const raw = responses[field.key] ?? top[field.key];
+      const answered = Array.isArray(raw) ? raw.length > 0 : String(raw ?? '').trim().length > 0;
+      if (!answered) throw new ValidationError(`Please complete: ${field.label || field.key}`);
+    }
+
     // If they already have a real account, they should log in, not apply.
     const existingUser = await models.User.findOne({ where: { email } });
     if (existingUser) throw new ConflictError('An account already exists for this email - please log in instead');

@@ -255,6 +255,15 @@ await user.update({
     const userId = req.user.id;
     const { firstName, lastName, bio, phone, profilePictureUrl, city, country, languages, timezone } = req.body;
 
+    // Phone (optional) must look like a real phone, not free text.
+    if (phone !== undefined && phone !== null && String(phone).trim()) {
+      const v = String(phone).trim();
+      const digits = v.replace(/\D/g, '');
+      if (!/^[+(]?[\d\s().+-]+$/.test(v) || digits.length < 7 || digits.length > 15) {
+        throw new ValidationError('Enter a valid phone number');
+      }
+    }
+
     const user = await models.User.findByPk(userId);
     if (!user) {
       throw new NotFoundError('User not found');

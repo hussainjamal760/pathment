@@ -26,6 +26,28 @@ const PERMISSION_GROUPS = [
 const prettyPerm = (p: string) => p.replace(/[._]/g, ' ');
 const SCOPE_LABEL: Record<string, string> = { org: 'Organization-wide', program: 'A program', clan: 'A clan', self: 'The user only' };
 
+/** Shows exactly what a selected role can do, so the admin grants with eyes open. */
+function RolePermissionList({ role }: { role?: RoleCatalogEntry }) {
+  if (!role) return null;
+  const perms = role.permissions;
+  return (
+    <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-slate-400 mb-1.5">What this role can do</p>
+      {perms === '*' ? (
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 dark:text-brand-300"><ShieldCheck className="w-3.5 h-3.5" /> Full access — every permission</span>
+      ) : perms.length === 0 ? (
+        <p className="text-xs text-slate-400">No permissions granted.</p>
+      ) : (
+        <div className="flex flex-wrap gap-1">
+          {perms.map((p) => (
+            <span key={p} className="px-1.5 py-0.5 rounded bg-card border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-300 capitalize">{prettyPerm(p)}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RolesAccessPage() {
   const [tab, setTab] = useState<'people' | 'roles'>('people');
   return (
@@ -196,6 +218,7 @@ function InviteWithAccessDrawer({ onClose, onInvited }: { onClose: () => void; o
             {custom.length > 0 && <optgroup label="Custom">{custom.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}</optgroup>}
           </select>
           {role && <p className="mt-1 text-xs text-slate-500">{role.description} · Scope: {SCOPE_LABEL[role.scope]}</p>}
+          <RolePermissionList role={role} />
         </div>
         {needsTarget && (
           <div>
@@ -342,6 +365,7 @@ function GrantDrawer({ user, onClose, onGranted }: { user: DirectoryUser; onClos
             )}
           </select>
           {role && <p className="mt-1 text-xs text-slate-500">{role.description} · Scope: {SCOPE_LABEL[role.scope]}</p>}
+          <RolePermissionList role={role} />
         </div>
 
         {needsTarget && (

@@ -99,8 +99,20 @@ export default function AssessmentBuilderPage() {
 
   const save = async () => {
     if (!meta.title.trim()) { toast.error('Title is required'); return; }
+    // You can't publish an empty assessment — there'd be nothing to answer.
+    if (meta.status === 'published' && questions.length === 0) {
+      toast.error('Add at least one question before publishing'); return;
+    }
+    // Numeric field validation.
+    if (meta.passingScore !== '' && (!Number.isFinite(Number(meta.passingScore)) || Number(meta.passingScore) < 0)) {
+      toast.error('Passing score must be a number ≥ 0'); return;
+    }
+    if (meta.timeLimitMins !== '' && (!Number.isInteger(Number(meta.timeLimitMins)) || Number(meta.timeLimitMins) < 1)) {
+      toast.error('Time limit must be a whole number of minutes ≥ 1'); return;
+    }
     for (const q of questions) {
       if (!q.prompt.trim()) { toast.error('Every question needs a prompt'); return; }
+      if (!Number.isFinite(Number(q.points)) || Number(q.points) < 0) { toast.error('Question points must be a number ≥ 0'); return; }
       if (AUTO_GRADED.includes(q.type)) {
         const labeled = q.options.filter((o) => o.label.trim());
         if (labeled.length < 2) { toast.error('Choice questions need at least 2 options'); return; }
@@ -109,14 +121,8 @@ export default function AssessmentBuilderPage() {
     }
     setSaving(true);
     try {
-      await assessmentApi.update(id, {
-        title: meta.title.trim(),
-        description: meta.description.trim() || undefined,
-        instructions: meta.instructions.trim() || undefined,
-        status: meta.status as 'draft' | 'published' | 'archived',
-        passingScore: meta.passingScore === '' ? null : Number(meta.passingScore),
-        timeLimitMins: meta.timeLimitMins === '' ? null : Number(meta.timeLimitMins),
-      });
+      // Save questions FIRST so they exist when status flips to 'published'
+      // (the server refuses to publish an assessment with zero questions).
       await assessmentApi.setQuestions(id, questions.map((q) => ({
         type: q.type,
         prompt: q.prompt.trim(),
@@ -126,6 +132,14 @@ export default function AssessmentBuilderPage() {
         correctOptionIds: q.correctOptionIds,
         config: q.config,
       })));
+      await assessmentApi.update(id, {
+        title: meta.title.trim(),
+        description: meta.description.trim() || undefined,
+        instructions: meta.instructions.trim() || undefined,
+        status: meta.status as 'draft' | 'published' | 'archived',
+        passingScore: meta.passingScore === '' ? null : Number(meta.passingScore),
+        timeLimitMins: meta.timeLimitMins === '' ? null : Number(meta.timeLimitMins),
+      });
       toast.success('Assessment saved');
       load();
     } catch (e) {
@@ -197,11 +211,11 @@ export default function AssessmentBuilderPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Pass score</label>
-            <input type="number" value={meta.passingScore} onChange={(e) => setMeta({ ...meta, passingScore: e.target.value })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" min={0} value={meta.passingScore} onChange={(e) => setMeta({ ...meta, passingScore: e.target.value.replace(/^0+(?=\d)/, '') })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Time limit (min)</label>
-            <input type="number" value={meta.timeLimitMins} onChange={(e) => setMeta({ ...meta, timeLimitMins: e.target.value })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <input type="number" min={1} value={meta.timeLimitMins} onChange={(e) => setMeta({ ...meta, timeLimitMins: e.target.value.replace(/^0+(?=\d)/, '') })} placeholder="-" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
         </div>
         <p className="text-xs text-slate-400">{questions.length} questions · {totalPoints} auto-graded points</p>
@@ -317,8 +331,9 @@ function QuestionCard({
               Points
               <input
                 type="number"
+                min={0}
                 value={q.points}
-                onChange={(e) => onPatch({ points: Math.max(0, Number(e.target.value) || 0) })}
+                onChange={(e) => onPatch({ points: e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0) })}
                 className="w-20 border border-slate-200 rounded-lg px-2 py-1 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </label>

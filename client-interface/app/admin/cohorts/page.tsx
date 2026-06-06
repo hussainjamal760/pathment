@@ -35,6 +35,12 @@ function CreateCohortDrawer({ onClose, onCreated }: { onClose: () => void; onCre
 
   const submit = async () => {
     if (!form.programId || !form.name.trim()) { toast.error('Pick a program and name the cohort'); return; }
+    if (form.startDate && form.endDate && new Date(form.startDate) > new Date(form.endDate)) {
+      toast.error('Start date must be on or before the end date'); return;
+    }
+    if (form.capacity !== '' && (!Number.isInteger(Number(form.capacity)) || Number(form.capacity) < 1)) {
+      toast.error('Capacity must be a whole number ≥ 1'); return;
+    }
     try {
       setSaving(true);
       await cohortApi.create({

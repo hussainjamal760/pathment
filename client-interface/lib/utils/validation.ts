@@ -45,6 +45,38 @@ export const validateRequired = (value: string | undefined | null): boolean => {
   return value !== undefined && value !== null && value.trim().length > 0;
 };
 
+/**
+ * Phone validation. Empty is allowed (the field is optional everywhere we use
+ * it); a non-empty value must look like a real phone — digits with optional
+ * +, spaces, dashes, dots, parens — and carry 7–15 actual digits. Rejects free
+ * text like "this si number".
+ */
+export const validatePhone = (phone: string | undefined | null): boolean => {
+  const v = (phone || '').trim();
+  if (!v) return true;
+  if (!/^[+(]?[\d\s().+-]+$/.test(v)) return false;
+  const digits = v.replace(/\D/g, '');
+  return digits.length >= 7 && digits.length <= 15;
+};
+
+/**
+ * One-stop validation for the shared profile/settings fields. Returns the first
+ * human-readable error, or null if all valid. Used by every role's
+ * Settings → Profile save so the rules are identical everywhere.
+ */
+export const validateProfileFields = (p: {
+  phone?: string; linkedinUrl?: string; githubUrl?: string; portfolioUrl?: string;
+}): string | null => {
+  if (!validatePhone(p.phone)) return 'Enter a valid phone number (digits, spaces, + and - only).';
+  const urls: [string, string | undefined][] = [
+    ['LinkedIn', p.linkedinUrl], ['GitHub', p.githubUrl], ['Portfolio', p.portfolioUrl],
+  ];
+  for (const [label, val] of urls) {
+    if (val && val.trim() && !validateUrl(val.trim())) return `Enter a valid ${label} URL (e.g. https://…).`;
+  }
+  return null;
+};
+
 export const validateMinLength = (value: string, minLength: number): boolean => {
   return value.length >= minLength;
 };

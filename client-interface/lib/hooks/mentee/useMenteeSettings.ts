@@ -6,6 +6,7 @@ import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
 import { preferencesApi } from '@/lib/services/preferences-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { validateProfileFields } from '@/lib/utils/validation';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
 
@@ -159,6 +160,8 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
   }, [fetchSettings]);
 
   const handleProfileUpdate = useCallback(async () => {
+    const invalid = validateProfileFields(profileData);
+    if (invalid) { toast.error(invalid); return; }
     try {
       setSaving(true);
       await apiClient.put(apiConfig.endpoints.profile, profileData);
