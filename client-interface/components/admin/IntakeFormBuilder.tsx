@@ -76,7 +76,7 @@ export function IntakeFormBuilder({
               </div>
               <input
                 value={f.label}
-                onChange={(e) => patch(idx, { label: e.target.value, key: mapped ? f.key : customKeyFromLabel(e.target.value, fields.filter((_, i) => i !== idx).map((x) => x.key)) })}
+                onChange={(e) => patch(idx, { label: e.target.value })}
                 placeholder="Question / field label"
                 className="flex-1 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
               />
@@ -92,13 +92,21 @@ export function IntakeFormBuilder({
             </div>
 
             {HAS_OPTIONS.includes(f.type) && (
-              <div className="mt-2 ml-7">
-                <input
-                  value={(f.options || []).join(', ')}
-                  onChange={(e) => patch(idx, { options: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })}
-                  placeholder="Options, comma-separated"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
-                />
+              <div className="mt-2 ml-7 space-y-1.5">
+                <p className="text-[11px] text-slate-400">Options</p>
+                {(f.options && f.options.length ? f.options : ['']).map((opt, oi) => (
+                  <div key={oi} className="flex items-center gap-2">
+                    <span className="w-4 text-center text-[11px] text-slate-300">{oi + 1}</span>
+                    <input
+                      value={opt}
+                      onChange={(e) => { const next = [...(f.options || [''])]; next[oi] = e.target.value; patch(idx, { options: next }); }}
+                      placeholder={`Option ${oi + 1}`}
+                      className="flex-1 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card"
+                    />
+                    <button type="button" onClick={() => patch(idx, { options: (f.options || []).filter((_, i) => i !== oi) })} disabled={(f.options || []).length <= 1} className="p-1 rounded-md hover:bg-rose-50 text-rose-400 disabled:opacity-30"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => patch(idx, { options: [...(f.options || []), ''] })} className="text-xs text-brand-700 hover:text-brand-800 inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" /> Add option</button>
               </div>
             )}
           </div>

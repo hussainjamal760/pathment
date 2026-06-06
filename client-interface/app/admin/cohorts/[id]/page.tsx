@@ -227,7 +227,10 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
         assessmentRequired: required,
         applyClosesAt: closesAt ? new Date(closesAt).toISOString() : null,
         maxApplications: maxApps === '' ? null : Number(maxApps),
-        intakeFormSchema: formFields,
+        // Drop blank options so empty choices never reach the apply form.
+        intakeFormSchema: formFields.map((f) => (
+          f.options ? { ...f, options: f.options.map((o) => o.trim()).filter(Boolean) } : f
+        )),
       });
       toast.success('Intake settings saved');
       onChange();
