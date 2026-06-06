@@ -29,6 +29,8 @@ export const mentorApi = {
     apiClient.post(`/mentor/mentee/${menteeId}/insights`, data),
   addMeetingNote: (menteeId: string, data: {
     kind?: string; summary: string; sentiment?: string; issues?: string[]; nextSteps?: string[]; date?: string;
+    personalityRead?: string; workingStyle?: { consistency: number; communication: number; resilience: number; independence: number }; blockers?: string[];
+    attributedTo?: string; attributedToId?: string | null;
   }) => apiClient.post(`/mentor/mentee/${menteeId}/notes`, data),
   addCollaborator: (menteeId: string, data: { name: string; role: string; email?: string }) =>
     apiClient.post(`/mentor/mentee/${menteeId}/collaborators`, data),

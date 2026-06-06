@@ -58,6 +58,35 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: [],
       field: 'next_steps'
     },
+    // Richer 1:1 read: what you learned about how they think/work + blockers to track.
+    personalityRead: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: 'personality_read'
+    },
+    workingStyle: {
+      // { consistency, communication, resilience, independence } each 0-100
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'working_style'
+    },
+    blockers: {
+      type: DataTypes.ARRAY(DataTypes.TEXT),
+      allowNull: false,
+      defaultValue: []
+    },
+    // "Logged by" attribution: the specialist this 1:1 is credited to (display
+    // name + optional collaborator id). createdBy stays the real authed logger.
+    attributedTo: {
+      type: DataTypes.STRING(150),
+      allowNull: true,
+      field: 'attributed_to'
+    },
+    attributedToId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'attributed_to_id'
+    },
     createdBy: {
       type: DataTypes.UUID,
       allowNull: true,

@@ -90,6 +90,13 @@ export function PersonalityBars({
           })}
         </div>
       )}
+
+      {!editing && personality?.read && (
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400 mb-1">Read</p>
+          <p className="text-sm text-slate-600">{personality.read}</p>
+        </div>
+      )}
     </div>
   );
 }
