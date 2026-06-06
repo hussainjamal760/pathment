@@ -50,6 +50,10 @@ router.post('/roadmaps/:id/steps', mentorOnly, linearRoadmapController.addStep);
 router.delete('/roadmaps/:id/steps/:stepId', mentorOnly, linearRoadmapController.removeStep);
 router.get('/roadmaps/:id/assignees', mentorOnly, linearRoadmapController.assignees);
 router.post('/roadmaps/:id/assign', mentorOnly, linearRoadmapController.assign);
+// Roadmap chaining: define what comes next (reusable), + manually advance a mentee.
+router.post('/roadmaps/advance', mentorOnly, linearRoadmapController.advance);
+router.get('/roadmaps/:id/links', mentorOnly, linearRoadmapController.getLinks);
+router.put('/roadmaps/:id/links', mentorOnly, linearRoadmapController.setLinks);
 
 // Promotions (mentee → co-mentor). Final promote is admin-gated.
 router.get('/promotions', mentorOnly, promotionController.list);

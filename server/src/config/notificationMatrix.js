@@ -3,6 +3,7 @@ const NOTIFICATION_EVENTS = {
   SUBMISSION_REVIEWED: 'submission_reviewed',
   FEEDBACK_SENT: 'feedback_sent',
   TASK_ASSIGNED: 'task_assigned',
+  ROADMAP_ADVANCED: 'roadmap_advanced',
   TASK_DEADLINE_APPROACHING: 'task_deadline_approaching',
   CHAT_MESSAGE_NEW: 'chat_message_new',
   MENTEE_ENROLLED: 'mentee_enrolled',
@@ -47,6 +48,11 @@ const NOTIFICATION_MATRIX = {
     type: 'task',
     preferenceKey: 'task_assigned',
     channels: { inApp: true, email: true, chat: false }
+  },
+  [NOTIFICATION_EVENTS.ROADMAP_ADVANCED]: {
+    type: 'task',
+    preferenceKey: 'task_assigned',
+    channels: { inApp: true, email: false, chat: false }
   },
   [NOTIFICATION_EVENTS.TASK_DEADLINE_APPROACHING]: {
     type: 'task',

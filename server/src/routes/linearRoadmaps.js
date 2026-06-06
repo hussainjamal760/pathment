@@ -22,4 +22,8 @@ router.post('/org/:id/steps', adminOnly, c.addOrgStep);
 router.delete('/org/:id/steps/:stepId', adminOnly, c.removeOrgStep);
 router.delete('/org/:id', adminOnly, c.deleteOrg);
 
+// Chain authoring for org roadmaps: "what comes next" (reusable graph edges).
+router.get('/org/:id/links', adminOnly, c.getLinks);
+router.put('/org/:id/links', adminOnly, c.setLinks);
+
 module.exports = router;

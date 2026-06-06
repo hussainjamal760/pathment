@@ -396,12 +396,135 @@ class LinearRoadmapService {
     });
   }
 
+  // ── Reusable chain graph (roadmap_links) ────────────────────────────────────
+  /** Outgoing links of a roadmap, with the target's name (for authoring UI). */
+  async getNextLinks(roadmapId) {
+    const links = await models.RoadmapLink.findAll({
+      where: { fromRoadmapId: roadmapId },
+      order: [['position', 'ASC']],
+      include: [{ model: models.Roadmap, as: 'toRoadmap', attributes: ['id', 'name'] }],
+    });
+    return links.map((l) => ({ id: l.id, toRoadmapId: l.toRoadmapId, name: l.toRoadmap?.name || null, position: l.position }));
+  }
+
+  /** Would adding from→to create a cycle? (to already reaches from, or to===from) */
+  async _wouldCreateCycle(fromId, toId) {
+    if (fromId === toId) return true;
+    const seen = new Set();
+    let frontier = [toId];
+    while (frontier.length) {
+      const rows = await models.RoadmapLink.findAll({ where: { fromRoadmapId: { [Op.in]: frontier } }, attributes: ['toRoadmapId'] });
+      const next = [];
+      for (const r of rows) {
+        if (r.toRoadmapId === fromId) return true;
+        if (!seen.has(r.toRoadmapId)) { seen.add(r.toRoadmapId); next.push(r.toRoadmapId); }
+      }
+      frontier = next;
+    }
+    return false;
+  }
+
+  /** Replace a roadmap's outgoing links. Rejects self/duplicate/cycle edges. */
+  async setNextLinks(authorId, roadmapId, toIds = []) {
+    const from = await models.Roadmap.findByPk(roadmapId);
+    if (!from) throw new NotFoundError('Roadmap not found');
+    const clean = [...new Set((toIds || []).filter(Boolean))];
+    for (const toId of clean) {
+      if (toId === roadmapId) throw new ValidationError('A roadmap cannot lead to itself');
+      const to = await models.Roadmap.findByPk(toId);
+      if (!to) throw new ValidationError('One of the next roadmaps does not exist');
+      if (await this._wouldCreateCycle(roadmapId, toId)) {
+        throw new ValidationError(`"${to.name}" would create a loop in the chain`);
+      }
+    }
+    await models.RoadmapLink.destroy({ where: { fromRoadmapId: roadmapId } });
+    if (clean.length) {
+      await models.RoadmapLink.bulkCreate(clean.map((toId, i) => ({ fromRoadmapId: roadmapId, toRoadmapId: toId, position: i, createdBy: authorId })));
+    }
+    return this.getNextLinks(roadmapId);
+  }
+
+  /** Manually assign the next roadmap (mentor picks from a branch, or skips). */
+  async manualAdvance(mentorId, menteeId, nextRoadmapId) {
+    return this.assignToMentee(mentorId, nextRoadmapId, menteeId, 0);
+  }
+
+  /** Create/reset progress for `nextId` and assign its first step. Idempotent. */
+  async _startNextRoadmap(menteeId, nextId, prevAssignment, slotId = null) {
+    const steps = await this.getSteps(nextId);
+    if (!steps.length) return false;
+    const enrollment = await this._activeEnrollment(menteeId);
+    const existing = await models.RoadmapProgress.findOne({ where: { roadmapId: nextId, menteeId } });
+    if (existing && !existing.completed) return false; // already active - don't disturb
+    if (existing) {
+      existing.currentStep = 0; existing.completed = false; if (slotId) existing.slot = slotId;
+      if (enrollment) existing.enrollmentId = enrollment.id;
+      await existing.save();
+    } else {
+      await models.RoadmapProgress.create({ roadmapId: nextId, menteeId, enrollmentId: enrollment?.id || null, currentStep: 0, slot: slotId, completed: false });
+    }
+    if (steps[0] && enrollment && prevAssignment) {
+      await this._assignStep(steps[0], menteeId, prevAssignment.mentorId, enrollment.id);
+    }
+    return true;
+  }
+
+  /** Tell the mentor what happened when a roadmap completes (auto / choose / paused). */
+  async _notifyAdvanced(prevAssignment, menteeId, fromId, nextId, mode, optionIds = []) {
+    const mentorId = prevAssignment?.mentorId;
+    if (!mentorId) return;
+    try {
+      const [mentee, fromRm, nextRm] = await Promise.all([
+        models.User.findByPk(menteeId, { attributes: ['firstName', 'lastName'] }),
+        models.Roadmap.findByPk(fromId, { attributes: ['name'] }),
+        nextId ? models.Roadmap.findByPk(nextId, { attributes: ['name'] }) : null,
+      ]);
+      const who = mentee ? `${mentee.firstName} ${mentee.lastName}`.trim() : 'A mentee';
+      const fromName = fromRm?.name || 'a roadmap';
+      const msg = mode === 'auto'
+        ? `${who} finished "${fromName}" — "${nextRm?.name || 'the next roadmap'}" was assigned automatically.`
+        : mode === 'paused'
+          ? `${who} finished "${fromName}". Auto-advance is off for them — assign their next roadmap when ready.`
+          : `${who} finished "${fromName}". Choose their next roadmap (${optionIds.length} options).`;
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.ROADMAP_ADVANCED,
+        recipients: [{ userId: mentorId }],
+        payload: {
+          title: mode === 'auto' ? 'Roadmap auto-advanced' : 'Pick the next roadmap',
+          message: msg,
+          actionUrl: `/mentor/mentees/${menteeId}`,
+          actionLabel: 'Open mentee',
+          relatedEntityType: 'roadmap_advance',
+          relatedEntityId: menteeId,
+        },
+      });
+    } catch (e) { console.warn('[roadmap-advance notify]', e.message); }
+  }
+
   /**
-   * Chain advance: after a roadmap completes, if it sits in one of the mentee's
-   * schedule slots (a roadmapChain) and there's a next roadmap, auto-start it.
-   * Returns the next roadmap id, or null if no chain continuation.
+   * Chain advance after a roadmap completes. Prefers the reusable roadmap-level
+   * links (one → auto-assign + notify; several → ask the mentor to pick; the
+   * mentee's enrollment can switch auto-advance off). Falls back to the legacy
+   * per-mentee schedule-slot chain. Returns the auto-assigned next id, or null.
    */
   async _advanceChain(menteeId, completedRoadmapId, prevAssignment) {
+    // 1) Reusable roadmap-level links take precedence.
+    const links = await models.RoadmapLink.findAll({ where: { fromRoadmapId: completedRoadmapId }, order: [['position', 'ASC']] });
+    if (links.length) {
+      const enrollment = await this._activeEnrollment(menteeId);
+      const autoOn = enrollment ? enrollment.autoAdvanceRoadmaps !== false : true;
+      if (links.length === 1 && autoOn) {
+        const nextId = links[0].toRoadmapId;
+        const started = await this._startNextRoadmap(menteeId, nextId, prevAssignment);
+        if (started) { await this._notifyAdvanced(prevAssignment, menteeId, completedRoadmapId, nextId, 'auto'); return nextId; }
+        return null;
+      }
+      // Branch (multiple) or auto disabled → suggest, don't auto-assign.
+      await this._notifyAdvanced(prevAssignment, menteeId, completedRoadmapId, null, autoOn ? 'choose' : 'paused', links.map((l) => l.toRoadmapId));
+      return null;
+    }
+
+    // 2) Legacy fallback: per-mentee schedule-slot roadmapChain.
     if (!models.MenteeSchedule) return null;
     const ms = await models.MenteeSchedule.findOne({ where: { menteeId } });
     if (!ms || !Array.isArray(ms.schedule)) return null;
@@ -410,24 +533,8 @@ class LinearRoadmapService {
     const i = slot.roadmapChain.indexOf(completedRoadmapId);
     const nextId = slot.roadmapChain[i + 1];
     if (!nextId) return null;
-
-    const steps = await this.getSteps(nextId);
-    if (!steps.length) return null;
-    const enrollment = await this._activeEnrollment(menteeId);
-
-    let existing = await models.RoadmapProgress.findOne({ where: { roadmapId: nextId, menteeId } });
-    if (existing && !existing.completed) return null; // already active - don't disturb
-    if (existing) {
-      existing.currentStep = 0; existing.completed = false; existing.slot = slot.id;
-      if (enrollment) existing.enrollmentId = enrollment.id;
-      await existing.save();
-    } else {
-      await models.RoadmapProgress.create({ roadmapId: nextId, menteeId, enrollmentId: enrollment?.id || null, currentStep: 0, slot: slot.id, completed: false });
-    }
-    if (steps[0] && enrollment && prevAssignment) {
-      await this._assignStep(steps[0], menteeId, prevAssignment.mentorId, enrollment.id);
-    }
-    return nextId;
+    const started = await this._startNextRoadmap(menteeId, nextId, prevAssignment, slot.id);
+    return started ? nextId : null;
   }
 
   /** Start the head roadmap of a slot's chain (used when a roadmap slot is filled). */

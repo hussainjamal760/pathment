@@ -110,6 +110,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       field: 'total_points_earned'
+    },
+    // When a roadmap completes, auto-assign the next one in the chain. Mentors
+    // can turn this off for a mentee whose path they want to hand-pick.
+    autoAdvanceRoadmaps: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: 'auto_advance_roadmaps'
     }
   }, {
     tableName: 'enrollments',

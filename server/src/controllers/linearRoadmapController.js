@@ -96,7 +96,23 @@ const myRoadmaps = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Roadmaps retrieved', { roadmaps }));
 });
 
+// ── Roadmap chaining (reusable graph) ─────────────────────────────────────────
+const getLinks = catchAsync(async (req, res) => {
+  res.status(200).json(successResponse('Links retrieved', { links: await linearRoadmapService.getNextLinks(req.params.id) }));
+});
+const setLinks = catchAsync(async (req, res) => {
+  const links = await linearRoadmapService.setNextLinks(req.user.id, req.params.id, req.body?.toIds || []);
+  res.status(200).json(successResponse('Chain updated', { links }));
+});
+// Manually assign a mentee's next roadmap (mentor picks from a branch, or skips).
+const advance = catchAsync(async (req, res) => {
+  const { menteeId, nextRoadmapId } = req.body || {};
+  const progress = await linearRoadmapService.manualAdvance(req.user.id, menteeId, nextRoadmapId);
+  res.status(200).json(successResponse('Next roadmap assigned', { progress }));
+});
+
 module.exports = {
   list, getOne, create, updateMeta, addStep, removeStep, importOrg, assign, assignees,
-  listOrg, createOrg, updateOrg, addOrgStep, removeOrgStep, deleteOrg, generate, myRoadmaps
+  listOrg, createOrg, updateOrg, addOrgStep, removeOrgStep, deleteOrg, generate, myRoadmaps,
+  getLinks, setLinks, advance
 };

@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Route, Plus, X, Trash2, Download, Users, Loader2, GripVertical, Tag, Sparkles,
+  Route, Plus, X, Trash2, Download, Users, Loader2, GripVertical, Tag, Sparkles, GitBranch, Check,
 } from 'lucide-react';
 import { useMentorRoadmaps, useMentorPrograms, useMentorCohort, type LinearRoadmap } from '@/lib/hooks/mentor';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { roadmapAiApi } from '@/lib/services/roadmap-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { Drawer } from '@/components/shared/Drawer';
 
 const STEP_TYPES = ['project', 'assignment', 'reading', 'video', 'quiz', 'discussion'];
 const EFFORTS = ['xs', 's', 'm', 'l'];
@@ -253,6 +254,68 @@ function AssignDrawer({ roadmap, onClose, onAssigned }: { roadmap: LinearRoadmap
   );
 }
 
+// ── Chain drawer: define "what comes next" (reusable graph) ──────────────────
+function ChainDrawer({ roadmap, candidates, onClose, onSaved }: { roadmap: LinearRoadmap; candidates: LinearRoadmap[]; onClose: () => void; onSaved: () => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    mentorApi.getRoadmapLinks(roadmap.id)
+      .then((r: any) => setSelected(new Set((r.data?.links || []).map((l: any) => l.toRoadmapId)))) // eslint-disable-line @typescript-eslint/no-explicit-any
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [roadmap.id]);
+
+  const toggle = (id: string) => setSelected((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const save = async () => {
+    setSaving(true);
+    try {
+      await mentorApi.setRoadmapLinks(roadmap.id, [...selected]);
+      toast.success('Next roadmap(s) saved');
+      onSaved(); onClose();
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not save the chain')); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Drawer open onClose={onClose} width="md" title="What comes next" subtitle={`After "${roadmap.name}" completes`}
+      footer={
+        <>
+          <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
+          <button onClick={save} disabled={saving} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Save
+          </button>
+        </>
+      }>
+      <div className="space-y-3">
+        <div className="rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-500">
+          {selected.size <= 1
+            ? 'Pick one — it auto-assigns the moment a mentee finishes this roadmap.'
+            : `Pick several to branch — when a mentee finishes, you'll choose which of the ${selected.size} they go to next.`}
+        </div>
+        {loading ? (
+          <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
+        ) : candidates.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-8">No other roadmaps to chain to yet.</p>
+        ) : candidates.map((c) => {
+          const on = selected.has(c.id);
+          return (
+            <button key={c.id} type="button" onClick={() => toggle(c.id)}
+              className={`w-full flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${on ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/15' : 'border-slate-200 dark:border-slate-700 hover:border-brand-300'}`}>
+              <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${on ? 'bg-brand-600 border-brand-600 text-white' : 'border-slate-300'}`}>{on && <Check className="w-3 h-3" />}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium text-slate-900 truncate">{c.name}</span>
+                <span className="block text-xs text-slate-400">{c.steps.length} step{c.steps.length === 1 ? '' : 's'}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Drawer>
+  );
+}
+
 // ── Roadmap card ──────────────────────────────────────────────────────────────
 function RoadmapCard({ r, action }: { r: LinearRoadmap; action: React.ReactNode }) {
   return (
@@ -290,6 +353,7 @@ export default function MentorRoadmaps() {
   const { local, org, loading, error, refetch } = useMentorRoadmaps();
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState<LinearRoadmap | null>(null);
+  const [chaining, setChaining] = useState<LinearRoadmap | null>(null);
   const [importingId, setImportingId] = useState<string | null>(null);
 
   const onImport = async (id: string) => {
@@ -338,10 +402,16 @@ export default function MentorRoadmaps() {
               <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {local.map((r) => (
                   <RoadmapCard key={r.id} r={r} action={
-                    <button onClick={() => setAssigning(r)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium hover:bg-brand-100 shrink-0">
-                      <Users className="w-3.5 h-3.5" />Assign
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => setChaining(r)} title="Set what comes next"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-brand-300">
+                        <GitBranch className="w-3.5 h-3.5" />Next
+                      </button>
+                      <button onClick={() => setAssigning(r)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 text-xs font-medium hover:bg-brand-100">
+                        <Users className="w-3.5 h-3.5" />Assign
+                      </button>
+                    </div>
                   } />
                 ))}
               </div>
@@ -369,6 +439,7 @@ export default function MentorRoadmaps() {
 
       {creating && <CreateDrawer onClose={() => setCreating(false)} onCreated={refetch} />}
       {assigning && <AssignDrawer roadmap={assigning} onClose={() => setAssigning(null)} onAssigned={refetch} />}
+      {chaining && <ChainDrawer roadmap={chaining} candidates={[...local, ...org].filter((c) => c.id !== chaining.id)} onClose={() => setChaining(null)} onSaved={refetch} />}
     </div>
   );
 }

@@ -75,6 +75,13 @@ export const mentorApi = {
   getRoadmapAssignees: (id: string) => apiClient.get(`/mentor/roadmaps/${id}/assignees`),
   assignRoadmap: (id: string, payload: { menteeId?: string; menteeIds?: string[]; startStep?: number }) =>
     apiClient.post(`/mentor/roadmaps/${id}/assign`, payload),
+  // Roadmap chaining: read/set "what comes next", and manually advance a mentee.
+  getRoadmapLinks: (id: string) =>
+    apiClient.get<{ data: { links: { id: string; toRoadmapId: string; name: string | null; position: number }[] } }>(`/mentor/roadmaps/${id}/links`),
+  setRoadmapLinks: (id: string, toIds: string[]) =>
+    apiClient.put(`/mentor/roadmaps/${id}/links`, { toIds }),
+  advanceRoadmap: (menteeId: string, nextRoadmapId: string) =>
+    apiClient.post('/mentor/roadmaps/advance', { menteeId, nextRoadmapId }),
 
   deleteUser: (id: string) => {
     return apiClient.delete(`/admin/users/${id}`);
