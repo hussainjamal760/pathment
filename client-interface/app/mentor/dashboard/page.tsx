@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/context/AuthContext';
 import { useMentorCohort, type CohortMentee, type CohortRisk, type CohortMomentum } from '@/lib/hooks/mentor';
 import { StatsCard } from '@/components/admin/ui';
 import { DualProgress } from '@/components/mentor/DualProgress';
+import { NudgeButton } from '@/components/mentor/NudgeButton';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { AnnouncementsCard } from '@/components/shared/AnnouncementsCard';
 import { MentorFeedbackCard } from '@/components/mentor/MentorFeedbackCard';
@@ -49,9 +50,12 @@ function MomentumIcon({ momentum }: { momentum: CohortMomentum }) {
 function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
   const risk = RISK_BADGE[m.risk];
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onOpen}
-      className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+      className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer"
     >
       <div className="flex items-start gap-3">
         <div className="w-11 h-11 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
@@ -71,10 +75,13 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
             <span>{m.lastActive}</span>
           </div>
         </div>
-        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.className}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />
-          {risk.label}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.className}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />
+            {risk.label}
+          </span>
+          <NudgeButton menteeId={m.id} menteeName={m.name} variant="icon" stopPropagation />
+        </div>
       </div>
 
       <div className="my-4">
@@ -106,7 +113,7 @@ function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
       <div className="mt-3 flex items-center justify-end text-xs font-medium text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity">
         Open full story <ArrowUpRight className="ml-0.5 w-3.5 h-3.5" />
       </div>
-    </button>
+    </div>
   );
 }
 

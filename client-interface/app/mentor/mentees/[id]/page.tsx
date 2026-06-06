@@ -21,6 +21,7 @@ import { PersonalityBars } from '@/components/mentor/PersonalityBars';
 import { InsightsPanel } from '@/components/mentor/InsightsPanel';
 import { OneOnOneDrawer, type OneOnOneData } from '@/components/mentor/OneOnOneDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
+import { NudgeButton } from '@/components/mentor/NudgeButton';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
 
@@ -237,6 +238,7 @@ export default function MenteeDetail() {
             >
               <Plus className="w-4 h-4" />Assign task
             </button>
+            <NudgeButton menteeId={menteeId} menteeName={insights?.name} className="!rounded-xl !px-4" />
             {(enrollment?.status === 'active' || enrollment?.status === 'matched') && (
               <button
                 onClick={() => setShowCompleteConfirm(true)}

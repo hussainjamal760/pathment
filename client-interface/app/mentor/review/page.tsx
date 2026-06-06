@@ -16,6 +16,7 @@ import { submissionService } from '@/lib/services/submissionService';
 import { frictionApi } from '@/lib/services/friction-api';
 import { DualProgress } from '@/components/mentor/DualProgress';
 import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
+import { NudgeButton } from '@/components/mentor/NudgeButton';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { Drawer } from '@/components/shared/Drawer';
@@ -277,7 +278,10 @@ export default function CohortReview() {
                 </div>
                 <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '-'} · {mentee!.onTimeRate}% on-time</div>
               </div>
-              <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5 shrink-0">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
+              <div className="flex items-center gap-1 shrink-0">
+                <NudgeButton menteeId={mentee!.id} menteeName={mentee!.name} variant="icon" />
+                <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
+              </div>
             </div>
             <div className="mt-4"><DualProgress absolute={mentee!.absoluteProgress} relative={mentee!.relativeProgress} compact /></div>
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}

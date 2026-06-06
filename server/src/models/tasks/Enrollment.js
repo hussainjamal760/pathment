@@ -118,7 +118,9 @@ module.exports = (sequelize, DataTypes) => {
       { unique: true, fields: ['mentee_id', 'program_id'] },
       { fields: ['mentee_id'] },
       { fields: ['program_id'] },
-      { fields: ['status'] }
+      { fields: ['status'] },
+      // FK on a high-volume table — indexed for cohort-scoped queries + cascades.
+      { fields: ['cohort_id'] }
     ],
     hooks: {
       afterCreate: async (enrollment, options) => {

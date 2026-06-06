@@ -113,7 +113,9 @@ class CohortService {
     return clamp(Math.round(absolute + credit), Math.round(absolute), 100);
   }
 
-  computeMomentum(tasks, lastActiveDays) {
+  computeMomentum(tasks, lastActiveDays, hasWork = true) {
+    // No assigned work yet → nothing to have momentum on (don't read as "dropping").
+    if (!hasWork) return 'flat';
     const now = Date.now();
     const inWindow = (t, from, to) => {
       if (t.status !== 'completed' || !t.completedAt) return false;
@@ -129,7 +131,12 @@ class CohortService {
     return 'flat';
   }
 
-  computeRisk({ absolute, relative, expected, lastActiveDays, openBlockers, highSeverityBlockers, momentum }) {
+  computeRisk({ absolute, relative, expected, lastActiveDays, openBlockers, highSeverityBlockers, momentum, hasWork = true }) {
+    // A mentee with no assigned work isn't "at risk" - they're waiting on the
+    // mentor to give them something. Don't escalate them (this is what made every
+    // brand-new mentee read as high-risk via lastActiveDays = Infinity).
+    if (!hasWork) return { risk: 'low', riskReason: null };
+
     const behind = expected != null ? Math.max(0, expected - absolute) : 0;
     const gap = relative - absolute; // how much logged friction explains
 
@@ -138,7 +145,7 @@ class CohortService {
 
     if (lastActiveDays > 10) {
       level = 'high';
-      reasons.push(Number.isFinite(lastActiveDays) ? `no activity in ${lastActiveDays} days` : 'no activity logged yet');
+      reasons.push(Number.isFinite(lastActiveDays) ? `no activity in ${lastActiveDays} days` : 'assigned work but never started');
     } else if (behind >= 30 && gap < 10) {
       level = 'high';
       reasons.push('well behind plan with no logged reason');
@@ -215,10 +222,11 @@ class CohortService {
       occupation: mentee.menteeProfile?.currentOccupation || null,
       openBlockers
     });
-    const momentum = this.computeMomentum(tasks, lastActiveDays);
+    const hasWork = tasks.length > 0;
+    const momentum = this.computeMomentum(tasks, lastActiveDays, hasWork);
     const { risk, riskReason } = this.computeRisk({
       absolute, relative: relativeProgress, expected, lastActiveDays,
-      openBlockers, highSeverityBlockers, momentum
+      openBlockers, highSeverityBlockers, momentum, hasWork
     });
 
     // Concrete, rule-based "why" chips for the at-risk / review cards (no AI).

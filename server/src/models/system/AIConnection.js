@@ -29,7 +29,11 @@ module.exports = (sequelize, DataTypes) => {
   }, {
     tableName: 'ai_connections',
     underscored: true,
-    timestamps: true
+    timestamps: true,
+    // owner_id is filtered on every AI-feature resolution (resolveActiveConfig).
+    indexes: [
+      { fields: ['owner_id'] }
+    ]
   });
 
   return AIConnection;

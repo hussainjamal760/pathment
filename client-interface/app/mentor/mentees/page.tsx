@@ -7,6 +7,7 @@ import {
   ClipboardCheck, ArrowUpRight, Users2,
 } from 'lucide-react';
 import { useMentorCohort, type CohortMentee, type CohortMomentum, type CohortRisk } from '@/lib/hooks/mentor';
+import { NudgeButton } from '@/components/mentor/NudgeButton';
 
 type Filter = 'all' | 'attention' | 'on_track';
 
@@ -126,8 +127,10 @@ export default function MentorMentees() {
             const risk = RISK_BADGE[m.risk];
             const fair = Math.round(m.relativeProgress);
             return (
-              <button key={m.id} onClick={() => router.push(`/mentor/mentees/${m.id}`)}
-                className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all">
+              <div key={m.id} role="button" tabIndex={0}
+                onClick={() => router.push(`/mentor/mentees/${m.id}`)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/mentor/mentees/${m.id}`); } }}
+                className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer">
                 <div className="flex items-start gap-3">
                   <Avatar m={m} />
                   <div className="min-w-0 flex-1">
@@ -138,7 +141,10 @@ export default function MentorMentees() {
                     <p className="text-xs text-slate-400 truncate">{m.program}</p>
                     {m.clan && <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]"><Users2 className="w-2.5 h-2.5" />{m.clan.name}</span>}
                   </div>
-                  <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium shrink-0 ${risk.cls}`}>{risk.label}</span>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium ${risk.cls}`}>{risk.label}</span>
+                    <NudgeButton menteeId={m.id} menteeName={m.name} variant="icon" stopPropagation />
+                  </div>
                 </div>
 
                 {/* Fair progress bar */}
@@ -156,7 +162,7 @@ export default function MentorMentees() {
                   <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{m.lastActive}</span>
                   <span className="ml-auto inline-flex items-center gap-0.5 text-slate-400 group-hover:text-brand-600 transition-colors">Open<ArrowUpRight className="w-3.5 h-3.5" /></span>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

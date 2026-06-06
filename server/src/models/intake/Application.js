@@ -106,7 +106,9 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['status'] },
       { fields: ['cohort_id', 'email'], unique: true },
       { fields: ['invite_id'] },
-      { fields: ['user_id'] }
+      { fields: ['user_id'] },
+      // Applicant magic-link auth looks up by token hash on every access.
+      { fields: ['access_token_hash'] }
     ]
   });
 
