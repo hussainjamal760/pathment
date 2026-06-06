@@ -2,11 +2,10 @@
 
 import { use, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Upload, Loader2, X, CheckCircle2, XCircle, FileSpreadsheet,
-  Mail, Phone, Check, Link2, Copy, Power, ClipboardCheck, Pencil, Eye, CopyPlus, FormInput,
+  Mail, Phone, Check, Link2, Copy, Power, ClipboardCheck, Pencil, Eye, CopyPlus, FormInput, Plus,
 } from 'lucide-react';
 import {
   useCohortApplications,
@@ -16,6 +15,7 @@ import {
 import { cohortApi, applicationApi } from '@/lib/services/intake-api';
 import { assessmentApi, type Assessment } from '@/lib/services/assessment-api';
 import { IntakeFormBuilder } from '@/components/admin/IntakeFormBuilder';
+import { AssessmentDrawer } from '@/components/admin/AssessmentDrawer';
 import type { IntakeFormField } from '@/lib/config/intakeFields';
 
 const STATUS_TABS: { key: ApplicationStatus | 'all'; label: string }[] = [
@@ -178,7 +178,6 @@ function ApplicationDrawer({
 
 /** Public self-serve intake link + attached assessment configuration. */
 function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort: any; onChange: () => void }) {
-  const router = useRouter();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [otherCohorts, setOtherCohorts] = useState<{ id: string; name: string }[]>([]);
   const [assessmentId, setAssessmentId] = useState<string>(cohort?.assessmentId || '');
@@ -189,6 +188,7 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
   const [showPreview, setShowPreview] = useState(false);
   const [cloneFrom, setCloneFrom] = useState('');
   const [busy, setBusy] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
 
   useEffect(() => { assessmentApi.list().then(setAssessments).catch(() => {}); }, []);
   useEffect(() => {
@@ -235,17 +235,21 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
     finally { setBusy(false); }
   };
 
-  // Open the cohort's assessment in the builder - create + attach it first if
-  // there isn't one yet (one click, no separate "create then attach" dance).
-  const editAssessment = async () => {
-    setBusy(true);
-    try {
-      if (assessmentId) { router.push(`/admin/assessments/${assessmentId}`); return; }
-      const res: any = await cohortApi.ensureAssessment(cohortId);
-      const created = res?.data?.assessment;
-      if (created?.id) { onChange(); router.push(`/admin/assessments/${created.id}`); }
-    } catch { toast.error('Could not open the assessment'); }
-    finally { setBusy(false); }
+  // Build/edit the assessment right here in a drawer — no navigating away.
+  // Edit the attached one, or create a fresh one (auto-attached on save).
+  const openBuilder = () => setBuilderOpen(true);
+
+  const onAssessmentSaved = async (a: Assessment) => {
+    await assessmentApi.list().then(setAssessments).catch(() => {});
+    setAssessmentId(a.id);
+    // Persist the attachment so a freshly-built assessment sticks to this cohort.
+    try { await cohortApi.update(cohortId, { assessmentId: a.id }); onChange(); } catch { /* user can still Save intake settings */ }
+  };
+
+  const onAssessmentDeleted = async () => {
+    setAssessmentId('');
+    await assessmentApi.list().then(setAssessments).catch(() => {});
+    try { await cohortApi.update(cohortId, { assessmentId: null }); onChange(); } catch { /* noop */ }
   };
 
   const doClone = async () => {
@@ -337,8 +341,8 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
             <ClipboardCheck className="w-4 h-4 text-brand-600" />
             <h3 className="text-sm font-medium text-slate-900">Assessment</h3>
           </div>
-          <button onClick={editAssessment} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800">
-            {assessmentId ? <><Pencil className="w-3.5 h-3.5" /> Edit questions</> : <><Pencil className="w-3.5 h-3.5" /> Create &amp; build</>}
+          <button onClick={openBuilder} disabled={busy} className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 hover:text-brand-800">
+            {assessmentId ? <><Pencil className="w-3.5 h-3.5" /> Edit assessment</> : <><Plus className="w-3.5 h-3.5" /> Create &amp; build</>}
           </button>
         </div>
         <div className="grid sm:grid-cols-2 gap-4 items-end">
@@ -362,6 +366,14 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
           {busy && <Loader2 className="w-4 h-4 animate-spin" />} Save intake settings
         </button>
       </div>
+
+      <AssessmentDrawer
+        open={builderOpen}
+        assessmentId={assessmentId || null}
+        onClose={() => setBuilderOpen(false)}
+        onSaved={onAssessmentSaved}
+        onDeleted={onAssessmentDeleted}
+      />
     </div>
   );
 }
