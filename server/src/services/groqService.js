@@ -230,11 +230,11 @@ class GroqService {
 - Description: ${programDescription}
 - Level: ${levelName}
 - Duration: ${levelDuration} weeks
-- Skills/Tags: ${tags?.join(', ') || 'Not specified'}
+- Skills/Tags: ${(Array.isArray(tags) ? tags.join(', ') : tags) || 'Not specified'}
 - Prerequisites: ${prerequisites || 'None'}
 
 **Learning Outcomes:**
-${learningOutcomes?.map((outcome, i) => `${i + 1}. ${outcome}`).join('\n') || 'Not specified'}
+${(Array.isArray(learningOutcomes) ? learningOutcomes.map((outcome, i) => `${i + 1}. ${outcome}`).join('\n') : learningOutcomes) || 'Not specified'}
 
 **Additional Instructions:**
 ${additionalInstructions || 'None'}
