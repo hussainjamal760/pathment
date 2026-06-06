@@ -67,6 +67,7 @@ export const mentorApi = {
   }) => apiClient.post('/mentor/roadmaps', data),
   updateRoadmapMeta: (id: string, data: { name?: string; description?: string; skillTags?: string[] }) =>
     apiClient.patch(`/mentor/roadmaps/${id}`, data),
+  replaceRoadmapSteps: (id: string, steps: any[]) => apiClient.put(`/mentor/roadmaps/${id}/steps`, { steps }), // eslint-disable-line @typescript-eslint/no-explicit-any
   addRoadmapStep: (id: string, step: { title: string; type?: string; brief?: string; criteria?: string[] }) =>
     apiClient.post(`/mentor/roadmaps/${id}/steps`, step),
   removeRoadmapStep: (id: string, stepId: string) => apiClient.delete(`/mentor/roadmaps/${id}/steps/${stepId}`),

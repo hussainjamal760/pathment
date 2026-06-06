@@ -20,12 +20,12 @@ inlineFeedback, checkedCriteria). `Track` (per-mentee personal lanes). See [DATA
 
 ## Backend
 - **`/api/tasks`** (assign/list/detail/status) and **`/api/submissions`** (submit with files, review). `taskService` + `submissionService` own the logic; `submissionService.reviewSubmission` advances the roadmap on approval, then recomputes enrollment stats.
-- **Roadmap authoring:** **org** roadmaps `/api/roadmaps/org` (`roadmap.author`) - the shared library mentors import; **mentor local** roadmaps under `/api/mentor/roadmaps` (build, import from org, add steps, assign to one/many mentees). `GET /api/roadmaps/me` = a mentee's step progress.
+- **Roadmap authoring:** **org** roadmaps `/api/roadmaps/org` (`roadmap.author`) - the shared library mentors import; **mentor local** roadmaps under `/api/mentor/roadmaps` (build, import from org, **edit** meta + steps, assign to one/many mentees). `GET /api/roadmaps/me` = a mentee's step progress. **Editing steps:** `PUT /api/mentor/roadmaps/:id/steps` (`replaceSteps`) replaces the whole step set in one call - reconciles (update existing by id / add new / delete removed), but **refuses to drop a step already assigned to a mentee**. Imported org roadmaps become local copies, so they're editable too.
 - **Tracks (`/api/tracks`):** per-mentee lanes to organize assigned tasks (create, reorder, archive, add tasks).
 - Progress is recomputed by `taskService.updateEnrollmentTaskStats` on every assign/submit/review - the **single source of truth** (see [Enrollment & Progress](./enrollment-and-progress.md)).
 
 ## Frontend
-- **Mentor:** `/mentor/roadmaps` (build/import/assign), `/mentor/tasks` + `/mentor/tasks/[id]` + `/mentor/tasks/[id]/feedback`, `/mentor/review` (cohort review - assign tasks/roadmaps to many), `/mentor/approvals` (review queue, bulk-approve).
+- **Mentor:** `/mentor/roadmaps` (build / **edit** (same drawer, create-or-edit) / import / chain "Next" / assign), `/mentor/tasks` + `/mentor/tasks/[id]` + `/mentor/tasks/[id]/feedback`, `/mentor/review` (cohort review - assign tasks/roadmaps to many), `/mentor/approvals` (review queue, bulk-approve).
 - **Mentee:** `/mentee/tasks` + `/mentee/tasks/[id]` + `/mentee/tasks/[id]/submit` (submit text/links/files, request extension).
 - **Admin:** `/admin/roadmaps` (org roadmap library authoring).
 

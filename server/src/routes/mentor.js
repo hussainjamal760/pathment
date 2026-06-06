@@ -47,6 +47,7 @@ router.post('/roadmaps/import', mentorOnly, linearRoadmapController.importOrg);
 router.get('/roadmaps/:id', mentorOnly, linearRoadmapController.getOne);
 router.patch('/roadmaps/:id', mentorOnly, linearRoadmapController.updateMeta);
 router.post('/roadmaps/:id/steps', mentorOnly, linearRoadmapController.addStep);
+router.put('/roadmaps/:id/steps', mentorOnly, linearRoadmapController.replaceSteps);
 router.delete('/roadmaps/:id/steps/:stepId', mentorOnly, linearRoadmapController.removeStep);
 router.get('/roadmaps/:id/assignees', mentorOnly, linearRoadmapController.assignees);
 router.post('/roadmaps/:id/assign', mentorOnly, linearRoadmapController.assign);

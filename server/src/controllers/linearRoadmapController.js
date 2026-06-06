@@ -32,6 +32,12 @@ const removeStep = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Step removed', { roadmap }));
 });
 
+// Replace a local roadmap's whole step set (the editor sends the full list).
+const replaceSteps = catchAsync(async (req, res) => {
+  const roadmap = await linearRoadmapService.replaceSteps(req.user.id, req.params.id, req.body?.steps || []);
+  res.status(200).json(successResponse('Steps saved', { roadmap }));
+});
+
 const importOrg = catchAsync(async (req, res) => {
   const roadmap = await linearRoadmapService.importOrgRoadmap(req.user.id, req.body.orgRoadmapId);
   res.status(201).json(successResponse('Roadmap imported', { roadmap }, 201));
@@ -114,5 +120,5 @@ const advance = catchAsync(async (req, res) => {
 module.exports = {
   list, getOne, create, updateMeta, addStep, removeStep, importOrg, assign, assignees,
   listOrg, createOrg, updateOrg, addOrgStep, removeOrgStep, deleteOrg, generate, myRoadmaps,
-  getLinks, setLinks, advance
+  getLinks, setLinks, advance, replaceSteps
 };

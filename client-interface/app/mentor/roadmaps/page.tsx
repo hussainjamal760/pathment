@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Route, Plus, X, Trash2, Download, Users, Loader2, GripVertical, Tag, Sparkles, GitBranch, Check,
+  Route, Plus, X, Trash2, Download, Users, Loader2, GripVertical, Tag, Sparkles, GitBranch, Check, Pencil,
 } from 'lucide-react';
 import { useMentorRoadmaps, useMentorPrograms, useMentorCohort, type LinearRoadmap } from '@/lib/hooks/mentor';
 import { mentorApi } from '@/lib/services/mentor-api';
@@ -14,15 +14,24 @@ import { Drawer } from '@/components/shared/Drawer';
 const STEP_TYPES = ['project', 'assignment', 'reading', 'video', 'quiz', 'discussion'];
 const EFFORTS = ['xs', 's', 'm', 'l'];
 
-interface DraftStep { title: string; type: string; criteria: string; effort: string; dueOffsetDays: string }
+interface DraftStep { id?: string; title: string; type: string; criteria: string; effort: string; dueOffsetDays: string }
 
-// ── Create drawer ───────────────────────────────────────────────────────────
-function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+// ── Create / edit drawer ─────────────────────────────────────────────────────
+function CreateDrawer({ roadmap, onClose, onCreated }: { roadmap?: LinearRoadmap | null; onClose: () => void; onCreated: () => void }) {
+  const editing = !!roadmap;
   const { programs, loading: progLoading } = useMentorPrograms();
-  const [name, setName] = useState('');
-  const [programId, setProgramId] = useState('');
-  const [tags, setTags] = useState('');
-  const [steps, setSteps] = useState<DraftStep[]>([{ title: '', type: 'project', criteria: '', effort: 'm', dueOffsetDays: '' }]);
+  const [name, setName] = useState(roadmap?.name || '');
+  const [programId, setProgramId] = useState(roadmap?.programId || '');
+  const [tags, setTags] = useState((roadmap?.skillTags || []).join(', '));
+  const [steps, setSteps] = useState<DraftStep[]>(
+    editing && roadmap!.steps.length
+      ? roadmap!.steps.map((s) => ({
+          id: s.id, title: s.title, type: s.type || 'project',
+          effort: s.effort || 'm', dueOffsetDays: s.dueOffsetDays != null ? String(s.dueOffsetDays) : '',
+          criteria: (s.acceptanceCriteria || []).join('\n'),
+        }))
+      : [{ title: '', type: 'project', criteria: '', effort: 'm', dueOffsetDays: '' }]
+  );
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
 
@@ -58,25 +67,29 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       toast.error('Add a name, a program, and at least one step');
       return;
     }
+    const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const stepPayload = cleanSteps.map((s) => ({
+      id: s.id, // present → updated in place; absent → created
+      title: s.title.trim(),
+      type: s.type,
+      effort: s.effort,
+      dueOffsetDays: s.dueOffsetDays.trim() ? Number(s.dueOffsetDays) : undefined,
+      criteria: s.criteria.split('\n').map((c) => c.trim()).filter(Boolean),
+    }));
     try {
       setSaving(true);
-      await mentorApi.createRoadmap({
-        name: name.trim(),
-        programId,
-        skillTags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-        steps: cleanSteps.map((s) => ({
-          title: s.title.trim(),
-          type: s.type,
-          effort: s.effort,
-          dueOffsetDays: s.dueOffsetDays.trim() ? Number(s.dueOffsetDays) : undefined,
-          criteria: s.criteria.split('\n').map((c) => c.trim()).filter(Boolean),
-        })),
-      });
-      toast.success('Roadmap created');
+      if (editing) {
+        await mentorApi.updateRoadmapMeta(roadmap!.id, { name: name.trim(), skillTags: tagList });
+        await mentorApi.replaceRoadmapSteps(roadmap!.id, stepPayload);
+        toast.success('Roadmap saved');
+      } else {
+        await mentorApi.createRoadmap({ name: name.trim(), programId, skillTags: tagList, steps: stepPayload });
+        toast.success('Roadmap created');
+      }
       onCreated();
       onClose();
-    } catch {
-      toast.error('Could not create the roadmap');
+    } catch (e) {
+      toast.error(extractApiErrorMessage(e, editing ? 'Could not save the roadmap' : 'Could not create the roadmap'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +100,7 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
       <div className="absolute inset-0 bg-black/40 dark:bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-lg h-full bg-card border-l border-slate-200 dark:border-slate-700 shadow-2xl dark:shadow-[-8px_0_30px_rgba(0,0,0,0.6)] flex flex-col">
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
-          <h2 className="font-semibold text-slate-900">New roadmap</h2>
+          <h2 className="font-semibold text-slate-900">{editing ? 'Edit roadmap' : 'New roadmap'}</h2>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><X className="w-5 h-5" /></button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
@@ -98,11 +111,12 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Program <span className="text-red-500">*</span></label>
-            <select value={programId} onChange={(e) => setProgramId(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card">
+            <select value={programId} onChange={(e) => setProgramId(e.target.value)} disabled={editing}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 bg-card disabled:opacity-60">
               <option value="">{progLoading ? 'Loading…' : 'Select a program'}</option>
               {programs.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
+            {editing && <p className="text-xs text-slate-400 mt-1">A roadmap stays in its program.</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Skill tags <span className="text-slate-400 font-normal">(comma-separated)</span></label>
@@ -164,7 +178,7 @@ function CreateDrawer({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
           <button onClick={save} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}Create roadmap
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}{editing ? 'Save roadmap' : 'Create roadmap'}
           </button>
         </div>
       </div>
@@ -352,6 +366,7 @@ function RoadmapCard({ r, action }: { r: LinearRoadmap; action: React.ReactNode 
 export default function MentorRoadmaps() {
   const { local, org, loading, error, refetch } = useMentorRoadmaps();
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<LinearRoadmap | null>(null);
   const [assigning, setAssigning] = useState<LinearRoadmap | null>(null);
   const [chaining, setChaining] = useState<LinearRoadmap | null>(null);
   const [importingId, setImportingId] = useState<string | null>(null);
@@ -403,6 +418,10 @@ export default function MentorRoadmaps() {
                 {local.map((r) => (
                   <RoadmapCard key={r.id} r={r} action={
                     <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => setEditing(r)} title="Edit this roadmap"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-brand-300">
+                        <Pencil className="w-3.5 h-3.5" />Edit
+                      </button>
                       <button onClick={() => setChaining(r)} title="Set what comes next"
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:border-brand-300">
                         <GitBranch className="w-3.5 h-3.5" />Next
@@ -438,6 +457,7 @@ export default function MentorRoadmaps() {
       )}
 
       {creating && <CreateDrawer onClose={() => setCreating(false)} onCreated={refetch} />}
+      {editing && <CreateDrawer roadmap={editing} onClose={() => setEditing(null)} onCreated={refetch} />}
       {assigning && <AssignDrawer roadmap={assigning} onClose={() => setAssigning(null)} onAssigned={refetch} />}
       {chaining && <ChainDrawer roadmap={chaining} candidates={[...local, ...org].filter((c) => c.id !== chaining.id)} onClose={() => setChaining(null)} onSaved={refetch} />}
     </div>

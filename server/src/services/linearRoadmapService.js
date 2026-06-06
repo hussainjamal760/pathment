@@ -177,6 +177,37 @@ class LinearRoadmapService {
     return this.getRoadmap(roadmapId);
   }
 
+  /**
+   * Replace a local roadmap's whole step set in one call (the editor sends the
+   * full list). Reconciles: steps with an existing id are updated (incl. reorder),
+   * new ones created, and removed ones deleted - but a removed step that's
+   * already been assigned to a mentee blocks the save (same guard as removeStep).
+   */
+  async replaceSteps(mentorId, roadmapId, steps) {
+    await this._assertOwnedLocal(roadmapId, mentorId);
+    if (!Array.isArray(steps) || steps.length === 0) throw new ValidationError('At least one step is required');
+
+    const existing = await models.RoadmapTask.findAll({ where: { roadmapId } });
+    const byId = new Map(existing.map((t) => [t.id, t]));
+    const keep = new Set(steps.filter((s) => s.id && byId.has(s.id)).map((s) => s.id));
+    const toDelete = existing.filter((t) => !keep.has(t.id));
+    for (const t of toDelete) {
+      const assigned = await models.AssignedTask.count({ where: { roadmapTaskId: t.id } });
+      if (assigned > 0) throw new ValidationError(`"${t.title}" is already assigned to a mentee and can't be removed`);
+    }
+
+    return sequelize.transaction(async (transaction) => {
+      if (toDelete.length) await models.RoadmapTask.destroy({ where: { id: toDelete.map((t) => t.id) }, transaction });
+      for (let i = 0; i < steps.length; i++) {
+        const s = steps[i];
+        const fields = this._stepToTask(s, roadmapId, i);
+        if (s.id && byId.has(s.id)) await byId.get(s.id).update(fields, { transaction });
+        else await models.RoadmapTask.create(fields, { transaction });
+      }
+      await models.Roadmap.update({ totalTasks: steps.length }, { where: { id: roadmapId }, transaction });
+    }).then(() => this.getRoadmap(roadmapId));
+  }
+
   /** Import an org roadmap into a mentor-owned local copy (deep copy of steps). */
   async importOrgRoadmap(mentorId, orgRoadmapId) {
     const org = await models.Roadmap.findByPk(orgRoadmapId);
