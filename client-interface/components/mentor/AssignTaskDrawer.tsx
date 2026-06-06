@@ -150,6 +150,7 @@ export function AssignTaskDrawer({
           return;
         }
         if (failed) toast.error(`${failed} mentee${failed > 1 ? 's' : ''} couldn't be assigned`);
+        toast.success(`Roadmap assigned to ${assigned} mentee${assigned > 1 ? 's' : ''}`);
         setDone(assigned);
         onAssigned?.();
         return;
@@ -176,9 +177,11 @@ export function AssignTaskDrawer({
           return;
         }
         if (failed.length) toast.error(`${failed.length} mentee${failed.length > 1 ? 's' : ''} couldn't be assigned`);
+        toast.success(`Task assigned to ${assigned} mentee${assigned > 1 ? 's' : ''}`);
         setDone(assigned);
       } else {
         await taskApi.createCustomTask({ ...base, menteeId: mentee!.id, trackId: trackId || undefined });
+        toast.success(`Task assigned to ${mentee?.name || 'the mentee'}`);
         setDone(1);
       }
       onAssigned?.();

@@ -10,6 +10,7 @@ import {
   Star, ThumbsUp, ThumbsDown, AlertCircle, ChevronLeft,
 } from 'lucide-react';
 import { useMenteeDetailPage, useMenteeProfile, type CohortRisk, type CohortMomentum } from '@/lib/hooks/mentor';
+import { useAuth } from '@/lib/context/AuthContext';
 import { useMenteeActivity } from '@/lib/hooks/mentor/useMenteeActivity';
 import { frictionApi } from '@/lib/services/friction-api';
 import { mentorApi } from '@/lib/services/mentor-api';
@@ -18,7 +19,7 @@ import { DualProgress } from '@/components/mentor/DualProgress';
 import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
 import { PersonalityBars } from '@/components/mentor/PersonalityBars';
 import { InsightsPanel } from '@/components/mentor/InsightsPanel';
-import { OneOnOneDrawer } from '@/components/mentor/OneOnOneDrawer';
+import { OneOnOneDrawer, type OneOnOneData } from '@/components/mentor/OneOnOneDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
@@ -97,6 +98,8 @@ export default function MenteeDetail() {
   } = useMenteeActivity(menteeId);
 
   const { profile: insights, refetch: refetchProfile } = useMenteeProfile(menteeId);
+  const { user } = useAuth();
+  const selfName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'You';
   const [frictionBusy, setFrictionBusy] = useState<string | null>(null);
 
   const onAcceptDelay = async (id: string) => {
@@ -130,7 +133,7 @@ export default function MenteeDetail() {
     await mentorApi.addInsight(menteeId, data);
     await refetchProfile();
   };
-  const onSaveNote = async (data: { kind: string; summary: string; sentiment: string; issues: string[]; nextSteps: string[] }) => {
+  const onSaveNote = async (data: OneOnOneData) => {
     await mentorApi.addMeetingNote(menteeId, data);
     await refetchProfile();
   };
@@ -518,6 +521,8 @@ export default function MenteeDetail() {
       {loggingOneOnOne && insights && (
         <OneOnOneDrawer
           menteeName={insights.name}
+          selfName={selfName}
+          specialists={insights.collaborators.map((c) => ({ id: c.id, name: c.name, role: c.role }))}
           onClose={() => setLoggingOneOnOne(false)}
           onSave={onSaveNote}
         />

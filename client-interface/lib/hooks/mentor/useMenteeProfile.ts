@@ -28,6 +28,8 @@ export interface Personality {
   communication: number | null;
   resilience: number | null;
   independence: number | null;
+  /** Free-text "how they think/work" read, captured in 1:1s. */
+  read?: string | null;
 }
 
 export interface ProfileInsight {

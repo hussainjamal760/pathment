@@ -80,11 +80,36 @@ class CohortService {
     return Math.round((onTime / completed.length) * 100);
   }
 
-  computeRelativeProgress(absolute, delays) {
+  /**
+   * Relative ("adjusted for constraints") progress = absolute output + a capped
+   * fairness credit for real-life constraints OUTSIDE the mentee's control, so a
+   * learner juggling e.g. a full-time job isn't graded as if they had 40 free
+   * hours/week. Credit sources (each capped, total capped at 30):
+   *   - Accepted EXTERNAL delays  (a mentor/admin agreed it wasn't their fault)
+   *   - Job / study load          (employed or studying → limited weekly hours)
+   *   - Actively-flagged blockers (they surfaced impediments early vs stalling)
+   * Never drops below absolute, never exceeds 100.
+   */
+  computeRelativeProgress(absolute, { delays = [], occupation = null, openBlockers = 0 } = {}) {
     const frictionDays = delays
       .filter((d) => d.accepted && d.category === 'external')
       .reduce((sum, d) => sum + (d.days || 0), 0);
-    const credit = Math.min(25, frictionDays * 1.5); // cap the fairness credit
+    const delayCredit = Math.min(15, frictionDays * 1.5);
+
+    // Job/study load: someone with a day job (or full-time study) has far fewer
+    // weekly hours, so steady output deserves more credit than raw % implies.
+    const occ = (occupation || '').toLowerCase().trim();
+    const studying = /\b(student|university|college|school|studying|bs|ms|phd|degree)\b/i.test(occ);
+    const noJob = !occ || /^(none|n\/?a|unemployed|looking|job ?seeker)$/i.test(occ);
+    let loadCredit = 0;
+    if (studying) loadCredit = 5;           // full-time study (checked first)
+    else if (!noJob) loadCredit = 9;        // employed / has an occupation
+    loadCredit = Math.min(10, loadCredit);
+
+    // Surfacing blockers early is healthy behaviour and represents real friction.
+    const blockerCredit = Math.min(6, Math.max(0, openBlockers) * 2);
+
+    const credit = Math.min(30, delayCredit + loadCredit + blockerCredit);
     return clamp(Math.round(absolute + credit), Math.round(absolute), 100);
   }
 
@@ -140,7 +165,7 @@ class CohortService {
     const mentee = await models.User.findByPk(menteeId, {
       attributes: ['id', 'firstName', 'lastName', 'email', 'profilePictureUrl'],
       include: [
-        { model: models.MenteeProfile, as: 'menteeProfile', attributes: ['lastActivityDate'] },
+        { model: models.MenteeProfile, as: 'menteeProfile', attributes: ['lastActivityDate', 'currentOccupation'] },
         {
           model: models.Enrollment,
           as: 'enrollments',
@@ -185,7 +210,11 @@ class CohortService {
     const totalWeeks = enrollment?.program?.totalDurationWeeks || 0;
     const expected = totalWeeks ? clamp(Math.round((week / totalWeeks) * 100), 0, 100) : null;
 
-    const relativeProgress = this.computeRelativeProgress(absolute, delays);
+    const relativeProgress = this.computeRelativeProgress(absolute, {
+      delays,
+      occupation: mentee.menteeProfile?.currentOccupation || null,
+      openBlockers
+    });
     const momentum = this.computeMomentum(tasks, lastActiveDays);
     const { risk, riskReason } = this.computeRisk({
       absolute, relative: relativeProgress, expected, lastActiveDays,
@@ -325,7 +354,7 @@ class CohortService {
         sentiment: n.sentiment,
         issues: n.issues || [],
         nextSteps: n.nextSteps || [],
-        by: n.author ? `${n.author.firstName} ${n.author.lastName}`.trim() : null
+        by: n.attributedTo || (n.author ? `${n.author.firstName} ${n.author.lastName}`.trim() : null)
       })),
       collaborators: collaborators.map((c) => ({
         id: c.id,
@@ -382,9 +411,12 @@ class CohortService {
       resilience: clampDim(dims.resilience),
       independence: clampDim(dims.independence)
     };
-    profile.personality = next;
+    // Merge so a manual edit doesn't wipe the personality "read" text (or vice
+    // versa); dims live at the top level (what the profile's Working-style card reads).
+    const current = (profile.personality && typeof profile.personality === 'object') ? profile.personality : {};
+    profile.personality = { ...current, ...next, updatedAt: new Date().toISOString() };
     await profile.save();
-    return next;
+    return profile.personality;
   }
 
   /** Invite a specialist collaborator to a mentee. */
@@ -410,7 +442,21 @@ class CohortService {
   /** Log a 1:1 (or standup/review/pairing) note about a mentee. */
   async logMeetingNote(menteeId, data, mentorId) {
     if (!data.summary || !data.summary.trim()) throw new ValidationError('summary is required');
-    return models.MeetingNote.create({
+
+    const workingStyle = this._sanitizeWorkingStyle(data.workingStyle);
+    const personalityRead = (data.personalityRead || '').trim() || null;
+    const blockerTitles = (Array.isArray(data.blockers) ? data.blockers : [])
+      .map((b) => String(b || '').trim()).filter(Boolean);
+
+    // "Logged by" attribution: default to the authenticated mentor's own name.
+    let attributedTo = (data.attributedTo || '').trim() || null;
+    const attributedToId = data.attributedToId || null;
+    if (!attributedTo) {
+      const me = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
+      attributedTo = me ? `${me.firstName || ''} ${me.lastName || ''}`.trim() || null : null;
+    }
+
+    const note = await models.MeetingNote.create({
       menteeId,
       mentorId,
       scheduledMeetingId: data.scheduledMeetingId || null,
@@ -420,8 +466,57 @@ class CohortService {
       sentiment: data.sentiment || 'neutral',
       issues: Array.isArray(data.issues) ? data.issues : [],
       nextSteps: Array.isArray(data.nextSteps) ? data.nextSteps : [],
+      personalityRead,
+      workingStyle,
+      blockers: blockerTitles,
+      attributedTo,
+      attributedToId,
       createdBy: mentorId
     });
+
+    // Make "blockers to track" REAL: open Blocker records so they surface on
+    // At-risk and feed the relative-grading blocker credit.
+    if (blockerTitles.length) {
+      await models.Blocker.bulkCreate(blockerTitles.map((title) => ({
+        menteeId,
+        title: title.slice(0, 255),
+        category: 'technical',
+        severity: 'medium',
+        status: 'open',
+        createdBy: mentorId
+      })));
+    }
+
+    // Flow the latest personality + working-style read onto the mentee's profile
+    // so it shows there and feeds the AI summary (latest read wins, merged).
+    if (personalityRead || workingStyle) {
+      const profile = await models.MenteeProfile.findOne({ where: { userId: menteeId } });
+      if (profile) {
+        const current = (profile.personality && typeof profile.personality === 'object') ? profile.personality : {};
+        await profile.update({
+          personality: {
+            ...current,
+            ...(workingStyle || {}), // dims at the top level → render in the Working-style card
+            ...(personalityRead ? { read: personalityRead } : {}),
+            updatedAt: new Date().toISOString()
+          }
+        });
+      }
+    }
+
+    return note;
+  }
+
+  /** Clamp working-style calibration to known 0-100 axes; null if nothing usable. */
+  _sanitizeWorkingStyle(ws) {
+    if (!ws || typeof ws !== 'object') return null;
+    const axes = ['consistency', 'communication', 'resilience', 'independence'];
+    const out = {};
+    for (const a of axes) {
+      const n = Number(ws[a]);
+      if (Number.isFinite(n)) out[a] = clamp(Math.round(n), 0, 100);
+    }
+    return Object.keys(out).length ? out : null;
   }
 
   /** Log a mentor insight/observation about a mentee. */

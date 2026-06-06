@@ -10,35 +10,74 @@ const SENTIMENTS: { key: string; label: string }[] = [
   { key: 'neutral', label: 'Neutral' },
   { key: 'low', label: 'Low' },
 ];
+const STYLE_AXES: { key: keyof WorkingStyle; label: string }[] = [
+  { key: 'consistency', label: 'Consistency' },
+  { key: 'communication', label: 'Communication' },
+  { key: 'resilience', label: 'Resilience' },
+  { key: 'independence', label: 'Independence' },
+];
+
+interface WorkingStyle { consistency: number; communication: number; resilience: number; independence: number }
+
+export interface Specialist { id: string; name: string; role: string }
+
+export interface OneOnOneData {
+  kind: string;
+  summary: string;
+  sentiment: string;
+  issues: string[];
+  nextSteps: string[];
+  personalityRead: string;
+  workingStyle: WorkingStyle;
+  blockers: string[];
+  attributedTo: string;
+  attributedToId: string | null;
+}
 
 /**
- * Log a 1:1 after it happens - summary, sentiment read, issues raised, and
- * next steps. Mirrors the prototype's OneOnOneDrawer.
+ * Log a 1:1 after it happens - capture the *understanding*: who logged it,
+ * sentiment, a personality/working-style read, issues, blockers to track, and
+ * next steps. Personality + working-style flow onto the mentee's profile;
+ * blockers become real open blockers.
  */
 export function OneOnOneDrawer({
   menteeName,
+  selfName = 'You',
+  specialists = [],
   onClose,
   onSave,
 }: {
   menteeName: string;
+  selfName?: string;
+  specialists?: Specialist[];
   onClose: () => void;
-  onSave: (data: { kind: string; summary: string; sentiment: string; issues: string[]; nextSteps: string[] }) => Promise<void>;
+  onSave: (data: OneOnOneData) => Promise<void>;
 }) {
+  const [loggedBy, setLoggedBy] = useState('self'); // 'self' | specialist id
   const [kind, setKind] = useState('1:1');
   const [sentiment, setSentiment] = useState('neutral');
   const [summary, setSummary] = useState('');
   const [issues, setIssues] = useState('');
   const [nextSteps, setNextSteps] = useState('');
+  const [blockers, setBlockers] = useState('');
+  const [personalityRead, setPersonalityRead] = useState('');
+  const [workingStyle, setWorkingStyle] = useState<WorkingStyle>({ consistency: 50, communication: 50, resilience: 50, independence: 50 });
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
     if (!summary.trim()) { toast.error('Add a short summary'); return; }
+    const specialist = specialists.find((s) => s.id === loggedBy);
     try {
       setSaving(true);
       await onSave({
         kind, sentiment, summary: summary.trim(),
         issues: issues.split('\n').map((s) => s.trim()).filter(Boolean),
         nextSteps: nextSteps.split('\n').map((s) => s.trim()).filter(Boolean),
+        personalityRead: personalityRead.trim(),
+        workingStyle,
+        blockers: blockers.split('\n').map((s) => s.trim()).filter(Boolean),
+        attributedTo: specialist ? specialist.name : selfName,
+        attributedToId: specialist ? specialist.id : null,
       });
       toast.success('1:1 logged');
       onClose();
@@ -61,10 +100,20 @@ export function OneOnOneDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          <div className="flex gap-2">
-            <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${field} capitalize`}>
-              {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Session type</label>
+              <select value={kind} onChange={(e) => setKind(e.target.value)} className={`${field} capitalize`}>
+                {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Logged by</label>
+              <select value={loggedBy} onChange={(e) => setLoggedBy(e.target.value)} className={field}>
+                <option value="self">{selfName} (you)</option>
+                {specialists.map((s) => <option key={s.id} value={s.id}>{s.name} - {s.role}</option>)}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -87,8 +136,37 @@ export function OneOnOneDrawer({
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Personality read</label>
+            <textarea value={personalityRead} onChange={(e) => setPersonalityRead(e.target.value)} rows={2}
+              placeholder="e.g. Responds best to async written feedback; gets discouraged by vague asks." className={`${field} resize-none`} />
+            <p className="mt-1 text-xs text-slate-400">What did you learn about how they think, communicate, stay motivated? Flows to their profile.</p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Working-style calibration</label>
+            <div className="space-y-3">
+              {STYLE_AXES.map(({ key, label }) => (
+                <div key={key}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm text-slate-600">{label}</span>
+                    <span className="text-xs font-semibold text-slate-700 tabular-nums">{workingStyle[key]}</span>
+                  </div>
+                  <input type="range" min={0} max={100} value={workingStyle[key]}
+                    onChange={(e) => setWorkingStyle((w) => ({ ...w, [key]: Number(e.target.value) }))}
+                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer accent-brand-600 bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Issues raised <span className="text-slate-400 font-normal">(one per line)</span></label>
             <textarea value={issues} onChange={(e) => setIssues(e.target.value)} rows={2} className={`${field} resize-none`} />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Blockers to track <span className="text-slate-400 font-normal">(one per line)</span></label>
+            <textarea value={blockers} onChange={(e) => setBlockers(e.target.value)} rows={2} placeholder="Anything in their way to follow up on" className={`${field} resize-none`} />
           </div>
 
           <div>
