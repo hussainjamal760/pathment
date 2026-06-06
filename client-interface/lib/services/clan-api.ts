@@ -26,4 +26,7 @@ export const clanApi = {
   addMember: (id: string, userId: string, role: 'lead_mentor' | 'co_mentor' | 'mentee' | 'core_team') =>
     apiClient.post(`/clans/${id}/members`, { userId, role }),
   removeMember: (id: string, userId: string) => apiClient.delete(`/clans/${id}/members/${userId}`),
+  // Lead mentor: list unassigned mentees + invite a new one straight into the clan.
+  availableMembers: (id: string, q?: string) => apiClient.get(`/clans/${id}/available`, { params: q ? { q } : {} }),
+  inviteToClan: (id: string, email: string) => apiClient.post(`/clans/${id}/invite`, { email }),
 };

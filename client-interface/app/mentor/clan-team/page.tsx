@@ -74,6 +74,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   const [clan, setClan] = useState<ClanDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [addingMentees, setAddingMentees] = useState(false);
   const canManage = myRole === 'lead_mentor';
 
   const load = useCallback(() => {
@@ -134,9 +135,14 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
           <p className="text-sm text-slate-500">{clan.program?.name} · {menteeCount} mentee{menteeCount === 1 ? '' : 's'}</p>
         </div>
         {canManage ? (
-          <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 shrink-0">
-            <UserPlus className="w-4 h-4" /> Add to team
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={() => setAddingMentees(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 dark:bg-brand-500/15 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100">
+              <Users2 className="w-4 h-4" /> Add mentees
+            </button>
+            <button onClick={() => setAdding(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+              <UserPlus className="w-4 h-4" /> Add to team
+            </button>
+          </div>
         ) : (
           <span className="text-xs text-slate-400 shrink-0">View only (co-mentor)</span>
         )}
@@ -154,6 +160,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
       {canManage && <CrossClanSection clanId={clanId} clanName={clan.name} />}
 
       {adding && <AddTeamMemberDrawer clanId={clanId} onClose={() => setAdding(false)} onAdded={() => { setAdding(false); load(); }} />}
+      {addingMentees && <AddMenteesDrawer clanId={clanId} clanName={clan.name} onClose={() => setAddingMentees(false)} onChanged={() => load()} />}
     </div>
   );
 }
@@ -404,6 +411,96 @@ function AddCoverDrawer({ clanId, clanName, onClose, onAdded }: { clanId: string
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Note <span className="text-slate-400 font-normal">(optional)</span></label>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="e.g. covering while I'm on leave next week" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+        </div>
+      </div>
+    </Drawer>
+  );
+}
+
+/** Lead-mentor: pull in unassigned mentees, or invite a new one straight into the clan. */
+function AddMenteesDrawer({ clanId, clanName, onClose, onChanged }: { clanId: string; clanName: string; onClose: () => void; onChanged: () => void }) {
+  const [query, setQuery] = useState('');
+  const [people, setPeople] = useState<{ id: string; name: string; email: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+
+  const load = useCallback((q: string) => {
+    setLoading(true);
+    clanApi.availableMembers(clanId, q || undefined)
+      .then((r: any) => setPeople(r.data?.people || []))
+      .catch(() => setPeople([]))
+      .finally(() => setLoading(false));
+  }, [clanId]);
+
+  useEffect(() => {
+    const t = setTimeout(() => load(query.trim()), 250);
+    return () => clearTimeout(t);
+  }, [query, load]);
+
+  const add = async (p: { id: string; name: string }) => {
+    setBusy(p.id);
+    try {
+      await clanApi.addMember(clanId, p.id, 'mentee');
+      toast.success(`${p.name} added to ${clanName}`);
+      setPeople((prev) => prev.filter((x) => x.id !== p.id));
+      onChanged();
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not add')); }
+    finally { setBusy(null); }
+  };
+
+  const invite = async () => {
+    if (!inviteEmail.trim()) { toast.error('Enter an email'); return; }
+    setInviting(true);
+    try {
+      await clanApi.inviteToClan(clanId, inviteEmail.trim());
+      toast.success(`Invite sent to ${inviteEmail.trim()}`);
+      setInviteEmail('');
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not send invite')); }
+    finally { setInviting(false); }
+  };
+
+  return (
+    <Drawer open onClose={onClose} title="Add mentees" subtitle={`Bring people into ${clanName}`}
+      footer={<div className="flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm">Done</button></div>}>
+      <div className="space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Invite someone new</label>
+          <div className="flex gap-2">
+            <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} type="email" placeholder="email@example.com"
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); invite(); } }}
+              className="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+            <button onClick={invite} disabled={inviting} className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-1.5">
+              {inviting && <Loader2 className="w-4 h-4 animate-spin" />} Invite
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-400">They get a magic-link to join this clan as a mentee.</p>
+        </div>
+
+        <div className="pt-4 border-t border-slate-100">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Available people <span className="text-slate-400 font-normal">(not in any clan)</span></label>
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or email…" className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500" />
+          </div>
+          <div className="mt-2 max-h-72 overflow-y-auto divide-y divide-slate-100">
+            {loading ? (
+              <div className="py-6 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-600" /></div>
+            ) : people.length === 0 ? (
+              <p className="py-6 text-center text-sm text-slate-400">No unassigned people{query ? ' match your search' : ' right now'}.</p>
+            ) : people.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-900 truncate">{p.name}</p>
+                  <p className="text-xs text-slate-500 truncate">{p.email}</p>
+                </div>
+                <button onClick={() => add(p)} disabled={busy === p.id} className="px-2.5 py-1.5 rounded-lg bg-brand-50 dark:bg-brand-500/15 text-brand-700 text-xs font-medium hover:bg-brand-100 disabled:opacity-50 inline-flex items-center gap-1.5 shrink-0">
+                  {busy === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />} Add
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Drawer>

@@ -90,6 +90,24 @@ const removeMember = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Member removed', { membership }));
 });
 
+/**
+ * GET /api/clans/:id/available  (admin / lead mentor of the clan)
+ * Mentees not in any active clan, that the lead can pull into theirs.
+ */
+const availableMembers = catchAsync(async (req, res) => {
+  const people = await clanService.listAvailableMembers({ q: req.query.q });
+  res.status(200).json(successResponse('Available members', { people }));
+});
+
+/**
+ * POST /api/clans/:id/invite  (admin / lead mentor of the clan)
+ * Invite a new person straight into this clan as a mentee.
+ */
+const inviteToClan = catchAsync(async (req, res) => {
+  const invite = await clanService.inviteToClan(req.params.id, req.body.email, req.user.id);
+  res.status(201).json(successResponse('Invite sent', { invite }, 201));
+});
+
 module.exports = {
   listClans,
   clanHealth,
@@ -100,5 +118,7 @@ module.exports = {
   createClan,
   updateClan,
   addMember,
-  removeMember
+  removeMember,
+  availableMembers,
+  inviteToClan
 };

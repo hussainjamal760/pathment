@@ -202,6 +202,45 @@ class ClanService {
     return membership;
   }
 
+  /**
+   * Mentees not currently in ANY active clan ("leftover" people a lead mentor can
+   * pull into their clan). Optional `q` filters by name/email.
+   */
+  async listAvailableMembers({ q } = {}) {
+    const { Op } = require('sequelize');
+    const assigned = await models.ClanMembership.findAll({ where: { status: 'active' }, attributes: ['userId'] });
+    const assignedIds = [...new Set(assigned.map((m) => m.userId).filter(Boolean))];
+
+    const where = { role: 'mentee', status: 'active' };
+    if (assignedIds.length) where.id = { [Op.notIn]: assignedIds };
+    if (q && q.trim()) {
+      const like = { [Op.iLike]: `%${q.trim()}%` };
+      where[Op.and] = [{ [Op.or]: [{ firstName: like }, { lastName: like }, { email: like }] }];
+    }
+    const users = await models.User.findAll({
+      where,
+      attributes: ['id', 'firstName', 'lastName', 'email'],
+      order: [['firstName', 'ASC']],
+      limit: 50
+    });
+    return users.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email, email: u.email }));
+  }
+
+  /**
+   * Lead mentor invites a new person straight into their clan as a mentee.
+   * Reuses the registration-invite flow, pre-scoped to the clan + its program.
+   */
+  async inviteToClan(clanId, email, invitedBy) {
+    if (!email || !email.trim()) throw new ValidationError('Email is required');
+    const clan = await models.Clan.findByPk(clanId);
+    if (!clan) throw new NotFoundError('Clan not found');
+    const adminService = require('./adminService');
+    return adminService.createRegistrationInvite(
+      { email: email.trim(), role: 'mentee', clanId, programId: clan.programId },
+      invitedBy
+    );
+  }
+
   async getMembershipsForUser(userId) {
     return models.ClanMembership.findAll({
       where: { userId, status: 'active' },

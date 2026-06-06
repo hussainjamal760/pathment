@@ -32,4 +32,8 @@ router.patch('/:id', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEM
 router.post('/:id/members', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.addMember);
 router.delete('/:id/members/:userId', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.removeMember);
 
+// Lead mentor: pull in unassigned mentees, or invite a new one straight into the clan.
+router.get('/:id/available', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.availableMembers);
+router.post('/:id/invite', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.inviteToClan);
+
 module.exports = router;
