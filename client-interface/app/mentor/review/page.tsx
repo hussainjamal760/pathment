@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  ChevronLeft, ChevronRight, SkipForward, Check, MessageSquarePlus, Loader2,
-  TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo,
+  ChevronLeft, ChevronRight, SkipForward, Check, Loader2,
+  TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo, CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
@@ -55,18 +55,21 @@ export default function CohortReview() {
   const [idx, setIdx] = useState(0);
   const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [tasksLoading, setTasksLoading] = useState(false);
-  const [profile, setProfile] = useState<any>(null); // full mentee profile (aiSummary/signals) for the current mentee
+  const [profile, setProfile] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any -- full mentee profile (aiSummary/signals)
   const [attendance, setAttendance] = useState<Record<string, Attendance>>({});
   const [deferred, setDeferred] = useState<Set<string>>(new Set());
   const [seen, setSeen] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState(0);
-  const [blockers, setBlockers] = useState<any[]>([]);
+  const [blockers, setBlockers] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [note, setNote] = useState('');
   const [noteSent, setNoteSent] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  // Extension request the mentor is reviewing (approve-with-adjust / decline).
+  const [extReview, setExtReview] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [extDays, setExtDays] = useState(3);
 
   const mentee: CohortMentee | undefined = cohort[idx];
   const menteeId = mentee?.id;
@@ -78,7 +81,7 @@ export default function CohortReview() {
   // Restore today's attendance once so marks survive a refresh mid-session.
   useEffect(() => {
     mentorApi.getReviewAttendance()
-      .then((r: any) => setAttendance(r?.data?.attendance ?? {}))
+      .then((r: any) => setAttendance(r?.data?.attendance ?? {})) // eslint-disable-line @typescript-eslint/no-explicit-any
       .catch(() => {});
   }, []);
 
@@ -88,12 +91,12 @@ export default function CohortReview() {
     if (!mentee) return;
     setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]); setProfile(null);
     setSeen((s) => new Set(s).add(mentee.id));
-    frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {});
-    mentorApi.getMenteeProfile(mentee.id).then((r: any) => setProfile(r?.data?.profile ?? r?.data ?? null)).catch(() => setProfile(null));
+    frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {}); // eslint-disable-line @typescript-eslint/no-explicit-any
+    mentorApi.getMenteeProfile(mentee.id).then((r: any) => setProfile(r?.data?.profile ?? r?.data ?? null)).catch(() => setProfile(null)); // eslint-disable-line @typescript-eslint/no-explicit-any
     if (user?.id) {
       setTasksLoading(true);
       taskApi.getMentorTasks(user.id, { menteeId: mentee.id })
-        .then((r: any) => setTasks(r?.data?.tasks ?? []))
+        .then((r: any) => setTasks(r?.data?.tasks ?? [])) // eslint-disable-line @typescript-eslint/no-explicit-any
         .catch(() => setTasks([]))
         .finally(() => setTasksLoading(false));
     }
@@ -101,6 +104,28 @@ export default function CohortReview() {
 
   // The mentee's assigned work, grouped by status (their "day"). 'submitted'
   // tasks live in the "To review" queue below, so exclude them here.
+  // Pending due-date extension requests for this mentee, derived from the
+  // latest submission on each task (already loaded — no extra fetch).
+  const pendingExtensions = useMemo(() => tasks.map((t) => {
+    const sub = t.submissions?.[0];
+    if (!sub || !sub.extensionRequested || sub.extensionStatus !== 'pending') return null;
+    return {
+      submissionId: sub.id,
+      taskId: t.id,
+      taskTitle: t.roadmapTask?.title || t.title || 'Task',
+      reason: sub.extensionReason || '',
+      days: sub.extensionDays || null,
+      currentDue: t.dueDate || null,
+    };
+  }).filter(Boolean) as { submissionId: string; taskId: string; taskTitle: string; reason: string; days: number | null; currentDue: string | null }[], [tasks]);
+
+  // New due date if we add `days` to the task's current due (or today if none).
+  const computeNewDue = (currentDue: string | null, days: number) => {
+    const base = currentDue ? new Date(currentDue) : new Date();
+    base.setDate(base.getDate() + Math.max(1, days));
+    return base.toISOString().split('T')[0];
+  };
+
   const dayTasks = useMemo(() => tasks.filter((t) => t.status !== 'submitted'), [tasks]);
   const taskGroups = useMemo(() => {
     const by: Record<string, any[]> = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -133,9 +158,27 @@ export default function CohortReview() {
   const refresh = useCallback(async () => {
     await refetchQueue();
     if (user?.id && menteeId) {
-      try { const r: any = await taskApi.getMentorTasks(user.id, { menteeId }); setTasks(r?.data?.tasks ?? []); } catch { /* keep prior */ }
+      try { const r: any = await taskApi.getMentorTasks(user.id, { menteeId }); setTasks(r?.data?.tasks ?? []); } catch { /* keep prior */ } // eslint-disable-line @typescript-eslint/no-explicit-any
     }
   }, [refetchQueue, user?.id, menteeId]);
+
+  // Open the review confirm for an extension request (default to requested days).
+  const openExtReview = (ext: typeof pendingExtensions[number]) => {
+    setExtDays(ext.days && ext.days > 0 ? ext.days : 3);
+    setExtReview(ext);
+  };
+
+  const decideExtension = async (approved: boolean) => {
+    if (!extReview) return;
+    try {
+      setBusy('extension');
+      const newDue = approved ? computeNewDue(extReview.currentDue, extDays) : undefined;
+      await submissionService.handleExtension(extReview.submissionId, approved, newDue);
+      toast.success(approved ? `Extension approved - new due ${newDue}` : 'Extension declined');
+      setExtReview(null);
+      await refresh();
+    } catch { toast.error('Could not update the extension request'); } finally { setBusy(null); }
+  };
 
   const approve = useCallback(async (item: ApprovalItem) => {
     try {
@@ -185,7 +228,7 @@ export default function CohortReview() {
     if (!bTitle.trim() || !mentee) return;
     try {
       setBusy('add-blocker');
-      const r: any = await frictionApi.createBlocker({ menteeId: mentee.id, title: bTitle.trim(), category: bCat, severity: bSev });
+      const r: any = await frictionApi.createBlocker({ menteeId: mentee.id, title: bTitle.trim(), category: bCat, severity: bSev }); // eslint-disable-line @typescript-eslint/no-explicit-any
       if (r?.data?.blocker) setBlockers((b) => [r.data.blocker, ...b]);
       setBTitle(''); setBCat('technical'); setBSev('medium'); setShowAddBlocker(false);
       toast.success('Blocker logged');
@@ -290,6 +333,36 @@ export default function CohortReview() {
           {/* State of this mentee - same read as the profile (AI summary + signals). */}
           {profile?.aiSummary && (
             <AISummaryPanel summary={profile.aiSummary} signals={profile.aiSignals || []} />
+          )}
+
+          {/* Extension requests - mentee asked to move a due date; mentor decides here. */}
+          {pendingExtensions.length > 0 && (
+            <div className="bg-amber-50/60 dark:bg-amber-500/10 rounded-2xl border border-amber-200 dark:border-amber-500/30">
+              <div className="px-5 py-4 border-b border-amber-200/70 dark:border-amber-500/30 flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-amber-600" />
+                <h3 className="text-slate-900 font-medium">Extension requests</h3>
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full">{pendingExtensions.length}</span>
+              </div>
+              <div className="p-4 space-y-2">
+                {pendingExtensions.map((ext) => (
+                  <div key={ext.submissionId} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-amber-200/70 dark:border-amber-500/20">
+                    <CalendarClock className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 truncate">{ext.taskTitle}</p>
+                      {ext.reason && <p className="text-xs text-slate-500 truncate">&ldquo;{ext.reason}&rdquo;</p>}
+                      <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                        {ext.days != null && <span>+{ext.days} day{ext.days === 1 ? '' : 's'} requested</span>}
+                        {ext.currentDue && <><span className="text-slate-300">·</span><span>due {new Date(ext.currentDue).toLocaleDateString()}</span></>}
+                      </div>
+                    </div>
+                    <button onClick={() => openExtReview(ext)}
+                      className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium">
+                      Review
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Assigned work - everything currently on this mentee's plate */}
@@ -493,6 +566,48 @@ export default function CohortReview() {
             </select>
           </div>
         </div>
+      </Drawer>
+
+      {/* Extension request: adjust days, then approve or decline */}
+      <Drawer
+        open={!!extReview}
+        onClose={() => setExtReview(null)}
+        title="Review extension request"
+        subtitle={extReview ? extReview.taskTitle : undefined}
+        footer={
+          <>
+            <button onClick={() => decideExtension(false)} disabled={busy === 'extension'}
+              className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50 disabled:opacity-50">
+              Decline
+            </button>
+            <button onClick={() => decideExtension(true)} disabled={busy === 'extension'}
+              className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+              {busy === 'extension' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Approve
+            </button>
+          </>
+        }
+      >
+        {extReview && (
+          <div className="space-y-4">
+            {extReview.reason && (
+              <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                <p className="text-xs font-medium text-slate-400 uppercase tracking-wide mb-1">Their reason</p>
+                <p className="text-sm text-slate-700">&ldquo;{extReview.reason}&rdquo;</p>
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Extend by (days)</label>
+              <input type="number" min={1} max={60} value={extDays}
+                onChange={(e) => setExtDays(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+              <p className="mt-1.5 text-xs text-slate-500">
+                {extReview.currentDue ? <>Current due {new Date(extReview.currentDue).toLocaleDateString()} → </> : <>New due </>}
+                <span className="font-medium text-slate-700">{new Date(computeNewDue(extReview.currentDue, extDays)).toLocaleDateString()}</span>
+                {extReview.days != null && extReview.days !== extDays && <span className="text-slate-400"> · they asked for {extReview.days}</span>}
+              </p>
+            </div>
+          </div>
+        )}
       </Drawer>
 
       {reviewing && <ReviewDrawer item={reviewing} onClose={() => setReviewing(null)} onReviewed={refresh} />}

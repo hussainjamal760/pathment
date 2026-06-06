@@ -3,14 +3,12 @@
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Users, ClipboardCheck, AlertTriangle, Flag, Clock,
-  TrendingUp, TrendingDown, Minus, Loader2, ArrowUpRight, Plus,
+  Users, ClipboardCheck, AlertTriangle, Flag, Loader2, Plus,
 } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
-import { useMentorCohort, type CohortMentee, type CohortRisk, type CohortMomentum } from '@/lib/hooks/mentor';
+import { useMentorCohort, type CohortMentee, type CohortRisk } from '@/lib/hooks/mentor';
 import { StatsCard } from '@/components/admin/ui';
-import { DualProgress } from '@/components/mentor/DualProgress';
-import { NudgeButton } from '@/components/mentor/NudgeButton';
+import { MenteeCard } from '@/components/mentor/MenteeCard';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { AnnouncementsCard } from '@/components/shared/AnnouncementsCard';
 import { MentorFeedbackCard } from '@/components/mentor/MentorFeedbackCard';
@@ -33,88 +31,6 @@ function matches(m: CohortMentee, f: Filter): boolean {
     case 'going_well': return m.risk === 'low' && m.momentum !== 'down';
     default: return true;
   }
-}
-
-const RISK_BADGE: Record<CohortRisk, { label: string; className: string; dot: string }> = {
-  high:  { label: 'At risk',     className: 'bg-red-50 text-red-700 border-red-200',         dot: 'bg-red-500' },
-  watch: { label: 'Watch',       className: 'bg-amber-50 text-amber-700 border-amber-200',   dot: 'bg-amber-500' },
-  low:   { label: 'On track',    className: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500' },
-};
-
-function MomentumIcon({ momentum }: { momentum: CohortMomentum }) {
-  if (momentum === 'up') return <TrendingUp className="w-4 h-4 text-emerald-500" />;
-  if (momentum === 'down') return <TrendingDown className="w-4 h-4 text-red-500" />;
-  return <Minus className="w-4 h-4 text-slate-400" />;
-}
-
-function MenteeCard({ m, onOpen }: { m: CohortMentee; onOpen: () => void }) {
-  const risk = RISK_BADGE[m.risk];
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
-      className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
-          <span className="text-brand-700 font-medium text-sm">{m.avatar}</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate font-medium text-slate-900">{m.name}</p>
-            <MomentumIcon momentum={m.momentum} />
-          </div>
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
-            <span>{m.level}</span>
-            <span className="text-slate-300">·</span>
-            <span>Wk {m.week}/{m.totalWeeks || '-'}</span>
-            <span className="text-slate-300">·</span>
-            <Clock className="w-3 h-3" />
-            <span>{m.lastActive}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.className}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />
-            {risk.label}
-          </span>
-          <NudgeButton menteeId={m.id} menteeName={m.name} variant="icon" stopPropagation />
-        </div>
-      </div>
-
-      <div className="my-4">
-        <DualProgress absolute={m.absoluteProgress} relative={m.relativeProgress} compact />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        {m.pendingApprovals > 0 && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-xs font-medium">
-            <ClipboardCheck className="w-3 h-3" />{m.pendingApprovals} to review
-          </span>
-        )}
-        {m.openBlockers > 0 && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-700 text-xs font-medium">
-            <Flag className="w-3 h-3" />{m.openBlockers} blocker{m.openBlockers > 1 ? 's' : ''}
-          </span>
-        )}
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
-          {m.onTimeRate}% on-time
-        </span>
-      </div>
-
-      {m.riskReason && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <span className="text-xs leading-relaxed text-slate-500">{m.riskReason}</span>
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center justify-end text-xs font-medium text-brand-600 opacity-0 group-hover:opacity-100 transition-opacity">
-        Open full story <ArrowUpRight className="ml-0.5 w-3.5 h-3.5" />
-      </div>
-    </div>
-  );
 }
 
 export default function MentorCockpit() {

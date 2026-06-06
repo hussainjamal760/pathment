@@ -2,33 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Loader2, Search, Users, TrendingUp, TrendingDown, Minus, Clock, Flag,
-  ClipboardCheck, ArrowUpRight, Users2,
-} from 'lucide-react';
-import { useMentorCohort, type CohortMentee, type CohortMomentum, type CohortRisk } from '@/lib/hooks/mentor';
-import { NudgeButton } from '@/components/mentor/NudgeButton';
+import { Loader2, Search, Users, Users2 } from 'lucide-react';
+import { useMentorCohort } from '@/lib/hooks/mentor';
+import { MenteeCard } from '@/components/mentor/MenteeCard';
 
 type Filter = 'all' | 'attention' | 'on_track';
-
-const RISK_BADGE: Record<CohortRisk, { label: string; cls: string }> = {
-  high: { label: 'At risk', cls: 'bg-red-50 text-red-700' },
-  watch: { label: 'Watch', cls: 'bg-amber-50 text-amber-700' },
-  low: { label: 'On track', cls: 'bg-emerald-50 text-emerald-700' },
-};
-
-function MomentumIcon({ m }: { m: CohortMomentum }) {
-  if (m === 'up') return <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />;
-  if (m === 'down') return <TrendingDown className="w-3.5 h-3.5 text-red-500" />;
-  return <Minus className="w-3.5 h-3.5 text-slate-400" />;
-}
-
-function Avatar({ m }: { m: CohortMentee }) {
-  return m.profilePictureUrl
-    // eslint-disable-next-line @next/next/no-img-element
-    ? <img src={m.profilePictureUrl} alt={m.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
-    : <div className="w-11 h-11 bg-brand-100 rounded-full flex items-center justify-center shrink-0"><span className="text-brand-700 font-medium text-sm">{m.avatar}</span></div>;
-}
 
 export default function MentorMentees() {
   const router = useRouter();
@@ -123,48 +101,9 @@ export default function MentorMentees() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((m) => {
-            const risk = RISK_BADGE[m.risk];
-            const fair = Math.round(m.relativeProgress);
-            return (
-              <div key={m.id} role="button" tabIndex={0}
-                onClick={() => router.push(`/mentor/mentees/${m.id}`)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/mentor/mentees/${m.id}`); } }}
-                className="group text-left bg-card rounded-2xl border border-slate-200 p-5 hover:border-brand-300 hover:shadow-sm transition-all cursor-pointer">
-                <div className="flex items-start gap-3">
-                  <Avatar m={m} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{m.name}</p>
-                      <MomentumIcon m={m.momentum} />
-                    </div>
-                    <p className="text-xs text-slate-400 truncate">{m.program}</p>
-                    {m.clan && <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[11px]"><Users2 className="w-2.5 h-2.5" />{m.clan.name}</span>}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className={`px-1.5 py-0.5 rounded-md text-[11px] font-medium ${risk.cls}`}>{risk.label}</span>
-                    <NudgeButton menteeId={m.id} menteeName={m.name} variant="icon" stopPropagation />
-                  </div>
-                </div>
-
-                {/* Fair progress bar */}
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-brand-500 rounded-full" style={{ width: `${fair}%` }} />
-                  </div>
-                  <span className="text-xs font-semibold text-slate-700 tabular-nums w-9 text-right">{fair}%</span>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-                  <span>{m.onTimeRate}% on-time</span>
-                  {m.pendingApprovals > 0 && <span className="inline-flex items-center gap-1 text-brand-600"><ClipboardCheck className="w-3 h-3" />{m.pendingApprovals} to review</span>}
-                  {m.openBlockers > 0 && <span className="inline-flex items-center gap-1 text-orange-600"><Flag className="w-3 h-3" />{m.openBlockers} blocker{m.openBlockers > 1 ? 's' : ''}</span>}
-                  <span className="inline-flex items-center gap-1"><Clock className="w-3 h-3" />{m.lastActive}</span>
-                  <span className="ml-auto inline-flex items-center gap-0.5 text-slate-400 group-hover:text-brand-600 transition-colors">Open<ArrowUpRight className="w-3.5 h-3.5" /></span>
-                </div>
-              </div>
-            );
-          })}
+          {filtered.map((m) => (
+            <MenteeCard key={m.id} m={m} showClan onOpen={() => router.push(`/mentor/mentees/${m.id}`)} />
+          ))}
         </div>
       )}
     </div>
