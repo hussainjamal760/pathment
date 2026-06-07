@@ -9,6 +9,8 @@ const connectionString = process.env.DATABASE_URL || 'postgres://postgres:passwo
 // DB_SSL_CA_PATH at the provider's CA cert, we verify strictly against it;
 // otherwise we encrypt without CA verification (fine behind an IP allow-list).
 function dbSsl() {
+  // Local/containerised Postgres has no TLS — set DB_SSL=false to connect plainly (staging).
+  if (String(process.env.DB_SSL).toLowerCase() === 'false') return false;
   const caPath = process.env.DB_SSL_CA_PATH;
   if (caPath && fs.existsSync(caPath)) {
     return { require: true, rejectUnauthorized: true, ca: fs.readFileSync(caPath, 'utf8') };
