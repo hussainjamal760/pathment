@@ -114,7 +114,13 @@ class SchedulingService {
 
   async bookSlot(menteeId, slotId, agenda) {
     return sequelize.transaction(async (transaction) => {
-      const slot = await models.AvailabilitySlot.findByPk(slotId, { transaction });
+      // Row-level lock (SELECT ... FOR UPDATE) so two mentees booking the same slot at the
+      // same instant serialize: the second request blocks here until the first commits, then
+      // re-reads taken=true and gets the "already booked" error instead of double-booking.
+      const slot = await models.AvailabilitySlot.findByPk(slotId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
       if (!slot) throw new NotFoundError('Slot not found');
       if (slot.taken) throw new ValidationError('This slot has already been booked');
 
@@ -138,18 +144,52 @@ class SchedulingService {
 
       return { slot, meeting };
     }).then(async ({ meeting }) => {
+      // The slot was pre-published by the mentor, so a booking is already confirmed.
+      // Notify BOTH parties — the mentee gets a confirmation (this was missing before,
+      // so mentees never heard back after booking) and the mentor gets a heads-up.
       try {
+        const [mentor, mentee] = await Promise.all([
+          models.User.findByPk(meeting.mentorId, { attributes: ['firstName', 'lastName'] }),
+          models.User.findByPk(meeting.menteeId, { attributes: ['firstName', 'lastName'] })
+        ]);
+        const mentorName = mentor ? `${mentor.firstName} ${mentor.lastName}`.trim() : 'your mentor';
+        const menteeName = mentee ? `${mentee.firstName} ${mentee.lastName}`.trim() : 'A mentee';
+        const when = `${meeting.day} at ${meeting.time}`;
+        const agendaLine = meeting.agenda ? ` - ${meeting.agenda}` : '';
+
+        // Mentee: their 1:1 is confirmed (in-app + email).
+        // NOTE: deliberately no relatedEntityType on the payload — the cancel notification
+        // dedupes on (type:'system', relatedEntityType:'scheduled_meeting', meetingId), and
+        // reusing that combo here would later suppress the cancellation notice for this meeting.
         await notificationOrchestrator.dispatch({
-          eventKey: NOTIFICATION_EVENTS.MENTOR_NUDGE, // reuse: lightweight in-app notice
+          eventKey: NOTIFICATION_EVENTS.MEETING_BOOKED,
+          recipients: [{ userId: meeting.menteeId }],
+          payload: {
+            title: `1:1 confirmed - ${when}`,
+            message: `Your 1:1 with ${mentorName} is booked for ${when}.${agendaLine}`,
+            actionUrl: '/mentee/meetings',
+            actionLabel: 'View meeting',
+            emailSubject: `Your 1:1 with ${mentorName} is confirmed (${when})`
+          },
+          dedupe: { relatedEntityType: 'meeting_booked', relatedEntityId: meeting.id }
+        });
+
+        // Mentor: a mentee booked (in-app only — keep mentor email noise down).
+        await notificationOrchestrator.dispatch({
+          eventKey: NOTIFICATION_EVENTS.MEETING_BOOKED,
           recipients: [{ userId: meeting.mentorId }],
           payload: {
             title: 'A mentee booked a 1:1',
-            message: `${meeting.day} at ${meeting.time}${meeting.agenda ? ` - ${meeting.agenda}` : ''}`,
+            message: `${menteeName} booked a 1:1 on ${when}.${agendaLine}`,
             actionUrl: '/mentor/schedules',
             actionLabel: 'View schedule'
-          }
+          },
+          channelOverrides: { email: false },
+          dedupe: { relatedEntityType: 'meeting_booked_mentor', relatedEntityId: meeting.id }
         });
-      } catch (e) { /* non-fatal */ }
+      } catch (e) {
+        console.error('[Scheduling] booking notify failed:', e.message);
+      }
       return meeting;
     });
   }
