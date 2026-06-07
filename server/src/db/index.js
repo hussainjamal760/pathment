@@ -4,9 +4,25 @@ const path = require('path');
 
 const connectionString = process.env.DATABASE_URL || 'postgres://postgres:password@localhost:5432/pathment_dev';
 
+// Managed Postgres (DigitalOcean etc.) uses TLS with a CA Node doesn't trust by
+// default → "self-signed certificate in certificate chain". If you point
+// DB_SSL_CA_PATH at the provider's CA cert, we verify strictly against it;
+// otherwise we encrypt without CA verification (fine behind an IP allow-list).
+function dbSsl() {
+  const caPath = process.env.DB_SSL_CA_PATH;
+  if (caPath && fs.existsSync(caPath)) {
+    return { require: true, rejectUnauthorized: true, ca: fs.readFileSync(caPath, 'utf8') };
+  }
+  return {
+    require: true,
+    rejectUnauthorized: String(process.env.DB_SSL_REJECT_UNAUTHORIZED).toLowerCase() === 'true',
+  };
+}
+
 const sequelize = new Sequelize(connectionString, {
   dialect: 'postgres',
   logging: false,
+  dialectOptions: { ssl: dbSsl() },
   define: {
     underscored: true,
     freezeTableName: false,
