@@ -22,16 +22,22 @@ const successResponse = (message, data = null, statusCode = 200) => {
 /**
  * Error response format
  */
-const errorResponse = (message, statusCode = 500, errors = null) => {
+const errorResponse = (message, statusCode = 500, errors = null, code = null) => {
   const response = {
     success: false,
     message,
     statusCode
   };
 
-  if (errors !== null) {
-    response.errors = errors;
-  }
+  if (code) response.code = code;
+  if (errors !== null) response.errors = errors;
+
+  // Attach the correlation id when inside a request (also in X-Request-Id header).
+  try {
+    const { getRequestContext } = require('../auditContext');
+    const reqId = getRequestContext()?.requestId;
+    if (reqId) response.requestId = reqId;
+  } catch { /* no request context (e.g. a unit test) - omit */ }
 
   return response;
 };

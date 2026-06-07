@@ -66,7 +66,35 @@ HTTP request
 - **Validation** uses Joi schemas in `src/validations/`, applied via
   `validateBody/validateParams/validateQuery` middleware.
 - **Errors** are typed (`NotFoundError`, `ValidationError`, `ConflictError`,
-  `ForbiddenError`, …) and turned into HTTP responses by the central error handler.
+  `ForbiddenError`, …), each carrying a **stable `code`**, and turned into HTTP responses by
+  the central error handler (see *Error handling* below).
+
+### Error handling & observability
+
+One consistent envelope for **every** failure:
+
+```json
+{ "success": false, "message": "Validation failed", "statusCode": 400,
+  "code": "VALIDATION_ERROR",
+  "errors": [{ "field": "email", "message": "A valid email is required" }],
+  "requestId": "9f1c…" }
+```
+
+- **Typed errors → codes.** `AppError(message, status, code)` (`src/utils/errors/`); subclasses
+  set the code (`NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `VALIDATION_ERROR`, …). Clients branch
+  on `code`, never on the message. Field errors come back as `errors[]` (Joi *and* Sequelize
+  validation now share that shape).
+- **Correlation id.** `requestContext` mints a `requestId` per request → `X-Request-Id` header,
+  the error body, and every log line (via the AsyncLocalStorage context). "It broke" becomes one
+  greppable id.
+- **Operational vs programmer split.** The central handler (`middlewares/errorHandler.js`) logs
+  5xx with a stack via the structured logger (`utils/logger.js` — JSON lines in prod, flagged
+  `unexpected:true` for real bugs, ready to ship to a log aggregator). In production an
+  unexpected 5xx returns a generic message — **internals/stack never leak**; dev gets the stack.
+- **Client boundaries.** Next `app/error.tsx` + per-role `error.tsx` (keep the sidebar) +
+  `app/global-error.tsx` so a thrown component degrades *locally* (`components/shared/ErrorView`:
+  retry / go-home / show the reference id) instead of white-screening. Helpers: `extractApiErrorMessage`,
+  `getErrorCode`, `getRequestId`, `getRateLimit` (`lib/utils/api-error.ts`).
 
 ### Auth
 

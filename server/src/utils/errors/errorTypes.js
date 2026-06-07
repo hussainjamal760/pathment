@@ -5,61 +5,61 @@ const AppError = require('./AppError');
  */
 class ValidationError extends AppError {
   constructor(message = 'Validation failed') {
-    super(message, 400);
+    super(message, 400, 'VALIDATION_ERROR');
   }
 }
 
 class AuthenticationError extends AppError {
   constructor(message = 'Authentication failed') {
-    super(message, 401);
+    super(message, 401, 'AUTH_REQUIRED');
   }
 }
 
 class AuthorizationError extends AppError {
   constructor(message = 'You do not have permission to perform this action') {
-    super(message, 403);
+    super(message, 403, 'FORBIDDEN');
   }
 }
 
 class ForbiddenError extends AppError {
   constructor(message = 'You do not have permission to perform this action') {
-    super(message, 403);
+    super(message, 403, 'FORBIDDEN');
   }
 }
 
 class BadRequestError extends AppError {
   constructor(message = 'Bad request') {
-    super(message, 400);
+    super(message, 400, 'BAD_REQUEST');
   }
 }
 
 class NotFoundError extends AppError {
   constructor(message = 'Resource not found') {
-    super(message, 404);
+    super(message, 404, 'NOT_FOUND');
   }
 }
 
 class ConflictError extends AppError {
   constructor(message = 'Resource already exists') {
-    super(message, 409);
+    super(message, 409, 'CONFLICT');
   }
 }
 
 class UnprocessableEntityError extends AppError {
   constructor(message = 'Unable to process the request') {
-    super(message, 422);
+    super(message, 422, 'UNPROCESSABLE');
   }
 }
 
 class TooManyRequestsError extends AppError {
   constructor(message = 'Too many requests, please try again later') {
-    super(message, 429);
+    super(message, 429, 'RATE_LIMITED');
   }
 }
 
 class InternalServerError extends AppError {
   constructor(message = 'Internal server error') {
-    super(message, 500);
+    super(message, 500, 'INTERNAL', false);
   }
 }
 

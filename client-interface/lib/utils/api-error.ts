@@ -39,6 +39,20 @@ export const extractApiErrorDetails = (error: any): string[] => {
   );
 };
 
+/**
+ * The backend's STABLE machine error code (e.g. 'NOT_FOUND', 'CONFLICT',
+ * 'RATE_LIMITED', 'VALIDATION_ERROR'). Branch on this — never parse the message.
+ */
+export const getErrorCode = (error: any): string | null => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  const code = error?.response?.data?.code;
+  return typeof code === 'string' && code ? code : null;
+};
+
+/** The correlation id for a failed request (X-Request-Id) — quote it to support. */
+export const getRequestId = (error: any): string | null => { // eslint-disable-line @typescript-eslint/no-explicit-any
+  return error?.response?.data?.requestId || error?.response?.headers?.['x-request-id'] || null;
+};
+
 export const extractApiErrorMessage = (error: any, fallback = 'Something went wrong'): string => {
   const details = extractApiErrorDetails(error);
   const backendMessage = toSafeString(error?.response?.data?.message);

@@ -65,6 +65,11 @@ Every feature file follows the same template so things are easy to find and reme
 | --- | --- |
 | [Profile, Skills & Settings](./profile-skills-settings.md) | Profile + location, skills, appearance/theming, and the settings tabs (incl. notification & AI prefs). |
 
+### Cross-cutting / platform
+| Topic | What it covers |
+| --- | --- |
+| [Error handling & observability](../ARCHITECTURE.md#error-handling--observability) | One error envelope (`message` + `code` + `errors[]` + `requestId`), typed errors, request-id correlation, no-leak prod, structured (aggregator-ready) logging, and the client error boundaries. *(Documented in ARCHITECTURE — it's cross-cutting.)* |
+
 ---
 
 *Keep these honest:* when you change a feature, update its file here. A doc that lies is
