@@ -1,0 +1,14 @@
+# Caddy automatically obtains + renews a Let's Encrypt cert for $API_DOMAIN,
+# terminates TLS, and reverse-proxies everything (including the Socket.IO
+# WebSocket upgrade) to the api container on the internal network.
+{$API_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy api:5000
+
+	# Sensible defaults; tune as needed.
+	header -Server
+	log {
+		output stdout
+		format console
+	}
+}
