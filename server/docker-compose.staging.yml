@@ -1,0 +1,34 @@
+# Staging-only overlay — adds a self-contained Postgres container so droplet #2
+# needs no managed DB. Production does NOT use this file (it points at managed PG).
+#
+# On the staging droplet, always run with BOTH files:
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build
+#
+# In the staging .env, point the app at this container and disable TLS:
+#   DATABASE_URL=postgres://pathment:pathment@postgres:5432/pathment
+#   DB_SSL=false
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pathment}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pathment}
+      POSTGRES_DB: ${POSTGRES_DB:-pathment}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks: [web]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pathment} -d ${POSTGRES_DB:-pathment}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Wait for the DB to be ready before the API boots.
+  api:
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pg_data:
