@@ -16,10 +16,27 @@
  * Rollback: node server/scripts/migrations/054_cohort_review_sessions.js --rollback
  */
 const { Sequelize } = require('sequelize');
+const fs = require('fs');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+// Match the app's TLS handling (src/db/index.js) so this runs against managed
+// Postgres (DigitalOcean), which REQUIRES an encrypted connection. Without this
+// the bare connection is rejected with "no pg_hba.conf entry … no encryption".
+function dbSsl() {
+  if (String(process.env.DB_SSL).toLowerCase() === 'false') return false; // local/containerised
+  const caPath = process.env.DB_SSL_CA_PATH;
+  if (caPath && fs.existsSync(caPath)) {
+    return { require: true, rejectUnauthorized: true, ca: fs.readFileSync(caPath, 'utf8') };
+  }
+  return { require: true, rejectUnauthorized: String(process.env.DB_SSL_REJECT_UNAUTHORIZED).toLowerCase() === 'true' };
+}
+
+const sequelize = new Sequelize(process.env.DATABASE_URL, {
+  dialect: 'postgres',
+  logging: false,
+  dialectOptions: { ssl: dbSsl() },
+});
 
 async function up() {
   const qi = sequelize.getQueryInterface();
