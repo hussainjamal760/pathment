@@ -16,7 +16,7 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+const sequelize = require('./_db');
 
 const COLS = [
   ['availability_slots', 'starts_at', { type: 'TIMESTAMPTZ' }],

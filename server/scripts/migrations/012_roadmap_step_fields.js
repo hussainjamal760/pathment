@@ -13,7 +13,7 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+const sequelize = require('./_db');
 
 async function addColumn(qi, table, name, spec) {
   try { await qi.addColumn(table, name, spec); console.log(`  ✓ Added ${table}.${name}`); }

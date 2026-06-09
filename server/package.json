@@ -9,6 +9,8 @@
     "db:sync": "node scripts/syncDatabase.js",
     "db:sync:alter": "node scripts/syncDatabase.js --alter",
     "db:reset": "node scripts/resetDatabase.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:migrate:status": "node scripts/migrate.js --status",
     "migrate": "sequelize db:migrate",
     "seed": "sequelize db:seed:all",
     "seed:admin": "node scripts/seedAdmin.js",

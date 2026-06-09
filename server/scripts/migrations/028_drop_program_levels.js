@@ -17,7 +17,7 @@ const { Sequelize } = require('sequelize');
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
-const sequelize = new Sequelize(process.env.DATABASE_URL, { logging: false });
+const sequelize = require('./_db');
 
 async function dropCol(qi, table, col) {
   try { await qi.removeColumn(table, col); console.log(`  ✓ Dropped ${table}.${col}`); }
