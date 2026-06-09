@@ -128,10 +128,8 @@ exports.getAllBadges = catchAsync(async (req, res) => {
  * POST /api/gamification/badges
  */
 exports.createBadge = catchAsync(async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Only admins can create badges' });
-  }
-
+  // Authorization enforced at the route (requirePermission GAMIFICATION_MANAGE),
+  // which a granted admin satisfies even if their base role isn't 'admin'.
   const badge = await require('../db').models.Badge.create(req.body);
 
   res.status(201).json(
@@ -144,9 +142,7 @@ exports.createBadge = catchAsync(async (req, res) => {
  * POST /api/gamification/badges/award
  */
 exports.awardBadgeManual = catchAsync(async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Only admins can award badges' });
-  }
+  // Authorization enforced at the route (requirePermission GAMIFICATION_MANAGE).
 
   const { userId, badgeId, context } = req.body;
 
@@ -272,9 +268,7 @@ exports.getUserChallenges = catchAsync(async (req, res) => {
  * POST /api/gamification/setup-badges
  */
 exports.setupDefaultBadges = catchAsync(async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Only admins can setup badges' });
-  }
+  // Authorization enforced at the route (requirePermission GAMIFICATION_MANAGE).
 
   const count = await gamificationService.createDefaultBadges();
 
