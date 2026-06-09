@@ -11,6 +11,7 @@ interface ExportStep {
   difficulty?: string | null;
   deliverable?: string | null;
   pointsBase?: number | null;
+  resources?: { title: string; url: string; resourceType?: string | null }[];
 }
 export interface ExportRoadmap {
   name: string;
@@ -34,6 +35,7 @@ export function roadmapToJsonString(r: ExportRoadmap): string {
       description: s.description || undefined,
       criteria: s.acceptanceCriteria || [],
       deliverable: s.deliverable || undefined,
+      resources: (s.resources || []).map((r) => ({ label: r.title, url: r.url })),
     })),
   }, null, 2);
 }

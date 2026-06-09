@@ -11,9 +11,13 @@ import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import RichTextEditor from '@/components/shared/RichTextEditor';
 
 const STEP_TYPES = ['project', 'assignment', 'reading', 'video', 'quiz', 'discussion'];
-const EFFORTS = ['xs', 's', 'm', 'l'];
+const EFFORTS = ['xs', 's', 'm', 'l', 'xl'];
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'];
 const TITLE_MAX = 255;
+// Common non-standard type names → our 6 types (so imports don't all become "project").
+const TYPE_ALIAS: Record<string, string> = { task: 'assignment', course: 'video', exercise: 'assignment', practical: 'project', assessment: 'quiz', lecture: 'video' };
+
+interface DraftResource { label: string; url: string }
 
 const uid = () =>
   (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
@@ -34,7 +38,11 @@ const JSON_TEMPLATE = `{
       "dueOffsetDays": 7,
       "description": "Watch the fundamentals and take notes.",
       "criteria": ["Can explain closures", "Built 2 small demos"],
-      "deliverable": "Link to your notes repo"
+      "deliverable": "Link to your notes repo",
+      "resources": [
+        { "label": "JS Tutorial (Urdu/Hindi)", "url": "https://youtu.be/..." },
+        { "label": "MDN JavaScript Guide", "url": "https://developer.mozilla.org/..." }
+      ]
     },
     {
       "title": "React Basics",
@@ -53,10 +61,11 @@ const JSON_TEMPLATE = `{
 interface DraftStep {
   key: string; id?: string; title: string; type: string; description: string; criteria: string;
   effort: string; dueOffsetDays: string; difficulty: string; deliverable: string; points: string;
+  resources: DraftResource[];
 }
 const emptyStep = (): DraftStep => ({
   key: uid(), title: '', type: 'project', description: '', criteria: '',
-  effort: 'm', dueOffsetDays: '', difficulty: 'medium', deliverable: '', points: '10',
+  effort: 'm', dueOffsetDays: '', difficulty: 'medium', deliverable: '', points: '10', resources: [],
 });
 
 // The roadmap shape this editor accepts (covers both mentor "local" and admin "org").
@@ -71,6 +80,7 @@ export interface EditableRoadmap {
     id: string; title: string; type: string; description?: string; acceptanceCriteria?: string[];
     effort?: string | null; dueOffsetDays?: number | null; difficulty?: string | null;
     deliverable?: string | null; pointsBase?: number | null;
+    resources?: { id?: string; title: string; url: string; resourceType?: string | null }[];
   }[];
 }
 
@@ -115,7 +125,7 @@ export function RoadmapEditorDrawer({
   const [published, setPublished] = useState<boolean>((draft?.published as boolean) ?? roadmap?.published ?? true);
   const [steps, setSteps] = useState<DraftStep[]>(() => {
     if (Array.isArray(draft?.steps) && (draft!.steps as DraftStep[]).length) {
-      return (draft!.steps as DraftStep[]).map((s) => ({ ...s, key: s.key || uid() }));
+      return (draft!.steps as DraftStep[]).map((s) => ({ ...s, key: s.key || uid(), resources: s.resources || [] }));
     }
     if (editing && roadmap!.steps.length) {
       return roadmap!.steps.map((s) => ({
@@ -126,6 +136,7 @@ export function RoadmapEditorDrawer({
         difficulty: s.difficulty || 'medium',
         deliverable: s.deliverable || '',
         points: s.pointsBase != null ? String(s.pointsBase) : '10',
+        resources: (s.resources || []).map((r) => ({ label: r.title, url: r.url })),
       }));
     }
     return [emptyStep()];
@@ -160,20 +171,26 @@ export function RoadmapEditorDrawer({
       if (Array.isArray(p.skillTags)) setTags(p.skillTags.join(', '));
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const drafts: DraftStep[] = rawSteps.filter((s: any) => s && s.title != null).map((s: any) => ({
-      key: uid(),
-      title: String(s.title || '').slice(0, TITLE_MAX),
-      type: STEP_TYPES.includes(String(s.type)) ? String(s.type) : 'project',
-      effort: EFFORTS.includes(String(s.effort)) ? String(s.effort) : 'm',
-      difficulty: DIFFICULTIES.includes(String(s.difficulty)) ? String(s.difficulty) : 'medium',
-      points: s.points != null ? String(s.points) : (s.pointsBase != null ? String(s.pointsBase) : '10'),
-      dueOffsetDays: s.dueOffsetDays != null && s.dueOffsetDays !== '' ? String(s.dueOffsetDays) : '',
-      description: typeof s.description === 'string' ? s.description : '',
-      criteria: Array.isArray(s.criteria) ? s.criteria.join('\n')
-        : Array.isArray(s.acceptanceCriteria) ? s.acceptanceCriteria.join('\n')
-          : (typeof s.criteria === 'string' ? s.criteria : ''),
-      deliverable: String(s.deliverable || ''),
-    }));
+    const drafts: DraftStep[] = rawSteps.filter((s: any) => s && s.title != null).map((s: any) => {
+      const rawType = String(s.type || '').toLowerCase();
+      const mappedType = TYPE_ALIAS[rawType] || rawType;
+      return {
+        key: uid(),
+        title: String(s.title || '').slice(0, TITLE_MAX),
+        type: STEP_TYPES.includes(mappedType) ? mappedType : 'project',
+        effort: EFFORTS.includes(String(s.effort)) ? String(s.effort) : 'm',
+        difficulty: DIFFICULTIES.includes(String(s.difficulty)) ? String(s.difficulty) : 'medium',
+        points: s.points != null ? String(s.points) : (s.pointsBase != null ? String(s.pointsBase) : '10'),
+        dueOffsetDays: s.dueOffsetDays != null && s.dueOffsetDays !== '' ? String(s.dueOffsetDays) : '',
+        description: typeof s.description === 'string' ? s.description : '',
+        criteria: Array.isArray(s.criteria) ? s.criteria.join('\n')
+          : Array.isArray(s.acceptanceCriteria) ? s.acceptanceCriteria.join('\n')
+            : (typeof s.criteria === 'string' ? s.criteria : ''),
+        deliverable: String(s.deliverable || ''),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        resources: Array.isArray(s.resources) ? s.resources.filter((r: any) => r && r.url).map((r: any) => ({ label: String(r.label || r.title || ''), url: String(r.url) })) : [],
+      };
+    });
     if (drafts.length === 0) { setJsonError('No steps with a "title" were found.'); return; }
     setSteps(drafts);
     setJsonOpen(false);
@@ -194,6 +211,7 @@ export function RoadmapEditorDrawer({
       description: s.description || undefined,
       criteria: s.criteria.split('\n').map((c) => c.trim()).filter(Boolean),
       deliverable: s.deliverable.trim() || undefined,
+      resources: s.resources.filter((r) => r.url.trim()).map((r) => ({ label: r.label.trim() || undefined, url: r.url.trim() })),
     })),
   }, null, 2);
 
@@ -278,7 +296,7 @@ export function RoadmapEditorDrawer({
         effort: s.effort || 'm',
         dueOffsetDays: s.dueOffsetDays != null ? String(s.dueOffsetDays) : '',
         criteria: Array.isArray(s.criteria) ? s.criteria.join('\n') : (s.criteria || ''),
-        difficulty: 'medium', deliverable: '', points: '10',
+        difficulty: 'medium', deliverable: '', points: '10', resources: [],
       }));
       if (aiSteps.length === 0) { toast.error('AI returned no steps — try richer instructions'); return; }
       setSteps(aiSteps);
@@ -308,6 +326,7 @@ export function RoadmapEditorDrawer({
       difficulty: s.difficulty,
       deliverable: s.deliverable.trim() || undefined,
       pointsBase: s.points.trim() ? Number(s.points) : undefined,
+      resources: s.resources.filter((r) => r.url.trim()).map((r) => ({ label: r.label.trim(), url: r.url.trim() })),
     }));
     try {
       setSaving(true);
@@ -471,6 +490,27 @@ export function RoadmapEditorDrawer({
 
                     <textarea value={s.criteria} onChange={(e) => setStep(s.key, { criteria: e.target.value })} rows={2} placeholder="Acceptance criteria, one per line" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500" />
                     <input value={s.deliverable} onChange={(e) => setStep(s.key, { deliverable: e.target.value })} placeholder="Deliverable — what the mentee submits (optional)" className="mt-2 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
+
+                    {/* Resources — the links the mentee watches/reads for this step */}
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-slate-500">Resources <span className="text-slate-400 font-normal">(links)</span></span>
+                        <button type="button" onClick={() => setStep(s.key, { resources: [...s.resources, { label: '', url: '' }] })} className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"><Plus className="w-3 h-3" />Add link</button>
+                      </div>
+                      {s.resources.length > 0 && (
+                        <div className="space-y-1.5">
+                          {s.resources.map((r, ri) => (
+                            <div key={ri} className="flex items-center gap-1.5">
+                              <input value={r.label} onChange={(e) => setStep(s.key, { resources: s.resources.map((x, idx) => idx === ri ? { ...x, label: e.target.value } : x) })}
+                                placeholder="Label" className="w-2/5 border border-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                              <input value={r.url} onChange={(e) => setStep(s.key, { resources: s.resources.map((x, idx) => idx === ri ? { ...x, url: e.target.value } : x) })}
+                                placeholder="https://…" className="flex-1 min-w-0 border border-slate-300 rounded-lg px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                              <button type="button" onClick={() => setStep(s.key, { resources: s.resources.filter((_, idx) => idx !== ri) })} className="shrink-0 text-slate-400 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     <button type="button" onClick={() => insertAfter(s.key)} className="mt-2 text-[11px] font-medium text-slate-400 hover:text-brand-600 inline-flex items-center gap-1"><CornerDownRight className="w-3 h-3" /> Insert step below</button>
                   </div>

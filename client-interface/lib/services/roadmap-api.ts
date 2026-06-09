@@ -1,5 +1,6 @@
 import { apiClient } from './api-client';
 
+export interface RoadmapResourceInput { label?: string; title?: string; url: string; resourceType?: string }
 export interface RoadmapStepInput {
   id?: string;
   title: string;
@@ -12,6 +13,7 @@ export interface RoadmapStepInput {
   difficulty?: string;
   deliverable?: string;
   pointsBase?: number;
+  resources?: RoadmapResourceInput[];
 }
 
 /** Admin org-roadmap authoring (the shared library mentors import + assign). */

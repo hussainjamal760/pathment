@@ -15,6 +15,7 @@ export interface OrgRoadmapStep {
   difficulty?: string | null;
   deliverable?: string | null;
   pointsBase?: number | null;
+  resources?: { id?: string; title: string; url: string; resourceType?: string | null }[];
 }
 
 export interface OrgRoadmap {

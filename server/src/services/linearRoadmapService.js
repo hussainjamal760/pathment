@@ -58,7 +58,12 @@ class LinearRoadmapService {
     return models.RoadmapTask.findAll({
       where: { roadmapId },
       order: [['taskOrder', 'ASC']],
-      attributes: ['id', 'title', 'description', 'type', 'difficulty', 'taskOrder', 'deliverable', 'acceptanceCriteria', 'estimatedHours', 'pointsBase', 'effort', 'dueOffsetDays']
+      attributes: ['id', 'title', 'description', 'type', 'difficulty', 'taskOrder', 'deliverable', 'acceptanceCriteria', 'estimatedHours', 'pointsBase', 'effort', 'dueOffsetDays'],
+      include: [{
+        model: models.TaskResource, as: 'resources',
+        attributes: ['id', 'title', 'url', 'resourceType', 'description', 'displayOrder'],
+        separate: true, order: [['displayOrder', 'ASC']],
+      }],
     });
   }
 
@@ -133,12 +138,48 @@ class LinearRoadmapService {
       deliverable: step.deliverable || title,
       acceptanceCriteria: Array.isArray(step.criteria) ? step.criteria : (step.acceptanceCriteria || []),
       estimatedHours: step.estimatedHours || null,
-      effort: ['xs', 's', 'm', 'l'].includes(step.effort) ? step.effort : null,
+      effort: ['xs', 's', 'm', 'l', 'xl'].includes(step.effort) ? step.effort : null,
       dueOffsetDays: Number.isFinite(Number(step.dueOffsetDays)) && step.dueOffsetDays !== null && step.dueOffsetDays !== '' ? Number(step.dueOffsetDays) : null,
       isMandatory: true,
       isCustomTask: false,
       pointsBase: step.pointsBase || 10
     };
+  }
+
+  // ── Step resources (the per-step links: videos, courses, repos) ─────────────
+  _inferResourceType(url) {
+    const u = String(url || '').toLowerCase();
+    if (/youtube\.com|youtu\.be/.test(u)) return 'video';
+    if (/docs\.google|drive\.google/.test(u)) return 'document';
+    if (/github\.com/.test(u)) return 'repo';
+    if (/freecodecamp|udemy|coursera|edx|scrimba|course/.test(u)) return 'course';
+    return 'link';
+  }
+
+  /** Normalize an incoming resources array → TaskResource field objects. */
+  _normalizeResources(resources) {
+    if (!Array.isArray(resources)) return [];
+    return resources.map((r, i) => {
+      const url = String(r?.url || '').trim();
+      if (!url) return null;
+      const title = (String(r?.title || r?.label || '').trim() || url).slice(0, 255);
+      return {
+        title,
+        url,
+        resourceType: (r?.resourceType ? String(r.resourceType).slice(0, 50) : this._inferResourceType(url)),
+        description: r?.description ? String(r.description) : null,
+        displayOrder: i,
+      };
+    }).filter(Boolean).slice(0, 40);
+  }
+
+  /** Replace a task's resources (delete + recreate) — idempotent on save. */
+  async _syncTaskResources(taskId, resources, transaction = null) {
+    const rows = this._normalizeResources(resources);
+    await models.TaskResource.destroy({ where: { roadmapTaskId: taskId }, transaction });
+    if (rows.length) {
+      await models.TaskResource.bulkCreate(rows.map((r) => ({ ...r, roadmapTaskId: taskId })), { transaction });
+    }
   }
 
   async createRoadmap(mentorId, data) {
@@ -160,10 +201,11 @@ class LinearRoadmapService {
         totalTasks: steps.length
       }, { transaction });
 
-      await models.RoadmapTask.bulkCreate(
+      const tasks = await models.RoadmapTask.bulkCreate(
         steps.map((s, i) => this._stepToTask(s, roadmap.id, i)),
         { transaction }
       );
+      for (let i = 0; i < tasks.length; i++) await this._syncTaskResources(tasks[i].id, steps[i].resources, transaction);
 
       return roadmap;
     }).then((roadmap) => this.getRoadmap(roadmap.id));
@@ -193,7 +235,8 @@ class LinearRoadmapService {
     this._assertSteps([step]);
     const max = await models.RoadmapTask.max('taskOrder', { where: { roadmapId } });
     const order = (Number.isFinite(max) ? max : -1) + 1;
-    await models.RoadmapTask.create(this._stepToTask(step, roadmapId, order));
+    const created = await models.RoadmapTask.create(this._stepToTask(step, roadmapId, order));
+    await this._syncTaskResources(created.id, step.resources);
     return this.getRoadmap(roadmapId);
   }
 
@@ -231,8 +274,10 @@ class LinearRoadmapService {
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         const fields = this._stepToTask(s, roadmapId, i);
-        if (s.id && byId.has(s.id)) await byId.get(s.id).update(fields, { transaction });
-        else await models.RoadmapTask.create(fields, { transaction });
+        let taskId;
+        if (s.id && byId.has(s.id)) { await byId.get(s.id).update(fields, { transaction }); taskId = s.id; }
+        else { const created = await models.RoadmapTask.create(fields, { transaction }); taskId = created.id; }
+        await this._syncTaskResources(taskId, s.resources, transaction);
       }
       await models.Roadmap.update({ totalTasks: steps.length }, { where: { id: roadmapId }, transaction });
     }).then(() => this.getRoadmap(roadmapId));
@@ -258,10 +303,12 @@ class LinearRoadmapService {
         totalTasks: steps.length
       }, { transaction });
 
-      await models.RoadmapTask.bulkCreate(
+      const tasks = await models.RoadmapTask.bulkCreate(
         steps.map((s, i) => this._stepToTask(s, copy.id, i)),
         { transaction }
       );
+      // Copy each step's resources into the imported copy too.
+      for (let i = 0; i < tasks.length; i++) await this._syncTaskResources(tasks[i].id, steps[i].resources, transaction);
 
       return copy;
     }).then((copy) => this.getRoadmap(copy.id));
@@ -293,10 +340,11 @@ class LinearRoadmapService {
         totalTasks: steps.length
       }, { transaction });
 
-      await models.RoadmapTask.bulkCreate(
+      const tasks = await models.RoadmapTask.bulkCreate(
         steps.map((s, i) => this._stepToTask(s, roadmap.id, i)),
         { transaction }
       );
+      for (let i = 0; i < tasks.length; i++) await this._syncTaskResources(tasks[i].id, steps[i].resources, transaction);
       return roadmap;
     }).then((roadmap) => this.getRoadmap(roadmap.id));
   }
@@ -323,7 +371,8 @@ class LinearRoadmapService {
     this._assertSteps([step]);
     const max = await models.RoadmapTask.max('taskOrder', { where: { roadmapId } });
     const order = (Number.isFinite(max) ? max : -1) + 1;
-    await models.RoadmapTask.create(this._stepToTask(step, roadmapId, order));
+    const created = await models.RoadmapTask.create(this._stepToTask(step, roadmapId, order));
+    await this._syncTaskResources(created.id, step.resources);
     return this.getRoadmap(roadmapId);
   }
 
@@ -350,8 +399,10 @@ class LinearRoadmapService {
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         const fields = this._stepToTask(s, roadmapId, i);
-        if (s.id && byId.has(s.id)) await byId.get(s.id).update(fields, { transaction });
-        else await models.RoadmapTask.create(fields, { transaction });
+        let taskId;
+        if (s.id && byId.has(s.id)) { await byId.get(s.id).update(fields, { transaction }); taskId = s.id; }
+        else { const created = await models.RoadmapTask.create(fields, { transaction }); taskId = created.id; }
+        await this._syncTaskResources(taskId, s.resources, transaction);
       }
       await models.Roadmap.update({ totalTasks: steps.length }, { where: { id: roadmapId }, transaction });
     }).then(() => this.getRoadmap(roadmapId));

@@ -76,7 +76,7 @@ export const mentorApi = {
     programId: string;
     description?: string;
     skillTags?: string[];
-    steps: Array<{ title: string; type?: string; brief?: string; description?: string; criteria?: string[]; effort?: string; dueOffsetDays?: number; difficulty?: string; deliverable?: string; pointsBase?: number }>;
+    steps: Array<{ title: string; type?: string; brief?: string; description?: string; criteria?: string[]; effort?: string; dueOffsetDays?: number; difficulty?: string; deliverable?: string; pointsBase?: number; resources?: { label?: string; title?: string; url: string }[] }>;
     // Many steps = many cross-region DB round-trips; allow longer than the 30s default.
   }) => apiClient.post('/mentor/roadmaps', data, { timeout: 90000 }),
   updateRoadmapMeta: (id: string, data: { name?: string; description?: string; skillTags?: string[] }) =>

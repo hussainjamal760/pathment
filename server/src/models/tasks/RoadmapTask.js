@@ -58,7 +58,7 @@ module.exports = (sequelize, DataTypes) => {
     effort: {
       type: DataTypes.STRING(2),
       allowNull: true,
-      validate: { isIn: [['xs', 's', 'm', 'l']] }
+      validate: { isIn: [['xs', 's', 'm', 'l', 'xl']] }
     },
     dueOffsetDays: {
       type: DataTypes.INTEGER,
