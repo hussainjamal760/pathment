@@ -62,8 +62,8 @@ function ClanCard({ clan }: { clan: ClanHealthCard }) {
           <p className="text-sm font-semibold text-slate-900">{clan.avgOnTime}%</p>
           <p className="text-[11px] text-slate-500">on-time</p>
         </div>
-        <div className={`rounded-lg py-2 ${clan.atRisk > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
-          <p className={`text-sm font-semibold ${clan.atRisk > 0 ? 'text-rose-700' : 'text-slate-900'}`}>{clan.atRisk}</p>
+        <div className={`rounded-lg py-2 ${clan.atRisk > 0 ? 'bg-rose-50 dark:bg-rose-500/10' : 'bg-slate-50'}`}>
+          <p className={`text-sm font-semibold ${clan.atRisk > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900'}`}>{clan.atRisk}</p>
           <p className="text-[11px] text-slate-500">at risk</p>
         </div>
       </div>

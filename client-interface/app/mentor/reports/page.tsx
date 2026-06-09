@@ -40,11 +40,14 @@ function nextStep(m: CohortMentee): string {
 }
 
 // Literal class strings (no runtime concatenation) so Tailwind keeps them.
+// The accent scales (emerald/brand/amber/red) don't invert in dark mode like
+// slate does, so each band carries explicit dark: tints + lighter accent text —
+// otherwise the light -50 background stays light while the text flips to light.
 const HEALTH_BANDS = [
-  { min: 78, label: 'Healthy', tone: 'text-emerald-700', stroke: 'stroke-emerald-500', soft: 'bg-emerald-50 border-emerald-200' },
-  { min: 58, label: 'Steady', tone: 'text-brand-700', stroke: 'stroke-brand-500', soft: 'bg-brand-50 border-brand-200' },
-  { min: 40, label: 'Needs attention', tone: 'text-amber-700', stroke: 'stroke-amber-500', soft: 'bg-amber-50 border-amber-200' },
-  { min: 0, label: 'At risk', tone: 'text-red-700', stroke: 'stroke-red-500', soft: 'bg-red-50 border-red-200' },
+  { min: 78, label: 'Healthy', tone: 'text-emerald-700 dark:text-emerald-300', stroke: 'stroke-emerald-500', soft: 'bg-emerald-50 border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/30' },
+  { min: 58, label: 'Steady', tone: 'text-brand-700 dark:text-brand-300', stroke: 'stroke-brand-500', soft: 'bg-brand-50 border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/30' },
+  { min: 40, label: 'Needs attention', tone: 'text-amber-700 dark:text-amber-300', stroke: 'stroke-amber-500', soft: 'bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30' },
+  { min: 0, label: 'At risk', tone: 'text-red-700 dark:text-red-300', stroke: 'stroke-red-500', soft: 'bg-red-50 border-red-200 dark:bg-red-500/10 dark:border-red-500/30' },
 ] as const;
 const bandFor = (score: number) => HEALTH_BANDS.find((b) => score >= b.min)!;
 
