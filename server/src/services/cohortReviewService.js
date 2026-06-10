@@ -67,6 +67,23 @@ class CohortReviewService {
     return this._withEntries(session);
   }
 
+  /**
+   * Today's session WITHOUT creating one. Returns { session, today } — session is
+   * null until the mentor takes a real action (then the client POSTs to create).
+   * This is what stops "just opening the page" from leaving a phantom session.
+   */
+  async getTodayOrNull(mentorId) {
+    const tz = await this._mentorTz(mentorId);
+    const today = todayInZone(tz);
+    const session = await models.CohortReviewSession.findOne({
+      where: { mentorId, sessionDate: today },
+      order: [['created_at', 'DESC']],
+    });
+    if (!session) return { session: null, today };
+    await this._reconcileEntries(session, mentorId);
+    return { session: await this._withEntries(session), today };
+  }
+
   /** Full history (newest first) with quick attendance/progress counts per session. */
   async listSessions(mentorId) {
     const sessions = await models.CohortReviewSession.findAll({

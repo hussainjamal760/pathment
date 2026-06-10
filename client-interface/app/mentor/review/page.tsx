@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -27,7 +27,9 @@ import { Drawer } from '@/components/shared/Drawer';
 type Attendance = 'present' | 'absent' | 'excused';
 type EntryStatus = 'pending' | 'reviewed' | 'deferred';
 interface ReviewEntry { id?: string; menteeId: string; attendance: Attendance | null; status: EntryStatus; note?: string | null; mentee?: { id: string; name: string } | null }
-interface ReviewSession { id: string; sessionDate: string; title: string | null; status: 'in_progress' | 'finished'; note: string | null; finishedAt?: string | null; entries: ReviewEntry[] }
+// `draft` = today's session that doesn't exist on the server yet. It's created
+// lazily on the first real action so merely opening the page leaves no record.
+interface ReviewSession { id: string; sessionDate: string; title: string | null; status: 'in_progress' | 'finished' | 'draft'; note: string | null; finishedAt?: string | null; entries: ReviewEntry[] }
 interface ReviewSessionSummary extends Omit<ReviewSession, 'entries'> { counts: { total: number; present: number; absent: number; excused: number; reviewed: number; deferred: number } }
 
 const RISK_PILL: Record<CohortRisk, { label: string; cls: string; dot: string }> = {
@@ -94,14 +96,29 @@ export default function CohortReview() {
   const sessionParam = searchParams.get('session');
   const [sessionError, setSessionError] = useState(false);
   const [sessionLoading, setSessionLoading] = useState(true);
+  // Mentees auto-marked "seen" while today is still a draft (no server row yet).
+  // Flushed to the server the moment the session is created (ensureSession).
+  const seenLocalRef = useRef<Set<string>>(new Set());
   const loadSession = useCallback(async () => {
     setSessionLoading(true);
+    seenLocalRef.current = new Set();
     try {
       const r: any = sessionParam // eslint-disable-line @typescript-eslint/no-explicit-any
         ? await mentorApi.getReviewSession(sessionParam)
         : await mentorApi.getTodayReviewSession();
-      setSession(r?.data?.session ?? null);
-      setSessionError(!(r?.data?.session));
+      const loaded = r?.data?.session ?? null;
+      if (loaded) {
+        setSession(loaded);
+        setSessionError(false);
+      } else if (!sessionParam) {
+        // No session for today yet → a draft (created lazily on first action).
+        const todayDate = r?.data?.today ?? new Date().toISOString().split('T')[0];
+        setSession({ id: '', sessionDate: todayDate, title: null, status: 'draft', note: null, entries: [] });
+        setSessionError(false);
+      } else {
+        setSession(null);
+        setSessionError(true);
+      }
     } catch {
       setSession(null);
       setSessionError(true);
@@ -124,22 +141,65 @@ export default function CohortReview() {
     (session?.entries || []).forEach((e) => { m[e.menteeId] = e; });
     return m;
   }, [session]);
-  const editable = session?.status === 'in_progress';
+  const editable = session?.status === 'in_progress' || session?.status === 'draft';
+  const isDraft = session?.status === 'draft';
 
-  // Optimistically patch one mentee's entry, then persist.
-  const patchEntry = useCallback(async (mId: string, patch: { attendance?: Attendance | null; status?: EntryStatus; note?: string }) => {
-    if (!session) return;
-    const sid = session.id;
-    setSession((s) => {
-      if (!s) return s;
-      const entries = s.entries.some((e) => e.menteeId === mId)
-        ? s.entries.map((e) => (e.menteeId === mId ? { ...e, ...patch } : e))
-        : [...s.entries, { menteeId: mId, attendance: null, status: 'pending', ...patch } as ReviewEntry];
-      return { ...s, entries };
-    });
-    try { await mentorApi.setReviewEntry(sid, mId, patch); }
-    catch { toast.error('Could not save the review'); }
+  // Create today's session on the first real action, flushing any "seen" marks
+  // accumulated while it was a draft. Returns the now-persisted session. The
+  // in-flight guard dedupes concurrent first-actions so we never create two
+  // sessions for the same day on rapid clicks.
+  const ensureRef = useRef<Promise<ReviewSession | null> | null>(null);
+  const ensureSession = useCallback(async (): Promise<ReviewSession | null> => {
+    if (session && session.id) return session;
+    if (ensureRef.current) return ensureRef.current;
+    const run = (async (): Promise<ReviewSession | null> => {
+      const r: any = await mentorApi.createReviewSession({}); // eslint-disable-line @typescript-eslint/no-explicit-any
+      const created: ReviewSession | null = r?.data?.session ?? null;
+      if (!created) throw new Error('Could not start the review');
+      const seenIds = [...seenLocalRef.current];
+      for (const id of seenIds) {
+        try { await mentorApi.setReviewEntry(created.id, id, { status: 'reviewed' }); } catch { /* best-effort */ }
+      }
+      const merged: ReviewSession = {
+        ...created,
+        entries: (created.entries || []).map((e) => (seenLocalRef.current.has(e.menteeId) ? { ...e, status: 'reviewed' } : e)),
+      };
+      seenLocalRef.current.clear();
+      setSession(merged);
+      return merged;
+    })();
+    ensureRef.current = run;
+    try { return await run; } finally { ensureRef.current = null; }
   }, [session]);
+
+  // Optimistically patch one mentee's entry, then persist. `commit` marks a
+  // deliberate action (attendance/defer/finish) that should create today's
+  // session if it's still a draft; passive "seen on view" marks (commit=false)
+  // only accumulate locally until a deliberate action commits them.
+  const upsert = (entries: ReviewEntry[], mId: string, patch: Partial<ReviewEntry>): ReviewEntry[] =>
+    entries.some((e) => e.menteeId === mId)
+      ? entries.map((e) => (e.menteeId === mId ? { ...e, ...patch } : e))
+      : [...entries, { menteeId: mId, attendance: null, status: 'pending', ...patch } as ReviewEntry];
+
+  const patchEntry = useCallback(async (mId: string, patch: { attendance?: Attendance | null; status?: EntryStatus; note?: string }, commit = false) => {
+    if (!session) return;
+    setSession((s) => (s ? { ...s, entries: upsert(s.entries, mId, patch) } : s));
+
+    if (session.id) {
+      try { await mentorApi.setReviewEntry(session.id, mId, patch); }
+      catch { toast.error('Could not save the review'); }
+      return;
+    }
+    // Draft (no server row yet).
+    if (!commit) { seenLocalRef.current.add(mId); return; }
+    try {
+      const s = await ensureSession();
+      if (s) {
+        setSession((cur) => (cur ? { ...cur, entries: upsert(cur.entries, mId, patch) } : cur));
+        await mentorApi.setReviewEntry(s.id, mId, patch);
+      }
+    } catch { toast.error('Could not save the review'); }
+  }, [session, ensureSession]);
 
   // Load open blockers + assigned tasks + the full profile (state/summary) for
   // the current mentee; reset state.
@@ -213,7 +273,7 @@ export default function CohortReview() {
   }, [cohort.length]);
 
   const skip = useCallback(() => {
-    if (mentee && editable) patchEntry(mentee.id, { status: 'deferred' });
+    if (mentee && editable) patchEntry(mentee.id, { status: 'deferred' }, true);
     go(1);
   }, [mentee, go, editable, patchEntry]);
 
@@ -296,33 +356,69 @@ export default function CohortReview() {
     if (!mentee || !editable) return;
     // Toggle off if re-clicking the same mark; persisted on the session entry.
     const current = entriesByMentee[mentee.id]?.attendance ?? null;
-    patchEntry(mentee.id, { attendance: current === status ? null : status });
+    patchEntry(mentee.id, { attendance: current === status ? null : status }, true);
   }, [mentee, editable, entriesByMentee, patchEntry]);
 
   const finishOrReopen = useCallback(async () => {
     if (!session) return;
     try {
-      if (session.status === 'in_progress') {
-        const r: any = await mentorApi.finishReviewSession(session.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-        setSession(r?.data?.session ?? session);
-        const c = (r?.data?.session?.entries || session.entries);
+      // Finishing a never-saved draft: create it (flushing seen marks) first.
+      const live = session.id ? session : await ensureSession();
+      if (!live) return;
+      if (live.status === 'in_progress' || live.status === 'draft') {
+        const r: any = await mentorApi.finishReviewSession(live.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+        setSession(r?.data?.session ?? live);
+        const c = (r?.data?.session?.entries || live.entries);
         const present = c.filter((e: ReviewEntry) => e.attendance === 'present').length;
         const absent = c.filter((e: ReviewEntry) => e.attendance === 'absent').length;
         const excused = c.filter((e: ReviewEntry) => e.attendance === 'excused').length;
         toast.success(`Review saved — ${present} present, ${absent} absent, ${excused} excused`);
       } else {
-        const r: any = await mentorApi.reopenReviewSession(session.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-        setSession(r?.data?.session ?? session);
+        const r: any = await mentorApi.reopenReviewSession(live.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+        setSession(r?.data?.session ?? live);
         toast.success('Review reopened for editing');
       }
     } catch { toast.error('Could not update the review'); }
-  }, [session]);
+  }, [session, ensureSession]);
 
   const openHistory = useCallback(async () => {
     setHistoryOpen(true);
     try { const r: any = await mentorApi.listReviewSessions(); setSessions(r?.data?.sessions ?? []); } // eslint-disable-line @typescript-eslint/no-explicit-any
     catch { setSessions([]); }
   }, []);
+
+  // Manage a saved session from history. Delete is TIERED: an empty session is a
+  // one-tap discard; one with recorded data needs an explicit confirm naming what
+  // is lost. (A future admin "lock" can disable delete org-wide — enforced server-side.)
+  const [busySession, setBusySession] = useState<string | null>(null);
+  const sessionIsEmpty = (s: ReviewSessionSummary) =>
+    s.counts.reviewed === 0 && s.counts.present === 0 && s.counts.absent === 0 && s.counts.excused === 0 && s.counts.deferred === 0;
+  const removeHistorySession = async (s: ReviewSessionSummary) => {
+    const dateLabel = new Date(`${s.sessionDate}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const empty = sessionIsEmpty(s);
+    const msg = empty
+      ? `Discard the empty review for ${dateLabel}? Nothing was recorded, so this just removes the entry.`
+      : `Permanently delete the review for ${dateLabel}?\n\nThis erases ${s.counts.reviewed} reviewed · ${s.counts.present} present · ${s.counts.absent} absent · ${s.counts.excused} excused${s.counts.deferred ? ` · ${s.counts.deferred} deferred` : ''}.\n\nThis cannot be undone.`;
+    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
+    try {
+      setBusySession(s.id);
+      await mentorApi.deleteReviewSession(s.id);
+      setSessions((prev) => prev.filter((x) => x.id !== s.id));
+      toast.success(empty ? 'Session discarded' : 'Session deleted');
+      if (s.id === session?.id || sessionParam === s.id) { setHistoryOpen(false); router.push('/mentor/review'); }
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not delete the session')); }
+    finally { setBusySession(null); }
+  };
+  const reopenHistorySession = async (s: ReviewSessionSummary) => {
+    try {
+      setBusySession(s.id);
+      await mentorApi.reopenReviewSession(s.id);
+      setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, status: 'in_progress' } : x)));
+      toast.success('Session reopened for editing');
+      if (s.id === session?.id) loadSession();
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not reopen the session')); }
+    finally { setBusySession(null); }
+  };
 
   // Give the next mentee a heads-up that they're up next, so they're ready.
   const notifyNext = useCallback(async () => {
@@ -841,23 +937,41 @@ export default function CohortReview() {
           ) : sessions.map((s) => {
             const isCurrent = s.id === session?.id;
             const dateLabel = new Date(`${s.sessionDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+            const busy = busySession === s.id;
             return (
-              <button key={s.id} type="button"
-                onClick={() => { setHistoryOpen(false); router.push(`/mentor/review?session=${s.id}`); }}
-                className={`w-full text-left rounded-xl border px-3.5 py-3 transition-colors ${isCurrent ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:border-brand-300'}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium text-slate-900 inline-flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5 text-slate-400" />{dateLabel}</span>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${s.status === 'finished' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{s.status === 'finished' ? 'Finished' : 'In progress'}</span>
+              <div key={s.id}
+                className={`rounded-xl border px-3.5 py-3 transition-colors ${isCurrent ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:border-brand-300'}`}>
+                <div className="flex items-start justify-between gap-2">
+                  <button type="button" onClick={() => { setHistoryOpen(false); router.push(`/mentor/review?session=${s.id}`); }} className="min-w-0 flex-1 text-left">
+                    <span className="text-sm font-medium text-slate-900 inline-flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5 text-slate-400" />{dateLabel}</span>
+                    {s.title && <p className="text-xs text-slate-500 mt-0.5">{s.title}</p>}
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
+                      <span>{s.counts.reviewed}/{s.counts.total} reviewed</span>
+                      <span className="text-emerald-600">{s.counts.present} present</span>
+                      <span className="text-red-500">{s.counts.absent} absent</span>
+                      <span>{s.counts.excused} excused</span>
+                      {s.counts.deferred > 0 && <span className="text-amber-600">{s.counts.deferred} deferred</span>}
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${s.status === 'finished' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>{s.status === 'finished' ? 'Finished' : 'In progress'}</span>
+                  </div>
                 </div>
-                {s.title && <p className="text-xs text-slate-500 mt-0.5">{s.title}</p>}
-                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 text-[11px] text-slate-500">
-                  <span>{s.counts.reviewed}/{s.counts.total} reviewed</span>
-                  <span className="text-emerald-600">{s.counts.present} present</span>
-                  <span className="text-red-500">{s.counts.absent} absent</span>
-                  <span>{s.counts.excused} excused</span>
-                  {s.counts.deferred > 0 && <span className="text-amber-600">{s.counts.deferred} deferred</span>}
+                <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
+                  {s.status === 'finished' && (
+                    <button type="button" onClick={() => reopenHistorySession(s)} disabled={busy}
+                      className="px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1 disabled:opacity-50" title="Reopen to edit">
+                      <RotateCcw className="w-3.5 h-3.5" />Reopen
+                    </button>
+                  )}
+                  <button type="button" onClick={() => removeHistorySession(s)} disabled={busy}
+                    className="px-2 py-1 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-1 disabled:opacity-50"
+                    title={sessionIsEmpty(s) ? 'Discard empty session' : 'Delete session'}>
+                    {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    {sessionIsEmpty(s) ? 'Discard' : 'Delete'}
+                  </button>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>

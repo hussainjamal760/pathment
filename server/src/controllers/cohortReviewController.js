@@ -2,10 +2,13 @@ const { catchAsync } = require('../middlewares/errorHandler');
 const { successResponse } = require('../utils/responses');
 const cohortReviewService = require('../services/cohortReviewService');
 
-/** GET /api/mentor/review/sessions/today — get-or-create today's session (mentor tz). */
+/** GET /api/mentor/review/sessions/today — today's session if it exists, else
+ *  null + today's date. Lazy: we DON'T create a row just because the page was
+ *  opened (that produced accidental phantom sessions). The session is created on
+ *  the first real action (see POST /sessions). */
 const today = catchAsync(async (req, res) => {
-  const session = await cohortReviewService.getOrCreateToday(req.user.id);
-  res.status(200).json(successResponse('Review session', { session }));
+  const result = await cohortReviewService.getTodayOrNull(req.user.id);
+  res.status(200).json(successResponse('Review session', result));
 });
 
 /** GET /api/mentor/review/sessions — full history with counts. */
