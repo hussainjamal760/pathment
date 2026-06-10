@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
-  Route, Plus, X, Download, Users, Loader2, Tag, GitBranch, Check, Pencil, Search, CheckCheck, FileJson,
+  Route, Plus, X, Download, Users, Loader2, Tag, GitBranch, Check, Pencil, Search, CheckCheck, FileJson, Eye,
 } from 'lucide-react';
 import { downloadRoadmapJson } from '@/lib/utils/roadmap-json';
 import { useMentorRoadmaps, useMentorPrograms, useMentorCohort, type LinearRoadmap } from '@/lib/hooks/mentor';
@@ -11,6 +11,7 @@ import { mentorApi } from '@/lib/services/mentor-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { Drawer } from '@/components/shared/Drawer';
 import { RoadmapEditorDrawer } from '@/components/mentor/RoadmapEditorDrawer';
+import { RoadmapStepsDrawer } from '@/components/mentor/RoadmapStepsDrawer';
 
 // Deadline quick-picks for assignment. `null` days = "Default" (use each step's
 // own timing). Shared shape with the custom-task drawer for consistency.
@@ -218,6 +219,7 @@ function ChainDrawer({ roadmap, candidates, onClose, onSaved }: { roadmap: Linea
 
 // ── Roadmap card ──────────────────────────────────────────────────────────────
 function RoadmapCard({ r, action }: { r: LinearRoadmap; action: React.ReactNode }) {
+  const [viewing, setViewing] = useState(false);
   return (
     <div className="bg-card rounded-2xl border border-slate-200 p-5">
       <div className="flex items-start justify-between gap-3">
@@ -226,11 +228,16 @@ function RoadmapCard({ r, action }: { r: LinearRoadmap; action: React.ReactNode 
           <p className="text-xs text-slate-500 mt-0.5">{r.steps.length} step{r.steps.length === 1 ? '' : 's'}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {r.steps.length > 0 && (
+            <button onClick={() => setViewing(true)} title="View steps"
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-brand-600 hover:border-brand-300"><Eye className="w-3.5 h-3.5" /></button>
+          )}
           <button onClick={() => downloadRoadmapJson(r)} title="Export as JSON"
             className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-brand-600 hover:border-brand-300"><FileJson className="w-3.5 h-3.5" /></button>
           {action}
         </div>
       </div>
+      {viewing && <RoadmapStepsDrawer roadmap={r} onClose={() => setViewing(false)} />}
       {r.description && <p className="text-sm text-slate-500 mt-2 line-clamp-2">{r.description}</p>}
       {r.skillTags?.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-3">

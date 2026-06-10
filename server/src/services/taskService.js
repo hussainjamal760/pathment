@@ -5,6 +5,34 @@ const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const { endOfDayInZone } = require('../utils/timezone');
 
+/**
+ * Merge a mentee's per-assignment overrides over the shared RoadmapTask so the
+ * mentee/mentor see the tailored copy. Overrides are null by default → roadmap
+ * defaults. Keeps the raw *Override fields on the object too, so the mentor edit
+ * drawer can read what was customized.
+ */
+function applyTaskOverrides(taskInstance) {
+  if (!taskInstance) return taskInstance;
+  const t = typeof taskInstance.toJSON === 'function' ? taskInstance.toJSON() : { ...taskInstance };
+  const rt = t.roadmapTask;
+  if (rt) {
+    const ac = t.acceptanceCriteriaOverride;
+    const res = t.resourcesOverride;
+    t.roadmapTask = {
+      ...rt,
+      title: t.titleOverride ?? rt.title,
+      description: t.descriptionOverride ?? rt.description,
+      deliverable: t.deliverableOverride ?? rt.deliverable,
+      acceptanceCriteria: Array.isArray(ac) && ac.length ? ac : rt.acceptanceCriteria,
+      resources: Array.isArray(res) ? res : rt.resources,
+    };
+  }
+  t.hasOverrides = !!(t.titleOverride || t.descriptionOverride || t.deliverableOverride
+    || (Array.isArray(t.acceptanceCriteriaOverride) && t.acceptanceCriteriaOverride.length)
+    || Array.isArray(t.resourcesOverride) || t.mentorNote);
+  return t;
+}
+
 class TaskService {
   /**
    * Deprecated: week-curriculum auto-assignment was removed. Onboarding is now
@@ -193,7 +221,7 @@ class TaskService {
       where.isCustomTask = filters.isCustomTask;
     }
 
-    return models.AssignedTask.findAll({
+    const rows = await models.AssignedTask.findAll({
       where,
       include: [
         {
@@ -230,6 +258,7 @@ class TaskService {
         ['assignedAt', 'DESC']
       ]
     });
+    return rows.map(applyTaskOverrides);
   }
 
   /**
@@ -255,7 +284,7 @@ class TaskService {
       where.status = 'submitted';
     }
 
-    return models.AssignedTask.findAll({
+    const rows = await models.AssignedTask.findAll({
       where,
       include: [
         {
@@ -293,6 +322,7 @@ class TaskService {
         ['dueDate', 'ASC']
       ]
     });
+    return rows.map(applyTaskOverrides);
   }
 
   /**
@@ -358,7 +388,7 @@ class TaskService {
       throw new NotFoundError('Task not found');
     }
 
-    return task;
+    return applyTaskOverrides(task);
   }
 
   /**
@@ -741,7 +771,7 @@ class TaskService {
     ).length;
 
     return {
-      total: allTasks.length,
+      total: allTasks.filter(t => t.status !== 'cancelled').length, // cancelled don't count
       completed,
       inProgress,
       pending,
@@ -800,6 +830,67 @@ class TaskService {
    * Cancel a task (admin/mentor only)
    * Marks task as cancelled and records who cancelled it
    */
+  /** Normalize a due-date input (ISO instant or YYYY-MM-DD → end-of-day in the
+   *  mentee's timezone) into a real UTC instant. */
+  async _resolveDueDate(menteeId, dueDate) {
+    const dateOnly = String(dueDate).split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+      const s = await models.UserSettings.findOne({ where: { userId: menteeId }, attributes: ['timezone'] });
+      return endOfDayInZone(dateOnly, s?.timezone || 'UTC');
+    }
+    return new Date(dueDate);
+  }
+
+  /**
+   * Mentor edits ONE mentee's assigned task: per-mentee overrides over the shared
+   * roadmap step (title/description/deliverable/acceptance criteria/resources) +
+   * a mentor note + due date. Passing null/'' for an override clears it (back to
+   * the roadmap default). Authorization is enforced at the route (task.assign
+   * scoped to the task's clan), so co-mentors/leads can edit too.
+   */
+  async updateAssignedTask(taskId, userId, userRole, data = {}) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    if (task.status === 'completed') throw new ValidationError('Cannot edit a completed task');
+
+    const overrideFields = ['titleOverride', 'descriptionOverride', 'deliverableOverride', 'acceptanceCriteriaOverride', 'resourcesOverride', 'mentorNote'];
+    for (const f of overrideFields) {
+      if (f in data) {
+        const v = data[f];
+        task[f] = (v === '' || v == null || (Array.isArray(v) && !v.length)) ? null : v;
+      }
+    }
+    if ('dueDate' in data && data.dueDate) {
+      task.dueDate = await this._resolveDueDate(task.menteeId, data.dueDate);
+    }
+    await task.save();
+    return this.getAssignedTaskById(taskId);
+  }
+
+  /**
+   * Reassign (reactivate) a cancelled task in place: clears the cancellation and
+   * resets the lifecycle so the mentee gets it fresh. Combined with editing, the
+   * mentor fixes whatever was wrong and re-assigns the same task.
+   */
+  async reactivateTask(taskId, userId, userRole, { dueDate } = {}) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    if (task.status !== 'cancelled') throw new ValidationError('Only a cancelled task can be reassigned');
+
+    task.status = 'assigned';
+    task.cancelledBy = null;
+    task.cancelledAt = null;
+    task.cancellationReason = null;
+    task.assignedAt = new Date();
+    task.startedAt = null;
+    task.submittedAt = null;
+    task.completedAt = null;
+    if (dueDate) task.dueDate = await this._resolveDueDate(task.menteeId, dueDate);
+    await task.save();
+    await this.updateEnrollmentTaskStats(task.enrollmentId);
+    return this.getAssignedTaskById(taskId);
+  }
+
   async cancelTask(taskId, userId, userRole, reason = null) {
     const task = await models.AssignedTask.findByPk(taskId, {
       include: [

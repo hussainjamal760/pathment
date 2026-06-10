@@ -105,7 +105,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.UUID,
       allowNull: true,
       field: 'track_id'
-    }
+    },
+    // ── Per-mentee overrides (null = use the RoadmapTask default) ────────────
+    titleOverride: { type: DataTypes.STRING(255), allowNull: true, field: 'title_override' },
+    descriptionOverride: { type: DataTypes.TEXT, allowNull: true, field: 'description_override' },
+    deliverableOverride: { type: DataTypes.TEXT, allowNull: true, field: 'deliverable_override' },
+    acceptanceCriteriaOverride: { type: DataTypes.ARRAY(DataTypes.TEXT), allowNull: true, field: 'acceptance_criteria_override' },
+    resourcesOverride: { type: DataTypes.JSONB, allowNull: true, field: 'resources_override' },
+    mentorNote: { type: DataTypes.TEXT, allowNull: true, field: 'mentor_note' }
   }, {
     tableName: 'assigned_tasks',
     underscored: true,

@@ -23,11 +23,15 @@ import {
   Send,
   AlertTriangle,
   Trash2,
+  Pencil,
+  RotateCcw,
+  StickyNote,
 } from 'lucide-react';
 import { useMentorTaskDetail } from '@/lib/hooks/mentor';
 import taskApi from '@/lib/services/task-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { PageHeader, StatusBadge } from '@/components/admin/ui';
+import { TaskEditDrawer } from '@/components/mentor/TaskEditDrawer';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -58,6 +62,20 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
   const [dueEdit, setDueEdit] = useState('');
   const [savingDue, setSavingDue] = useState(false);
   const [unassigning, setUnassigning] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+
+  const reassign = async () => {
+    try {
+      setReassigning(true);
+      await taskApi.reassignTask(resolvedParams.id);
+      toast.success('Task reassigned to the mentee');
+      window.location.reload();
+    } catch (e) {
+      toast.error(extractApiErrorMessage(e, 'Could not reassign the task'));
+      setReassigning(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -134,12 +152,26 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
                   <BookOpen className="w-3 h-3" /> Roadmap
                 </span>
               )}
+              {task.hasOverrides && (
+                <span className="px-2 py-1 bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 rounded text-xs font-medium flex items-center gap-1">
+                  <Pencil className="w-3 h-3" /> Customized for this mentee
+                </span>
+              )}
             </div>
             {taskDescription && (descriptionIsHtml ? (
               <div className="prose prose-sm max-w-none text-slate-600" dangerouslySetInnerHTML={{ __html: taskDescription }} />
             ) : (
               <p className="text-slate-600 whitespace-pre-wrap">{taskDescription}</p>
             ))}
+            {task.mentorNote && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2">
+                <StickyNote className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Note from your mentor</p>
+                  <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-wrap">{task.mentorNote}</p>
+                </div>
+              </div>
+            )}
           </div>
               <StatusBadge status={task.status} />
         </div>
@@ -260,6 +292,22 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
             </div>
           </div>
         )}
+
+        {/* Edit (per-mentee) + Reassign (if cancelled) */}
+        {task.status !== 'completed' && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-2">
+            <button onClick={() => setEditing(true)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium inline-flex items-center gap-1.5">
+              <Pencil className="w-3.5 h-3.5" />Edit for this mentee
+            </button>
+            {task.status === 'cancelled' && (
+              <button onClick={reassign} disabled={reassigning}
+                className="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+                {reassigning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}Reassign
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Task Requirements */}
@@ -291,8 +339,8 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
           <div>
             <h3 className="text-sm font-medium text-slate-700 mb-3">Learning Resources</h3>
             <ul className="space-y-2">
-              {resources.map((resource: any) => (
-                <li key={resource.id}>
+              {resources.map((resource: any, index: number) => (
+                <li key={resource.id || resource.url || index}>
                   <a
                     href={resource.url}
                     target="_blank"
@@ -598,6 +646,10 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
             </button>
           </div>
         </div>
+      )}
+
+      {editing && (
+        <TaskEditDrawer task={task} onClose={() => setEditing(false)} onSaved={() => window.location.reload()} />
       )}
     </div>
   );

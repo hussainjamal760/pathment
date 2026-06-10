@@ -205,6 +205,31 @@ async function mkUser(role, n) {
   const { cohort: gcCohort } = await cohortService.getCohort(grantCo.id);
   ok('grant-based co-mentor: getCohort surfaces the clan mentees', gcCohort.some((m) => m.id === menteeX.id));
 
+  // ── Assigned-task overrides + cancel/reassign (the roadmap task feature) ────
+  const taskService = require('../src/services/taskService');
+  const enrX = await models.Enrollment.findOne({ where: { menteeId: menteeX.id, programId: program.id } });
+  const rt = await models.RoadmapTask.create({ title: 'HTML & CSS', description: 'Master semantic HTML', type: 'exercise', difficulty: 'medium', taskOrder: 1, deliverable: 'Build a page', acceptanceCriteria: ['valid HTML'], pointsBase: 15 });
+  await models.TaskResource.create({ roadmapTaskId: rt.id, title: 'MDN', resourceType: 'reading', url: 'https://mdn.example' });
+  const at = await models.AssignedTask.create({ roadmapTaskId: rt.id, menteeId: menteeX.id, mentorId: lead.id, enrollmentId: enrX.id, status: 'assigned' });
+
+  // edit: override the resource (fix the wrong link) + add a mentor note
+  const edited = await taskService.updateAssignedTask(at.id, lead.id, 'mentor', {
+    resourcesOverride: [{ title: 'Fixed link', url: 'https://good.example', resourceType: 'reading' }],
+    mentorNote: 'Use this resource instead',
+  });
+  ok('edit task: resource override surfaces (merged)', edited.roadmapTask.resources?.[0]?.url === 'https://good.example');
+  ok('edit task: mentor note saved', edited.mentorNote === 'Use this resource instead');
+  ok('edit task: hasOverrides flag set', edited.hasOverrides === true);
+
+  // cancel → not counted; reassign → reactivated
+  await taskService.cancelTask(at.id, lead.id, 'mentor', 'wrong link');
+  const stats = await taskService.getMenteeTaskStats(menteeX.id);
+  ok('stats: cancelled task excluded from total', stats.total === 0);
+  const reactivated = await taskService.reactivateTask(at.id, lead.id, 'mentor', {});
+  ok('reassign: cancelled task reactivated to assigned', reactivated.status === 'assigned');
+  ok('reassign: cancellation cleared', !reactivated.cancellationReason && !reactivated.cancelledAt);
+  ok('reassign: edits preserved through reactivation', reactivated.mentorNote === 'Use this resource instead');
+
   // ── Audit: the grant + revoke were recorded with an actor ──────────────────
   const auditCount = await models.AuditLog.count({ where: { action: ['ROLE_GRANTED', 'ROLE_REVOKED'] } });
   ok('grant/revoke produced audit rows', auditCount >= 2);
@@ -212,6 +237,9 @@ async function mkUser(role, n) {
   console.log(`\n${pass} passed, ${fail} failed`);
   // Cleanup test data (everything this script touched).
   await models.AuditLog.destroy({ where: {} });
+  await models.AssignedTask.destroy({ where: {} });
+  await models.TaskResource.destroy({ where: {} });
+  await models.RoadmapTask.destroy({ where: {} });
   await models.RoleAssignment.destroy({ where: {} });
   await models.ClanMembership.destroy({ where: {} });
   await models.Enrollment.destroy({ where: {} });

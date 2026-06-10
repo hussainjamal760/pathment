@@ -453,7 +453,23 @@ class LinearRoadmapService {
 
   async _assignStep(step, menteeId, mentorId, enrollmentId, dueOverride = null) {
     const existing = await models.AssignedTask.findOne({ where: { roadmapTaskId: step.id, menteeId } });
-    if (existing) return existing;
+    if (existing) {
+      // A cancelled assignment shouldn't block reassigning the step — reactivate
+      // it in place (fresh lifecycle) so "assign again" actually works.
+      if (existing.status === 'cancelled') {
+        existing.status = 'assigned';
+        existing.cancelledBy = null;
+        existing.cancelledAt = null;
+        existing.cancellationReason = null;
+        existing.assignedAt = new Date();
+        existing.startedAt = null;
+        existing.submittedAt = null;
+        existing.completedAt = null;
+        if (dueOverride) { const d = new Date(dueOverride); if (!Number.isNaN(d.getTime())) existing.dueDate = d; }
+        await existing.save();
+      }
+      return existing;
+    }
     // An explicit deadline (mentor picked one at assign time) wins; otherwise fall
     // back to the step's own dueOffsetDays, then a sensible default of +7 days.
     let due = null;

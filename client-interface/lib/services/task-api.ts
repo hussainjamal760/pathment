@@ -70,6 +70,22 @@ export const taskApi = {
   cancelTask: (taskId: string, reason?: string) =>
     apiClient.post(`/tasks/${taskId}/cancel`, { reason }),
 
+  // Edit a mentee's assigned task — per-mentee overrides + note + due date.
+  // Pass null/'' for an override field to reset it to the roadmap default.
+  updateTask: (taskId: string, data: {
+    titleOverride?: string | null;
+    descriptionOverride?: string | null;
+    deliverableOverride?: string | null;
+    acceptanceCriteriaOverride?: string[] | null;
+    resourcesOverride?: { title: string; url: string; resourceType?: string }[] | null;
+    mentorNote?: string | null;
+    dueDate?: string;
+  }) => apiClient.patch(`/tasks/${taskId}`, data),
+
+  // Reassign (reactivate) a cancelled task in place.
+  reassignTask: (taskId: string, dueDate?: string) =>
+    apiClient.post(`/tasks/${taskId}/reassign`, dueDate ? { dueDate } : {}),
+
   deleteCustomTask: (taskId: string) =>
     apiClient.delete(`/tasks/${taskId}`),
 

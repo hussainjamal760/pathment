@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ExternalLink,
   Loader2,
+  StickyNote,
 } from 'lucide-react';
 import { useTaskDetail } from '@/lib/hooks/mentee';
 import { PageHeader, StatusBadge } from '@/components/admin/ui';
@@ -100,6 +101,15 @@ export default function TaskDetailsPage({ params }: PageProps) {
             ) : (
               <p className="text-slate-600 whitespace-pre-wrap">{taskDescription}</p>
             ))}
+            {task.mentorNote && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-3 py-2">
+                <StickyNote className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Note from your mentor</p>
+                  <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-wrap">{task.mentorNote}</p>
+                </div>
+              </div>
+            )}
           </div>
           <StatusBadge status={task.status} />
         </div>
@@ -205,8 +215,8 @@ export default function TaskDetailsPage({ params }: PageProps) {
           <div>
             <h3 className="text-sm font-medium text-slate-700 mb-3">Learning Resources</h3>
             <ul className="space-y-2">
-              {resources.map((resource: any) => (
-                <li key={resource.id}>
+              {resources.map((resource: any, index: number) => (
+                <li key={resource.id || resource.url || index}>
                   <a
                     href={resource.url}
                     target="_blank"

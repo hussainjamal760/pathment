@@ -182,9 +182,29 @@ exports.cancelTask = catchAsync(async (req, res) => {
   const { reason } = req.body;
   const userId = req.user.id;
   const userRole = req.user.role;
-  
+
   const task = await taskService.cancelTask(taskId, userId, userRole, reason);
   res.status(200).json(successResponse('Task cancelled successfully', { task }));
+});
+
+/**
+ * Edit a mentee's assigned task (per-mentee overrides + note + due date)
+ * PATCH /api/tasks/:taskId
+ */
+exports.updateAssignedTask = catchAsync(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await taskService.updateAssignedTask(taskId, req.user.id, req.user.role, req.body);
+  res.status(200).json(successResponse('Task updated successfully', { task }));
+});
+
+/**
+ * Reassign (reactivate) a cancelled task
+ * POST /api/tasks/:taskId/reassign
+ */
+exports.reassignTask = catchAsync(async (req, res) => {
+  const { taskId } = req.params;
+  const task = await taskService.reactivateTask(taskId, req.user.id, req.user.role, { dueDate: req.body && req.body.dueDate });
+  res.status(200).json(successResponse('Task reassigned successfully', { task }));
 });
 
 /**

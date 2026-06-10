@@ -150,6 +150,24 @@ router.post(
 );
 
 /**
+ * @route   PATCH /api/tasks/:taskId   — edit a mentee's assigned task (overrides + note + due date)
+ * @route   POST  /api/tasks/:taskId/reassign — reactivate a cancelled task
+ * @access  Mentor of the task's clan / Admin
+ */
+router.patch(
+  '/:taskId',
+  authenticate,
+  requirePermission(PERMISSIONS.TASK_ASSIGN, scope.task('taskId')),
+  taskController.updateAssignedTask
+);
+router.post(
+  '/:taskId/reassign',
+  authenticate,
+  requirePermission(PERMISSIONS.TASK_ASSIGN, scope.task('taskId')),
+  taskController.reassignTask
+);
+
+/**
  * @route   PATCH /api/tasks/:taskId/status
  * @desc    Update task status
  * @access  Admin, Mentor, Mentee
