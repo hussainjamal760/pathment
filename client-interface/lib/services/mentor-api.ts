@@ -68,6 +68,9 @@ export const mentorApi = {
   advancePromotion: (id: string, data: { stage?: string; motivation?: string; strengths?: string; availability?: string }) =>
     apiClient.patch(`/mentor/promotions/${id}`, data),
   promote: (id: string, clanId?: string) => apiClient.post(`/mentor/promotions/${id}/promote`, { clanId }),
+  /** AI-draft the interview write-up (motivation + strengths) from the mentee's real stats. */
+  draftPromotion: (id: string) =>
+    apiClient.post<{ data: { motivation: string; strengths: string } }>(`/mentor/promotions/${id}/draft`, {}, { timeout: 120000 }),
 
   // Linear roadmaps (author / import / assign).
   listRoadmaps: () => apiClient.get('/mentor/roadmaps'),

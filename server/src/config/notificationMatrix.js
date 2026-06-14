@@ -26,7 +26,8 @@ EXTENSION_HANDLED: 'extension_handled',
   MEETING_CANCELLED: 'meeting_cancelled',
   MEETING_BOOKED: 'meeting_booked',
   CROSS_CLAN_ASSIGNED: 'cross_clan_assigned',
-  NEW_MENTEE_IN_CLAN: 'new_mentee_in_clan'
+  NEW_MENTEE_IN_CLAN: 'new_mentee_in_clan',
+  PROMOTION_NOMINATED: 'promotion_nominated'
 };
 
 const NOTIFICATION_MATRIX = {
@@ -169,6 +170,11 @@ const NOTIFICATION_MATRIX = {
     type: 'system',
     preferenceKey: 'new_mentee_in_clan',
     channels: { inApp: true, email: true, chat: false }
+  },
+  [NOTIFICATION_EVENTS.PROMOTION_NOMINATED]: {
+    type: 'system',
+    preferenceKey: 'promotion_nominated',
+    channels: { inApp: true, email: true, chat: false }
   }
 };
 
@@ -194,6 +200,7 @@ const EMAIL_PREFERENCE_CATEGORIES = [
   { group: 'Program', key: 'meeting_cancelled', label: 'A 1:1 is cancelled' },
   { group: 'Program', key: 'cross_clan_assigned', label: 'I\'m asked to cover or help another clan' },
   { group: 'Program', key: 'new_mentee_in_clan', label: 'A new mentee joins my clan' },
+  { group: 'Program', key: 'promotion_nominated', label: 'A mentee is nominated for promotion (admins)' },
   { group: 'Milestones', key: 'completion_ready_for_signoff', label: 'Completion is ready for sign-off' },
   { group: 'Milestones', key: 'program_completed', label: 'A program is completed' },
   { group: 'Digests', key: 'weekly_progress_report', label: 'Weekly progress report' }

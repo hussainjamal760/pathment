@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
+const promotionController = require('../controllers/promotionController');
 const { validateBody, validateQuery } = require('../middlewares/validate');
 const { adminSchemas } = require('../validations/adminValidation');
 const { authenticate, authorize } = require('../middlewares/auth');
@@ -110,6 +111,34 @@ router.patch(
   authenticate,
   requirePermission(PERMISSIONS.USER_MANAGE),
   adminController.updateUserCapabilities
+);
+
+// ── Co-mentor promotions (admin review of mentor nominations) ────────────────
+// The mentor nominates / marks "awaiting admin" on /mentor/promotions; the admin
+// reviews, promotes, or declines here. Gated by user.manage.
+router.get(
+  '/promotions',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_MANAGE),
+  promotionController.list
+);
+router.patch(
+  '/promotions/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_MANAGE),
+  promotionController.advance
+);
+router.post(
+  '/promotions/:id/promote',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_MANAGE),
+  promotionController.promote
+);
+router.post(
+  '/promotions/:id/decline',
+  authenticate,
+  requirePermission(PERMISSIONS.USER_MANAGE),
+  promotionController.decline
 );
 
 module.exports = router;

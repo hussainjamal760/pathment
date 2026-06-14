@@ -24,7 +24,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(20),
       allowNull: false,
       defaultValue: 'nominated',
-      validate: { isIn: [['nominated', 'interview', 'approved', 'promoted']] }
+      validate: { isIn: [['nominated', 'interview', 'approved', 'promoted', 'rejected']] }
     },
     motivation: { type: DataTypes.TEXT, allowNull: true },
     strengths: { type: DataTypes.TEXT, allowNull: true },

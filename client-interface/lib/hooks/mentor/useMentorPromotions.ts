@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { mentorApi } from '@/lib/services/mentor-api';
 
-export type PromotionStage = 'nominated' | 'interview' | 'approved' | 'promoted';
+export type PromotionStage = 'nominated' | 'interview' | 'approved' | 'promoted' | 'rejected';
 
 export interface PromotionCandidate {
   id: string;
@@ -18,6 +18,13 @@ export interface PromotionCandidate {
   motivation: string | null;
   strengths: string | null;
   availability: string | null;
+  // Decision-support context for the interview drawer.
+  lastActive?: string | null;
+  momentum?: 'up' | 'steady' | 'down' | null;
+  openBlockers?: number;
+  signals?: string[];
+  traits?: { resilience: number; communication: number; consistency: number };
+  suggestedStrengths?: string[];
 }
 
 export interface UseMentorPromotionsReturn {

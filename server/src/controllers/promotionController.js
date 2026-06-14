@@ -2,15 +2,15 @@ const { catchAsync } = require('../middlewares/errorHandler');
 const { successResponse } = require('../utils/responses');
 const promotionService = require('../services/promotionService');
 
-function hasAdmin(req) {
-  const caps = Array.isArray(req.user.capabilities) && req.user.capabilities.length
-    ? req.user.capabilities
-    : [req.user.role];
+async function hasAdmin(req) {
+  // Derived capabilities (live), not the stored array, so an org/program admin
+  // sees the full pipeline even if their `capabilities` column is stale.
+  const caps = req.loadCapabilities ? await req.loadCapabilities() : [req.user.role];
   return caps.includes('admin');
 }
 
 const list = catchAsync(async (req, res) => {
-  const candidates = await promotionService.list({ actorId: req.user.id, isAdmin: hasAdmin(req) });
+  const candidates = await promotionService.list({ actorId: req.user.id, isAdmin: await hasAdmin(req) });
   res.status(200).json(successResponse('Promotion candidates retrieved', { candidates }));
 });
 
@@ -29,4 +29,14 @@ const promote = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Mentee promoted to co-mentor', { candidate }));
 });
 
-module.exports = { list, nominate, advance, promote };
+const decline = catchAsync(async (req, res) => {
+  const candidate = await promotionService.decline(req.params.id, req.body);
+  res.status(200).json(successResponse('Nomination declined', { candidate }));
+});
+
+const draft = catchAsync(async (req, res) => {
+  const draft = await promotionService.aiDraft(req.params.id);
+  res.status(200).json(successResponse('Interview draft generated', draft));
+});
+
+module.exports = { list, nominate, advance, promote, decline, draft };

@@ -74,6 +74,7 @@ router.put('/roadmaps/:id/links', mentorOnly, linearRoadmapController.setLinks);
 router.get('/promotions', mentorOnly, promotionController.list);
 router.post('/promotions', mentorOnly, promotionController.nominate);
 router.patch('/promotions/:id', mentorOnly, promotionController.advance);
+router.post('/promotions/:id/draft', mentorOnly, promotionController.draft);
 router.post('/promotions/:id/promote', authenticate, requirePermission(PERMISSIONS.USER_MANAGE), promotionController.promote);
 
 module.exports = router;

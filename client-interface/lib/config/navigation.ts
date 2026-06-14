@@ -81,6 +81,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
         { path: '/admin/users/mentors', icon: GraduationCap, label: 'Mentors', permission: 'user.manage' },
         { path: '/admin/users/mentees', icon: School, label: 'Mentees', permission: 'user.manage' },
         { path: '/admin/requests', icon: GitPullRequest, label: 'Clan Requests', permission: 'mentee.manage' },
+        { path: '/admin/promotions', icon: TrendingUp, label: 'Promotions', permission: 'user.manage' },
       ],
     },
     {

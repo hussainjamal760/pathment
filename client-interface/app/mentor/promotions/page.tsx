@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { TrendingUp, Plus, Loader2, ArrowRight, Crown, Check } from 'lucide-react';
+import { TrendingUp, Plus, Loader2, ArrowRight, Crown, Check, Sparkles, Activity, Clock, AlertTriangle } from 'lucide-react';
 import { useMentorPromotions, useMentorCohort, type PromotionCandidate, type PromotionStage } from '@/lib/hooks/mentor';
 import { Drawer } from '@/components/shared/Drawer';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -16,7 +16,7 @@ const STAGES: { key: PromotionStage; label: string }[] = [
 ];
 
 const NEXT_STAGE: Record<PromotionStage, PromotionStage | null> = {
-  nominated: 'interview', interview: 'approved', approved: 'promoted', promoted: null,
+  nominated: 'interview', interview: 'approved', approved: 'promoted', promoted: null, rejected: null,
 };
 
 function Bar({ label, value }: { label: string; value: number }) {
@@ -33,12 +33,58 @@ function Bar({ label, value }: { label: string; value: number }) {
   );
 }
 
-// Interview modal
+const AVAILABILITY_OPTIONS = ['2 hours / week', '5 hours / week', '10+ hours / week', 'Flexible'];
+
+function MiniBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[11px] text-slate-500">{label}</span>
+        <span className="text-[11px] font-semibold text-slate-700 tabular-nums">{value}</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full bg-brand-500" style={{ width: `${value}%` }} /></div>
+    </div>
+  );
+}
+
+// Interview drawer — decision support: the mentee's real signals up top, an
+// AI draft grounded in those numbers, quick-add strength chips, and a clear
+// availability picker. The mentor edits, then approves.
 function InterviewModal({ candidate, onClose, onSaved }: { candidate: PromotionCandidate; onClose: () => void; onSaved: () => void }) {
   const [motivation, setMotivation] = useState(candidate.motivation ?? '');
   const [strengths, setStrengths] = useState(candidate.strengths ?? '');
   const [availability, setAvailability] = useState(candidate.availability ?? '');
   const [saving, setSaving] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+
+  const traits = candidate.traits;
+  const driverChips = useMemo(() => {
+    const out: string[] = [];
+    if (candidate.absoluteProgress >= 50) out.push(`${candidate.absoluteProgress}% progress`);
+    if (candidate.onTimeRate >= 80) out.push(`${candidate.onTimeRate}% on-time`);
+    if (traits && traits.resilience >= 60) out.push('resilient');
+    if (traits && traits.communication >= 60) out.push('communicates well');
+    return out;
+  }, [candidate, traits]);
+
+  const draftWithAi = async () => {
+    setDrafting(true);
+    try {
+      const r = await mentorApi.draftPromotion(candidate.id);
+      const d = (r as any)?.data ?? r; // eslint-disable-line @typescript-eslint/no-explicit-any
+      if (d?.motivation) setMotivation(d.motivation);
+      if (d?.strengths) setStrengths(d.strengths);
+      toast.success('Drafted from this mentee\'s stats — edit as you like');
+    } catch { toast.error('Could not draft right now'); }
+    finally { setDrafting(false); }
+  };
+
+  const addStrength = (s: string) => {
+    setStrengths((cur) => {
+      if (cur.toLowerCase().includes(s.toLowerCase())) return cur;
+      return cur.trim() ? `${cur.trim().replace(/\.?$/, '')}. ${s}` : s;
+    });
+  };
 
   const save = async (advance: boolean) => {
     try {
@@ -47,13 +93,14 @@ function InterviewModal({ candidate, onClose, onSaved }: { candidate: PromotionC
         motivation, strengths, availability,
         ...(advance ? { stage: 'approved' } : {}),
       });
-      toast.success(advance ? 'Marked approved' : 'Saved');
+      toast.success(advance ? 'Approved — sent to admin for final promotion' : 'Saved');
       onSaved(); onClose();
     } catch { toast.error('Could not save'); }
     finally { setSaving(false); }
   };
 
   const field = 'w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
+  const remaining = (candidate.suggestedStrengths ?? []).filter((s) => !strengths.toLowerCase().includes(s.toLowerCase()));
 
   return (
     <Drawer
@@ -70,18 +117,59 @@ function InterviewModal({ candidate, onClose, onSaved }: { candidate: PromotionC
         </>
       }
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
+        {/* Context panel — the real signals to decide on */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 dark:bg-slate-800/40 p-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <MiniBar label="Readiness" value={candidate.readiness} />
+            <MiniBar label="Willingness" value={candidate.willingness} />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" />{candidate.absoluteProgress}% progress</span>
+            <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{candidate.onTimeRate}% on-time</span>
+            {candidate.lastActive && <span className="inline-flex items-center gap-1"><Activity className="w-3.5 h-3.5" />active {candidate.lastActive}</span>}
+            {(candidate.openBlockers ?? 0) > 0 && <span className="inline-flex items-center gap-1 text-amber-600"><AlertTriangle className="w-3.5 h-3.5" />{candidate.openBlockers} blocker{candidate.openBlockers === 1 ? '' : 's'}</span>}
+          </div>
+          {driverChips.length > 0 && (
+            <p className="text-[11px] text-slate-400">Why they&apos;re a candidate: {driverChips.join(' · ')}</p>
+          )}
+        </div>
+
+        {/* AI draft */}
+        <button type="button" onClick={draftWithAi} disabled={drafting}
+          className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-brand-200 bg-brand-50 dark:bg-brand-500/15 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50">
+          {drafting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          Draft with AI from {candidate.name.split(' ')[0]}&apos;s stats
+        </button>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Motivation</label>
-          <textarea value={motivation} onChange={(e) => setMotivation(e.target.value)} rows={2} className={`${field} resize-none`} autoFocus />
+          <textarea value={motivation} onChange={(e) => setMotivation(e.target.value)} rows={3}
+            placeholder="Why is this mentee ready to help lead? What have they shown?" className={`${field} resize-none`} autoFocus />
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Strengths</label>
-          <textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} rows={2} className={`${field} resize-none`} />
+          <textarea value={strengths} onChange={(e) => setStrengths(e.target.value)} rows={3}
+            placeholder="Concrete strengths — reliability, communication, ownership…" className={`${field} resize-none`} />
+          {remaining.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {remaining.map((s) => (
+                <button key={s} type="button" onClick={() => addStrength(s)}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-0.5 text-[11px] text-slate-600 hover:border-brand-300 hover:text-brand-700">
+                  <Plus className="w-3 h-3" />{s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Availability</label>
-          <input value={availability} onChange={(e) => setAvailability(e.target.value)} placeholder="e.g. 5h / week" className={field} />
+          <select value={AVAILABILITY_OPTIONS.includes(availability) ? availability : ''} onChange={(e) => setAvailability(e.target.value)} className={field}>
+            <option value="">Select expected availability…</option>
+            {AVAILABILITY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
         </div>
       </div>
     </Drawer>
