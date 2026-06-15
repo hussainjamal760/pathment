@@ -44,6 +44,19 @@ import { toast } from 'sonner';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
+/** "Today" / "Yesterday" / "5d ago" / "3 mo ago" / "Never". */
+function relativeTime(dateStr?: string | null): string {
+  if (!dateStr) return 'Never';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return 'Never';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 30)} mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 const columns: DataTableColumn<MenteeListItem>[] = [
   {
     key: 'firstName',
@@ -139,6 +152,11 @@ const columns: DataTableColumn<MenteeListItem>[] = [
         <span className="text-slate-400 text-sm">-</span>
       );
     },
+  },
+  {
+    key: 'lastActive' as keyof MenteeListItem,
+    label: 'Last active',
+    render: (_, row) => <span className="text-sm text-slate-600">{relativeTime(row.menteeProfile?.lastActivityDate)}</span>,
   },
   {
     key: 'createdAt',
@@ -250,7 +268,8 @@ export default function AdminMenteesListPage() {
 
   const actionColumn: DataTableColumn<MenteeListItem> = {
     key: 'actions' as keyof MenteeListItem,
-    label: '',
+    label: 'Actions',
+    align: 'right',
     render: (_, row) => {
       const isSuspended = row.status === 'suspended';
       const name = `${row.firstName} ${row.lastName}`;

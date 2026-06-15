@@ -14,6 +14,8 @@ export interface MentorListItem {
   email: string;
   status: string;
   createdAt: string;
+  lastLoginAt?: string | null;
+  activeMentees?: number;
   clans?: { id: string; name: string; role: string }[];
   specializations?: string[];
   mentorProfile?: {

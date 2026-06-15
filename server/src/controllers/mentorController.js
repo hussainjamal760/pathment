@@ -1,5 +1,5 @@
 const { models } = require('../db');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const { catchAsync } = require('../middlewares/errorHandler');
 const { NotFoundError } = require('../utils/errors/errorTypes');
 
@@ -41,7 +41,7 @@ const getAllMentors = catchAsync(async (req, res) => {
 
   const { count, rows: mentors } = await models.User.findAndCountAll({
     where: { ...where, ...searchConditions },
-    attributes: ['id', 'firstName', 'lastName', 'email', 'status', 'createdAt'],
+    attributes: ['id', 'firstName', 'lastName', 'email', 'status', 'createdAt', 'lastLoginAt'],
     include: [mentorProfileInclude],
     order: [['firstName', 'ASC']],
     limit: limitNum,
@@ -71,10 +71,24 @@ const getAllMentors = catchAsync(async (req, res) => {
     clansByUser.set(m.userId, arr);
   }
   const skillsByUser = new Map(skillUsers.map((u) => [u.id, (u.skills || []).map((s) => s.name)]));
+
+  // Active mentees per mentor = sum of active mentees across the clans they run.
+  const allClanIds = [...new Set(clanRows.map((r) => r.clanId).filter(Boolean))];
+  const menteeCountRows = allClanIds.length ? await models.ClanMembership.findAll({
+    where: { clanId: { [Op.in]: allClanIds }, role: 'mentee', status: 'active' },
+    attributes: ['clanId', [fn('COUNT', col('id')), 'n']], group: ['clanId'], raw: true,
+  }) : [];
+  const countByClan = new Map(menteeCountRows.map((r) => [r.clanId, Number(r.n)]));
+  const menteesByUser = new Map();
+  for (const m of clanRows) {
+    menteesByUser.set(m.userId, (menteesByUser.get(m.userId) || 0) + (countByClan.get(m.clanId) || 0));
+  }
+
   const mentorRows = mentors.map((m) => {
     const json = m.toJSON();
     json.clans = clansByUser.get(m.id) || [];
     json.specializations = skillsByUser.get(m.id) || [];
+    json.activeMentees = menteesByUser.get(m.id) || 0;
     return json;
   });
 

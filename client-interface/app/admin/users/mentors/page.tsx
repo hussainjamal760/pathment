@@ -40,6 +40,19 @@ import { toast } from 'sonner';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
+/** "Today" / "Yesterday" / "5d ago" / "3 mo ago" / "Never". */
+function relativeTime(dateStr?: string | null): string {
+  if (!dateStr) return 'Never';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return 'Never';
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.floor(days / 30)} mo ago`;
+  return `${Math.floor(days / 365)}y ago`;
+}
+
 const columns: DataTableColumn<MentorListItem>[] = [
   {
     key: 'firstName',
@@ -169,6 +182,16 @@ const columns: DataTableColumn<MentorListItem>[] = [
     },
   },
   {
+    key: 'activeMentees' as keyof MentorListItem,
+    label: 'Active mentees',
+    render: (_, row) => <span className="text-sm font-medium text-slate-700 tabular-nums">{row.activeMentees ?? 0}</span>,
+  },
+  {
+    key: 'lastLoginAt' as keyof MentorListItem,
+    label: 'Last active',
+    render: (_, row) => <span className="text-sm text-slate-600">{relativeTime(row.lastLoginAt)}</span>,
+  },
+  {
     key: 'createdAt',
     label: 'Joined',
     sortable: true,
@@ -280,7 +303,8 @@ export default function AdminMentorsListPage() {
 
   const actionColumn: DataTableColumn<MentorListItem> = {
     key: 'actions' as keyof MentorListItem,
-    label: '',
+    label: 'Actions',
+    align: 'right',
     render: (_, row) => {
       const isSuspended = row.status === 'suspended';
       const name = `${row.firstName} ${row.lastName}`;
