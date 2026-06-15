@@ -41,6 +41,7 @@ import { EditUserDrawer } from '@/components/admin/EditUserDrawer';
 import { menteeApi } from '@/lib/services/mentee-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -190,6 +191,7 @@ export default function AdminMenteesListPage() {
     refetch,
   } = useMenteesList();
 
+  const confirm = useConfirm();
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [suspendLoading, setSuspendLoading] = useState<string | null>(null);
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
@@ -198,7 +200,7 @@ export default function AdminMenteesListPage() {
   const [editUser, setEditUser] = useState<MenteeListItem | null>(null);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Permanently delete ${name}? This removes all their enrollments and data and cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete ${name}?`, description: `This permanently removes all their enrollments and data and cannot be undone.`, variant: 'danger', confirmLabel: 'Delete' }))) return;
     try {
       setDeleteLoading(id);
       await menteeApi.deleteUser(id);

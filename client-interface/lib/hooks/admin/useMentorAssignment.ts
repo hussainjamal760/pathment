@@ -6,6 +6,7 @@ import { enrollmentApi, matchingApi, mentorApi } from '@/lib/services/enrollment
 import { programManagementApi } from '@/lib/services/program-api';
 import { useDebounce } from '@/lib/hooks/shared/useDebounce';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const MENTOR_LIMIT = 10;
 
@@ -59,6 +60,7 @@ export interface UseMentorAssignmentReturn {
 }
 
 export function useMentorAssignment(): UseMentorAssignmentReturn {
+  const confirm = useConfirm();
   // ── programs ──────────────────────────────────────────────────────────────
   const [programs, setPrograms] = useState<MentorAssignmentProgram[]>([]);
   const [selectedProgram, setSelectedProgram] = useState('');
@@ -178,7 +180,7 @@ export function useMentorAssignment(): UseMentorAssignmentReturn {
   // ── auto-match all pending ─────────────────────────────────────────────────
   const handleAutoMatch = useCallback(async () => {
     const scope = selectedProgram ? ' in this program' : '';
-    if (!confirm(`Auto-match all pending enrollments${scope}? This will assign the top AI-suggested mentor to each unmatched mentee.`)) return;
+    if (!(await confirm({ title: `Auto-match all pending enrollments${scope}?`, description: 'This will assign the top AI-suggested mentor to each unmatched mentee.' }))) return;
     try {
       setAutoMatching(true);
       const response = await matchingApi.autoMatchPending(selectedProgram || undefined);

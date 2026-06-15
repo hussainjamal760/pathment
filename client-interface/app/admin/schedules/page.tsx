@@ -6,6 +6,7 @@ import { CalendarClock, Plus, Trash2, X, Loader2, Pencil, Clock, FileJson } from
 import { scheduleApi, type ScheduleBlock } from '@/lib/services/schedule-api';
 import { ScheduleJsonPanel } from '@/components/shared/ScheduleJsonPanel';
 import { downloadScheduleTemplateJson } from '@/lib/utils/schedule-json';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 interface OrgTemplate { id: string; name: string; description?: string | null; blocks: ScheduleBlock[] }
 interface DraftBlock { label: string; time: string; days: string; bookable: boolean }
@@ -15,6 +16,7 @@ const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus
 const blankBlock = (): DraftBlock => ({ label: '', time: '', days: 'weekdays', bookable: false });
 
 export default function AdminSchedulesPage() {
+  const confirm = useConfirm();
   const [templates, setTemplates] = useState<OrgTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<OrgTemplate | 'new' | null>(null);
@@ -27,7 +29,7 @@ export default function AdminSchedulesPage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this org template? Mentor copies already imported are unaffected.')) return;
+    if (!(await confirm({ title: 'Delete this org template?', description: 'Mentor copies already imported are unaffected.', variant: 'danger', confirmLabel: 'Delete' }))) return;
     setBusy(id);
     try { await scheduleApi.deleteOrgTemplate(id); toast.success('Deleted'); await fetchAll(); }
     catch { toast.error('Could not delete'); } finally { setBusy(null); }

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { assessmentApi, type Assessment, type AssessmentQuestionType } from '@/lib/services/assessment-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { Drawer } from '@/components/shared/Drawer';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 interface Option { id: string; label: string }
 interface QuestionDraft {
@@ -53,6 +54,7 @@ export function AssessmentDrawer({
   onDeleted?: (id: string) => void;
 }) {
   const editing = Boolean(assessmentId);
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [meta, setMeta] = useState({ title: '', description: '', instructions: '', status: 'draft', passingScore: '' as string | number, timeLimitMins: '' as string | number });
@@ -149,7 +151,7 @@ export function AssessmentDrawer({
 
   const remove = async () => {
     if (!assessmentId) return;
-    if (!confirm('Delete this assessment? This cannot be undone.')) return;
+    if (!(await confirm({ title: 'Delete this assessment?', description: 'This cannot be undone.', variant: 'danger', confirmLabel: 'Delete' }))) return;
     try {
       await assessmentApi.remove(assessmentId);
       toast.success('Assessment deleted');

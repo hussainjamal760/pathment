@@ -23,6 +23,7 @@ import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { MenteeTaskDrawer } from '@/components/mentor/MenteeTaskDrawer';
 import { Drawer } from '@/components/shared/Drawer';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 type Attendance = 'present' | 'absent' | 'excused';
 type EntryStatus = 'pending' | 'reviewed' | 'deferred';
@@ -61,6 +62,7 @@ export default function CohortReview() {
   const { user } = useAuth();
   const { cohort, loading } = useMentorCohort();
   const { queue, refetch: refetchQueue } = useMentorApprovals();
+  const confirm = useConfirm();
 
   const [idx, setIdx] = useState(0);
   const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -336,7 +338,7 @@ export default function CohortReview() {
     } finally { setBusyTaskId(null); }
   };
   const unassignTask = async (taskId: string) => {
-    if (typeof window !== 'undefined' && !window.confirm('Unassign this task from the mentee? It will be removed from their list.')) return;
+    if (!(await confirm({ title: 'Unassign this task?', description: "It will be removed from the mentee's list.", variant: 'danger', confirmLabel: 'Unassign' }))) return;
     try {
       setBusyTaskId(taskId);
       await taskApi.unassignTask(taskId);
@@ -427,10 +429,11 @@ export default function CohortReview() {
   const removeHistorySession = async (s: ReviewSessionSummary) => {
     const dateLabel = new Date(`${s.sessionDate}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     const empty = sessionIsEmpty(s);
-    const msg = empty
-      ? `Discard the empty review for ${dateLabel}? Nothing was recorded, so this just removes the entry.`
-      : `Permanently delete the review for ${dateLabel}?\n\nThis erases ${s.counts.reviewed} reviewed · ${s.counts.present} present · ${s.counts.absent} absent · ${s.counts.excused} excused${s.counts.deferred ? ` · ${s.counts.deferred} deferred` : ''}.\n\nThis cannot be undone.`;
-    if (typeof window !== 'undefined' && !window.confirm(msg)) return;
+    const title = empty ? `Discard the empty review for ${dateLabel}?` : `Permanently delete the review for ${dateLabel}?`;
+    const description = empty
+      ? 'Nothing was recorded, so this just removes the entry.'
+      : `This erases ${s.counts.reviewed} reviewed · ${s.counts.present} present · ${s.counts.absent} absent · ${s.counts.excused} excused${s.counts.deferred ? ` · ${s.counts.deferred} deferred` : ''}. This cannot be undone.`;
+    if (!(await confirm({ title, description, variant: 'danger', confirmLabel: empty ? 'Discard' : 'Delete' }))) return;
     try {
       setBusySession(s.id);
       await mentorApi.deleteReviewSession(s.id);

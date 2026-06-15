@@ -4,6 +4,7 @@ import '../styles/globals.css';
 import { AuthProvider } from '@/lib/context/AuthContext';
 import { ThemeProvider } from '@/lib/context/ThemeContext';
 import { ClanProvider } from '@/lib/context/ClanContext';
+import { ConfirmProvider } from '@/lib/context/ConfirmContext';
 import { Toaster } from '@/components/ui/sonner';
 
 const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-jakarta', display: 'swap' });
@@ -25,8 +26,10 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             <ClanProvider>
-              {children}
-              <Toaster />
+              <ConfirmProvider>
+                {children}
+                <Toaster />
+              </ConfirmProvider>
             </ClanProvider>
           </AuthProvider>
         </ThemeProvider>

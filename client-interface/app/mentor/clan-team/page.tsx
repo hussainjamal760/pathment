@@ -10,6 +10,7 @@ import { clanRequestsApi } from '@/lib/services/clan-requests-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { Drawer } from '@/components/shared/Drawer';
 import { CoMentorPermissionsDrawer } from '@/components/shared/CoMentorPermissionsDrawer';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 interface Member {
   role: 'lead_mentor' | 'co_mentor' | 'core_team' | 'mentee';
@@ -77,6 +78,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   const [adding, setAdding] = useState(false);
   const [addingMentees, setAddingMentees] = useState(false);
   const [permMember, setPermMember] = useState<Member | null>(null);
+  const confirm = useConfirm();
   const canManage = myRole === 'lead_mentor';
 
   const load = useCallback(() => {
@@ -89,7 +91,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   useEffect(load, [load]);
 
   const remove = async (userId: string, label: string) => {
-    if (!confirm(`Remove ${label} from this clan? They'll be unassigned and can be placed again.`)) return;
+    if (!(await confirm({ title: `Remove ${label}?`, description: "They'll be unassigned from this clan and can be placed again.", variant: 'danger', confirmLabel: 'Remove' }))) return;
     try { await clanApi.removeMember(clanId, userId); toast.success('Removed'); load(); }
     catch (e) { toast.error(extractApiErrorMessage(e, 'Could not remove')); }
   };
@@ -264,6 +266,7 @@ function CrossClanSection({ clanId, clanName }: { clanId: string; clanName: stri
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [permCover, setPermCover] = useState<CrossClan | null>(null);
+  const confirm = useConfirm();
 
   const load = useCallback(() => {
     setLoading(true);
@@ -275,7 +278,7 @@ function CrossClanSection({ clanId, clanName }: { clanId: string; clanName: stri
   useEffect(load, [load]);
 
   const remove = async (id: string, label: string) => {
-    if (!confirm(`Remove cross-clan help from ${label}?`)) return;
+    if (!(await confirm({ title: 'Remove cross-clan help?', description: `${label} will no longer be helping this clan.`, variant: 'danger', confirmLabel: 'Remove' }))) return;
     try { await clanRequestsApi.removeCrossClan(id); toast.success('Removed'); load(); }
     catch (e) { toast.error(extractApiErrorMessage(e, 'Could not remove')); }
   };

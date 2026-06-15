@@ -32,6 +32,7 @@ import taskApi from '@/lib/services/task-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { PageHeader, StatusBadge } from '@/components/admin/ui';
 import { TaskEditDrawer } from '@/components/mentor/TaskEditDrawer';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -40,6 +41,7 @@ interface PageProps {
 export default function MentorTaskDetailsPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const confirm = useConfirm();
   const {
     task,
     loading,
@@ -120,7 +122,7 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
     }
   };
   const unassign = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Unassign this task from the mentee? It will be removed from their list.')) return;
+    if (!(await confirm({ title: 'Unassign this task?', description: "It will be removed from the mentee's list.", variant: 'danger', confirmLabel: 'Unassign' }))) return;
     try {
       setUnassigning(true);
       await taskApi.unassignTask(task.id);

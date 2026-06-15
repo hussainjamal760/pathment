@@ -8,6 +8,7 @@ import { Drawer } from '@/components/shared/Drawer';
 import { adminApi, type AdminPromotionCandidate } from '@/lib/services/admin-api';
 import { clanApi } from '@/lib/services/clan-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const STAGE_BADGE: Record<string, string> = {
   nominated: 'bg-slate-100 text-slate-600',
@@ -87,6 +88,7 @@ function PromoteDrawer({ candidate, onClose, onDone }: { candidate: AdminPromoti
 }
 
 export default function AdminPromotions() {
+  const confirm = useConfirm();
   const [candidates, setCandidates] = useState<AdminPromotionCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export default function AdminPromotions() {
   }, [candidates]);
 
   const decline = async (c: AdminPromotionCandidate) => {
-    if (!confirm(`Decline the nomination for ${c.name}? They stay a mentee.`)) return;
+    if (!(await confirm({ title: `Decline the nomination for ${c.name}?`, description: `They stay a mentee.`, variant: 'danger', confirmLabel: 'Decline' }))) return;
     try {
       setBusy(c.id);
       await adminApi.promotions.decline(c.id);

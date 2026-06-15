@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useProgramDetail } from '@/lib/hooks/admin';
 import { MenuPanel } from '@/components/shared/MenuPanel';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 type ProgramStatus = 'draft' | 'published' | 'archived' | 'completed';
 
@@ -50,6 +51,7 @@ const STATUS_TRANSITIONS: Record<ProgramStatus, { value: ProgramStatus; label: s
 function StatusSelector({
   status, onUpdate, updating,
 }: { status: string; onUpdate: (s: string) => void; updating: boolean }) {
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const s = (STATUS_CONFIG[status as ProgramStatus] ?? STATUS_CONFIG.draft);
@@ -63,9 +65,9 @@ function StatusSelector({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const handleSelect = (t: typeof transitions[0]) => {
+  const handleSelect = async (t: typeof transitions[0]) => {
     setOpen(false);
-    if (t.confirm && !confirm(t.confirm)) return;
+    if (t.confirm && !(await confirm({ title: t.confirm }))) return;
     onUpdate(t.value);
   };
 

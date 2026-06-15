@@ -11,6 +11,7 @@ import { libraryApi } from '@/lib/services/library-api';
 import { Drawer } from '@/components/shared/Drawer';
 import RichTextEditor from '@/components/shared/RichTextEditor';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const CATEGORIES = ['guidance', 'reading', 'template', 'policy'] as const;
 const CAT_META: Record<string, { icon: typeof BookOpen; cls: string; label: string }> = {
@@ -25,6 +26,7 @@ const CAT_META: Record<string, { icon: typeof BookOpen; cls: string; label: stri
  * add / edit / pin / delete; mentees get a clean read-only view.
  */
 export default function LibraryView({ canCurate = false }: { canCurate?: boolean }) {
+  const confirm = useConfirm();
   const { documents, loading, error, refetch } = useLibrary();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string>('all');
@@ -62,7 +64,7 @@ export default function LibraryView({ canCurate = false }: { canCurate?: boolean
     onOpen: () => open(d),
     onEdit: () => setEditing(d),
     onPin: () => act(d.id, () => libraryApi.togglePin(d.id)),
-    onRemove: () => { if (confirm('Delete this resource?')) act(d.id, () => libraryApi.remove(d.id), 'Deleted'); },
+    onRemove: async () => { if (await confirm({ title: 'Delete this resource?', variant: 'danger', confirmLabel: 'Delete' })) act(d.id, () => libraryApi.remove(d.id), 'Deleted'); },
   });
 
   return (

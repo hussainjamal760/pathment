@@ -11,6 +11,7 @@ import { usePagination } from '@/lib/hooks/shared/usePagination';
 import { useDebounce } from '@/lib/hooks/shared/useDebounce';
 import { changelogApi, type ChangelogAdminEntry, type ChangelogInput, type ChangelogRole, type ChangelogType } from '@/lib/services/changelog-api';
 import { isBlankHtml, stripHtml } from '@/lib/utils/html';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const RichTextEditor = dynamic(() => import('@/components/shared/RichTextEditor'), { ssr: false });
 
@@ -31,6 +32,7 @@ const TYPE_ICON: Record<string, typeof Rocket> = { feature: Rocket, improvement:
 const EMPTY: ChangelogInput = { title: '', body: '', type: 'feature', audience: ['admin', 'mentor', 'mentee'], isMajor: false, actionUrl: '', actionLabel: '' };
 
 export default function AdminChangelogPage() {
+  const confirm = useConfirm();
   const [entries, setEntries] = useState<ChangelogAdminEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -156,7 +158,7 @@ export default function AdminChangelogPage() {
   };
 
   const remove = async (e: ChangelogAdminEntry) => {
-    if (!confirm(`Delete "${e.title}"? This can't be undone.`)) return;
+    if (!(await confirm({ title: `Delete "${e.title}"?`, description: `This can't be undone.`, variant: 'danger', confirmLabel: 'Delete' }))) return;
     try {
       await changelogApi.remove(e.id);
       toast.success('Deleted');

@@ -7,6 +7,7 @@ import { useOrgRoadmaps, type OrgRoadmap, type OrgRoadmapStep } from '@/lib/hook
 import { programManagementApi } from '@/lib/services/program-api';
 import { RoadmapEditorDrawer } from '@/components/mentor/RoadmapEditorDrawer';
 import { downloadRoadmapJson } from '@/lib/utils/roadmap-json';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const TYPE_LABEL: Record<string, string> = { assignment: 'Assignment', project: 'Project', quiz: 'Quiz', reading: 'Reading', video: 'Video', discussion: 'Discussion', custom: 'Custom', practical: 'Practical', assessment: 'Assessment' };
 
@@ -26,6 +27,7 @@ function StepLine({ step, n }: { step: OrgRoadmapStep; n: number }) {
 }
 
 export default function AdminRoadmapsPage() {
+  const confirm = useConfirm();
   const hub = useOrgRoadmaps();
   const { roadmaps, loading, create, update, replaceSteps, setPublished, remove, refetch } = hub;
   const [programs, setPrograms] = useState<ProgramOpt[]>([]);
@@ -110,7 +112,7 @@ export default function AdminRoadmapsPage() {
                   {r.published ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   {r.published ? 'Unpublish' : 'Publish'}
                 </button>
-                <button onClick={async () => { if (!confirm(`Delete "${r.name}"? Imported mentor copies are unaffected.`)) return; setBusy(r.id); try { await remove(r.id); toast.success('Deleted'); } catch { toast.error('Could not delete'); } finally { setBusy(null); } }}
+                <button onClick={async () => { if (!(await confirm({ title: `Delete "${r.name}"?`, description: 'Imported mentor copies are unaffected.', variant: 'danger', confirmLabel: 'Delete' }))) return; setBusy(r.id); try { await remove(r.id); toast.success('Deleted'); } catch { toast.error('Could not delete'); } finally { setBusy(null); } }}
                   disabled={busy === r.id}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm text-slate-600 hover:text-red-600 hover:border-red-200 disabled:opacity-50 ml-auto">
                   <Trash2 className="w-3.5 h-3.5" />

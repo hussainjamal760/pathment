@@ -18,6 +18,7 @@ import {
 } from '@/lib/services/access-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { Drawer } from '@/components/shared/Drawer';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const PERMISSION_GROUPS = [
   { label: 'Programs & curriculum', perms: ['program.create', 'program.manage', 'program.publish', 'cohort.manage', 'roadmap.author', 'roadmap.publish_local'] },
@@ -434,6 +435,7 @@ function GrantDrawer({ user, onClose, onGranted }: { user: DirectoryUser; onClos
 
 /* ─────────────────────────── Custom roles ─────────────────────────── */
 function CustomRolesTab() {
+  const confirm = useConfirm();
   const [roles, setRoles] = useState<CustomRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<CustomRole | 'new' | null>(null);
@@ -442,7 +444,7 @@ function CustomRolesTab() {
   useEffect(load, []);
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this custom role?')) return;
+    if (!(await confirm({ title: 'Delete this custom role?', variant: 'danger', confirmLabel: 'Delete' }))) return;
     try { await accessApi.deleteCustomRole(id); toast.success('Deleted'); load(); }
     catch (e) { toast.error(extractApiErrorMessage(e, 'Could not delete')); }
   };

@@ -37,6 +37,7 @@ import { useMentorsList, MentorListItem, AcceptingFilter } from '@/lib/hooks/adm
 import { mentorApi } from '@/lib/services/mentor-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { toast } from 'sonner';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -231,6 +232,7 @@ export default function AdminMentorsListPage() {
     refetch,
   } = useMentorsList();
 
+  const confirm = useConfirm();
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
   const [suspendLoading, setSuspendLoading] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<MentorListItem | null>(null);
@@ -238,7 +240,7 @@ export default function AdminMentorsListPage() {
   const [suspendRow, setSuspendRow] = useState<MentorListItem | null>(null);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Permanently delete ${name}? Their active mentee assignments will be cancelled. This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete ${name}?`, description: `Their active mentee assignments will be cancelled. This permanently removes the account and cannot be undone.`, variant: 'danger', confirmLabel: 'Delete' }))) return;
     try {
       setDeleteLoading(id);
       await mentorApi.deleteUser(id);

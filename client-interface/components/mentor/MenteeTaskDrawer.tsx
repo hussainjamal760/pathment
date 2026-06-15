@@ -7,6 +7,7 @@ import { Drawer } from '@/components/shared/Drawer';
 import { TaskEditDrawer } from '@/components/mentor/TaskEditDrawer';
 import taskApi from '@/lib/services/task-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const STATUS_CLS: Record<string, string> = {
   assigned: 'bg-slate-100 text-slate-600', not_started: 'bg-slate-100 text-slate-600',
@@ -26,6 +27,7 @@ const DIFF_CLS: Record<string, string> = {
  * cancelled task, or unassign — without leaving the review flow.
  */
 export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onClose: () => void; onChanged: () => void }) {
+  const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const rt = task.roadmapTask || {};
@@ -42,7 +44,7 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
     finally { setBusy(false); }
   };
   const unassign = async () => {
-    if (typeof window !== 'undefined' && !window.confirm('Unassign this task from the mentee? It will be removed from their list.')) return;
+    if (!(await confirm({ title: 'Unassign this task?', description: "It will be removed from the mentee's list.", variant: 'danger', confirmLabel: 'Unassign' }))) return;
     try { setBusy(true); await taskApi.unassignTask(task.id); toast.success('Task unassigned'); onChanged(); onClose(); }
     catch (e) { toast.error(extractApiErrorMessage(e, 'Could not unassign the task')); }
     finally { setBusy(false); }

@@ -5,18 +5,20 @@ import { toast } from 'sonner';
 import { Gift as GiftIcon, Plus, Trash2, Pencil, Loader2, X } from 'lucide-react';
 import { useRewards, type Gift } from '@/lib/hooks/mentor';
 import { rewardsApi } from '@/lib/services/rewards-api';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 /**
  * Admin rewards catalog - the org-wide gift list mentees can redeem with points
  * they earn. Mentors redeem on a mentee's behalf from the mentor Rewards page.
  */
 export default function AdminRewardsPage() {
+  const confirm = useConfirm();
   const { gifts, redemptions, loading, refetch } = useRewards();
   const [editing, setEditing] = useState<Gift | 'new' | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const removeGift = async (id: string) => {
-    if (!confirm('Remove this gift from the catalog?')) return;
+    if (!(await confirm({ title: 'Remove this gift?', description: 'It will be removed from the catalog.', variant: 'danger', confirmLabel: 'Remove' }))) return;
     setBusy(id);
     try { await rewardsApi.removeGift(id); toast.success('Gift removed'); refetch(); }
     catch { toast.error('Could not remove'); } finally { setBusy(null); }

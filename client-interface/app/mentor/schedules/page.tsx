@@ -12,6 +12,7 @@ import { Drawer } from '@/components/shared/Drawer';
 import { ScheduleJsonPanel } from '@/components/shared/ScheduleJsonPanel';
 import { downloadScheduleTemplateJson } from '@/lib/utils/schedule-json';
 import { getBrowserTimeZone, formatMeeting } from '@/lib/utils/datetime';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 const DURATIONS = [15, 30, 45, 60];
 const SLOT_DAYS = ['everyday', 'weekdays', 'weekends'];
@@ -35,6 +36,7 @@ const DEFAULT_BLOCKS: DraftBlock[] = [
 function TemplatesTab() {
   const { local, org, loading, refetch } = useScheduleTemplates();
   const { cohort } = useMentorCohort();
+  const confirm = useConfirm();
   const [editing, setEditing] = useState<ScheduleTemplate | 'new' | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [assignFor, setAssignFor] = useState<ScheduleTemplate | null>(null);
@@ -58,7 +60,7 @@ function TemplatesTab() {
                       <div className="flex items-center gap-1 shrink-0">
                         <button onClick={() => setEditing(t)} aria-label="Edit schedule" className="p-1.5 text-slate-400 hover:text-brand-600"><Pencil className="w-4 h-4" /></button>
                         <button onClick={() => downloadScheduleTemplateJson(t)} aria-label="Export as JSON" title="Export as JSON" className="p-1.5 text-slate-400 hover:text-brand-600"><FileJson className="w-4 h-4" /></button>
-                        <button onClick={async () => { if (!confirm(`Delete "${t.name}"?`)) return; setBusy(t.id); try { await scheduleApi.deleteTemplate(t.id); refetch(); } finally { setBusy(null); } }} aria-label="Delete schedule" className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={async () => { if (!(await confirm({ title: `Delete "${t.name}"?`, description: 'This schedule template will be permanently removed.', variant: 'danger', confirmLabel: 'Delete' }))) return; setBusy(t.id); try { await scheduleApi.deleteTemplate(t.id); refetch(); } finally { setBusy(null); } }} aria-label="Delete schedule" className="p-1.5 text-slate-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </div>
                     <p className="text-xs text-slate-500 mt-0.5">{t.blocks.length} block{t.blocks.length === 1 ? '' : 's'}</p>

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { assessmentApi, type AssessmentQuestionType } from '@/lib/services/assessment-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { useConfirm } from '@/lib/context/ConfirmContext';
 
 interface Option { id: string; label: string }
 interface QuestionDraft {
@@ -37,6 +38,7 @@ const newId = () =>
     : `id_${Math.random().toString(36).slice(2)}`;
 
 export default function AssessmentBuilderPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const router = useRouter();
   const id = String(params?.id || '');
@@ -150,7 +152,7 @@ export default function AssessmentBuilderPage() {
   };
 
   const removeAssessment = async () => {
-    if (!confirm('Delete this assessment? This cannot be undone.')) return;
+    if (!(await confirm({ title: 'Delete this assessment?', description: 'This cannot be undone.', variant: 'danger', confirmLabel: 'Delete' }))) return;
     try {
       await assessmentApi.remove(id);
       toast.success('Assessment deleted');
