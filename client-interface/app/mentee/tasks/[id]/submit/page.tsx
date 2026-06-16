@@ -167,6 +167,17 @@ export default function TaskSubmission({ params }: PageProps) {
   const acceptanceCriteria = task.roadmapTask?.acceptanceCriteria || task.acceptanceCriteria || [];
   const resources = task.roadmapTask?.resources || [];
 
+  // The most recent mentor feedback (across versions) so a re-submitting mentee
+  // sees exactly what was requested. The API returns feedback with the real
+  // TaskFeedback shape: feedbackText / revisionNotes / decision.
+  const latestFeedback = (task.submissions || [])
+    .flatMap((s: { feedback?: { createdAt?: string }[] }) => s.feedback || [])
+    .sort((a: { createdAt?: string }, b: { createdAt?: string }) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0] as
+      | { feedbackText?: string; revisionNotes?: string; decision?: string; isApproved?: boolean }
+      | undefined;
+  const showRevisionBanner = task.status === 'revision_needed' && !!latestFeedback;
+  const revisionText = latestFeedback?.revisionNotes?.trim() || latestFeedback?.feedbackText?.trim() || '';
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -192,6 +203,18 @@ export default function TaskSubmission({ params }: PageProps) {
         <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <p className="text-red-900">{error}</p>
+        </div>
+      )}
+
+      {/* Changes requested — what the mentee must address before re-submitting */}
+      {showRevisionBanner && revisionText && (
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-amber-900">Your mentor asked for changes</p>
+            <p className="text-sm text-amber-800 mt-1 whitespace-pre-wrap">{revisionText}</p>
+            <p className="text-xs text-amber-700 mt-2">Address these, then re-submit below.</p>
+          </div>
         </div>
       )}
 

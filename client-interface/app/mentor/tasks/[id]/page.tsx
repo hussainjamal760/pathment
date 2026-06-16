@@ -102,8 +102,15 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
   const taskDeliverable = task.roadmapTask?.deliverable || task.deliverable;
   const acceptanceCriteria = task.roadmapTask?.acceptanceCriteria || task.acceptanceCriteria || [];
   const resources = task.roadmapTask?.resources || [];
-  const latestSubmission = task.submissions?.[task.submissions.length - 1] || null;
-  const feedback = latestSubmission?.feedback || [];
+  // The API returns submissions ordered version DESC — pick the highest version
+  // (don't assume array order) and show feedback across all versions, newest first.
+  const submissionsList: any[] = task.submissions || []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const latestSubmission = submissionsList.length
+    ? [...submissionsList].sort((a, b) => (b.version || 0) - (a.version || 0))[0]
+    : null;
+  const feedback = submissionsList
+    .flatMap((s: any) => (s.feedback || []).map((fb: any) => ({ ...fb, version: s.version }))) // eslint-disable-line @typescript-eslint/no-explicit-any
+    .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const canReview = ['submitted', 'revision_needed'].includes(task.status);
   const canCancel = !['completed', 'cancelled'].includes(task.status);
@@ -416,47 +423,51 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
             <MessageSquare className="w-5 h-5 text-brand-500" />
             Feedback Given
           </h2>
-          {feedback.map((fb: any, index: number) => (
-            <div key={fb.id || index} className="p-4 bg-brand-50 dark:bg-brand-500/10 border border-brand-200 dark:border-brand-500/20 rounded-lg space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-brand-900">
-                  {fb.action === 'approve' || fb.action === 'approved' ? 'Approved' : fb.action === 'request_revision' ? 'Revision Requested' : 'Reviewed'}
-                </p>
-                {fb.rating != null && (
-                  <div className="flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        className={`w-4 h-4 ${
-                          star <= fb.rating
-                            ? 'fill-yellow-400 text-yellow-400'
-                            : 'text-slate-200'
-                        }`}
-                      />
-                    ))}
+          {feedback.map((fb: any, index: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            const decision: string = fb.decision || (fb.isApproved ? 'approved' : 'changes');
+            const isChanges = decision === 'changes' || decision === 'rejected';
+            const ratingNum = Number(fb.rating);
+            const DECISION_META: Record<string, { label: string; cls: string }> = {
+              approved: { label: 'Approved', cls: 'bg-emerald-100 text-emerald-700' },
+              approved_notes: { label: 'Approved with notes', cls: 'bg-emerald-100 text-emerald-700' },
+              changes: { label: 'Changes requested', cls: 'bg-amber-100 text-amber-700' },
+              rejected: { label: 'Not accepted', cls: 'bg-rose-100 text-rose-700' },
+            };
+            const meta = DECISION_META[decision] || DECISION_META.changes;
+            const showNotes = fb.revisionNotes && fb.revisionNotes.trim() && fb.revisionNotes.trim() !== (fb.feedbackText || '').trim();
+            return (
+              <div key={fb.id || index} className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span>
+                    {fb.version != null && <span className="text-[11px] text-slate-400">on v{fb.version}</span>}
+                  </div>
+                  {Number.isFinite(ratingNum) && ratingNum > 0 && (
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star key={star} className={`w-4 h-4 ${star <= Math.round(ratingNum) ? 'fill-yellow-400 text-yellow-400' : 'text-slate-200'}`} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {fb.feedbackText && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-500 mb-1">{isChanges ? 'What you asked for' : 'Feedback'}</p>
+                    <p className="text-sm text-slate-800 whitespace-pre-wrap">{fb.feedbackText}</p>
                   </div>
                 )}
+                {showNotes && (
+                  <div>
+                    <p className="text-xs font-medium text-amber-700 mb-1">Changes to make</p>
+                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{fb.revisionNotes}</p>
+                  </div>
+                )}
+                {fb.createdAt && (
+                  <p className="text-xs text-slate-400">{new Date(fb.createdAt).toLocaleString()}</p>
+                )}
               </div>
-              {fb.comments && (
-                <p className="text-sm text-brand-800">{fb.comments}</p>
-              )}
-              {fb.strengths && (
-                <div>
-                  <p className="text-xs font-medium text-green-700 mb-1">Strengths</p>
-                  <p className="text-sm text-green-800">{fb.strengths}</p>
-                </div>
-              )}
-              {fb.improvements && (
-                <div>
-                  <p className="text-xs font-medium text-orange-700 mb-1">Areas for Improvement</p>
-                  <p className="text-sm text-orange-800">{fb.improvements}</p>
-                </div>
-              )}
-              {fb.createdAt && (
-                <p className="text-xs text-slate-400">{new Date(fb.createdAt).toLocaleString()}</p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
