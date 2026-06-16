@@ -715,7 +715,21 @@ class SubmissionService {
       order: [['submittedAt', 'ASC']]
     });
 
-    return submissions.map((s) => {
+    // Collapse to ONE entry per assignment. A mentee can resubmit / request an
+    // extension before review, and each of those creates a new TaskSubmission
+    // version while older versions stay 'pending' — without this, the same task
+    // shows up once per version in the queue (the "duplicate tasks" bug). We keep
+    // the latest version (the mentee's most recent state); the mentor still sees
+    // the full version thread when they open Review.
+    const latestByTask = new Map();
+    for (const s of submissions) {
+      const prev = latestByTask.get(s.assignedTaskId);
+      if (!prev || (s.version || 0) > (prev.version || 0)) latestByTask.set(s.assignedTaskId, s);
+    }
+    const latest = [...latestByTask.values()]
+      .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
+
+    return latest.map((s) => {
       const t = s.assignedTask;
       const m = t.mentee;
       return {
@@ -726,6 +740,14 @@ class SubmissionService {
         submissionUrls: s.submissionUrls || [],
         submittedAt: s.submittedAt,
         isLate: t.isLate,
+        // Extension-request fields — lets the client split the queue into a
+        // "To review" tab (work) and an "Extension requests" tab. A pending
+        // extension request is a TaskSubmission with extensionRequested=true and
+        // an unresolved extensionStatus.
+        isExtensionRequest: Boolean(s.extensionRequested && s.extensionStatus === 'pending'),
+        extensionReason: s.extensionReason || null,
+        extensionDays: s.extensionDays || null,
+        dueDate: t.dueDate || null,
         // Prefer the per-mentee override so the mentor reviews exactly what the
         // mentee saw, and the max points reflect this assignment's points.
         title: t.titleOverride || t.roadmapTask?.title || 'Task',

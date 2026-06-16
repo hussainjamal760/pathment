@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(20),
       defaultValue: 'pending',
       validate: {
-        isIn: [['pending', 'approved', 'revision_needed', 'reviewing']]
+        isIn: [['pending', 'approved', 'revision_needed', 'reviewing', 'superseded']]
       }
     },
     extensionRequested: {
