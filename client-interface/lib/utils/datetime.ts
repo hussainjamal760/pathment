@@ -75,10 +75,42 @@ export function formatMeeting(
   return [fallbackDay, fallbackTime].filter(Boolean).join(' · ') || '—';
 }
 
+/**
+ * The calendar date 'YYYY-MM-DD' for an instant, IN A SPECIFIC IANA zone.
+ * Use for `<input type="date">` values/limits when the date is meaningful in
+ * someone else's zone (e.g. a deadline is the MENTEE's calendar day, not the
+ * mentor's). `en-CA` formats as YYYY-MM-DD.
+ */
+export function dateInZone(value: string | number | Date | null | undefined, tz?: string): string {
+  const d = toDate(value);
+  if (!d) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz || getViewerTimeZone(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+}
+
+/** Today's calendar date 'YYYY-MM-DD' in a specific zone. */
+export function todayInZone(tz?: string): string {
+  return dateInZone(new Date(), tz);
+}
+
+/** Calendar arithmetic on a bare 'YYYY-MM-DD' (zone-free, DST-safe). */
+export function addDaysToDateStr(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+/** A short zone label for an arbitrary IANA zone, e.g. "PKT" / "GMT+5". */
+export function zoneLabel(tz?: string): string {
+  const zone = tz || getViewerTimeZone();
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short', timeZone: zone }).formatToParts(new Date());
+    return parts.find((p) => p.type === 'timeZoneName')?.value || zone;
+  } catch { return zone; }
+}
+
 /** Short zone label for the viewer, e.g. "PKT" / "GMT+5". */
 export function viewerZoneLabel(): string {
-  try {
-    const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short', timeZone: getViewerTimeZone() }).formatToParts(new Date());
-    return parts.find((p) => p.type === 'timeZoneName')?.value || getViewerTimeZone();
-  } catch { return getViewerTimeZone(); }
+  return zoneLabel(getViewerTimeZone());
 }

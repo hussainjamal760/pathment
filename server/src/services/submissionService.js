@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../utils/cloudinaryUpload');
 const { models } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../utils/errors/errorTypes');
@@ -231,7 +232,12 @@ class SubmissionService {
       throw new ValidationError('Extension request already processed');
     }
 
+    // Resolve the request AND drop it out of the pending approvals queue: an
+    // extension request is a 'pending' TaskSubmission, so once handled we mark it
+    // 'superseded' (it carries no work to review). Any earlier real work
+    // submission for the task that's still pending then re-surfaces for review.
     await submission.update({
+      status: 'superseded',
       extensionStatus: approved ? 'approved' : 'rejected',
       reviewedAt: new Date()
     });
@@ -254,7 +260,17 @@ class SubmissionService {
       const menteeTz = menteeSettings?.timezone || 'UTC';
       const dueInstant = endOfDayInZone(String(targetDate).split('T')[0], menteeTz);
       finalDueDate = dueInstant || targetDate;
-      await submission.assignedTask.update({ dueDate: finalDueDate });
+
+      // Recompute lateness against the NEW deadline. The mentee may have already
+      // submitted (and been flagged late) before requesting the extension — once
+      // we push the due date past that submission, it's no longer late, so clear
+      // the stale flag. If they haven't submitted yet, leave it (submit recomputes).
+      const at = submission.assignedTask;
+      const updateFields = { dueDate: finalDueDate };
+      if (at.submittedAt) {
+        updateFields.isLate = new Date(at.submittedAt) > new Date(finalDueDate);
+      }
+      await at.update(updateFields);
     }
 
     //  ADD: Send notification to mentee
@@ -729,6 +745,15 @@ class SubmissionService {
     const latest = [...latestByTask.values()]
       .sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
 
+    // A deadline is the MENTEE's calendar day (extensions anchor end-of-day in
+    // their zone), so the client needs each mentee's timezone to show/seed dates
+    // in the right calendar. One batched lookup, defaulting to UTC.
+    const menteeIds = [...new Set(latest.map((s) => s.assignedTask?.menteeId).filter(Boolean))];
+    const tzRows = menteeIds.length
+      ? await models.UserSettings.findAll({ where: { userId: { [Op.in]: menteeIds } }, attributes: ['userId', 'timezone'] })
+      : [];
+    const tzByUser = new Map(tzRows.map((r) => [r.userId, r.timezone || 'UTC']));
+
     return latest.map((s) => {
       const t = s.assignedTask;
       const m = t.mentee;
@@ -748,6 +773,7 @@ class SubmissionService {
         extensionReason: s.extensionReason || null,
         extensionDays: s.extensionDays || null,
         dueDate: t.dueDate || null,
+        menteeTimezone: tzByUser.get(t.menteeId) || 'UTC',
         // Prefer the per-mentee override so the mentor reviews exactly what the
         // mentee saw, and the max points reflect this assignment's points.
         title: t.titleOverride || t.roadmapTask?.title || 'Task',

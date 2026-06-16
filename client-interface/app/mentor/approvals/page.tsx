@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useMentorApprovals, type ApprovalItem } from '@/lib/hooks/mentor';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
+import { todayInZone, dateInZone, addDaysToDateStr, zoneLabel } from '@/lib/utils/datetime';
 
 function timeAgo(iso: string): string {
   const d = new Date(iso).getTime();
@@ -28,6 +29,22 @@ export default function MentorApprovals() {
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [extBusy, setExtBusy] = useState<string | null>(null);
+  // Mentor-chosen new due date per extension request (YYYY-MM-DD).
+  const [extDates, setExtDates] = useState<Record<string, string>>({});
+
+  // A deadline is the MENTEE's calendar day — compute "today" and the current
+  // due date in THEIR timezone (not UTC / the mentor's browser) so the date the
+  // mentor picks matches what the mentee experiences and what the server anchors.
+  const todayStr = (item: ApprovalItem) => todayInZone(item.menteeTimezone || undefined);
+  const suggestedDate = (item: ApprovalItem) => {
+    const tz = item.menteeTimezone || undefined;
+    const today = todayInZone(tz);
+    const dueStr = item.dueDate ? dateInZone(item.dueDate, tz) : '';
+    // Start from the later of today / current due (so it's always in the future
+    // even when overdue), then add the requested days.
+    const base = dueStr && dueStr > today ? dueStr : today;
+    return addDaysToDateStr(base, item.extensionDays || 3);
+  };
 
   // Split the queue: work submissions to review vs pending extension requests.
   const reviewItems = useMemo(() => queue.filter((q) => !q.isExtensionRequest), [queue]);
@@ -66,10 +83,15 @@ export default function MentorApprovals() {
   };
 
   const decideExtension = async (item: ApprovalItem, approved: boolean) => {
+    const newDate = approved ? (extDates[item.submissionId] || suggestedDate(item)) : undefined;
     try {
       setExtBusy(item.submissionId);
-      await handleExtension(item.submissionId, approved);
-      toast.success(approved ? 'Extension approved (+3 days)' : 'Extension declined');
+      await handleExtension(item.submissionId, approved, newDate);
+      toast.success(
+        approved
+          ? `Extension approved — new due date ${new Date(`${newDate}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+          : 'Extension declined'
+      );
     } catch {
       toast.error('Could not update the extension request');
     } finally {
@@ -252,21 +274,35 @@ export default function MentorApprovals() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => decideExtension(item, false)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
-                    >
-                      <X className="w-4 h-4" /> Decline
-                    </button>
-                    <button
-                      onClick={() => decideExtension(item, true)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
-                    >
-                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Approve
-                    </button>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-500">
+                      New due date
+                      <input
+                        type="date"
+                        min={todayStr(item)}
+                        value={extDates[item.submissionId] || suggestedDate(item)}
+                        onChange={(e) => setExtDates((p) => ({ ...p, [item.submissionId]: e.target.value }))}
+                        disabled={busy}
+                        className="border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+                      />
+                    </label>
+                    <span className="text-[10px] text-slate-400">Ends 11:59 PM {item.menteeTimezone ? `(${zoneLabel(item.menteeTimezone)})` : ''} in the mentee&apos;s timezone</span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <button
+                        onClick={() => decideExtension(item, false)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-red-300 hover:text-red-700 disabled:opacity-50"
+                      >
+                        <X className="w-4 h-4" /> Decline
+                      </button>
+                      <button
+                        onClick={() => decideExtension(item, true)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand-600 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                      >
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Approve
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -21,6 +21,7 @@ export interface ApprovalItem {
   extensionReason: string | null;
   extensionDays: number | null;
   dueDate: string | null;
+  menteeTimezone: string | null;
 }
 
 export interface UseMentorApprovalsReturn {

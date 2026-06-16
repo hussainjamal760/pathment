@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, Search, ShieldCheck, SlidersHorizontal, Trash2, UserPlus, X, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -97,7 +97,12 @@ function PeopleTab() {
   const [inviting, setInviting] = useState(false);
   const pagination = usePagination({ initialPage: 1, initialLimit: 20 });
 
+  // Monotonic request token — only the latest in-flight fetch is allowed to
+  // write state, so an earlier (e.g. page-3) response can never overwrite a
+  // later (page-1) one. This is what kills the pagination "glitch".
+  const reqRef = useRef(0);
   const load = useCallback(async () => {
+    const token = ++reqRef.current;
     setLoading(true);
     try {
       const res = await accessApi.directory({
@@ -106,16 +111,25 @@ function PeopleTab() {
         page: pagination.page,
         limit: pagination.limit,
       });
+      if (token !== reqRef.current) return; // superseded by a newer request
       setUsers(res.users);
       pagination.setTotal(res.total);
-    } catch { setUsers([]); }
-    finally { setLoading(false); }
+    } catch { if (token === reqRef.current) setUsers([]); }
+    finally { if (token === reqRef.current) setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, roleFilter, pagination.page, pagination.limit]);
 
-  useEffect(() => { load(); }, [load]);
+  // Single load effect. When the search/role filter changes we snap back to
+  // page 1 FIRST (and skip this run) so we never fetch a now-out-of-range page;
+  // the page change re-triggers the effect and fetches page 1 exactly once.
+  const prevFilters = useRef({ s: debouncedSearch, r: roleFilter });
+  useEffect(() => {
+    const changed = prevFilters.current.s !== debouncedSearch || prevFilters.current.r !== roleFilter;
+    prevFilters.current = { s: debouncedSearch, r: roleFilter };
+    if (changed && pagination.page !== 1) { pagination.goToPage(1); return; }
+    load();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { pagination.reset(); }, [debouncedSearch, roleFilter]);
+  }, [load]);
 
   return (
     <div className="grid lg:grid-cols-12 gap-6">
