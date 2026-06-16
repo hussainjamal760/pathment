@@ -113,6 +113,27 @@ class CohortService {
     return { status: entry.attendance, date: entry.session?.sessionDate || null };
   }
 
+  /**
+   * Full cohort-review attendance history for a mentee, newest first.
+   * Only entries the mentee was actually marked on (present/absent/excused) —
+   * a late-joiner has no entries for meetings before they joined, so this is
+   * naturally "since they joined". Each: { sessionId, date, status, title }.
+   */
+  async getAttendanceHistory(menteeId) {
+    if (!models.CohortReviewEntry || !models.CohortReviewSession) return [];
+    const entries = await models.CohortReviewEntry.findAll({
+      where: { menteeId, attendance: { [Op.ne]: null } },
+      include: [{ model: models.CohortReviewSession, as: 'session', attributes: ['id', 'sessionDate', 'title'], required: true }],
+      order: [[{ model: models.CohortReviewSession, as: 'session' }, 'session_date', 'DESC']],
+    });
+    return entries.map((e) => ({
+      sessionId: e.session?.id || e.sessionId,
+      date: e.session?.sessionDate || null,
+      status: e.attendance,
+      title: e.session?.title || null,
+    }));
+  }
+
   /** Pick the most relevant enrollment for a mentee's cockpit card. */
   pickPrimaryEnrollment(enrollments) {
     if (!enrollments || !enrollments.length) return null;

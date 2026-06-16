@@ -30,6 +30,7 @@ router.patch('/mentee/:id/personality', mentorOnly, cohortController.updatePerso
 router.post('/mentee/:id/insights', mentorOnly, cohortController.addInsight);
 router.post('/mentee/:id/notes', mentorOnly, cohortController.logMeetingNote);
 router.post('/mentee/:id/attendance', mentorOnly, cohortController.setAttendance);
+router.get('/mentee/:id/attendance/history', mentorOnly, cohortController.getMenteeAttendanceHistory);
 router.get('/review/attendance', authenticate, authorize(['mentor', 'admin']), cohortController.getReviewAttendance);
 
 // Dated, saved, editable cohort-review sessions (full history). `today` and the

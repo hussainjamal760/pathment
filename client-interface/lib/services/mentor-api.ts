@@ -41,6 +41,8 @@ export const mentorApi = {
   setAttendance: (menteeId: string, status: 'present' | 'absent' | 'excused') =>
     apiClient.post(`/mentor/mentee/${menteeId}/attendance`, { status }),
   getReviewAttendance: () => apiClient.get<{ data: { attendance: Record<string, 'present' | 'absent' | 'excused'> } }>('/mentor/review/attendance'),
+  getMenteeAttendanceHistory: (menteeId: string) =>
+    apiClient.get<{ data: { history: { sessionId: string; date: string | null; status: 'present' | 'absent' | 'excused'; title: string | null }[] } }>(`/mentor/mentee/${menteeId}/attendance/history`),
 
   // Dated, saved, editable cohort-review sessions (full history).
   getTodayReviewSession: () => apiClient.get('/mentor/review/sessions/today'),

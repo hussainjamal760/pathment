@@ -68,6 +68,9 @@ export default function CohortReview() {
   const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [tasksLoading, setTasksLoading] = useState(false);
   const [profile, setProfile] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any -- full mentee profile (aiSummary/signals)
+  // Full cohort-review attendance history for the current mentee (newest first).
+  const [attHistory, setAttHistory] = useState<{ sessionId: string; date: string | null; status: Attendance; title: string | null }[]>([]);
+  const [attOpen, setAttOpen] = useState(false);
   // The dated, saved cohort-review session (today by default, or ?session=<id>).
   // attendance / seen / deferred are derived from its entries — nothing ephemeral.
   const [session, setSession] = useState<ReviewSession | null>(null);
@@ -177,6 +180,14 @@ export default function CohortReview() {
   const editable = session?.status === 'in_progress' || session?.status === 'draft';
   const isDraft = session?.status === 'draft';
 
+  // "Last meeting" = the most recent attendance STRICTLY BEFORE the session being
+  // viewed (history is newest-first). So opening a Jun 9 review never shows a
+  // Jun 14 meeting, and the current session's own mark isn't echoed back as "last".
+  const lastMeeting = useMemo(() => {
+    if (!session?.sessionDate) return null;
+    return attHistory.find((h) => h.date && h.date < session.sessionDate) || null;
+  }, [attHistory, session?.sessionDate]);
+
   // Create today's session on the first real action, flushing any "seen" marks
   // accumulated while it was a draft. Returns the now-persisted session. The
   // in-flight guard dedupes concurrent first-actions so we never create two
@@ -238,9 +249,10 @@ export default function CohortReview() {
   // the current mentee; reset state.
   useEffect(() => {
     if (!mentee) return;
-    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]); setProfile(null);
+    setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]); setProfile(null); setAttHistory([]);
     frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {}); // eslint-disable-line @typescript-eslint/no-explicit-any
     mentorApi.getMenteeProfile(mentee.id).then((r: any) => setProfile(r?.data?.profile ?? r?.data ?? null)).catch(() => setProfile(null)); // eslint-disable-line @typescript-eslint/no-explicit-any
+    mentorApi.getMenteeAttendanceHistory(mentee.id).then((r) => setAttHistory((r?.data?.history ?? []) as typeof attHistory)).catch(() => setAttHistory([]));
     // The mentee's FULL task list (every assignment, whoever made it) — not just
     // the viewer's own — so a co-mentor sees the same work as the lead.
     setTasksLoading(true);
@@ -511,7 +523,7 @@ export default function CohortReview() {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
       // Also bail while any field-bearing drawer is open (review / assign / task
       // edit / extension / history) — its inputs own the keyboard.
-      if (reviewing || assigning || taskDetail || extReview || historyOpen) return;
+      if (reviewing || assigning || taskDetail || extReview || historyOpen || attOpen) return;
       const k = e.key.toLowerCase();
       if (k === 't') { e.preventDefault(); setAssigning(true); return; }
       if (k === 'arrowright' || k === 'l') { e.preventDefault(); go(1); }
@@ -529,7 +541,7 @@ export default function CohortReview() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [go, skip, approve, requestChanges, mark, pending, focus, reviewing, assigning, taskDetail, extReview, historyOpen]);
+  }, [go, skip, approve, requestChanges, mark, pending, focus, reviewing, assigning, taskDetail, extReview, historyOpen, attOpen]);
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
   if (!cohort.length) return (
@@ -838,7 +850,13 @@ export default function CohortReview() {
         <div className="space-y-4">
           {/* Attendance */}
           <div className="bg-card rounded-2xl border border-slate-200 p-5">
-            <h3 className="font-semibold text-slate-900 mb-3">Attendance</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">Attendance</h3>
+              <button onClick={() => setAttOpen(true)}
+                className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+                <History className="w-3.5 h-3.5" /> History
+              </button>
+            </div>
             <div className="flex gap-2">
               {(['present', 'absent', 'excused'] as Attendance[]).map((s) => (
                 <button key={s} onClick={() => mark(s)} disabled={!editable}
@@ -847,14 +865,14 @@ export default function CohortReview() {
                 </button>
               ))}
             </div>
-            {profile?.lastAttendance?.status && (
-              <p className="text-[11px] text-slate-500 mt-2.5 inline-flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${profile.lastAttendance.status === 'present' ? 'bg-emerald-500' : profile.lastAttendance.status === 'excused' ? 'bg-amber-500' : 'bg-rose-500'}`} />
-                Last meeting: <span className="font-medium capitalize text-slate-700">{profile.lastAttendance.status}</span>
-                {profile.lastAttendance.date && (
-                  <span className="text-slate-400">· {new Date(`${profile.lastAttendance.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+            {lastMeeting?.status && (
+              <button onClick={() => setAttOpen(true)} className="text-[11px] text-slate-500 mt-2.5 inline-flex items-center gap-1.5 hover:text-slate-700">
+                <span className={`w-1.5 h-1.5 rounded-full ${lastMeeting.status === 'present' ? 'bg-emerald-500' : lastMeeting.status === 'excused' ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                Last meeting: <span className="font-medium capitalize text-slate-700">{lastMeeting.status}</span>
+                {lastMeeting.date && (
+                  <span className="text-slate-400">· {new Date(`${lastMeeting.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                 )}
-              </p>
+              </button>
             )}
             {session?.status === 'finished' && <p className="text-[11px] text-slate-400 mt-2">This review is finished — reopen it to make changes.</p>}
             {!session && !sessionLoading && <p className="text-[11px] text-amber-600 mt-2">Couldn&apos;t load today&apos;s review session — marks won&apos;t save until it loads.</p>}
@@ -1058,6 +1076,48 @@ export default function CohortReview() {
             );
           })}
         </div>
+      </Drawer>
+
+      {/* Per-mentee attendance history — every cohort review they were marked on,
+          newest first. A late-joiner simply has no entries before they joined. */}
+      <Drawer open={attOpen} onClose={() => setAttOpen(false)} width="md"
+        title="Attendance history"
+        subtitle={mentee ? `${mentee.name} · ${attHistory.length} recorded meeting${attHistory.length === 1 ? '' : 's'}` : undefined}>
+        {attHistory.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-10">No attendance recorded yet — nothing before they joined.</p>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-3">
+              <span className="text-emerald-600">{attHistory.filter((h) => h.status === 'present').length} present</span>
+              <span className="text-red-500">{attHistory.filter((h) => h.status === 'absent').length} absent</span>
+              <span className="text-amber-600">{attHistory.filter((h) => h.status === 'excused').length} excused</span>
+            </div>
+            <div className="space-y-2">
+              {attHistory.map((h) => {
+                const isCurrent = !!session?.sessionDate && h.date === session.sessionDate;
+                const dateLabel = h.date
+                  ? new Date(`${h.date}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                  : 'Undated';
+                const dot = h.status === 'present' ? 'bg-emerald-500' : h.status === 'excused' ? 'bg-amber-500' : 'bg-rose-500';
+                const pill = h.status === 'present' ? 'bg-emerald-100 text-emerald-700' : h.status === 'excused' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700';
+                return (
+                  <div key={h.sessionId}
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-3 ${isCurrent ? 'border-brand-300 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700'}`}>
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-slate-900 inline-flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                        {dateLabel}
+                        {isCurrent && <span className="text-[10px] font-medium text-brand-600">· this review</span>}
+                      </span>
+                      {h.title && <p className="text-xs text-slate-500 mt-0.5 truncate">{h.title}</p>}
+                    </div>
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize shrink-0 ${pill}`}>{h.status}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </Drawer>
 
       {showHelp && (

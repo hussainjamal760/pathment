@@ -147,4 +147,10 @@ const getReviewAttendance = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Attendance', { attendance }));
 });
 
-module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance };
+/** GET /api/mentor/mentee/:id/attendance/history — full cohort-review attendance (newest first). */
+const getMenteeAttendanceHistory = catchAsync(async (req, res) => {
+  const history = await cohortService.getAttendanceHistory(req.params.id);
+  res.status(200).json(successResponse('Attendance history', { history }));
+});
+
+module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance, getMenteeAttendanceHistory };
