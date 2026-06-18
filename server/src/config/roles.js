@@ -62,7 +62,7 @@ const ROLES = {
     scope: 'clan',
     description: 'Leads a clan - full mentoring plus member management.',
     permissions: [
-      P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE,
+      P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE, P.MENTEE_ADD,
       P.CLAN_MANAGE_MEMBERS, P.ROADMAP_PUBLISH_LOCAL, P.LIBRARY_MANAGE,
       P.ANNOUNCEMENT_POST, P.ANALYTICS_VIEW, P.COMMUNITY_POST
     ]
@@ -72,11 +72,12 @@ const ROLES = {
     scope: 'clan',
     description: 'Full mentoring access by default; the lead mentor and admins manage the team and can fine-tune each co-mentor.',
     // Co-mentors default to the SAME power as a lead mentor, EXCEPT
-    // clan.manage_members (managing the team + editing permissions stays with
-    // the lead mentor + admins). A lead/admin can then revoke any of these for
-    // an individual co-mentor via clan_memberships.permission_overrides.
+    // clan.manage_members (managing co-mentors/core team + editing permissions
+    // stays with the lead mentor + admins). mentee.add is toggleable here so a
+    // lead can revoke it per co-mentor. A lead/admin can fine-tune via
+    // clan_memberships.permission_overrides.
     permissions: [
-      P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE,
+      P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE, P.MENTEE_ADD,
       P.ROADMAP_PUBLISH_LOCAL, P.LIBRARY_MANAGE, P.ANNOUNCEMENT_POST,
       P.ANALYTICS_VIEW, P.COMMUNITY_POST
     ]

@@ -1,7 +1,9 @@
 const { models, sequelize } = require('../db');
-const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors/errorTypes');
+const { NotFoundError, ValidationError, ConflictError, AuthorizationError } = require('../utils/errors/errorTypes');
 const { createAuditLog } = require('../utils/auditContext');
 const { ROLES } = require('../config/roles');
+const authzService = require('./authzService');
+const { PERMISSIONS: P } = require('../config/permissions');
 
 // The permissions a co-mentor holds by default — and therefore the exact set a
 // lead mentor / admin may toggle on or off for an individual co-mentor. Derived
@@ -192,9 +194,18 @@ class ClanService {
    * clan-based assignment entry point: assigning a mentee here is how they're
    * "matched". Ensures the user gains the implied platform capability.
    */
-  async addMember(clanId, { userId, role, enrollmentId }) {
+  async addMember(clanId, { userId, role, enrollmentId }, actor = null) {
     if (!userId || !role) throw new ValidationError('userId and role are required');
     if (!CAPABILITY_FOR_CLAN_ROLE[role]) throw new ValidationError(`Invalid clan role: ${role}`);
+
+    if (actor) {
+      const resource = await authzService.scopeOfClan(clanId);
+      const canManageTeam = await authzService.can(actor, P.CLAN_MANAGE_MEMBERS, resource);
+      const canAddMentee = role === 'mentee' && await authzService.can(actor, P.MENTEE_ADD, resource);
+      if (!canManageTeam && !canAddMentee) {
+        throw new AuthorizationError('You do not have permission to perform this action');
+      }
+    }
 
     const clan = await models.Clan.findByPk(clanId);
     if (!clan) throw new NotFoundError('Clan not found');
@@ -269,6 +280,27 @@ class ClanService {
   /** The permission keys a lead/admin may toggle for a co-mentor (the defaults). */
   coMentorPermissionKeys() {
     return [...CO_MENTOR_PERMISSIONS];
+  }
+
+  /**
+   * What the current user may do in THIS clan — clan-scoped, matches route guards.
+   * Drives the mentor clan-team UI (so co-mentor "Add mentees" aligns with the API).
+   */
+  async getMyClanAccess(clanId, user) {
+    const userId = user.id;
+    const membership = await models.ClanMembership.findOne({
+      where: { clanId, userId, status: 'active' },
+      attributes: ['role']
+    });
+    if (!membership || !['lead_mentor', 'co_mentor'].includes(membership.role)) {
+      throw new AuthorizationError('You are not a mentor of this clan');
+    }
+
+    const resource = await authzService.scopeOfClan(clanId);
+    const canManageTeam = await authzService.can(user, P.CLAN_MANAGE_MEMBERS, resource);
+    const canAddMentees = canManageTeam || await authzService.can(user, P.MENTEE_ADD, resource);
+
+    return { role: membership.role, canManageTeam, canAddMentees };
   }
 
   /**

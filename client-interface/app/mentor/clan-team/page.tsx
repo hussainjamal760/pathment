@@ -78,16 +78,30 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   const [adding, setAdding] = useState(false);
   const [addingMentees, setAddingMentees] = useState(false);
   const [permMember, setPermMember] = useState<Member | null>(null);
+  const [canManageTeam, setCanManageTeam] = useState(myRole === 'lead_mentor');
+  const [canAddMentees, setCanAddMentees] = useState(myRole === 'lead_mentor');
   const confirm = useConfirm();
-  const canManage = myRole === 'lead_mentor';
 
   const load = useCallback(() => {
     setLoading(true);
-    clanApi.get(clanId)
-      .then((r: any) => setClan(r.data?.clan || r.data))
+    Promise.all([
+      clanApi.get(clanId),
+      clanApi.myClanAccess(clanId).catch(() => null),
+    ])
+      .then(([clanRes, accessRes]: any[]) => {
+        setClan(clanRes.data?.clan || clanRes.data);
+        const access = accessRes?.data;
+        if (access) {
+          setCanManageTeam(Boolean(access.canManageTeam));
+          setCanAddMentees(Boolean(access.canAddMentees));
+        } else {
+          setCanManageTeam(myRole === 'lead_mentor');
+          setCanAddMentees(myRole === 'lead_mentor');
+        }
+      })
       .catch(() => toast.error('Could not load clan'))
       .finally(() => setLoading(false));
-  }, [clanId]);
+  }, [clanId, myRole]);
   useEffect(load, [load]);
 
   const remove = async (userId: string, label: string) => {
@@ -118,10 +132,10 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        {managePerms && canManage && (
+        {managePerms && canManageTeam && (
           <button onClick={() => setPermMember(m)} className="p-1.5 rounded-md text-slate-400 hover:text-brand-600 hover:bg-brand-50" aria-label="Edit permissions" title="Edit permissions"><SlidersHorizontal className="w-4 h-4" /></button>
         )}
-        {removable && canManage && (
+        {removable && canManageTeam && (
           <button onClick={() => remove(m.user.id, name(m.user))} className="p-1.5 rounded-md text-rose-500 hover:bg-rose-50" aria-label="Remove"><Trash2 className="w-4 h-4" /></button>
         )}
       </div>
@@ -144,7 +158,7 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
           <h2 className="font-semibold text-slate-900">{clan.name}</h2>
           <p className="text-sm text-slate-500">{clan.program?.name} · {menteeCount} mentee{menteeCount === 1 ? '' : 's'}</p>
         </div>
-        {canManage ? (
+        {canManageTeam ? (
           <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setAddingMentees(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 dark:bg-brand-500/15 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100">
               <Users2 className="w-4 h-4" /> Add mentees
@@ -153,6 +167,10 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
               <UserPlus className="w-4 h-4" /> Add to team
             </button>
           </div>
+        ) : canAddMentees ? (
+          <button onClick={() => setAddingMentees(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 dark:bg-brand-500/15 px-3 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 shrink-0">
+            <Users2 className="w-4 h-4" /> Add mentees
+          </button>
         ) : (
           <span className="text-xs text-slate-400 shrink-0">View only (co-mentor)</span>
         )}
@@ -168,11 +186,11 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
         )}
       </div>
 
-      {canManage && <CrossClanSection clanId={clanId} clanName={clan.name} />}
+      {canManageTeam && <CrossClanSection clanId={clanId} clanName={clan.name} />}
 
-      {adding && <AddTeamMemberDrawer clanId={clanId} onClose={() => setAdding(false)} onAdded={() => { setAdding(false); load(); }} />}
-      {addingMentees && <AddMenteesDrawer clanId={clanId} clanName={clan.name} onClose={() => setAddingMentees(false)} onChanged={() => load()} />}
-      {permMember && <CoMentorPermissionsDrawer clanId={clanId} userId={permMember.user.id} name={name(permMember.user)} onClose={() => setPermMember(null)} onSaved={load} />}
+      {canManageTeam && adding && <AddTeamMemberDrawer clanId={clanId} onClose={() => setAdding(false)} onAdded={() => { setAdding(false); load(); }} />}
+      {canAddMentees && addingMentees && <AddMenteesDrawer clanId={clanId} clanName={clan.name} onClose={() => setAddingMentees(false)} onChanged={() => load()} />}
+      {canManageTeam && permMember && <CoMentorPermissionsDrawer clanId={clanId} userId={permMember.user.id} name={name(permMember.user)} onClose={() => setPermMember(null)} onSaved={load} />}
     </div>
   );
 }

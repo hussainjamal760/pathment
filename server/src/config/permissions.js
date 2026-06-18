@@ -25,6 +25,7 @@ const PERMISSIONS = {
   CLAN_MANAGE_MEMBERS: 'clan.manage_members',
   MENTEE_VIEW: 'mentee.view',                // see mentees' profiles/progress
   MENTEE_MANAGE: 'mentee.manage',            // notes, insights, placement actions
+  MENTEE_ADD: 'mentee.add',                  // add mentees to a clan (co-mentor toggle)
   USER_MANAGE: 'user.manage',               // org user directory / status
 
   // Work

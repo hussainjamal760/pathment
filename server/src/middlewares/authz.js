@@ -1,4 +1,5 @@
 const authzService = require('../services/authzService');
+const { PERMISSIONS } = require('../config/permissions');
 const { AuthenticationError, AuthorizationError } = require('../utils/errors/errorTypes');
 
 /**
@@ -26,6 +27,61 @@ function requirePermission(permission, scopeResolver = null) {
         throw new AuthorizationError('You do not have permission to perform this action');
       }
       next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+/**
+ * Admit the request when the user holds ANY of the listed permissions at the
+ * resolved scope. Same assignment caching as requirePermission.
+ */
+function requireAnyPermission(permissions, scopeResolver = null) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) throw new AuthenticationError('You must be logged in to access this resource');
+
+      req._assignments = req.loadAssignments
+        ? await req.loadAssignments()
+        : (req._assignments || (await authzService.getAssignments(req.user)));
+      const resource = scopeResolver ? await scopeResolver(req) : null;
+
+      for (const permission of permissions) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await authzService.can(req.user, permission, resource, { assignments: req._assignments })) {
+          return next();
+        }
+      }
+      throw new AuthorizationError('You do not have permission to perform this action');
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+/**
+ * Add a member to a clan: clan.manage_members covers any role; mentee.add covers
+ * adding mentees only (co-mentor toggle). Prevents mentee.add from assigning
+ * co-mentors / core team.
+ */
+function requireAddClanMember(scopeResolver) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) throw new AuthenticationError('You must be logged in to access this resource');
+
+      req._assignments = req.loadAssignments
+        ? await req.loadAssignments()
+        : (req._assignments || (await authzService.getAssignments(req.user)));
+      const resource = await scopeResolver(req);
+
+      if (await authzService.can(req.user, PERMISSIONS.CLAN_MANAGE_MEMBERS, resource, { assignments: req._assignments })) {
+        return next();
+      }
+      if (req.body?.role === 'mentee' && await authzService.can(req.user, PERMISSIONS.MENTEE_ADD, resource, { assignments: req._assignments })) {
+        return next();
+      }
+      throw new AuthorizationError('You do not have permission to perform this action');
     } catch (err) {
       next(err);
     }
@@ -95,4 +151,4 @@ const scope = {
     authzService.scopeOfAnnouncementAudience(req.body && req.body.audience, req.body && req.body.audienceId)
 };
 
-module.exports = { requirePermission, requirePermissionAnyScope, requirePermissionMinScope, scope };
+module.exports = { requirePermission, requireAnyPermission, requireAddClanMember, requirePermissionAnyScope, requirePermissionMinScope, scope };

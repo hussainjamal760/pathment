@@ -23,7 +23,7 @@ import { useConfirm } from '@/lib/context/ConfirmContext';
 const PERMISSION_GROUPS = [
   { label: 'Programs & curriculum', perms: ['program.create', 'program.manage', 'program.publish', 'cohort.manage', 'roadmap.author', 'roadmap.publish_local'] },
   { label: 'Intake', perms: ['intake.manage', 'assessment.author', 'invite.create'] },
-  { label: 'People & clans', perms: ['clan.create', 'clan.manage_members', 'mentee.view', 'mentee.manage', 'user.manage'] },
+  { label: 'People & clans', perms: ['clan.create', 'clan.manage_members', 'mentee.view', 'mentee.manage', 'mentee.add', 'user.manage'] },
   { label: 'Work', perms: ['task.assign', 'task.review', 'library.manage'] },
   { label: 'Community & rewards', perms: ['community.post', 'community.moderate', 'announcement.post', 'gamification.manage'] },
   { label: 'Platform', perms: ['analytics.view', 'access.manage', 'system.settings'] },

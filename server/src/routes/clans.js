@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const clanController = require('../controllers/clanController');
 const { authenticate, authorize } = require('../middlewares/auth');
-const { requirePermission, requirePermissionMinScope, scope } = require('../middlewares/authz');
+const { requirePermission, requireAnyPermission, requireAddClanMember, requirePermissionMinScope, scope } = require('../middlewares/authz');
 const { validateQuery } = require('../middlewares/validate');
 const clanSchemas = require('../validations/clanValidation');
 const { PERMISSIONS } = require('../config/permissions');
@@ -29,11 +29,14 @@ router.get('/:id', authenticate, clanController.getClan);
 router.post('/', authenticate, requirePermission(PERMISSIONS.CLAN_CREATE, (req) => ({ programId: req.body.programId })), clanController.createClan);
 
 // Update / manage members - needs clan.manage_members ON THIS CLAN. That's held
-// by admins and the clan's LEAD MENTOR (not co-mentors). This is how a lead
-// mentor adds a co-mentor / core-team member to their own clan.
+// by admins and the clan's LEAD MENTOR (not co-mentors). Co-mentors may add
+// mentees when they hold mentee.add (see requireAddClanMember below).
 router.patch('/:id', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.updateClan);
-router.post('/:id/members', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.addMember);
+router.post('/:id/members', authenticate, requireAddClanMember(scope.clan('id')), clanController.addMember);
 router.delete('/:id/members/:userId', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.removeMember);
+
+// Clan-scoped capabilities for the current mentor (before /:userId routes).
+router.get('/:id/members/me/access', authenticate, clanController.getMyClanAccess);
 
 // Fine-tune one co-mentor's permissions (lead mentor of THIS clan, or an admin).
 // Co-mentors don't hold clan.manage_members, so they can't edit anyone's perms.
@@ -46,8 +49,9 @@ router.patch('/:id/members/:userId/permissions', authenticate, requirePermission
 router.post('/reassign', authenticate, requirePermissionMinScope(PERMISSIONS.CLAN_MANAGE_MEMBERS, 'program'), clanController.reassignClan);
 
 // Lead mentor: pull in unassigned mentees, or invite a new one straight into the clan.
-router.get('/:id/available', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.availableMembers);
-router.post('/:id/invite', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.inviteToClan);
+// Co-mentors with mentee.add may use these too.
+router.get('/:id/available', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.availableMembers);
+router.post('/:id/invite', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.inviteToClan);
 
 // Candidates for co-mentor / core-team (anyone active, not already in the clan).
 router.get('/:id/candidates', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.candidates);

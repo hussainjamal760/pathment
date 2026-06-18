@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   CLAN_MANAGE_MEMBERS: 'clan.manage_members',
   MENTEE_VIEW: 'mentee.view',
   MENTEE_MANAGE: 'mentee.manage',
+  MENTEE_ADD: 'mentee.add',
   USER_MANAGE: 'user.manage',
   TASK_ASSIGN: 'task.assign',
   TASK_REVIEW: 'task.review',
@@ -42,6 +43,7 @@ export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 export const CO_MENTOR_PERMISSIONS: { key: Permission; label: string; description: string }[] = [
   { key: PERMISSIONS.MENTEE_VIEW, label: 'View mentees', description: 'See mentee profiles, progress, and submissions.' },
   { key: PERMISSIONS.MENTEE_MANAGE, label: 'Manage mentees', description: 'Add notes, manage placement, and act on insights.' },
+  { key: PERMISSIONS.MENTEE_ADD, label: 'Add mentees', description: 'Bring new mentees into the clan or invite them by email.' },
   { key: PERMISSIONS.TASK_ASSIGN, label: 'Assign tasks', description: 'Create and assign tasks to mentees.' },
   { key: PERMISSIONS.TASK_REVIEW, label: 'Review work', description: 'Mark tasks complete and leave feedback.' },
   { key: PERMISSIONS.ROADMAP_PUBLISH_LOCAL, label: 'Publish roadmaps', description: "Build and publish the clan's roadmap." },
