@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ChevronLeft, ChevronRight, SkipForward, Check, Loader2,
   TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo, CalendarClock,
-  Trash2, X, History, RotateCcw, CalendarDays, AlertTriangle, StickyNote, Search,
+  Trash2, X, History, RotateCcw, CalendarDays, AlertTriangle, StickyNote, Search, Lock, Unlock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
@@ -15,6 +15,7 @@ import { mentorApi } from '@/lib/services/mentor-api';
 import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
 import { frictionApi } from '@/lib/services/friction-api';
+import { reviewLockApi, type MentorLockState } from '@/lib/services/review-lock-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { DualProgress } from '@/components/mentor/DualProgress';
 import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
@@ -426,16 +427,46 @@ export default function CohortReview() {
     } catch { toast.error('Could not update the review'); }
   }, [session, ensureSession]);
 
+  // ── Deletion lock: admins can lock review-record deletion org-wide for audit
+  // integrity. When locked without an active grant, delete/reopen are disabled
+  // and the mentor can request time-boxed access. Loaded when history opens. ──
+  const [lockState, setLockState] = useState<MentorLockState | null>(null);
+  const [requestingAccess, setRequestingAccess] = useState(false);
+  const [accessReason, setAccessReason] = useState('');
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const loadLockState = useCallback(async () => {
+    try { setLockState(await reviewLockApi.mentorLockState()); }
+    catch { setLockState(null); }
+  }, []);
+  const locked = !!lockState?.locked;
+  const hasGrant = !!lockState?.hasActiveGrant;
+  const deletionBlocked = locked && !hasGrant;
+  const submitAccessRequest = async () => {
+    if (!accessReason.trim()) { toast.error('Add a short reason'); return; }
+    try {
+      setSendingRequest(true);
+      await reviewLockApi.requestUnlock({ reason: accessReason.trim() });
+      toast.success('Request sent to your admins.');
+      setRequestingAccess(false);
+      setAccessReason('');
+      await loadLockState();
+    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not send the request')); }
+    finally { setSendingRequest(false); }
+  };
+
   const openHistory = useCallback(async () => {
     setHistoryOpen(true);
+    setRequestingAccess(false); setAccessReason('');
+    loadLockState();
     try { const r: any = await mentorApi.listReviewSessions(); setSessions(r?.data?.sessions ?? []); } // eslint-disable-line @typescript-eslint/no-explicit-any
     catch { setSessions([]); }
-  }, []);
+  }, [loadLockState]);
 
   // Manage a saved session from history. Delete is TIERED: an empty session is a
   // one-tap discard; one with recorded data needs an explicit confirm naming what
   // is lost. (A future admin "lock" can disable delete org-wide — enforced server-side.)
   const [busySession, setBusySession] = useState<string | null>(null);
+
   const sessionIsEmpty = (s: ReviewSessionSummary) =>
     s.counts.reviewed === 0 && s.counts.present === 0 && s.counts.absent === 0 && s.counts.excused === 0 && s.counts.deferred === 0;
   const removeHistorySession = async (s: ReviewSessionSummary) => {
@@ -452,7 +483,10 @@ export default function CohortReview() {
       setSessions((prev) => prev.filter((x) => x.id !== s.id));
       toast.success(empty ? 'Session discarded' : 'Session deleted');
       if (s.id === session?.id || sessionParam === s.id) { setHistoryOpen(false); router.push('/mentor/review'); }
-    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not delete the session')); }
+    } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      toast.error(extractApiErrorMessage(e, 'Could not delete the session'));
+      if (e?.response?.status === 403) loadLockState(); // stale lock — re-sync the banner
+    }
     finally { setBusySession(null); }
   };
   const reopenHistorySession = async (s: ReviewSessionSummary) => {
@@ -462,7 +496,10 @@ export default function CohortReview() {
       setSessions((prev) => prev.map((x) => (x.id === s.id ? { ...x, status: 'in_progress' } : x)));
       toast.success('Session reopened for editing');
       if (s.id === session?.id) loadSession();
-    } catch (e) { toast.error(extractApiErrorMessage(e, 'Could not reopen the session')); }
+    } catch (e: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+      toast.error(extractApiErrorMessage(e, 'Could not reopen the session'));
+      if (e?.response?.status === 403) loadLockState(); // stale lock — re-sync the banner
+    }
     finally { setBusySession(null); }
   };
 
@@ -1032,6 +1069,49 @@ export default function CohortReview() {
 
       {/* Cohort-review history: browse & open past dated sessions to view or edit. */}
       <Drawer open={historyOpen} onClose={() => setHistoryOpen(false)} width="md" title="Cohort review history" subtitle="Open a past session to view or edit it">
+        {/* Deletion lock: org-enforced for audit integrity. Mentor can request access. */}
+        {deletionBlocked && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-4 py-3">
+            <div className="flex items-start gap-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-amber-800 dark:text-amber-200">Deletion is locked by your organization for audit integrity.</p>
+                {lockState?.pendingRequest ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-amber-700"><Clock className="w-3.5 h-3.5" />Request pending review</p>
+                ) : requestingAccess ? (
+                  <div className="mt-2.5 space-y-2">
+                    <textarea
+                      value={accessReason}
+                      onChange={(e) => setAccessReason(e.target.value)}
+                      rows={2}
+                      autoFocus
+                      placeholder="Why do you need to edit or delete a review record?"
+                      className="w-full border border-amber-300 dark:border-amber-500/40 rounded-lg px-3 py-2 text-sm bg-card resize-none focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button onClick={submitAccessRequest} disabled={sendingRequest || !accessReason.trim()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium disabled:opacity-50">
+                        {sendingRequest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}Send request
+                      </button>
+                      <button onClick={() => { setRequestingAccess(false); setAccessReason(''); }} className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-100/60">Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setRequestingAccess(true)}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-300 text-amber-800 text-xs font-medium hover:bg-amber-100/60">
+                    Request access
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {locked && hasGrant && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/30 px-4 py-2.5 flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300">
+            <Unlock className="w-3.5 h-3.5 shrink-0" />
+            Editing unlocked{lockState?.grantExpiresAt ? <> until {new Date(lockState.grantExpiresAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</> : ''}.
+          </div>
+        )}
         <div className="space-y-2">
           {sessions.length === 0 ? (
             <p className="text-sm text-slate-400 text-center py-10">No saved reviews yet.</p>
@@ -1060,15 +1140,15 @@ export default function CohortReview() {
                 </div>
                 <div className="flex items-center justify-end gap-1 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700/60">
                   {s.status === 'finished' && (
-                    <button type="button" onClick={() => reopenHistorySession(s)} disabled={busy}
-                      className="px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1 disabled:opacity-50" title="Reopen to edit">
+                    <button type="button" onClick={() => reopenHistorySession(s)} disabled={busy || deletionBlocked}
+                      className="px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-slate-100 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed" title={deletionBlocked ? 'Locked by your org' : 'Reopen to edit'}>
                       <RotateCcw className="w-3.5 h-3.5" />Reopen
                     </button>
                   )}
-                  <button type="button" onClick={() => removeHistorySession(s)} disabled={busy}
-                    className="px-2 py-1 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-1 disabled:opacity-50"
-                    title={sessionIsEmpty(s) ? 'Discard empty session' : 'Delete session'}>
-                    {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  <button type="button" onClick={() => removeHistorySession(s)} disabled={busy || deletionBlocked}
+                    className="px-2 py-1 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={deletionBlocked ? 'Locked by your org' : sessionIsEmpty(s) ? 'Discard empty session' : 'Delete session'}>
+                    {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : deletionBlocked ? <Lock className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                     {sessionIsEmpty(s) ? 'Discard' : 'Delete'}
                   </button>
                 </div>

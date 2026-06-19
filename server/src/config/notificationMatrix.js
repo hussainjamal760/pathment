@@ -27,7 +27,9 @@ EXTENSION_HANDLED: 'extension_handled',
   MEETING_BOOKED: 'meeting_booked',
   CROSS_CLAN_ASSIGNED: 'cross_clan_assigned',
   NEW_MENTEE_IN_CLAN: 'new_mentee_in_clan',
-  PROMOTION_NOMINATED: 'promotion_nominated'
+  PROMOTION_NOMINATED: 'promotion_nominated',
+  REVIEW_UNLOCK_REQUESTED: 'review_unlock_requested',
+  REVIEW_UNLOCK_HANDLED: 'review_unlock_handled'
 };
 
 const NOTIFICATION_MATRIX = {
@@ -79,6 +81,18 @@ const NOTIFICATION_MATRIX = {
   [NOTIFICATION_EVENTS.PROGRAM_UPDATED]: {
     type: 'system',
     preferenceKey: 'program_updates',
+    channels: { inApp: true, email: true, chat: false }
+  },
+  // Cohort-review deletion lock: admins get notified of unlock requests; mentors
+  // get the approve/decline outcome. New preferenceKeys default to on.
+  [NOTIFICATION_EVENTS.REVIEW_UNLOCK_REQUESTED]: {
+    type: 'system',
+    preferenceKey: 'review_unlock_requested',
+    channels: { inApp: true, email: true, chat: false }
+  },
+  [NOTIFICATION_EVENTS.REVIEW_UNLOCK_HANDLED]: {
+    type: 'system',
+    preferenceKey: 'review_unlock_handled',
     channels: { inApp: true, email: true, chat: false }
   },
   [NOTIFICATION_EVENTS.SUBMISSION_DEADLINE_PASSED]: {

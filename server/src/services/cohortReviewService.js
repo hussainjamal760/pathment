@@ -2,7 +2,9 @@ const { Op } = require('sequelize');
 const { models } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError } = require('../utils/errors/errorTypes');
 const { todayInZone } = require('../utils/timezone');
+const { createAuditLog } = require('../utils/auditContext');
 const cohortService = require('./cohortService');
+const lockService = require('./cohortReviewLockService');
 
 /**
  * cohortReviewService - dated, saved, editable cohort-review sessions.
@@ -204,6 +206,7 @@ class CohortReviewService {
   }
 
   async reopenSession(mentorId, sessionId) {
+    await lockService.assertCanDelete(mentorId);
     const session = await this._own(mentorId, sessionId);
     session.status = 'in_progress';
     session.finishedAt = null;
@@ -212,9 +215,17 @@ class CohortReviewService {
   }
 
   async deleteSession(mentorId, sessionId) {
+    await lockService.assertCanDelete(mentorId);
     const session = await this._own(mentorId, sessionId);
     await models.CohortReviewEntry.destroy({ where: { sessionId: session.id } });
     await session.destroy();
+    createAuditLog({
+      userId: mentorId,
+      action: 'REVIEW_SESSION_DELETED',
+      entityType: 'cohort_review_session',
+      entityId: sessionId,
+      newValues: { mentorId, sessionId, deletedAt: new Date() },
+    }).catch(() => {});
     return { deleted: true };
   }
 }
