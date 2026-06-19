@@ -161,9 +161,12 @@ function PeopleTab() {
             <span className="ml-auto text-xs text-slate-400 tabular-nums">{pagination.total} {pagination.total === 1 ? 'person' : 'people'}</span>
           </div>
 
-          {/* Bounded, scrollable list so the card height stays stable and the
-              pagination bar below never gets pushed off-screen ("out of the area"). */}
-          <div className="mt-2 h-[52vh] min-h-[280px] overflow-y-auto divide-y divide-slate-100 pr-1">
+          {/* Adaptive height: the list grows with its content but is capped to the
+              viewport MINUS the page header + card chrome + pagination, so the whole
+              card always fits without the page itself scrolling (no double scrollbar,
+              pagination always visible), and short/filtered lists stay compact instead
+              of leaving a big empty gap. */}
+          <div className="mt-2 max-h-[calc(100vh-22rem)] min-h-[14rem] overflow-y-auto divide-y divide-slate-100 pr-1">
             {loading ? (
               <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-600" /></div>
             ) : users.length === 0 ? (
@@ -181,7 +184,7 @@ function PeopleTab() {
           </div>
 
           {pagination.total > pagination.limit && (
-            <TablePagination pagination={pagination} isLoading={loading} showPageSize={false} className="pt-3 mt-1 border-t border-slate-100" />
+            <TablePagination pagination={pagination} isLoading={loading} showPageSize={false} stack className="pt-3 mt-1 border-t border-slate-100" />
           )}
         </div>
       </div>
