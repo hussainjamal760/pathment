@@ -7,6 +7,8 @@ import { GitPullRequest, Loader2, Check, X, Plus, Trash2, ArrowRight, Search } f
 import { useClanRequests } from '@/lib/hooks/admin';
 import { clanRequestsApi } from '@/lib/services/clan-requests-api';
 import { apiClient } from '@/lib/services/api-client';
+import { Drawer } from '@/components/shared/Drawer';
+import { SelectMenu } from '@/components/shared/SelectMenu';
 
 type Tab = 'requests' | 'cross';
 const CROSS_KINDS = [
@@ -161,8 +163,8 @@ function AdminClanRequestsInner() {
                 <h2 className="text-sm font-semibold text-slate-700">
                   Cross-clan support {crossClan.length > 0 && <span className="text-slate-400 font-normal">· {crossClan.length}</span>}
                 </h2>
-                <button onClick={() => setShowCcForm((v) => !v)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                  {showCcForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}{showCcForm ? 'Close' : 'Grant access'}
+                <button onClick={() => setShowCcForm(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                  <Plus className="w-4 h-4" />Grant access
                 </button>
               </div>
 
@@ -191,71 +193,74 @@ function AdminClanRequestsInner() {
                 </div>
               )}
 
-              {/* Grant form - revealed on demand so it never buries the list. */}
-              {showCcForm && (
-              <div className="bg-card rounded-2xl border border-slate-200 p-4 space-y-3">
-                <p className="text-sm font-medium text-slate-700">Give someone temporary access to another clan</p>
-
-                {/* Person picker */}
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">Person who will help</label>
-                  {ccUser ? (
-                    <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-                      <span className="text-sm text-slate-800">{ccUser.name}</span>
-                      <button onClick={() => { setCcUser(null); setCcUserQuery(''); }} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                        <input value={ccUserQuery} onChange={(e) => setCcUserQuery(e.target.value)} placeholder="Search by name or email…" className={`${field} w-full pl-9`} />
+              {/* Grant form lives in the shared side-drawer for consistency. */}
+              <Drawer
+                open={showCcForm}
+                onClose={() => setShowCcForm(false)}
+                width="md"
+                title="Grant cross-clan access"
+                subtitle="Give someone temporary co-mentor access to another clan"
+              >
+                <div className="space-y-4">
+                  {/* Person picker */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Person who will help</label>
+                    {ccUser ? (
+                      <div className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
+                        <span className="text-sm text-slate-800">{ccUser.name}</span>
+                        <button onClick={() => { setCcUser(null); setCcUserQuery(''); }} className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
                       </div>
-                      {ccUserResults.length > 0 && (
-                        <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
-                          {ccUserResults.map((u) => (
-                            <button key={u.id} onClick={() => { setCcUser({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }); setCcUserResults([]); }} className="w-full text-left px-3 py-2 hover:bg-slate-50">
-                              <p className="text-sm text-slate-900">{`${u.firstName} ${u.lastName}`.trim() || u.email}</p>
-                              <p className="text-xs text-slate-500">{u.email}</p>
-                            </button>
-                          ))}
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                          <input value={ccUserQuery} onChange={(e) => setCcUserQuery(e.target.value)} placeholder="Search by name or email…" className={`${field} w-full pl-9`} />
                         </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                        {ccUserResults.length > 0 && (
+                          <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+                            {ccUserResults.map((u) => (
+                              <button key={u.id} onClick={() => { setCcUser({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }); setCcUserResults([]); }} className="w-full text-left px-3 py-2 hover:bg-slate-50">
+                                <p className="text-sm text-slate-900">{`${u.firstName} ${u.lastName}`.trim() || u.email}</p>
+                                <p className="text-xs text-slate-500">{u.email}</p>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
 
-                <div className="grid sm:grid-cols-3 gap-2">
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Type</label>
-                    <select value={ccKind} onChange={(e) => setCcKind(e.target.value)} className={`${field} w-full`}>
-                      {CROSS_KINDS.map((k) => <option key={k.key} value={k.key}>{k.label}</option>)}
-                    </select>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Type</label>
+                      <SelectMenu value={ccKind} onChange={setCcKind} options={CROSS_KINDS.map((k) => ({ value: k.key, label: k.label }))} searchable={false} ariaLabel="Type" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Clan to help <span className="text-rose-500">*</span></label>
+                      <SelectMenu value={ccToClan} onChange={setCcToClan} options={clans.map((c) => ({ value: c.id, label: c.name }))} placeholder="Select a clan…" ariaLabel="Clan to help" />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">Clan to help <span className="text-rose-500">*</span></label>
-                    <select value={ccToClan} onChange={(e) => setCcToClan(e.target.value)} className={`${field} w-full`}>
-                      <option value="">Select…</option>
-                      {clans.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-slate-500 mb-1">From clan <span className="text-slate-400">(optional)</span></label>
-                    <select value={ccFromClan} onChange={(e) => setCcFromClan(e.target.value)} className={`${field} w-full`}>
-                      <option value="">-</option>
-                      {clans.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                </div>
 
-                <input value={ccNote} onChange={(e) => setCcNote(e.target.value)} placeholder="Note (optional) - e.g. covering while lead is on leave" className={`${field} w-full`} />
-                <div className="flex justify-end">
-                  <button onClick={addCross} disabled={busy === 'cc'} className="px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm inline-flex items-center gap-1.5 disabled:opacity-50">
-                    {busy === 'cc' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Grant access
-                  </button>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">From clan <span className="text-slate-400">(optional)</span></label>
+                    <SelectMenu value={ccFromClan} onChange={setCcFromClan} options={clans.map((c) => ({ value: c.id, label: c.name }))} placeholder="Any clan" ariaLabel="From clan" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Note <span className="text-slate-400">(optional)</span></label>
+                    <input value={ccNote} onChange={(e) => setCcNote(e.target.value)} placeholder="e.g. covering while the lead is on leave" className={`${field} w-full`} />
+                  </div>
+
+                  <p className="text-xs text-slate-400">They get co-mentor access to that clan (review tasks, see mentees) until you remove it.</p>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                    <button onClick={() => setShowCcForm(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm font-medium hover:bg-slate-50">Cancel</button>
+                    <button onClick={addCross} disabled={busy === 'cc'} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium inline-flex items-center gap-1.5 disabled:opacity-50">
+                      {busy === 'cc' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Grant access
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400">They get co-mentor access to that clan (review tasks, see mentees) until you remove it.</p>
-              </div>
-              )}
+              </Drawer>
             </div>
           )}
         </>
