@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CheckCircle2, Clock, Award, Pencil, RotateCcw, Trash2, Loader2, StickyNote } from 'lucide-react';
+import { CheckCircle2, Clock, Award, Pencil, RotateCcw, Trash2, Loader2, StickyNote, ClipboardCheck } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import { ResourceLink } from '@/components/shared/ResourceLink';
 import { TaskEditDrawer } from '@/components/mentor/TaskEditDrawer';
@@ -28,6 +29,7 @@ const DIFF_CLS: Record<string, string> = {
  * cancelled task, or unassign — without leaving the review flow.
  */
 export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onClose: () => void; onChanged: () => void }) {
+  const router = useRouter();
   const confirm = useConfirm();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,6 +54,11 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
   };
 
   const canUnassign = !['submitted', 'completed', 'cancelled'].includes(task.status);
+  // Submitted / revision tasks open the review; an already-reviewed (completed)
+  // task opens the same page in edit mode so the mentor can correct feedback.
+  const canReview = ['submitted', 'revision_needed'].includes(task.status);
+  const isReviewed = task.status === 'completed';
+  const openReview = () => router.push(`/mentor/tasks/${task.id}/feedback`);
 
   return (
     <>
@@ -68,9 +75,19 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}Reassign
               </button>
             )}
-            <button onClick={() => setEditing(true)} className="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-1.5">
+            <button onClick={() => setEditing(true)} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm font-medium inline-flex items-center gap-1.5">
               <Pencil className="w-4 h-4" />Edit / add note
             </button>
+            {canReview && (
+              <button onClick={openReview} className="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-1.5">
+                <ClipboardCheck className="w-4 h-4" />Review
+              </button>
+            )}
+            {isReviewed && (
+              <button onClick={openReview} className="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-1.5">
+                <ClipboardCheck className="w-4 h-4" />Edit review
+              </button>
+            )}
           </div>
         }
       >
