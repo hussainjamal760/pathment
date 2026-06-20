@@ -72,6 +72,33 @@ class CohortService {
     return [...ids];
   }
 
+  /** Active mentee userIds in ONE clan (cohort-review is now clan-scoped). */
+  async resolveMenteeIdsForClan(clanId) {
+    if (!clanId) return [];
+    const memberships = await models.ClanMembership.findAll({
+      where: { clanId, status: 'active', role: 'mentee' },
+      attributes: ['userId'],
+    });
+    return [...new Set(memberships.map((m) => m.userId))];
+  }
+
+  /** Join date per mentee within ONE clan → Map(menteeId → Date). */
+  async menteeJoinDatesForClan(clanId) {
+    const map = new Map();
+    if (!clanId) return map;
+    const ms = await models.ClanMembership.findAll({
+      where: { clanId, role: 'mentee' },
+      attributes: ['userId', 'joinedAt'],
+    });
+    ms.forEach((m) => {
+      if (!m.userId || !m.joinedAt) return;
+      const dt = new Date(m.joinedAt);
+      const cur = map.get(m.userId);
+      if (!cur || dt < cur) map.set(m.userId, dt);
+    });
+    return map;
+  }
+
   /**
    * Earliest date each mentee entered THIS mentor's world (clan membership or a
    * 1:1 match). Cohort-review sessions dated before a mentee's join date should

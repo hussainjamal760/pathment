@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
 import { useAuth } from '@/lib/context/AuthContext';
+import { useClan, ALL_CLANS } from '@/lib/context/ClanContext';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { taskApi } from '@/lib/services/task-api';
 import { submissionService } from '@/lib/services/submissionService';
@@ -61,9 +62,22 @@ export default function CohortReview() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { clans, activeClanId, setActiveClanId } = useClan();
   const { cohort, loading } = useMentorCohort();
   const { queue, refetch: refetchQueue } = useMentorApprovals();
   const confirm = useConfirm();
+
+  // Cohort review is CLAN-scoped: a session belongs to a clan, shared by its
+  // lead + co-mentors. "All clans" can't map to one dated session, so for a
+  // multi-clan mentor we pin to a concrete clan (keeps the cohort list and the
+  // session on the same clan). Single-clan mentors never see the picker and the
+  // server resolves their one clan automatically.
+  const effectiveClanId = activeClanId !== ALL_CLANS ? activeClanId : (clans[0]?.id ?? null);
+  useEffect(() => {
+    if (clans.length >= 2 && activeClanId === ALL_CLANS && clans[0]?.id) {
+      setActiveClanId(clans[0].id);
+    }
+  }, [clans, activeClanId, setActiveClanId]);
 
   const [idx, setIdx] = useState(0);
   const [tasks, setTasks] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -142,7 +156,7 @@ export default function CohortReview() {
     try {
       const r: any = sessionParam // eslint-disable-line @typescript-eslint/no-explicit-any
         ? await mentorApi.getReviewSession(sessionParam)
-        : await mentorApi.getTodayReviewSession();
+        : await mentorApi.getTodayReviewSession(effectiveClanId);
       const loaded = r?.data?.session ?? null;
       if (loaded) {
         setSession(loaded);
@@ -162,7 +176,7 @@ export default function CohortReview() {
     } finally {
       setSessionLoading(false);
     }
-  }, [sessionParam]);
+  }, [sessionParam, effectiveClanId]);
   useEffect(() => { loadSession(); }, [loadSession]);
 
   // Derive attendance / seen / deferred from the session's entries.
@@ -198,7 +212,7 @@ export default function CohortReview() {
     if (session && session.id) return session;
     if (ensureRef.current) return ensureRef.current;
     const run = (async (): Promise<ReviewSession | null> => {
-      const r: any = await mentorApi.createReviewSession({}); // eslint-disable-line @typescript-eslint/no-explicit-any
+      const r: any = await mentorApi.createReviewSession({ clanId: effectiveClanId }); // eslint-disable-line @typescript-eslint/no-explicit-any
       const created: ReviewSession | null = r?.data?.session ?? null;
       if (!created) throw new Error('Could not start the review');
       const seenIds = [...seenLocalRef.current];
@@ -215,7 +229,7 @@ export default function CohortReview() {
     })();
     ensureRef.current = run;
     try { return await run; } finally { ensureRef.current = null; }
-  }, [session]);
+  }, [session, effectiveClanId]);
 
   // Optimistically patch one mentee's entry, then persist. `commit` marks a
   // deliberate action (attendance/defer/finish) that should create today's
@@ -458,9 +472,9 @@ export default function CohortReview() {
     setHistoryOpen(true);
     setRequestingAccess(false); setAccessReason('');
     loadLockState();
-    try { const r: any = await mentorApi.listReviewSessions(); setSessions(r?.data?.sessions ?? []); } // eslint-disable-line @typescript-eslint/no-explicit-any
+    try { const r: any = await mentorApi.listReviewSessions(effectiveClanId); setSessions(r?.data?.sessions ?? []); } // eslint-disable-line @typescript-eslint/no-explicit-any
     catch { setSessions([]); }
-  }, [loadLockState]);
+  }, [loadLockState, effectiveClanId]);
 
   // Manage a saved session from history. Delete is TIERED: an empty session is a
   // one-tap discard; one with recorded data needs an explicit confirm naming what
@@ -619,6 +633,34 @@ export default function CohortReview() {
           <button onClick={() => go(1)} disabled={idx === cohort.length - 1} className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-40 inline-flex items-center gap-1">Next<ChevronRight className="w-4 h-4" /></button>
         </div>
       </div>
+
+      {/* Clan tabs — only for mentors who run more than one clan. Each clan has
+          its own daily session + history, shared by its lead and co-mentors. */}
+      {clans.length >= 2 && (
+        <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200">
+          {clans.map((c) => {
+            const active = c.id === effectiveClanId;
+            return (
+              <button
+                key={c.id}
+                onClick={() => {
+                  if (c.id === activeClanId) return;
+                  setActiveClanId(c.id);
+                  setIdx(0);
+                  const params = new URLSearchParams(Array.from(searchParams.entries()));
+                  params.delete('session'); params.delete('mentee');
+                  router.replace(`/mentor/review${params.toString() ? `?${params.toString()}` : ''}`, { scroll: false });
+                }}
+                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                  active ? 'border-brand-600 text-brand-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Jump to a mentee */}
       <div className="relative max-w-xs">
