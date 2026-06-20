@@ -270,7 +270,9 @@ export default function FeedbackProvision({ params }: PageProps) {
         {/* Rating */}
         <div>
           <label className="block text-sm text-slate-700 mb-2">
-            Rating <span className="text-red-500">*</span>
+            Rating {decision === 'revision'
+              ? <span className="text-slate-400 text-xs">(optional)</span>
+              : <span className="text-red-500">*</span>}
           </label>
           <div className="flex gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -306,7 +308,9 @@ export default function FeedbackProvision({ params }: PageProps) {
         {/* General Feedback */}
         <div>
           <label className="block text-sm text-slate-700 mb-2">
-            General Feedback <span className="text-red-500">*</span>
+            General Feedback {decision === 'revision'
+              ? <span className="text-slate-400 text-xs">(optional — your revision notes below cover the details)</span>
+              : <span className="text-red-500">*</span>}
           </label>
           <div className={feedbackError ? 'ring-2 ring-red-400 rounded-lg' : ''}>
             <RichTextEditor
