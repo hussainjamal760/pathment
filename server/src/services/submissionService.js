@@ -722,7 +722,7 @@ class SubmissionService {
         model: models.AssignedTask,
         as: 'assignedTask',
         required: true,
-        where: { mentorId, status: 'submitted' },
+        where: { mentorId },
         include: [
           { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
@@ -731,6 +731,16 @@ class SubmissionService {
       order: [['submittedAt', 'ASC']]
     });
 
+    // Two things belong in this queue: submitted work awaiting review, and a
+    // pending extension request. An extension request creates a 'pending'
+    // TaskSubmission but does NOT move the task into 'submitted' (the mentee
+    // hasn't done the work yet), so filtering the query on task.status alone
+    // dropped extension requests from the queue entirely. Keep either case.
+    const reviewable = submissions.filter((s) =>
+      s.assignedTask?.status === 'submitted' ||
+      Boolean(s.extensionRequested && s.extensionStatus === 'pending')
+    );
+
     // Collapse to ONE entry per assignment. A mentee can resubmit / request an
     // extension before review, and each of those creates a new TaskSubmission
     // version while older versions stay 'pending' — without this, the same task
@@ -738,7 +748,7 @@ class SubmissionService {
     // the latest version (the mentee's most recent state); the mentor still sees
     // the full version thread when they open Review.
     const latestByTask = new Map();
-    for (const s of submissions) {
+    for (const s of reviewable) {
       const prev = latestByTask.get(s.assignedTaskId);
       if (!prev || (s.version || 0) > (prev.version || 0)) latestByTask.set(s.assignedTaskId, s);
     }
