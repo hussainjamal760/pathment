@@ -2,6 +2,9 @@ const { models } = require('../db');
 const { Op, fn, col } = require('sequelize');
 const { catchAsync } = require('../middlewares/errorHandler');
 const { NotFoundError } = require('../utils/errors/errorTypes');
+const programReviewService = require('../services/programReviewService');
+
+const TERMINAL_ENROLLMENT_STATUSES = ['program_completed', 'dropped', 'rejected', 'withdrawn'];
 
 /**
  * Get all active mentors
@@ -136,65 +139,112 @@ const getMentorById = catchAsync(async (req, res) => {
 
   if (!mentor) throw new NotFoundError('Mentor not found');
 
-  // ── Live stats (stored columns are never updated so we compute them here) ──
-  const allMatches = await models.MentorMenteeMatch.findAll({
-    where: { mentorId: id },
-    attributes: ['menteeSatisfactionRating'],
-    include: [{
-      model: models.Enrollment,
-      as: 'enrollment',
-      attributes: ['status'],
-      required: false,
-    }],
+  // ── Mentee resolution is CLAN-based (the live data model) ──
+  // This org assigns mentees by placing them in a clan the mentor leads/co-mentors,
+  // NOT by creating MentorMenteeMatch rows. The legacy match-based stats therefore
+  // always read 0. We compute every stat from the mentor's clans + the mentees'
+  // enrollments in those clans' programs (mirrors getAllMentors' approach).
+  const clanRows = await models.ClanMembership.findAll({
+    where: { userId: id, status: 'active', role: { [Op.in]: ['lead_mentor', 'co_mentor', 'core_team'] } },
+    include: [{ model: models.Clan, as: 'clan', attributes: ['id', 'name', 'programId'] }],
   }).catch(() => []);
 
-  const totalMenteesGuided = allMatches.length;
+  const clanIds = [...new Set(clanRows.map((r) => r.clanId).filter(Boolean))];
+  const programIds = [...new Set(clanRows.map((r) => r.clan?.programId).filter(Boolean))];
 
-  const completedCount = allMatches.filter(
-    m => m.enrollment?.status === 'program_completed'
-  ).length;
+  // All active mentee memberships in those clans (one batched query → no N+1).
+  const menteeMemberships = clanIds.length
+    ? await models.ClanMembership.findAll({
+        where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
+        include: [{
+          model: models.User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'lastName', 'email'],
+        }],
+      }).catch(() => [])
+    : [];
 
-  const successRate = totalMenteesGuided > 0
-    ? parseFloat(((completedCount / totalMenteesGuided) * 100).toFixed(1))
+  // De-dupe mentees (a person could be in more than one of the mentor's clans).
+  const menteeById = new Map();
+  const clanByMentee = new Map();
+  for (const m of menteeMemberships) {
+    if (!m.user) continue;
+    if (!menteeById.has(m.userId)) {
+      menteeById.set(m.userId, m.user);
+      const cl = clanRows.find((c) => c.clanId === m.clanId)?.clan;
+      clanByMentee.set(m.userId, { id: cl?.id, name: cl?.name, programId: cl?.programId });
+    }
+  }
+  const menteeIds = [...menteeById.keys()];
+
+  // Pull every enrollment for those mentees in the mentor's programs in one query,
+  // then bucket by mentee. Used both for the active-mentee list (with program +
+  // progress) and the success-rate computation.
+  const enrollments = menteeIds.length && programIds.length
+    ? await models.Enrollment.findAll({
+        where: { menteeId: { [Op.in]: menteeIds }, programId: { [Op.in]: programIds } },
+        attributes: ['id', 'menteeId', 'programId', 'status', 'overallProgressPercentage', 'enrolledAt'],
+        include: [{ model: models.Program, as: 'program', attributes: ['id', 'name'] }],
+        order: [['enrolledAt', 'DESC']],
+      }).catch(() => [])
+    : [];
+
+  const enrollmentsByMentee = new Map();
+  for (const e of enrollments) {
+    const arr = enrollmentsByMentee.get(e.menteeId) || [];
+    arr.push(e);
+    enrollmentsByMentee.set(e.menteeId, arr);
+  }
+
+  // Active mentees = current clan mentees, paired with their best enrollment in the
+  // mentor's program (prefer a non-terminal one). Shaped like the old MentorMenteeMatch
+  // payload so the client renders unchanged: { id, mentee, enrollment{ ...program } }.
+  const activeMatches = menteeIds.map((mid) => {
+    const list = enrollmentsByMentee.get(mid) || [];
+    const enr = list.find((e) => !TERMINAL_ENROLLMENT_STATUSES.includes(e.status)) || list[0] || null;
+    return {
+      id: `${id}:${mid}`,
+      status: 'active',
+      mentee: menteeById.get(mid),
+      clan: clanByMentee.get(mid) || null,
+      enrollment: enr
+        ? {
+            id: enr.id,
+            status: enr.status,
+            overallProgressPercentage: enr.overallProgressPercentage,
+            program: enr.program ? { id: enr.program.id, name: enr.program.name } : null,
+          }
+        : null,
+    };
+  });
+
+  // Success rate over all enrollments that reached a terminal state.
+  const completedCount = enrollments.filter((e) => e.status === 'program_completed').length;
+  const finishedCount = enrollments.filter((e) => TERMINAL_ENROLLMENT_STATUSES.includes(e.status)).length;
+  const successRate = finishedCount > 0
+    ? parseFloat(((completedCount / finishedCount) * 100).toFixed(1))
     : 0;
 
-  const ratedMatches = allMatches.filter(m => m.menteeSatisfactionRating != null);
-  const avgFeedbackRating = ratedMatches.length > 0
-    ? parseFloat(
-        (ratedMatches.reduce((sum, m) => sum + parseFloat(m.menteeSatisfactionRating), 0) / ratedMatches.length).toFixed(1)
-      )
+  // Total mentees guided = distinct mentees ever placed in the mentor's clans
+  // (any membership status), so completed/graduated mentees still count.
+  const everMembers = clanIds.length
+    ? await models.ClanMembership.findAll({
+        where: { clanId: { [Op.in]: clanIds }, role: 'mentee' },
+        attributes: ['userId'],
+        raw: true,
+      }).catch(() => [])
+    : [];
+  const totalMenteesGuided = new Set(everMembers.map((m) => m.userId)).size;
+
+  // Avg rating comes from anonymous mentee→mentor program reviews (the real source),
+  // not the never-written MentorMenteeMatch.menteeSatisfactionRating column.
+  const feedbackSummary = await programReviewService.getMentorFeedbackSummary(id).catch(() => null);
+  const avgFeedbackRating = feedbackSummary?.revealed && feedbackSummary.overall != null
+    ? feedbackSummary.overall
     : null;
 
-  // Fetch active matches - match must be active AND enrollment must not be terminated.
-  // Matches are sometimes left in 'active' state even after the enrollment reaches
-  // program_completed or dropped, so we exclude those enrollment statuses explicitly.
-  const TERMINAL_ENROLLMENT_STATUSES = ['program_completed', 'dropped', 'rejected', 'withdrawn'];
-
-  const activeMatches = await models.MentorMenteeMatch.findAll({
-    attributes: ['id', 'status', 'matchedAt'],
-    where: { mentorId: id, status: 'active' },
-    include: [
-      {
-        model: models.User,
-        as: 'mentee',
-        attributes: ['id', 'firstName', 'lastName', 'email'],
-      },
-      {
-        model: models.Enrollment,
-        as: 'enrollment',
-        attributes: ['id', 'status', 'overallProgressPercentage'],
-        where: { status: { [Op.notIn]: TERMINAL_ENROLLMENT_STATUSES } },
-        required: true,
-        include: [{
-          model: models.Program,
-          as: 'program',
-          attributes: ['id', 'name'],
-        }],
-      },
-    ],
-    order: [['matchedAt', 'DESC']],
-    limit: 20,
-  }).catch(() => []);
+  // Tasks reviewed = task feedback rows authored by this mentor.
+  const totalTasksReviewed = await models.TaskFeedback.count({ where: { mentorId: id } }).catch(() => 0);
 
   const mentorJson = mentor.toJSON();
   // Override stale stored stats with live-computed values
@@ -202,6 +252,9 @@ const getMentorById = catchAsync(async (req, res) => {
     mentorJson.mentorProfile.totalMenteesGuided = totalMenteesGuided;
     mentorJson.mentorProfile.successRate = successRate;
     mentorJson.mentorProfile.avgFeedbackRating = avgFeedbackRating;
+    mentorJson.mentorProfile.totalTasksReviewed = totalTasksReviewed;
+    // Keep capacity card honest: current mentees = live active clan-mentee count.
+    mentorJson.mentorProfile.currentMenteeCount = menteeIds.length;
   }
 
   res.status(200).json({

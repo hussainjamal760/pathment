@@ -15,7 +15,7 @@ router.post(
   '/:taskId',
   authenticate,
   authorize(['mentee']),
-  upload.array('files', 5), // Allow up to 5 files
+  upload.arraySafe('files', 5), // Allow up to 5 files (clean 400 on type/size errors)
   submissionController.submitTask
 );
 
@@ -65,6 +65,19 @@ router.post(
   authenticate,
   requirePermission(PERMISSIONS.TASK_REVIEW, scope.submission('submissionId')),
   submissionController.reviewSubmission
+);
+
+/**
+ * @route   PATCH /api/submissions/:submissionId/review
+ * @desc    Edit an already-submitted review (feedback, rating, points). Only the
+ *          reviewing mentor may edit; the decision is unchanged.
+ * @access  Mentor (original reviewer), Admin
+ */
+router.patch(
+  '/:submissionId/review',
+  authenticate,
+  requirePermission(PERMISSIONS.TASK_REVIEW, scope.submission('submissionId')),
+  submissionController.editReview
 );
 
 /**

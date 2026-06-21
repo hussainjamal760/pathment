@@ -16,10 +16,12 @@ import {
   Link as LinkIcon,
   Loader2,
   ChevronDown,
+  Pencil,
 } from 'lucide-react';
 import { useProgramDetail } from '@/lib/hooks/admin';
 import { MenuPanel } from '@/components/shared/MenuPanel';
 import { useConfirm } from '@/lib/context/ConfirmContext';
+import { EditProgramDrawer } from '@/components/admin/EditProgramDrawer';
 
 type ProgramStatus = 'draft' | 'published' | 'archived' | 'completed';
 
@@ -119,10 +121,11 @@ export default function ProgramDetails() {
     shareOpen, shareRef, setShareOpen, copyToClipboard,
     handleApproveEnrollment, handleRejectEnrollment,
     handleStatusUpdate, handleVisibilityUpdate, updatingStatus,
-    fetchEnrollments,
+    fetchEnrollments, refetch,
   } = useProgramDetail();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'enrollments'>('overview');
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'enrollments') {
@@ -189,7 +192,11 @@ export default function ProgramDetails() {
                 {program.visibility === 'public' ? 'Public' : 'Private'}
               </button>
             </div>
-            <p className="text-slate-600 mb-4">{program.description || 'No description available'}</p>
+            {program.description
+              ? (/<[a-z][\s\S]*>/i.test(program.description)
+                  ? <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300 mb-4" dangerouslySetInnerHTML={{ __html: program.description }} />
+                  : <p className="text-slate-600 mb-4 whitespace-pre-wrap">{program.description}</p>)
+              : <p className="text-slate-600 mb-4">No description available</p>}
             {program.tags && program.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {program.tags.map((tag: string, idx: number) => (
@@ -202,6 +209,15 @@ export default function ProgramDetails() {
           </div>
 
           <div className="flex gap-2 items-center">
+            {/* Edit Button */}
+            <button
+              onClick={() => setEditOpen(true)}
+              className="px-4 py-2 bg-card hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-2"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </button>
+
             {/* Share Button */}
             <div className="relative" ref={shareRef}>
               <button
@@ -466,6 +482,14 @@ export default function ProgramDetails() {
             </>
           )}
         </div>
+      )}
+
+      {editOpen && (
+        <EditProgramDrawer
+          program={program}
+          onClose={() => setEditOpen(false)}
+          onSaved={refetch}
+        />
       )}
     </>
   );

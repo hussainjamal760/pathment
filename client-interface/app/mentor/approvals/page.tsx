@@ -4,9 +4,11 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   ClipboardCheck, CheckCircle2, Clock, Loader2, ChevronRight, CalendarClock, Check, X,
+  Search, ArrowDownUp, Layers,
 } from 'lucide-react';
 import { useMentorApprovals, type ApprovalItem } from '@/lib/hooks/mentor';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
+import { BulkReviewDrawer } from '@/components/mentor/BulkReviewDrawer';
 import { todayInZone, dateInZone, addDaysToDateStr, zoneLabel } from '@/lib/utils/datetime';
 
 function timeAgo(iso: string): string {
@@ -20,17 +22,30 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Days a submission has been waiting (for the fairness emphasis at >= 3 days).
+function waitingDays(iso: string): number {
+  const d = new Date(iso).getTime();
+  if (Number.isNaN(d)) return 0;
+  return Math.floor((Date.now() - d) / 86400000);
+}
+
 type Tab = 'review' | 'extensions';
 
 export default function MentorApprovals() {
-  const { queue, loading, error, refetch, bulkApprove, handleExtension } = useMentorApprovals();
+  const { queue, loading, error, refetch, bulkReview, handleExtension } = useMentorApprovals();
   const [tab, setTab] = useState<Tab>('review');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [extBusy, setExtBusy] = useState<string | null>(null);
   // Mentor-chosen new due date per extension request (YYYY-MM-DD).
   const [extDates, setExtDates] = useState<Record<string, string>>({});
+
+  // To-review controls.
+  const [search, setSearch] = useState('');
+  const [newestFirst, setNewestFirst] = useState(false);
+  const [lateOnly, setLateOnly] = useState(false);
+  const [groupByTask, setGroupByTask] = useState(false);
 
   // A deadline is the MENTEE's calendar day — compute "today" and the current
   // due date in THEIR timezone (not UTC / the mentor's browser) so the date the
@@ -50,10 +65,38 @@ export default function MentorApprovals() {
   const reviewItems = useMemo(() => queue.filter((q) => !q.isExtensionRequest), [queue]);
   const extensionItems = useMemo(() => queue.filter((q) => q.isExtensionRequest), [queue]);
 
-  const onTime = useMemo(() => reviewItems.filter((q) => !q.isLate), [reviewItems]);
-  const selectedOnTime = useMemo(
-    () => [...selected].filter((id) => onTime.some((q) => q.submissionId === id)),
-    [selected, onTime]
+  // Apply search + late-only + sort to the To-review list (queue is already loaded).
+  const filteredReview = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = reviewItems;
+    if (q) {
+      list = list.filter(
+        (it) =>
+          it.title.toLowerCase().includes(q) ||
+          (it.mentee?.name || '').toLowerCase().includes(q)
+      );
+    }
+    if (lateOnly) list = list.filter((it) => it.isLate);
+    const sorted = [...list].sort(
+      (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+    );
+    return newestFirst ? sorted.reverse() : sorted;
+  }, [reviewItems, search, lateOnly, newestFirst]);
+
+  // Cluster filtered items by task (roadmapTaskId, falling back to title).
+  const groups = useMemo(() => {
+    const map = new Map<string, { title: string; items: ApprovalItem[] }>();
+    for (const it of filteredReview) {
+      const key = it.roadmapTaskId ?? `title:${it.title}`;
+      if (!map.has(key)) map.set(key, { title: it.title, items: [] });
+      map.get(key)!.items.push(it);
+    }
+    return [...map.values()];
+  }, [filteredReview]);
+
+  const selectedItems = useMemo(
+    () => queue.filter((q) => selected.has(q.submissionId)),
+    [queue, selected]
   );
 
   const toggle = (id: string) =>
@@ -63,23 +106,32 @@ export default function MentorApprovals() {
       return next;
     });
 
-  const selectAllOnTime = () => {
-    if (selectedOnTime.length === onTime.length) setSelected(new Set());
-    else setSelected(new Set(onTime.map((q) => q.submissionId)));
+  const allFilteredSelected =
+    filteredReview.length > 0 && filteredReview.every((q) => selected.has(q.submissionId));
+  const selectAllFiltered = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allFilteredSelected) filteredReview.forEach((q) => next.delete(q.submissionId));
+      else filteredReview.forEach((q) => next.add(q.submissionId));
+      return next;
+    });
   };
 
-  const runBulk = async () => {
-    if (!selectedOnTime.length) return;
-    try {
-      setBulkBusy(true);
-      await bulkApprove(selectedOnTime);
-      setSelected(new Set());
-      toast.success(`Approved ${selectedOnTime.length} submission${selectedOnTime.length > 1 ? 's' : ''}`);
-    } catch {
-      toast.error('Bulk approval failed');
-    } finally {
-      setBulkBusy(false);
-    }
+  // Select / deselect every item within one task group.
+  const groupAllSelected = (g: { items: ApprovalItem[] }) =>
+    g.items.length > 0 && g.items.every((q) => selected.has(q.submissionId));
+  const toggleGroup = (g: { items: ApprovalItem[] }) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (groupAllSelected(g)) g.items.forEach((q) => next.delete(q.submissionId));
+      else g.items.forEach((q) => next.add(q.submissionId));
+      return next;
+    });
+
+  const runBulkReview = async (submissionIds: string[], payload: Parameters<typeof bulkReview>[1]) => {
+    await bulkReview(submissionIds, payload);
+    setSelected(new Set());
+    toast.success(`Reviewed ${submissionIds.length} submission${submissionIds.length === 1 ? '' : 's'}`);
   };
 
   const decideExtension = async (item: ApprovalItem, approved: boolean) => {
@@ -104,6 +156,60 @@ export default function MentorApprovals() {
     { key: 'extensions', label: 'Extension requests', count: extensionItems.length },
   ];
 
+  // A single waiting-age badge, amber once a submission has waited >= 3 days.
+  const WaitBadge = ({ iso }: { iso: string }) => {
+    const stale = waitingDays(iso) >= 3;
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[11px] ${
+          stale ? 'bg-amber-100 text-amber-700' : 'text-slate-500'
+        }`}
+        title={stale ? 'Waiting 3+ days' : undefined}
+      >
+        <Clock className="w-3 h-3" />
+        {timeAgo(iso)}
+      </span>
+    );
+  };
+
+  // Shared row body for a To-review item (used flat AND inside groups).
+  const ReviewRow = ({ item }: { item: ApprovalItem }) => (
+    <div className="flex items-center gap-4 px-5 py-4">
+      <input
+        type="checkbox"
+        checked={selected.has(item.submissionId)}
+        onChange={() => toggle(item.submissionId)}
+        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0"
+      />
+
+      <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
+        <span className="text-brand-700 text-xs font-medium">{item.mentee?.avatar}</span>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
+        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500 flex-wrap">
+          <span>{item.mentee?.name}</span>
+          {item.type && (<><span className="text-slate-300">·</span><span className="capitalize">{item.type}</span></>)}
+          <span className="text-slate-300">·</span>
+          <WaitBadge iso={item.submittedAt} />
+          {item.isLate && (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700">
+              <Clock className="w-3 h-3" />late
+            </span>
+          )}
+        </div>
+      </div>
+
+      <button
+        onClick={() => setReviewing(item)}
+        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
+      >
+        Review <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -117,14 +223,14 @@ export default function MentorApprovals() {
                 (extensionItems.length ? ` · ${extensionItems.length} extension request${extensionItems.length === 1 ? '' : 's'}` : '')}
           </p>
         </div>
-        {tab === 'review' && onTime.length > 0 && (
+        {tab === 'review' && (
           <button
-            onClick={runBulk}
-            disabled={bulkBusy || selectedOnTime.length === 0}
+            onClick={() => setBulkOpen(true)}
+            disabled={selected.size === 0}
             className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 shrink-0"
           >
-            {bulkBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />}
-            Approve selected{selectedOnTime.length > 0 ? ` (${selectedOnTime.length})` : ''}
+            <ClipboardCheck className="w-4 h-4" />
+            Review{selected.size > 0 ? ` ${selected.size}` : ''} selected
           </button>
         )}
       </div>
@@ -166,19 +272,71 @@ export default function MentorApprovals() {
       ) : tab === 'review' ? (
         /* ── To review ───────────────────────────────────────────── */
         <>
-          {onTime.length > 0 && (
+          {/* Controls */}
+          {reviewItems.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search mentee or task…"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <button
+                onClick={() => setNewestFirst((v) => !v)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:border-brand-300 hover:text-brand-700"
+                title="Toggle sort order"
+              >
+                <ArrowDownUp className="w-4 h-4" />
+                {newestFirst ? 'Newest first' : 'Oldest first'}
+              </button>
+              <button
+                onClick={() => setLateOnly((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm ${
+                  lateOnly
+                    ? 'border-red-300 bg-red-50 text-red-700'
+                    : 'border-slate-200 text-slate-600 hover:border-brand-300 hover:text-brand-700'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                Late only
+              </button>
+              <button
+                onClick={() => setGroupByTask((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-sm ${
+                  groupByTask
+                    ? 'border-brand-300 bg-brand-50 text-brand-700'
+                    : 'border-slate-200 text-slate-600 hover:border-brand-300 hover:text-brand-700'
+                }`}
+              >
+                <Layers className="w-4 h-4" />
+                Group by task
+              </button>
+            </div>
+          )}
+
+          {/* Select-all affordance for the current filtered set */}
+          {filteredReview.length > 0 && (
             <div className="flex items-center gap-2 text-sm text-slate-500">
-              <button onClick={selectAllOnTime} className="inline-flex items-center gap-2 hover:text-slate-700">
+              <button onClick={selectAllFiltered} className="inline-flex items-center gap-2 hover:text-slate-700">
                 <input
                   type="checkbox"
                   readOnly
-                  checked={selectedOnTime.length === onTime.length && onTime.length > 0}
+                  checked={allFilteredSelected}
                   className="w-4 h-4 rounded border-slate-300 text-brand-600"
                 />
-                Select all on-time ({onTime.length})
+                Select all ({filteredReview.length})
               </button>
-              <span className="text-slate-300">·</span>
-              <span>Late work opens a full review.</span>
+              {selected.size > 0 && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <button onClick={() => setSelected(new Set())} className="hover:text-slate-700">
+                    Clear selection ({selected.size})
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -187,48 +345,35 @@ export default function MentorApprovals() {
               <CheckCircle2 className="w-12 h-12 text-brand-300 mx-auto mb-3" />
               <p className="text-slate-600">All caught up - nothing waiting on you.</p>
             </div>
-          ) : (
-            <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
-              {reviewItems.map((item) => (
-                <div key={item.submissionId} className="flex items-center gap-4 px-5 py-4">
-                  {!item.isLate ? (
+          ) : filteredReview.length === 0 ? (
+            <div className="bg-card rounded-2xl border border-slate-200 py-16 text-center">
+              <p className="text-slate-600">No submissions match these filters.</p>
+            </div>
+          ) : groupByTask ? (
+            /* Grouped by task */
+            <div className="space-y-4">
+              {groups.map((g) => (
+                <div key={g.title + g.items[0]?.submissionId} className="bg-card rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="flex items-center gap-3 px-5 py-3 bg-slate-50 border-b border-slate-100">
                     <input
                       type="checkbox"
-                      checked={selected.has(item.submissionId)}
-                      onChange={() => toggle(item.submissionId)}
+                      checked={groupAllSelected(g)}
+                      onChange={() => toggleGroup(g)}
                       className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0"
                     />
-                  ) : (
-                    <span className="w-4 shrink-0" />
-                  )}
-
-                  <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
-                    <span className="text-brand-700 text-xs font-medium">{item.mentee?.avatar}</span>
+                    <p className="text-sm font-semibold text-slate-800 truncate flex-1">{g.title}</p>
+                    <span className="text-xs text-slate-500 shrink-0">{g.items.length} submission{g.items.length === 1 ? '' : 's'}</span>
                   </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900 truncate">{item.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
-                      <span>{item.mentee?.name}</span>
-                      {item.type && (<><span className="text-slate-300">·</span><span className="capitalize">{item.type}</span></>)}
-                      <span className="text-slate-300">·</span>
-                      <span>{timeAgo(item.submittedAt)}</span>
-                      {item.isLate && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-red-50 text-red-700">
-                          <Clock className="w-3 h-3" />late
-                        </span>
-                      )}
-                    </div>
+                  <div className="divide-y divide-slate-100">
+                    {g.items.map((item) => <ReviewRow key={item.submissionId} item={item} />)}
                   </div>
-
-                  <button
-                    onClick={() => setReviewing(item)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
-                  >
-                    Review <ChevronRight className="w-4 h-4" />
-                  </button>
                 </div>
               ))}
+            </div>
+          ) : (
+            /* Flat list */
+            <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
+              {filteredReview.map((item) => <ReviewRow key={item.submissionId} item={item} />)}
             </div>
           )}
         </>
@@ -316,6 +461,15 @@ export default function MentorApprovals() {
           item={reviewing}
           onClose={() => setReviewing(null)}
           onReviewed={() => { setSelected(new Set()); refetch(); }}
+        />
+      )}
+
+      {bulkOpen && selectedItems.length > 0 && (
+        <BulkReviewDrawer
+          items={selectedItems}
+          onClose={() => setBulkOpen(false)}
+          onReviewed={() => {}}
+          onSubmit={runBulkReview}
         />
       )}
     </div>

@@ -7,6 +7,12 @@ const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const { endOfDayInZone } = require('../utils/timezone');
 const authzService = require('./authzService');
 const { PERMISSIONS } = require('../config/permissions');
+const { pointsForDifficulty } = require('../config/points');
+
+/** Standard points for a submission's task, derived solely from difficulty. */
+function taskStandardPoints(task) {
+  return pointsForDifficulty(task?.roadmapTask?.difficulty);
+}
 
 class SubmissionService {
   /**
@@ -349,23 +355,9 @@ class SubmissionService {
       throw new ValidationError('Rating must be between 0 and 5');
     }
 
-    const maxPoints = task.pointsBase ?? task.roadmapTask?.pointsBase ?? 10;
-
-    if (isApproved && pointsAwarded !== undefined && pointsAwarded !== null) {
-      const parsedPoints = Number(pointsAwarded);
-
-      if (!Number.isFinite(parsedPoints)) {
-        throw new ValidationError('Points awarded must be a valid number');
-      }
-
-      if (parsedPoints < 0) {
-        throw new ValidationError('Points awarded cannot be less than 0');
-      }
-
-      if (parsedPoints > maxPoints) {
-        throw new ValidationError(`Points awarded cannot be greater than maximum marks ${maxPoints}`);
-      }
-    }
+    // Points are STANDARD by difficulty — not chosen by the mentor. Same
+    // difficulty always earns the same points (fair, ungameable leaderboard).
+    const standardPoints = taskStandardPoints(task);
 
     // Create feedback
     const feedbackType = inlineFeedback && inlineFeedback.length > 0 ? 'both' : 'general';
@@ -399,9 +391,7 @@ class SubmissionService {
 
     if (isApproved) {
       updateData.completedAt = new Date();
-      const parsedPoints = Number(pointsAwarded);
-      const safePoints = Number.isFinite(parsedPoints) ? parsedPoints : maxPoints;
-      updateData.pointsAwarded = safePoints;
+      updateData.pointsAwarded = standardPoints;
     } else {
       updateData.revisionCount = task.revisionCount + 1;
     }
@@ -510,6 +500,118 @@ class SubmissionService {
     }
 
     return reviewedSubmission;
+  }
+
+  /**
+   * Edit an already-submitted review: correct the feedback text, inline notes,
+   * rating, and (for an approved task) the points awarded — WITHOUT changing the
+   * decision. The original decision stands (approved stays approved, revision
+   * stays revision); this is for fixing a review, not redoing it. Only the
+   * mentor who wrote the review may edit it. When the points change on an
+   * approved task we reconcile the difference with gamification so the mentee's
+   * running total stays correct.
+   */
+  async editReview(submissionId, mentorId, reviewData) {
+    const submission = await models.TaskSubmission.findByPk(submissionId, {
+      include: [{
+        model: models.AssignedTask,
+        as: 'assignedTask',
+        include: [{ model: models.RoadmapTask, as: 'roadmapTask' }]
+      }]
+    });
+
+    if (!submission) {
+      throw new NotFoundError('Submission not found');
+    }
+
+    if (submission.status !== 'approved' && submission.status !== 'revision_needed') {
+      throw new ValidationError('Only a reviewed submission can be edited');
+    }
+
+    const task = submission.assignedTask;
+
+    // The latest feedback row for this submission is the review being edited.
+    const feedback = await models.TaskFeedback.findOne({
+      where: { submissionId: submission.id },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!feedback) {
+      throw new NotFoundError('No review found to edit');
+    }
+
+    // Only the mentor who wrote the review may edit it.
+    if (feedback.mentorId !== mentorId) {
+      throw new ForbiddenError('Only the mentor who wrote this review can edit it');
+    }
+
+    const isApproved = submission.status === 'approved';
+
+    const {
+      rating,
+      feedbackText,
+      inlineFeedback,
+      revisionNotes,
+      criteriaMet,
+      checkedCriteria
+    } = reviewData;
+
+    if (rating !== undefined && rating !== null && (rating < 0 || rating > 5)) {
+      throw new ValidationError('Rating must be between 0 and 5');
+    }
+
+    // Update the feedback row in place (only provided fields change).
+    const nextFeedbackText = feedbackText !== undefined ? feedbackText : feedback.feedbackText;
+    const nextInline = inlineFeedback !== undefined ? (inlineFeedback || null) : feedback.inlineFeedback;
+    const nextRating = (rating !== undefined && rating !== null) ? rating : feedback.rating;
+    await feedback.update({
+      feedbackText: nextFeedbackText,
+      inlineFeedback: nextInline,
+      rating: nextRating,
+      // Revision notes only apply to a revision decision; approved stays null.
+      revisionNotes: isApproved ? null : (revisionNotes !== undefined ? revisionNotes : feedback.revisionNotes),
+      criteriaMet: criteriaMet !== undefined ? (criteriaMet || null) : feedback.criteriaMet,
+      checkedCriteria: checkedCriteria !== undefined ? (checkedCriteria || null) : feedback.checkedCriteria,
+      feedbackType: (nextInline && nextInline.length > 0) ? 'both' : 'general'
+    });
+
+    // Keep the task's final rating in sync. Points are fixed by difficulty and
+    // not editable here, so they are intentionally left untouched.
+    await task.update({ finalRating: nextRating });
+
+    // Refresh the mentee's avg rating (points are unchanged).
+    await this.updateMenteeGamificationProgress(task.menteeId);
+
+    // Mentor's average-rating stat may have shifted.
+    await this.updateMentorReviewStats(mentorId);
+
+    const edited = await this.getSubmissionById(submissionId);
+    const editedTitle = edited.assignedTask?.roadmapTask?.title || 'your task';
+
+    // Tell the mentee their feedback was updated (best-effort; never block).
+    try {
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.FEEDBACK_SENT,
+        recipients: [{ userId: task.menteeId }],
+        payload: {
+          title: `Your mentor updated their feedback`,
+          message: `The review on “${editedTitle}” was updated. Take a look when you get a moment.`,
+          actionUrl: `/mentee/tasks/${task.id}`,
+          actionLabel: 'Read feedback',
+          relatedEntityType: 'task_feedback',
+          relatedEntityId: submission.id,
+          emailSubject: `Updated feedback on “${editedTitle}”`
+        },
+        dedupe: {
+          relatedEntityType: 'feedback_edited',
+          relatedEntityId: submission.id
+        }
+      });
+    } catch (notifyError) {
+      console.error('[editReview] mentee notification failed (non-fatal):', notifyError.message);
+    }
+
+    return edited;
   }
 
   /**
@@ -722,14 +824,24 @@ class SubmissionService {
         model: models.AssignedTask,
         as: 'assignedTask',
         required: true,
-        where: { mentorId, status: 'submitted' },
+        where: { mentorId },
         include: [
-          { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase'] },
+          { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase', 'difficulty'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
         ]
       }],
       order: [['submittedAt', 'ASC']]
     });
+
+    // Two things belong in this queue: submitted work awaiting review, and a
+    // pending extension request. An extension request creates a 'pending'
+    // TaskSubmission but does NOT move the task into 'submitted' (the mentee
+    // hasn't done the work yet), so filtering the query on task.status alone
+    // dropped extension requests from the queue entirely. Keep either case.
+    const reviewable = submissions.filter((s) =>
+      s.assignedTask?.status === 'submitted' ||
+      Boolean(s.extensionRequested && s.extensionStatus === 'pending')
+    );
 
     // Collapse to ONE entry per assignment. A mentee can resubmit / request an
     // extension before review, and each of those creates a new TaskSubmission
@@ -738,7 +850,7 @@ class SubmissionService {
     // the latest version (the mentee's most recent state); the mentor still sees
     // the full version thread when they open Review.
     const latestByTask = new Map();
-    for (const s of submissions) {
+    for (const s of reviewable) {
       const prev = latestByTask.get(s.assignedTaskId);
       if (!prev || (s.version || 0) > (prev.version || 0)) latestByTask.set(s.assignedTaskId, s);
     }
@@ -760,6 +872,9 @@ class SubmissionService {
       return {
         submissionId: s.id,
         taskId: t.id,
+        // Stable peer-grouping key for the client's "group by task" view. Title
+        // can be per-mentee overridden, so don't group by title.
+        roadmapTaskId: t.roadmapTaskId || null,
         version: s.version,
         submissionText: s.submissionText,
         submissionUrls: s.submissionUrls || [],
@@ -782,7 +897,7 @@ class SubmissionService {
         deliverable: t.deliverableOverride || t.roadmapTask?.deliverable || null,
         criteria: (Array.isArray(t.acceptanceCriteriaOverride) && t.acceptanceCriteriaOverride.length)
           ? t.acceptanceCriteriaOverride : (t.roadmapTask?.acceptanceCriteria || []),
-        maxPoints: t.pointsBase ?? t.roadmapTask?.pointsBase ?? 10,
+        maxPoints: pointsForDifficulty(t.roadmapTask?.difficulty),
         mentee: m ? {
           id: m.id,
           name: `${m.firstName} ${m.lastName}`.trim(),
@@ -793,26 +908,78 @@ class SubmissionService {
   }
 
   /**
-   * Bulk-approve a set of submissions (used for on-time work). Each goes
-   * through the normal review path so points/notifications/stats all fire.
-   * Returns per-submission results so the caller can report partial failure.
+   * Apply the SAME review decision to a set of submissions. Each goes through
+   * the normal review path so points/notifications/stats all fire. Returns
+   * per-submission results so the caller can report partial failure.
    */
-  async bulkApprove(mentorId, submissionIds = []) {
+  async bulkReview(mentorId, submissionIds = [], reviewData = {}) {
     const results = [];
     for (const submissionId of submissionIds) {
       try {
-        await this.reviewSubmission(submissionId, mentorId, {
-          rating: 5,
-          feedbackText: 'Approved.',
-          isApproved: true,
-          decision: 'approved'
-        });
+        await this.reviewSubmission(submissionId, mentorId, reviewData);
         results.push({ submissionId, ok: true });
       } catch (error) {
         results.push({ submissionId, ok: false, error: error.message });
       }
     }
     return results;
+  }
+
+  /**
+   * Bulk-approve a set of submissions (used for on-time work). Delegates to
+   * bulkReview with the standard approve payload.
+   */
+  async bulkApprove(mentorId, submissionIds = []) {
+    return this.bulkReview(mentorId, submissionIds, {
+      rating: 5,
+      feedbackText: 'Approved.',
+      isApproved: true,
+      decision: 'approved'
+    });
+  }
+
+  /**
+   * AI-draft concise, constructive mentor feedback for a submitted task, using
+   * the mentor's configured AI connection (feature: 'feedback'). The tone follows
+   * `decision` (approved = affirming + a growth nudge; changes = clearly states
+   * what to fix). When `count > 1` it's phrased for a GROUP (general, not "you").
+   * Returns the text; bubbles the ValidationError (no AI key) so the client can
+   * surface the "AI not configured" message.
+   */
+  async draftFeedback(mentorId, { taskTitle, brief, criteria, decision, count } = {}) {
+    const n = Math.max(1, Number(count) || 1);
+    const isApproved = decision === 'approved' || decision === 'approved_notes';
+    const criteriaList = Array.isArray(criteria)
+      ? criteria.map((c) => String(c).trim()).filter(Boolean)
+      : [];
+
+    const brief_ = [
+      `Task: ${String(taskTitle || 'Submitted task').trim()}`,
+      brief ? `What the task asked for: ${String(brief).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 800)}` : null,
+      criteriaList.length ? `Acceptance criteria: ${criteriaList.slice(0, 12).join('; ')}` : null,
+      `Decision: ${isApproved ? 'approving the work' : decision === 'rejected' ? 'rejecting the work' : 'requesting changes'}`,
+      n > 1 ? `Audience: a GROUP of ${n} mentees who submitted this same task (write generally, do not address one person).` : 'Audience: the single mentee who submitted this task.',
+    ].filter(Boolean).join('\n');
+
+    const tone = isApproved
+      ? 'The work is being approved. Be affirming and specific about what was done well, then add ONE concrete growth nudge for next time.'
+      : decision === 'rejected'
+        ? 'The work is being rejected. Be respectful but clear about why it does not meet the bar and what a passing submission would need.'
+        : 'Changes are being requested. Clearly and concretely state what needs to be fixed before resubmission.';
+
+    const audience = n > 1
+      ? 'Write for the whole group in general terms (e.g. "the submissions", "this work") — never single anyone out.'
+      : 'Write directly to the mentee.';
+
+    const system =
+      'You are an experienced mentor writing brief, constructive feedback on a submitted task. ' +
+      'Write 2-4 sentences, warm but professional, specific and actionable. ' +
+      'No headings, no bullet lists, no markdown, no preamble. Do not invent facts beyond the brief. ' +
+      `${tone} ${audience}`;
+    const prompt = `Here is the task context. Write the feedback.\n\n${brief_}`;
+
+    const groqService = require('./groqService');
+    return groqService.generateText({ system, prompt, feature: 'feedback', userId: mentorId, temperature: 0.6, maxTokens: 300 });
   }
 }
 

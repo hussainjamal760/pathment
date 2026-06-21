@@ -18,6 +18,8 @@ import {
 import RichTextEditor from '@/components/shared/RichTextEditor';
 import { useMentorTaskFeedback } from '@/lib/hooks/mentor';
 import { PageHeader } from '@/components/admin/ui';
+import { formatFileSize } from '@/lib/utils/formatting';
+import { pointsForDifficulty } from '@/lib/config/points';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,30 +33,27 @@ export default function FeedbackProvision({ params }: PageProps) {
     loading,
     isSubmitting,
     showSuccess,
+    alreadyReviewed,
     rating,
     hoveredRating,
     feedbackText,
     revisionNotes,
     decision,
-    pointsAwarded,
     inlineFeedback,
     error,
     ratingError,
     feedbackError,
     decisionError,
     revisionError,
-    pointsError,
     setRating,
     setHoveredRating,
     setFeedbackText,
     setRevisionNotes,
     setDecision,
-    setPointsAwarded,
     setRatingError,
     setFeedbackError,
     setDecisionError,
     setRevisionError,
-    setPointsError,
     addInlineFeedback,
     updateInlineFeedback,
     removeInlineFeedback,
@@ -81,7 +80,7 @@ export default function FeedbackProvision({ params }: PageProps) {
   const taskDescription = task.roadmapTask?.description || task.description;
   const taskDeliverable = task.roadmapTask?.deliverable || task.deliverable;
   const acceptanceCriteria = task.roadmapTask?.acceptanceCriteria || task.acceptanceCriteria || [];
-  const maxPoints = task.roadmapTask?.pointsBase || 10;
+  const standardPoints = pointsForDifficulty(task.roadmapTask?.difficulty || task.difficulty);
 
   return (
     <div className="space-y-6">
@@ -96,7 +95,7 @@ export default function FeedbackProvision({ params }: PageProps) {
         <div className="p-4 bg-green-50 border border-green-200 rounded-xl flex items-start gap-3">
           <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
           <div>
-            <p className="text-green-900">Feedback submitted successfully!</p>
+            <p className="text-green-900">{alreadyReviewed ? 'Review updated successfully!' : 'Feedback submitted successfully!'}</p>
             <p className="text-green-700 text-sm mt-1">Your mentee will be notified.</p>
           </div>
         </div>
@@ -149,8 +148,10 @@ export default function FeedbackProvision({ params }: PageProps) {
               {task.difficulty}
             </span>
           </div>
-          <p className="text-slate-600 text-sm mb-4">{taskDescription}</p>
-          
+          {taskDescription && (/<[a-z][\s\S]*>/i.test(taskDescription)
+            ? <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300 mb-4" dangerouslySetInnerHTML={{ __html: taskDescription }} />
+            : <p className="text-slate-600 text-sm mb-4 whitespace-pre-wrap">{taskDescription}</p>)}
+
           {taskDeliverable && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900"><strong>Expected Deliverable:</strong> {taskDeliverable}</p>
@@ -228,7 +229,9 @@ export default function FeedbackProvision({ params }: PageProps) {
                     <FileText className="w-5 h-5 text-slate-600" />
                     <div>
                       <p className="text-sm text-slate-900">{file.fileName}</p>
-                      <p className="text-xs text-slate-500">{(file.fileSize / 1024).toFixed(2)} KB</p>
+                      {Number(file.fileSizeBytes) > 0 && (
+                        <p className="text-xs text-slate-500">{formatFileSize(Number(file.fileSizeBytes))}</p>
+                      )}
                     </div>
                   </div>
                   <a
@@ -249,12 +252,24 @@ export default function FeedbackProvision({ params }: PageProps) {
 
       {/* Review Form */}
       <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-slate-200 p-6 space-y-6">
-        <h3 className="text-lg text-slate-900">Provide Feedback</h3>
+        <h3 className="text-lg text-slate-900">{alreadyReviewed ? 'Edit Review' : 'Provide Feedback'}</h3>
+
+        {alreadyReviewed && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-blue-900">
+              You already reviewed this submission. You can correct the feedback, rating
+              {decision === 'approve' ? ', and points' : ''}. The decision stays the same.
+            </p>
+          </div>
+        )}
 
         {/* Rating */}
         <div>
           <label className="block text-sm text-slate-700 mb-2">
-            Rating <span className="text-red-500">*</span>
+            Rating {decision === 'revision'
+              ? <span className="text-slate-400 text-xs">(optional)</span>
+              : <span className="text-red-500">*</span>}
           </label>
           <div className="flex gap-2">
             {[1, 2, 3, 4, 5].map((star) => (
@@ -290,7 +305,9 @@ export default function FeedbackProvision({ params }: PageProps) {
         {/* General Feedback */}
         <div>
           <label className="block text-sm text-slate-700 mb-2">
-            General Feedback <span className="text-red-500">*</span>
+            General Feedback {decision === 'revision'
+              ? <span className="text-slate-400 text-xs">(optional — your revision notes below cover the details)</span>
+              : <span className="text-red-500">*</span>}
           </label>
           <div className={feedbackError ? 'ring-2 ring-red-400 rounded-lg' : ''}>
             <RichTextEditor
@@ -363,12 +380,13 @@ export default function FeedbackProvision({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4">
             <button
               type="button"
-              onClick={() => { setDecision('approve'); setDecisionError(''); }}
+              disabled={alreadyReviewed}
+              onClick={() => { if (alreadyReviewed) return; setDecision('approve'); setDecisionError(''); }}
               className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all ${
                 decision === 'approve'
                   ? 'border-green-500 bg-green-50'
                   : 'border-slate-200 hover:border-green-300'
-              }`}
+              } ${alreadyReviewed && decision !== 'approve' ? 'opacity-40 cursor-not-allowed' : ''} ${alreadyReviewed ? 'cursor-default' : ''}`}
             >
               <ThumbsUp className={`w-6 h-6 ${decision === 'approve' ? 'text-green-600' : 'text-slate-400'}`} />
               <div className="text-left">
@@ -378,12 +396,13 @@ export default function FeedbackProvision({ params }: PageProps) {
             </button>
             <button
               type="button"
-              onClick={() => { setDecision('revision'); setDecisionError(''); }}
+              disabled={alreadyReviewed}
+              onClick={() => { if (alreadyReviewed) return; setDecision('revision'); setDecisionError(''); }}
               className={`p-4 border-2 rounded-xl flex items-center gap-3 transition-all ${
                 decision === 'revision'
                   ? 'border-orange-500 bg-orange-50'
                   : 'border-slate-200 hover:border-orange-300'
-              }`}
+              } ${alreadyReviewed && decision !== 'revision' ? 'opacity-40 cursor-not-allowed' : ''} ${alreadyReviewed ? 'cursor-default' : ''}`}
             >
               <RotateCw className={`w-6 h-6 ${decision === 'revision' ? 'text-orange-600' : 'text-slate-400'}`} />
               <div className="text-left">
@@ -400,40 +419,16 @@ export default function FeedbackProvision({ params }: PageProps) {
           )}
         </div>
 
-         {/* Points (if approved) */}
+         {/* Points (if approved) — standard by difficulty, not editable. */}
         {decision === 'approve' && (
           <div>
-            <label className="block text-sm text-slate-700 mb-2">
-              Points Awarded <span className="text-slate-500 text-xs">(Max: {maxPoints})</span>
-            </label>
-            <input
-              type="number"
-              value={pointsAwarded}
-              onChange={(e) => {
-                const newValue = Number(e.target.value);
-                // const maxPoints = task?.roadmapTask?.pointsBase || task?.pointsBase || 10;
-                
-                // Clamp behavior: if user types more than max, show max instead
-                if (newValue > maxPoints) {
-                  setPointsAwarded(maxPoints);
-                } else {
-                  setPointsAwarded(newValue);
-                }
-              }}
-              min="0"
-              max={task?.roadmapTask?.pointsBase || task?.pointsBase || 10}
-              className={`w-32 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                pointsAwarded >= maxPoints
-                  ? 'points-input-disabled'
-                  : 'points-input-enabled'
-              }`}
-            />
-            {pointsError && (
-              <p className="mt-2 text-sm text-red-600 flex items-center gap-1">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {pointsError}
-              </p>
-            )}
+            <label className="block text-sm text-slate-700 mb-2">Points</label>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-sm font-medium tabular-nums">
+              {standardPoints} pts
+            </span>
+            <p className="mt-1 text-xs text-slate-400">
+              Set by task difficulty{task.roadmapTask?.difficulty ? ` (${task.roadmapTask.difficulty})` : ''}. Awarded in full on approval.
+            </p>
           </div>
         )}
 
@@ -472,12 +467,12 @@ export default function FeedbackProvision({ params }: PageProps) {
             {isSubmitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Submitting...
+                {alreadyReviewed ? 'Saving...' : 'Submitting...'}
               </>
             ) : (
               <>
                 <Send className="w-4 h-4" />
-                Submit Review
+                {alreadyReviewed ? 'Save Changes' : 'Submit Review'}
               </>
             )}
           </button>

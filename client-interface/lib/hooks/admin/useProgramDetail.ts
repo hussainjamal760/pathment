@@ -52,6 +52,7 @@ interface UseProgramDetailReturn {
   handleVisibilityUpdate: (newVisibility: string) => Promise<void>;
   updatingStatus: boolean;
   fetchEnrollments: () => Promise<void>;
+  refetch: () => Promise<void>;
 }
 
 export function useProgramDetail(): UseProgramDetailReturn {
@@ -204,5 +205,6 @@ export function useProgramDetail(): UseProgramDetailReturn {
     handleVisibilityUpdate,
     updatingStatus,
     fetchEnrollments,
+    refetch: fetchProgram,
   };
 }

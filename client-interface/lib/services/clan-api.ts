@@ -27,6 +27,8 @@ export const clanApi = {
   update: (id: string, data: Record<string, unknown>) => apiClient.patch(`/clans/${id}`, data),
   addMember: (id: string, userId: string, role: 'lead_mentor' | 'co_mentor' | 'mentee' | 'core_team') =>
     apiClient.post(`/clans/${id}/members`, { userId, role }),
+  /** Clan-scoped mentor capabilities for the current user (matches server guards). */
+  myClanAccess: (id: string) => apiClient.get(`/clans/${id}/members/me/access`),
   removeMember: (id: string, userId: string) => apiClient.delete(`/clans/${id}/members/${userId}`),
   /** A co-mentor's current toggle state: { keys, denied }. Works for co-mentors
    *  from any source (team membership / cross-clan cover / IAM grant). */

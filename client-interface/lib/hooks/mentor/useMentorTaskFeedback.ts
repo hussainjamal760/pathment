@@ -19,6 +19,9 @@ export interface UseMentorTaskFeedbackReturn {
   loading: boolean;
   isSubmitting: boolean;
   showSuccess: boolean;
+  /** True when this submission was already reviewed — the form edits the
+   * existing review instead of creating one, and the decision is locked. */
+  alreadyReviewed: boolean;
   rating: number;
   hoveredRating: number;
   feedbackText: string;
@@ -57,6 +60,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
 
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -73,27 +77,56 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
   const [revisionError, setRevisionError] = useState('');
   const [pointsError, setPointsError] = useState('');
 
+  const loadTaskAndSubmission = useCallback(async () => {
+    try {
+      const response = await taskApi.getTaskById(taskId);
+      const taskData = response.data.task;
+      setTask(taskData);
+
+      const sub = taskData.submissions?.[0] ?? null;
+      setSubmission(sub);
+
+      // Already-reviewed? Prefill the form from the existing review so the
+      // mentor edits it in place instead of starting from a blank form.
+      const reviewed = sub?.status === 'approved' || sub?.status === 'revision_needed';
+      setAlreadyReviewed(reviewed);
+
+      if (reviewed && Array.isArray(sub?.feedback) && sub.feedback.length > 0) {
+        // hasMany feedback; take the most recently created row.
+        const fb = [...sub.feedback].sort(
+          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+        setRating(Number(fb.rating) || 0);
+        setFeedbackText(fb.feedbackText || '');
+        setRevisionNotes(fb.revisionNotes || '');
+        setDecision(sub.status === 'approved' ? 'approve' : 'revision');
+        setInlineFeedback(
+          Array.isArray(fb.inlineFeedback)
+            ? fb.inlineFeedback.map((item: any, i: number) => ({
+                id: Date.now() + i,
+                comment: item.comment || '',
+                type: item.type || 'suggestion',
+              }))
+            : []
+        );
+        // Points live on the task once approved; fall back to the base value.
+        setPointsAwarded(
+          Number(taskData.pointsAwarded ?? taskData.roadmapTask?.pointsBase ?? 0) || 0
+        );
+      } else if (taskData.roadmapTask?.pointsBase) {
+        setPointsAwarded(taskData.roadmapTask.pointsBase);
+      }
+    } catch (err: unknown) {
+      setError(extractApiErrorMessage(err, 'Failed to load task'));
+    } finally {
+      setLoading(false);
+    }
+  }, [taskId]);
+
   useEffect(() => {
     if (!taskId) return;
-    const fetchTaskAndSubmission = async () => {
-      try {
-        const response = await taskApi.getTaskById(taskId);
-        const taskData = response.data.task;
-        setTask(taskData);
-        if (taskData.submissions && taskData.submissions.length > 0) {
-          setSubmission(taskData.submissions[0]);
-        }
-        if (taskData.roadmapTask?.pointsBase) {
-          setPointsAwarded(taskData.roadmapTask.pointsBase);
-        }
-      } catch (err: unknown) {
-        setError(extractApiErrorMessage(err, 'Failed to load task'));
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTaskAndSubmission();
-  }, [taskId]);
+    loadTaskAndSubmission();
+  }, [taskId, loadTaskAndSubmission]);
 
   const addInlineFeedback = useCallback(() => {
     setInlineFeedback((prev) => [
@@ -128,24 +161,30 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
       }
 
       let hasError = false;
-      if (rating === 0) {
-        setRatingError('Please select a rating before submitting.');
-        hasError = true;
-      }
-      const plainText = feedbackText.replace(/<[^>]*>/g, '').trim();
-      if (!plainText) {
-        setFeedbackError('Feedback is required. Please describe your thoughts on the submission.');
-        hasError = true;
-      }
       if (!decision) {
         setDecisionError('Please select a decision (Approve or Request Revision).');
         hasError = true;
       }
-      if (decision === 'revision' && !revisionNotes.trim()) {
-        setRevisionError('Revision notes are required when requesting a revision.');
-        hasError = true;
+      // Requesting a revision: the Revision Notes ARE the description of what to
+      // fix, so that's the only required field — don't also force a rating or
+      // general feedback (those are for an approval). Approving: rating +
+      // feedback are required.
+      if (decision === 'revision') {
+        if (!revisionNotes.trim()) {
+          setRevisionError('Revision notes are required — tell the mentee what to fix.');
+          hasError = true;
+        }
       }
       if (decision === 'approve') {
+        if (rating === 0) {
+          setRatingError('Please select a rating before submitting.');
+          hasError = true;
+        }
+        const plainText = feedbackText.replace(/<[^>]*>/g, '').trim();
+        if (!plainText) {
+          setFeedbackError('Feedback is required. Please describe your thoughts on the submission.');
+          hasError = true;
+        }
         const maxPoints = task?.roadmapTask?.pointsBase ?? 10;
         if (pointsAwarded > maxPoints) {
           setPointsError(`Maximum points are ${maxPoints}.`);
@@ -160,17 +199,33 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
           .filter((item) => item.comment.trim())
           .map((item) => ({ line: 0, comment: item.comment, type: item.type }));
 
-        await submissionService.reviewSubmission(submission.id, {
-          rating,
-          feedbackText,
-          isApproved: decision === 'approve',
-          revisionNotes: decision === 'revision' ? revisionNotes : undefined,
-          pointsAwarded: decision === 'approve' ? pointsAwarded : 0,
-          inlineFeedback: validInlineFeedback,
-        } as any);
+        if (alreadyReviewed) {
+          // Editing an existing review: the decision is locked, so we never flip
+          // approve/revision here — we only correct feedback, rating, and points.
+          await submissionService.editReview(submission.id, {
+            rating,
+            feedbackText,
+            revisionNotes: decision === 'revision' ? revisionNotes : undefined,
+            pointsAwarded: decision === 'approve' ? pointsAwarded : undefined,
+            inlineFeedback: validInlineFeedback,
+          });
+          setShowSuccess(true);
+          // Stay on the page and refresh so the saved review is reflected.
+          await loadTaskAndSubmission();
+          setTimeout(() => setShowSuccess(false), 3000);
+        } else {
+          await submissionService.reviewSubmission(submission.id, {
+            rating,
+            feedbackText,
+            isApproved: decision === 'approve',
+            revisionNotes: decision === 'revision' ? revisionNotes : undefined,
+            pointsAwarded: decision === 'approve' ? pointsAwarded : 0,
+            inlineFeedback: validInlineFeedback,
+          } as any);
 
-        setShowSuccess(true);
-        setTimeout(() => router.push('/mentor/tasks'), 2000);
+          setShowSuccess(true);
+          setTimeout(() => router.push('/mentor/tasks'), 2000);
+        }
       } catch (err: unknown) {
         setError(extractApiErrorMessage(err, 'Failed to submit feedback'));
       } finally {
@@ -187,6 +242,8 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
       task,
       inlineFeedback,
       router,
+      alreadyReviewed,
+      loadTaskAndSubmission,
     ]
   );
 
@@ -196,6 +253,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
     loading,
     isSubmitting,
     showSuccess,
+    alreadyReviewed,
     rating,
     hoveredRating,
     feedbackText,

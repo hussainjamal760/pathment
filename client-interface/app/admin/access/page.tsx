@@ -23,7 +23,7 @@ import { useConfirm } from '@/lib/context/ConfirmContext';
 const PERMISSION_GROUPS = [
   { label: 'Programs & curriculum', perms: ['program.create', 'program.manage', 'program.publish', 'cohort.manage', 'roadmap.author', 'roadmap.publish_local'] },
   { label: 'Intake', perms: ['intake.manage', 'assessment.author', 'invite.create'] },
-  { label: 'People & clans', perms: ['clan.create', 'clan.manage_members', 'mentee.view', 'mentee.manage', 'user.manage'] },
+  { label: 'People & clans', perms: ['clan.create', 'clan.manage_members', 'mentee.view', 'mentee.manage', 'mentee.add', 'user.manage'] },
   { label: 'Work', perms: ['task.assign', 'task.review', 'library.manage'] },
   { label: 'Community & rewards', perms: ['community.post', 'community.moderate', 'announcement.post', 'gamification.manage'] },
   { label: 'Platform', perms: ['analytics.view', 'access.manage', 'system.settings'] },
@@ -161,7 +161,12 @@ function PeopleTab() {
             <span className="ml-auto text-xs text-slate-400 tabular-nums">{pagination.total} {pagination.total === 1 ? 'person' : 'people'}</span>
           </div>
 
-          <div className="mt-2 min-h-[40vh] divide-y divide-slate-100">
+          {/* Adaptive height: the list grows with its content but is capped to the
+              viewport MINUS the page header + card chrome + pagination, so the whole
+              card always fits without the page itself scrolling (no double scrollbar,
+              pagination always visible), and short/filtered lists stay compact instead
+              of leaving a big empty gap. */}
+          <div className="mt-2 max-h-[calc(100vh-22rem)] min-h-[14rem] overflow-y-auto divide-y divide-slate-100 pr-1">
             {loading ? (
               <div className="py-8 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-brand-600" /></div>
             ) : users.length === 0 ? (
@@ -179,7 +184,7 @@ function PeopleTab() {
           </div>
 
           {pagination.total > pagination.limit && (
-            <TablePagination pagination={pagination} isLoading={loading} className="pt-2" />
+            <TablePagination pagination={pagination} isLoading={loading} showPageSize={false} stack className="pt-3 mt-1 border-t border-slate-100" />
           )}
         </div>
       </div>

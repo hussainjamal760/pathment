@@ -95,8 +95,17 @@ const updateClan = catchAsync(async (req, res) => {
  * Assign a user to the clan with a clan-scoped role (clan-based assignment).
  */
 const addMember = catchAsync(async (req, res) => {
-  const membership = await clanService.addMember(req.params.id, req.body);
+  const membership = await clanService.addMember(req.params.id, req.body, req.user);
   res.status(201).json(successResponse('Member added', { membership }, 201));
+});
+
+/**
+ * GET /api/clans/:id/members/me/access  (lead / co-mentor of this clan)
+ * Clan-scoped capabilities for the current user — drives the clan-team UI.
+ */
+const getMyClanAccess = catchAsync(async (req, res) => {
+  const access = await clanService.getMyClanAccess(req.params.id, req.user);
+  res.status(200).json(successResponse('Clan access retrieved', access));
 });
 
 /**
@@ -218,6 +227,7 @@ module.exports = {
   createClan,
   updateClan,
   addMember,
+  getMyClanAccess,
   removeMember,
   getMemberPermissions,
   setMemberPermissions,

@@ -44,10 +44,13 @@ export const mentorApi = {
   getMenteeAttendanceHistory: (menteeId: string) =>
     apiClient.get<{ data: { history: { sessionId: string; date: string | null; status: 'present' | 'absent' | 'excused'; title: string | null }[] } }>(`/mentor/mentee/${menteeId}/attendance/history`),
 
-  // Dated, saved, editable cohort-review sessions (full history).
-  getTodayReviewSession: () => apiClient.get('/mentor/review/sessions/today'),
-  listReviewSessions: () => apiClient.get('/mentor/review/sessions'),
-  createReviewSession: (data: { date?: string; title?: string }) => apiClient.post('/mentor/review/sessions', data),
+  // Dated, saved, editable cohort-review sessions (full history). Clan-scoped:
+  // pass the active clan so lead + co-mentors of the same clan share one session.
+  getTodayReviewSession: (clanId?: string | null) =>
+    apiClient.get('/mentor/review/sessions/today', clanId ? { params: { clanId } } : undefined),
+  listReviewSessions: (clanId?: string | null) =>
+    apiClient.get('/mentor/review/sessions', clanId ? { params: { clanId } } : undefined),
+  createReviewSession: (data: { date?: string; title?: string; clanId?: string | null }) => apiClient.post('/mentor/review/sessions', data),
   getReviewSession: (id: string) => apiClient.get(`/mentor/review/sessions/${id}`),
   updateReviewSession: (id: string, data: { title?: string; note?: string; sessionDate?: string }) =>
     apiClient.patch(`/mentor/review/sessions/${id}`, data),
@@ -60,9 +63,44 @@ export const mentorApi = {
   // Approvals queue (pending reviews across the cohort) + bulk approve.
   getApprovals: () => apiClient.get('/mentor/approvals'),
   bulkApprove: (submissionIds: string[]) => apiClient.post('/mentor/approvals/bulk', { submissionIds }),
+  bulkReview: (
+    submissionIds: string[],
+    payload: {
+      decision: 'approved' | 'approved_notes' | 'changes' | 'rejected';
+      rating?: number;
+      feedbackText?: string;
+      revisionNotes?: string;
+      pointsAwarded?: number;
+    }
+  ) => apiClient.post('/mentor/approvals/bulk-review', { submissionIds, ...payload }),
 
   // Send a gentle nudge to a mentee.
   nudge: (menteeId: string, message?: string) => apiClient.post('/mentor/nudge', { menteeId, message }),
+
+  // AI-draft constructive feedback for a submitted task (uses the mentor's AI
+  // connection). Throws with the server message when AI is not configured.
+  draftFeedback: (payload: {
+    taskTitle: string;
+    brief?: string | null;
+    criteria?: string[];
+    decision: 'approved' | 'approved_notes' | 'changes' | 'rejected';
+    count?: number;
+  }) =>
+    apiClient
+      .post<{ data: { text: string } }>('/mentor/feedback/draft', payload, { timeout: 120000 })
+      .then((r) => r.data),
+
+  // Saved feedback snippets (per-mentor).
+  listFeedbackSnippets: () =>
+    apiClient
+      .get<{ data: { snippets: { id: string; label: string; body: string }[] } }>('/mentor/feedback-snippets')
+      .then((r) => r.data.snippets),
+  createFeedbackSnippet: (payload: { label: string; body: string }) =>
+    apiClient
+      .post<{ data: { snippet: { id: string; label: string; body: string } } }>('/mentor/feedback-snippets', payload)
+      .then((r) => r.data.snippet),
+  removeFeedbackSnippet: (id: string) =>
+    apiClient.delete(`/mentor/feedback-snippets/${id}`),
 
   // Promotions (mentee → co-mentor).
   listPromotions: () => apiClient.get('/mentor/promotions'),

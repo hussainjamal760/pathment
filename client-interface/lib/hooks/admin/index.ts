@@ -65,6 +65,17 @@ export type {
   MentorActiveMatch,
 } from './useMentorProfile';
 
+export { useMenteeProfile } from './useMenteeProfile';
+export type {
+  MenteeDetail,
+  MenteeProfileData,
+  MenteeSkill,
+  MenteePerson,
+  MenteeEnrollment,
+  MenteeRecentTask,
+  MenteeStats,
+} from './useMenteeProfile';
+
 export { useProgramDetail } from './useProgramDetail';
 export type {
   ProgramDetailProgram,

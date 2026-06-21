@@ -27,6 +27,9 @@ interface TablePaginationProps {
   /** Options for per-page selector. Default [10, 20, 50, 100]. */
   pageSizeOptions?: number[];
   isLoading?: boolean;
+  /** Always stack the info + controls vertically (for narrow panels, where the
+   *  viewport-based sm: breakpoint would otherwise force a row that overflows). */
+  stack?: boolean;
   className?: string;
 }
 
@@ -60,6 +63,7 @@ export function TablePagination({
   showPageSize = true,
   pageSizeOptions = [10, 20, 50, 100],
   isLoading = false,
+  stack = false,
   className,
 }: TablePaginationProps) {
   const { page, limit, total, totalPages, hasNextPage, hasPrevPage, goToPage, setLimit } =
@@ -71,11 +75,14 @@ export function TablePagination({
   const to = Math.min(page * limit, total);
   const pageNumbers = buildPageRange(page, totalPages);
 
+  // Stacked: info on its own line, controls centered below — for narrow panels
+  // where a viewport-based row would overflow. Default: row on sm+.
+  const containerCls = stack
+    ? 'flex flex-col items-center gap-2'
+    : 'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between';
+
   return (
-    <div
-      className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between
-                  px-1 py-2 ${className ?? ''}`}
-    >
+    <div className={`${containerCls} px-1 py-2 ${className ?? ''}`}>
       {/* ── Left: info + page size ── */}
       <div className="flex items-center gap-4">
         {showInfo && (

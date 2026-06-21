@@ -613,6 +613,16 @@ export default function MentorTaskDetailsPage({ params }: PageProps) {
             Review Submission
           </button>
         )}
+
+        {task.status === 'completed' && !cancellingTask && (
+          <button
+            onClick={() => router.push(`/mentor/tasks/${task.id}/feedback`)}
+            className="ml-auto px-6 py-2.5 border border-slate-200 text-slate-700 hover:bg-card rounded-xl font-medium transition-colors flex items-center gap-2"
+          >
+            <Send className="w-4 h-4" />
+            Edit Review
+          </button>
+        )}
       </div>
 
       {/* Cancel confirmation */}

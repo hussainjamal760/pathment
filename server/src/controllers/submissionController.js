@@ -106,6 +106,26 @@ exports.reviewSubmission = catchAsync(async (req, res) => {
 });
 
 /**
+ * Edit an already-submitted review (feedback text, inline notes, rating, and
+ * points). Only the reviewing mentor may edit; the decision is unchanged.
+ * PATCH /api/submissions/:submissionId/review
+ */
+exports.editReview = catchAsync(async (req, res) => {
+  const { submissionId } = req.params;
+  const mentorId = req.user.id;
+
+  const submission = await submissionService.editReview(
+    submissionId,
+    mentorId,
+    req.body
+  );
+
+  res.status(200).json(
+    successResponse('Review updated successfully', { submission })
+  );
+});
+
+/**
  * Handle extension request (approve/reject)
  * POST /api/submissions/:submissionId/extension/handle
  */

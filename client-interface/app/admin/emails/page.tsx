@@ -1,10 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, RefreshCw, Mail, AlertTriangle, Ban, RotateCcw } from 'lucide-react';
 import { emailAdminApi, type FailedEmail, type SuppressedEntry } from '@/lib/services/email-admin-api';
 import { formatDateTime } from '@/lib/utils/datetime';
+import { usePagination } from '@/lib/hooks/shared/usePagination';
+import { TablePagination } from '@/components/shared/TablePagination';
 
 const STATUS_TABS = ['dead', 'pending', 'sent', 'sending'] as const;
 type StatusTab = typeof STATUS_TABS[number];
@@ -16,24 +18,56 @@ export default function AdminEmailQueue() {
   const [suppressed, setSuppressed] = useState<SuppressedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const pagination = usePagination({ initialPage: 1, initialLimit: 50 });
 
-  const load = useCallback(async () => {
+  // Always-current refs so the load callbacks don't churn on every page change.
+  const pageRef = useRef(pagination.page);
+  const limitRef = useRef(pagination.limit);
+  pageRef.current = pagination.page;
+  limitRef.current = pagination.limit;
+
+  // Monotonic request token — only the latest in-flight list fetch may write
+  // state, so a stale (older page/tab) response can't clobber a newer one.
+  const reqRef = useRef(0);
+
+  const loadList = useCallback(async () => {
+    const token = ++reqRef.current;
     setLoading(true);
     try {
-      const [s, l, sup] = await Promise.all([
-        emailAdminApi.stats(),
-        emailAdminApi.list(tab),
-        emailAdminApi.suppressed(),
-      ]);
-      setStats(s.data ?? null);
+      const l = await emailAdminApi.list(tab, pageRef.current, limitRef.current);
+      if (token !== reqRef.current) return; // superseded
       setEmails(l.data?.emails ?? []);
-      setSuppressed(sup.data?.suppressed ?? []);
+      pagination.setTotal(l.data?.total ?? 0);
     } catch {
-      toast.error('Could not load the email queue');
-    } finally { setLoading(false); }
+      if (token === reqRef.current) { setEmails([]); toast.error('Could not load the email queue'); }
+    } finally { if (token === reqRef.current) setLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadAside = useCallback(async () => {
+    try {
+      const [s, sup] = await Promise.all([emailAdminApi.stats(), emailAdminApi.suppressed()]);
+      setStats(s.data ?? null);
+      setSuppressed(sup.data?.suppressed ?? []);
+    } catch { /* list error toast already covers the page */ }
+  }, []);
+
+  // Refresh everything (used by the Refresh button and after mutations).
+  const load = useCallback(() => { loadList(); loadAside(); }, [loadList, loadAside]);
+
+  useEffect(() => { loadAside(); }, [loadAside]);
+
+  // Single list-load effect. When the tab changes we snap to page 1 FIRST (and
+  // skip this run) so we never fetch a now-out-of-range page; the page change
+  // re-triggers the effect and fetches page 1 exactly once.
+  const prevTab = useRef(tab);
+  useEffect(() => {
+    const tabChanged = prevTab.current !== tab;
+    prevTab.current = tab;
+    if (tabChanged && pagination.page !== 1) { pagination.goToPage(1); return; }
+    loadList();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, pagination.page]);
 
   const retry = async (id: string) => {
     setBusy(id);
@@ -121,6 +155,11 @@ export default function AdminEmailQueue() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {pagination.total > pagination.limit && (
+          <div className="px-5 py-3 border-t border-slate-200">
+            <TablePagination pagination={pagination} isLoading={loading} />
           </div>
         )}
       </div>

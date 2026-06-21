@@ -140,7 +140,11 @@ export default function MentorProgramDetail() {
                 </span>
               )}
             </div>
-            <p className="text-slate-600 mt-2 text-sm">{program.description || 'No description provided for this program.'}</p>
+            {program.description
+              ? (/<[a-z][\s\S]*>/i.test(program.description)
+                  ? <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300 mt-2" dangerouslySetInnerHTML={{ __html: program.description }} />
+                  : <p className="text-slate-600 mt-2 text-sm whitespace-pre-wrap">{program.description}</p>)
+              : <p className="text-slate-600 mt-2 text-sm">No description provided for this program.</p>}
           </div>
         </div>
       </div>

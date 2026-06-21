@@ -63,7 +63,9 @@ export default function PublicProgramDetailPage() {
       </div>
 
       <h1 className="mt-3 text-3xl font-semibold text-slate-900">{program.name}</h1>
-      {program.description && <p className="mt-3 text-slate-600 leading-relaxed">{program.description}</p>}
+      {program.description && (/<[a-z][\s\S]*>/i.test(program.description)
+        ? <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300 mt-3 leading-relaxed" dangerouslySetInnerHTML={{ __html: program.description }} />
+        : <p className="mt-3 text-slate-600 leading-relaxed whitespace-pre-wrap">{program.description}</p>)}
 
       {program.targetAudience && (
         <p className="mt-4 text-sm text-slate-500"><span className="font-medium text-slate-700">Who it&apos;s for:</span> {program.targetAudience}</p>

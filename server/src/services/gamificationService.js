@@ -58,6 +58,68 @@ class GamificationService {
     };
   }
 
+  /**
+   * Apply a SIGNED points delta (can be negative) and record it. Used when a
+   * mentor edits an already-approved review and the awarded points change — we
+   * reconcile only the difference so the running total and the points history
+   * stay correct. The total is floored at 0; the history row records the actual
+   * applied change (which may be smaller than the requested delta if it would
+   * have gone negative). A zero (or non-finite) delta is a no-op.
+   */
+  async adjustPoints(menteeId, delta, sourceType, sourceId = null, reason = null) {
+    const change = Number(delta);
+    if (!menteeId || !Number.isFinite(change) || change === 0) {
+      return null;
+    }
+
+    const menteeProfile = await models.MenteeProfile.findOne({
+      where: { userId: menteeId }
+    });
+
+    if (!menteeProfile) {
+      throw new NotFoundError('Mentee profile not found');
+    }
+
+    const pointsBefore = Number(menteeProfile.totalPoints || 0);
+    const pointsAfter = Math.max(0, pointsBefore + change);
+    const applied = pointsAfter - pointsBefore;
+    if (applied === 0) {
+      return { applied: 0, totalPoints: pointsAfter };
+    }
+
+    await models.PointsHistory.create({
+      userId: menteeId,
+      pointsChange: applied,
+      pointsBefore,
+      pointsAfter,
+      sourceType,
+      sourceId,
+      reason
+    });
+
+    await menteeProfile.update({ totalPoints: pointsAfter });
+
+    try {
+      await this.checkLevelUp(menteeId);
+    } catch (error) {
+      console.error('[Gamification] checkLevelUp failed:', error.message);
+    }
+
+    try {
+      await this.updateLeaderboardEntry(menteeId);
+    } catch (error) {
+      console.error('[Gamification] updateLeaderboardEntry failed:', error.message);
+    }
+
+    try {
+      await this.checkAndAwardBadges(menteeId);
+    } catch (error) {
+      console.error('[Gamification] checkAndAwardBadges failed:', error.message);
+    }
+
+    return { applied, totalPoints: pointsAfter };
+  }
+
   async awardBadge(userId, badgeId, unlockContext = {}) {
     const existing = await models.UserBadge.findOne({
       where: { userId, badgeId }

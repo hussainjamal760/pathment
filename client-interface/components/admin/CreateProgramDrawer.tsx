@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { X, Loader2, Plus, Check } from 'lucide-react';
 import { useProgramCreate } from '@/lib/hooks/admin';
+import RichTextEditor from '@/components/shared/RichTextEditor';
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500';
 const labelCls = 'block text-sm font-medium text-slate-700 mb-1';
@@ -72,7 +73,7 @@ export function CreateProgramDrawer({ onClose }: { onClose: () => void }) {
 
           <div>
             <label htmlFor="cp-desc" className={labelCls}>Description <span className="text-red-500">*</span></label>
-            <textarea id="cp-desc" value={programData.description} onChange={(e) => setProgramData({ ...programData, description: e.target.value })} rows={3} placeholder="Objectives, outcomes, key focus areas…" className={`${field} resize-none`} />
+            <RichTextEditor content={programData.description} onChange={(html) => setProgramData({ ...programData, description: html })} placeholder="Objectives, outcomes, key focus areas…" minHeight="120px" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

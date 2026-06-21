@@ -2,9 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { submissionService } from '@/lib/services/submissionService';
 
+export interface BulkReviewPayload {
+  decision: 'approved' | 'approved_notes' | 'changes' | 'rejected';
+  rating?: number;
+  feedbackText?: string;
+  revisionNotes?: string;
+  pointsAwarded?: number;
+}
+
 export interface ApprovalItem {
   submissionId: string;
   taskId: string;
+  roadmapTaskId: string | null;
   version: number;
   submissionText: string;
   submissionUrls: string[];
@@ -30,6 +39,7 @@ export interface UseMentorApprovalsReturn {
   error: string | null;
   refetch: () => Promise<void>;
   bulkApprove: (submissionIds: string[]) => Promise<void>;
+  bulkReview: (submissionIds: string[], payload: BulkReviewPayload) => Promise<void>;
   handleExtension: (submissionId: string, approved: boolean, newDueDate?: string) => Promise<void>;
 }
 
@@ -57,6 +67,11 @@ export function useMentorApprovals(): UseMentorApprovalsReturn {
     await fetchQueue();
   }, [fetchQueue]);
 
+  const bulkReview = useCallback(async (submissionIds: string[], payload: BulkReviewPayload) => {
+    await mentorApi.bulkReview(submissionIds, payload);
+    await fetchQueue();
+  }, [fetchQueue]);
+
   const handleExtension = useCallback(async (submissionId: string, approved: boolean, newDueDate?: string) => {
     await submissionService.handleExtension(submissionId, approved, newDueDate);
     await fetchQueue();
@@ -66,5 +81,5 @@ export function useMentorApprovals(): UseMentorApprovalsReturn {
     fetchQueue();
   }, [fetchQueue]);
 
-  return { queue, loading, error, refetch: fetchQueue, bulkApprove, handleExtension };
+  return { queue, loading, error, refetch: fetchQueue, bulkApprove, bulkReview, handleExtension };
 }

@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const cohortController = require('../controllers/cohortController');
 const cohortReviewController = require('../controllers/cohortReviewController');
+const reviewLockController = require('../controllers/reviewLockController');
 const linearRoadmapController = require('../controllers/linearRoadmapController');
 const promotionController = require('../controllers/promotionController');
+const feedbackController = require('../controllers/feedbackController');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { requirePermission } = require('../middlewares/authz');
 const { PERMISSIONS } = require('../config/permissions');
@@ -44,12 +46,17 @@ router.put('/review/sessions/:id/entries/:menteeId', mentorOnly, cohortReviewCon
 router.post('/review/sessions/:id/finish', mentorOnly, cohortReviewController.finish);
 router.post('/review/sessions/:id/reopen', mentorOnly, cohortReviewController.reopen);
 router.delete('/review/sessions/:id', mentorOnly, cohortReviewController.remove);
+// Cohort-review deletion lock (mentor-side): see the org lock state + ask an
+// admin for temporary delete access.
+router.get('/review/lock-state', mentorOnly, reviewLockController.lockState);
+router.post('/review/unlock-request', mentorOnly, reviewLockController.requestUnlock);
 router.post('/mentee/:id/collaborators', mentorOnly, cohortController.addCollaborator);
 router.delete('/mentee/:id/collaborators/:collaboratorId', mentorOnly, cohortController.removeCollaborator);
 
 // Approvals queue + bulk approve.
 router.get('/approvals', authenticate, authorize(['mentor', 'admin']), cohortController.getApprovals);
 router.post('/approvals/bulk', authenticate, authorize(['mentor', 'admin']), cohortController.bulkApprove);
+router.post('/approvals/bulk-review', authenticate, authorize(['mentor', 'admin']), cohortController.bulkReview);
 
 // Nudge a mentee.
 router.post('/nudge', authenticate, authorize(['mentor', 'admin']), cohortController.nudge);
@@ -70,6 +77,12 @@ router.post('/roadmaps/:id/assign', mentorOnly, linearRoadmapController.assign);
 router.post('/roadmaps/advance', mentorOnly, linearRoadmapController.advance);
 router.get('/roadmaps/:id/links', mentorOnly, linearRoadmapController.getLinks);
 router.put('/roadmaps/:id/links', mentorOnly, linearRoadmapController.setLinks);
+
+// Mentor feedback (Phase 2): AI-drafted feedback + saved snippets.
+router.post('/feedback/draft', mentorOnly, feedbackController.draftFeedback);
+router.get('/feedback-snippets', mentorOnly, feedbackController.listSnippets);
+router.post('/feedback-snippets', mentorOnly, feedbackController.createSnippet);
+router.delete('/feedback-snippets/:id', mentorOnly, feedbackController.removeSnippet);
 
 // Promotions (mentee → co-mentor). Final promote is admin-gated.
 router.get('/promotions', mentorOnly, promotionController.list);

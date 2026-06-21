@@ -278,12 +278,12 @@ export default function AdminMenteesListPage() {
       return (
         <div className="flex items-center justify-end gap-2">
           <Link
-            href={`/admin/enrollment/overview`}
+            href={`/admin/mentees/${row.id}`}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
-            title={`View enrollments for ${name}`}
+            title={`View profile for ${name}`}
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            Enrollments
+            Profile
           </Link>
           <button
             onClick={() => setMovingMentee(row)}

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Check, Star, ExternalLink, Loader2, Clock, ShieldCheck } from 'lucide-react';
 import { submissionService } from '@/lib/services/submissionService';
 import { Drawer } from '@/components/shared/Drawer';
+import { FeedbackAssist } from '@/components/mentor/FeedbackAssist';
 import { looksLikeHtml } from '@/lib/utils/html';
 import type { ApprovalItem } from '@/lib/hooks/mentor';
 
@@ -27,10 +28,9 @@ export function ReviewDrawer({
   onReviewed: () => void;
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  // Points are STANDARD by difficulty — fixed, not chosen by the mentor.
   const total = Math.max(0, item.maxPoints ?? 10);
   const [rating, setRating] = useState(4);
-  // Default to full marks; the mentor decides whether to award less. No auto-cuts.
-  const [points, setPoints] = useState<number>(total);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState<Decision | null>(null);
 
@@ -70,8 +70,7 @@ export function ReviewDrawer({
         revisionNotes: isApproved ? undefined : notes.trim(),
         decision,
         checkedCriteria: [...checked],
-        // Points only count on approval; clamp to the task's total.
-        ...(isApproved ? { pointsAwarded: Math.max(0, Math.min(total, Math.round(points) || 0)) } : {}),
+        // Points are standardized by difficulty server-side; nothing to send.
       });
       toast.success(isApproved ? 'Approved' : decision === 'changes' ? 'Changes requested' : 'Rejected');
       onReviewed();
@@ -199,42 +198,39 @@ export function ReviewDrawer({
           </div>
         </div>
 
-        {/* Points — award out of the task total (defaults to full; mentor decides) */}
+        {/* Points — standard for this task's difficulty (not editable). */}
         <div>
-          <h3 className="text-sm font-medium text-slate-700 mb-2">Points awarded</h3>
-          <div className="flex items-center gap-2">
-            <input type="number" min={0} max={total} value={points}
-              onChange={(e) => setPoints(Math.max(0, Math.min(total, Number(e.target.value) || 0)))}
-              className="w-20 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
-            <span className="text-sm text-slate-500">/ {total}</span>
-            <button type="button" onClick={() => setPoints(total)}
-              className="text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:border-brand-300">Full</button>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">Out of {total}. Awarded only when you approve.</p>
+          <h3 className="text-sm font-medium text-slate-700 mb-2">Points</h3>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 text-sm font-medium tabular-nums">
+            {total} pts
+          </span>
+          <p className="mt-1 text-xs text-slate-400">Set by task difficulty. Awarded in full on approval.</p>
         </div>
 
-        {/* Feedback templates */}
-        <div>
-          <h3 className="text-sm font-medium text-slate-700 mb-2">Quick feedback</h3>
-          <div className="flex flex-wrap gap-2">
-            {FEEDBACK_TEMPLATES.map((t) => (
-              <button key={t} onClick={() => addTemplate(t)}
-                className="px-2.5 py-1 rounded-full border border-slate-200 text-xs text-slate-600 hover:border-brand-300 hover:text-brand-700">
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Notes */}
+        {/* Notes + feedback assist (AI draft, templates, saved snippets) */}
         <div>
           <h3 className="text-sm font-medium text-slate-700 mb-2">Notes to the mentee</h3>
+          <FeedbackAssist
+            templates={FEEDBACK_TEMPLATES}
+            getCurrentText={() => notes}
+            getDraftContext={() => ({
+              taskTitle: item.title,
+              brief: item.brief,
+              criteria: item.criteria,
+              // The draft tone follows the likely decision: all required ticked → approving, else changes.
+              decision: allRequiredTicked ? 'approved' : 'changes',
+              count: 1,
+            })}
+            onInsert={(t) => addTemplate(t)}
+            // Replace when empty, otherwise append on its own line.
+            onApplyDraft={(t) => setNotes((prev) => (prev.trim() ? `${prev}\n${t}` : t))}
+          />
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
             placeholder="What's good, what to change…"
-            className="w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+            className="mt-2 w-full border border-slate-300 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
           />
         </div>
       </div>

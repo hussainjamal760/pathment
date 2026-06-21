@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { Users2, Plus, X, Loader2, Trash2, UserPlus, Crown, GraduationCap, Search, ArrowRightLeft, SlidersHorizontal } from 'lucide-react';
-import { SelectMenu } from '@/components/shared/SelectMenu';
+import { SelectMenu, type SelectOption } from '@/components/shared/SelectMenu';
 import { TablePagination } from '@/components/shared/TablePagination';
 import { CoMentorPermissionsDrawer } from '@/components/shared/CoMentorPermissionsDrawer';
 import { ReassignClanModal } from '@/components/admin/ReassignClanModal';
@@ -49,6 +49,15 @@ function CreateClanDrawer({ programs, mentors, onClose, onCreated }: {
 
   const field = 'w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500';
 
+  const programOpts = useMemo<SelectOption[]>(
+    () => programs.map((p: any) => ({ value: p.id, label: p.name })),
+    [programs]
+  );
+  const mentorOpts = useMemo<SelectOption[]>(
+    () => mentors.map((m) => ({ value: m.id, label: `${m.firstName} ${m.lastName}`.trim() })),
+    [mentors]
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40 dark:bg-black/70" onClick={onClose} aria-hidden="true" />
@@ -64,17 +73,11 @@ function CreateClanDrawer({ programs, mentors, onClose, onCreated }: {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Program <span className="text-red-500">*</span></label>
-            <select value={programId} onChange={(e) => setProgramId(e.target.value)} className={field}>
-              <option value="">Select a program</option>
-              {programs.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <SelectMenu value={programId} onChange={setProgramId} options={programOpts} placeholder="Select a program" ariaLabel="Program" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Lead mentor <span className="text-slate-400 font-normal">(optional)</span></label>
-            <select value={leadMentorId} onChange={(e) => setLeadMentorId(e.target.value)} className={field}>
-              <option value="">No lead mentor yet</option>
-              {mentors.map((m) => <option key={m.id} value={m.id}>{m.firstName} {m.lastName}</option>)}
-            </select>
+            <SelectMenu value={leadMentorId} onChange={setLeadMentorId} options={mentorOpts} placeholder="No lead mentor yet" ariaLabel="Lead mentor" />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Level label <span className="text-slate-400 font-normal">(optional)</span></label>

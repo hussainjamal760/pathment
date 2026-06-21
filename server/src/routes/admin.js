@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const promotionController = require('../controllers/promotionController');
+const reviewLockController = require('../controllers/reviewLockController');
 const { validateBody, validateQuery } = require('../middlewares/validate');
 const { adminSchemas } = require('../validations/adminValidation');
 const { authenticate, authorize } = require('../middlewares/auth');
@@ -171,6 +172,52 @@ router.post(
   authenticate,
   requirePermission(PERMISSIONS.USER_MANAGE),
   promotionController.decline
+);
+
+// ── Cohort-review deletion lock (admin) ──────────────────────────────────────
+// Org-wide lock on deleting/reopening cohort review sessions + the unlock
+// request/grant pipeline. Gated by system.settings.
+router.get(
+  '/review-lock',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.overview
+);
+router.patch(
+  '/review-lock',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.setLock
+);
+router.get(
+  '/review-lock/requests',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.listRequests
+);
+router.post(
+  '/review-lock/requests/:id/respond',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.respondToRequest
+);
+router.get(
+  '/review-lock/grants',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.listGrants
+);
+router.delete(
+  '/review-lock/grants/:id',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.revokeGrant
+);
+router.get(
+  '/review-lock/logs',
+  authenticate,
+  requirePermission(PERMISSIONS.SYSTEM_SETTINGS),
+  reviewLockController.logs
 );
 
 module.exports = router;

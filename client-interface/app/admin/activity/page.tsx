@@ -1,7 +1,10 @@
 'use client';
 
 import { Search, Loader2, Users, Clock, CalendarCheck, Flame } from 'lucide-react';
+import { useEffect } from 'react';
 import { useAdminActivity } from '@/lib/hooks/admin';
+import { usePagination } from '@/lib/hooks/shared/usePagination';
+import { TablePagination } from '@/components/shared/TablePagination';
 import { formatDistanceToNow } from 'date-fns';
 
 function fmt(minutes: number): string {
@@ -39,6 +42,13 @@ export default function AdminActivityPage() {
     setSearch,
     filtered,
   } = useAdminActivity();
+
+  // Client-side pagination: the list is already loaded and filtered in-memory,
+  // so we just page the displayed slice (606 mentees was rendering as one wall).
+  const pagination = usePagination({ initialPage: 1, initialLimit: 25 });
+  useEffect(() => { pagination.setTotal(filtered.length); }, [filtered.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { pagination.reset(); }, [search, days]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pageItems = filtered.slice((pagination.page - 1) * pagination.limit, pagination.page * pagination.limit);
 
   return (
     <div className="space-y-6">
@@ -143,7 +153,7 @@ export default function AdminActivityPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filtered.map((m) => (
+                    {pageItems.map((m) => (
                       <tr key={m.user.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
@@ -194,6 +204,11 @@ export default function AdminActivityPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+            {filtered.length > pagination.limit && (
+              <div className="px-5 py-3 border-t border-slate-100">
+                <TablePagination pagination={pagination} />
               </div>
             )}
           </div>

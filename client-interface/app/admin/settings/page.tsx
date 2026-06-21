@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { User, Bell, Shield, Loader2, Save, KeyRound, Palette } from 'lucide-react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { User, Bell, Shield, Loader2, Save, KeyRound, Palette, Lock } from 'lucide-react';
 import { useAdminSettings } from '@/lib/hooks/admin';
 import { PageHeader, TabBar } from '@/components/admin/ui';
 import SecurityTab from '@/components/shared/SecurityTab';
@@ -9,18 +10,38 @@ import { LocationDetailsFields } from '@/components/settings/LocationDetailsFiel
 import { AppearanceTab } from '@/components/settings/AppearanceTab';
 import AIConnectionsTab from '@/components/settings/AIConnectionsTab';
 import { NotificationPreferencesTab } from '@/components/settings/NotificationPreferencesTab';
+import ReviewLockTab from '@/components/settings/ReviewLockTab';
 
 const TABS = [
   { id: 'profile', label: 'Profile', icon: User },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'ai', label: 'AI Connections', icon: KeyRound },
+  { id: 'review-lock', label: 'Review Lock', icon: Lock },
   { id: 'security', label: 'Security', icon: Shield },
 ];
 
 export default function AdminSettings() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>}>
+      <AdminSettingsInner />
+    </Suspense>
+  );
+}
+
+function AdminSettingsInner() {
   const [activeTab, setActiveTab] = useState('profile');
   const { loading, saving, profileData, setProfileData, handleProfileUpdate } = useAdminSettings();
+
+  // Honor a `?tab=` deep-link (e.g. the "review unlock requested" notification
+  // routes admins straight to Settings → Review Lock). useSearchParams is
+  // reactive, so this also switches tabs when only the query changes while the
+  // page is already mounted.
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  useEffect(() => {
+    if (tabParam && TABS.some((x) => x.id === tabParam)) setActiveTab(tabParam);
+  }, [tabParam]);
 
   if (loading) {
     return (
@@ -115,6 +136,7 @@ export default function AdminSettings() {
           {activeTab === 'appearance' && <AppearanceTab />}
           {activeTab === 'notifications' && <NotificationPreferencesTab role="admin" />}
           {activeTab === 'ai' && <AIConnectionsTab />}
+          {activeTab === 'review-lock' && <ReviewLockTab />}
           {activeTab === 'security' && <SecurityTab userRole="admin" showAuditLogs={true} />}
         </div>
       </div>

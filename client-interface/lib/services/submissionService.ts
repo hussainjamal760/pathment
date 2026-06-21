@@ -98,6 +98,23 @@ export const submissionService = {
   },
 
   /**
+   * Edit an already-submitted review. The decision stays the same; only the
+   * feedback text, inline notes, rating, and (for an approved task) points
+   * change. Only the reviewing mentor may edit (enforced server-side).
+   */
+  async editReview(submissionId: string, data: {
+    rating?: number;
+    feedbackText?: string;
+    inlineFeedback?: Array<{ line: number; comment: string; type: 'suggestion' | 'issue' | 'praise' }>;
+    revisionNotes?: string;
+    pointsAwarded?: number;
+    checkedCriteria?: string[];
+  }) {
+    const response = await axiosInstance.patch(`/submissions/${submissionId}/review`, data);
+    return response.data;
+  },
+
+  /**
    * Handle extension request (approve/reject)
    */
   async handleExtension(submissionId: string, approved: boolean, newDueDate?: string) {

@@ -15,13 +15,14 @@ exports.getEmailStats = async (req, res) => {
 /** List dead (DLQ) / failed emails for inspection + replay. */
 exports.listFailedEmails = async (req, res) => {
   const status = ['dead', 'pending', 'sent', 'sending'].includes(req.query.status) ? req.query.status : 'dead';
-  const limit = Math.min(200, Number(req.query.limit) || 50);
-  const rows = await models.EmailQueue.findAll({
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+  const { count, rows } = await models.EmailQueue.findAndCountAll({
     where: { status },
     attributes: ['id', 'recipientEmail', 'subject', 'emailType', 'status', 'attemptCount', 'maxAttempts', 'errorCategory', 'lastError', 'failedAt', 'nextAttemptAt', 'createdAt'],
-    order: [['updatedAt', 'DESC']], limit,
+    order: [['updatedAt', 'DESC']], limit, offset: (page - 1) * limit,
   });
-  res.json({ success: true, data: { emails: rows } });
+  res.json({ success: true, data: { emails: rows, total: count, page, limit } });
 };
 
 /** Requeue a dead/failed email for another attempt. */

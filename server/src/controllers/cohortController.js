@@ -75,6 +75,34 @@ const bulkApprove = catchAsync(async (req, res) => {
 });
 
 /**
+ * POST /api/mentor/approvals/bulk-review
+ * { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded }
+ * Apply the same review decision (approve / request changes) to many submissions.
+ */
+const bulkReview = catchAsync(async (req, res) => {
+  const { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded } = req.body;
+  const ids = Array.isArray(submissionIds) ? submissionIds : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ success: false, message: 'submissionIds is required', statusCode: 400 });
+  }
+
+  const isApproved = decision === 'approved' || decision === 'approved_notes';
+  const reviewData = {
+    decision,
+    isApproved,
+    rating,
+    feedbackText,
+    // Revision notes only make sense when changes are requested.
+    ...(isApproved ? {} : { revisionNotes }),
+    // Points only count on approval.
+    ...(isApproved ? { pointsAwarded } : {})
+  };
+
+  const results = await submissionService.bulkReview(req.user.id, ids, reviewData);
+  res.status(200).json(successResponse('Bulk review applied', { results }));
+});
+
+/**
  * POST /api/mentor/nudge  { menteeId, message? }
  * Send a gentle in-app nudge to a mentee.
  */
@@ -153,4 +181,4 @@ const getMenteeAttendanceHistory = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Attendance history', { history }));
 });
 
-module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance, getMenteeAttendanceHistory };
+module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, bulkApprove, bulkReview, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance, getMenteeAttendanceHistory };
