@@ -135,15 +135,19 @@ export default function CohortReview() {
     params.set('mentee', id);
     router.replace(`/mentor/review?${params.toString()}`, { scroll: false });
   }, [cohort, searchParams, router]);
-  // Restore the current mentee from ?mentee=<id> once the cohort has loaded
-  // (deep-link / refresh). Only acts when the URL points elsewhere, so it never
-  // fights selectMentee.
+  // Restore the current mentee from ?mentee=<id> ONCE, the first time the cohort
+  // loads (deep-link / refresh). After that, navigation (selectMentee) owns both
+  // idx and the URL. Running this on every menteeParam change made it fight
+  // selectMentee on a lagging param, so Prev/Next appeared not to update the URL.
+  const restoredRef = useRef(false);
   useEffect(() => {
-    if (!cohort.length || !menteeParam) return;
+    if (restoredRef.current || !cohort.length) return;
+    restoredRef.current = true;
+    if (!menteeParam) return;
     const i = cohort.findIndex((m) => m.id === menteeParam);
-    if (i >= 0 && i !== idx) setIdx(i);
+    if (i >= 0) setIdx(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cohort, menteeParam]);
+  }, [cohort]);
   const pending = useMemo(
     () => queue.filter((q) => q.mentee?.id === mentee?.id),
     [queue, mentee?.id]
