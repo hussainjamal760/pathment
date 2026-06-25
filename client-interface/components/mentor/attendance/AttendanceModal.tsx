@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, X, UserCheck, UserX, CheckCircle2 } from 'lucide-react';
+import { Loader2, UserCheck, UserX, CheckCircle2 } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
+import { getInitials } from '@/lib/utils/formatting';
+import type { AttendanceMentee } from './MenteeAttendanceCard';
 
 type Attendance = 'present' | 'absent' | 'excused' | null;
 
 interface AttendanceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mentees: { id: string; name: string }[];
+  mentees: AttendanceMentee[];
   initialAttendance: Record<string, Attendance>;
   onSave: (updates: Record<string, Attendance>) => void;
   isSaving: boolean;
@@ -35,13 +37,6 @@ export function AttendanceModal({ isOpen, onClose, mentees, initialAttendance, o
       ...prev,
       [id]: prev[id] === status ? null : status,
     }));
-  };
-
-  const getInitials = (name: string) => {
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 0) return '?';
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
   const handleSave = () => {
@@ -98,9 +93,14 @@ export function AttendanceModal({ isOpen, onClose, mentees, initialAttendance, o
             return (
               <div key={m.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-700 font-semibold text-xs shrink-0">
-                    {getInitials(m.name)}
-                  </div>
+                  {m.profilePictureUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={m.profilePictureUrl} alt={m.name} className="w-8 h-8 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-700 font-semibold text-xs shrink-0">
+                      {m.avatar || getInitials(m.name)}
+                    </div>
+                  )}
                   <span className="text-sm font-medium text-slate-900 truncate max-w-[140px] sm:max-w-[200px]">
                     {m.name}
                   </span>

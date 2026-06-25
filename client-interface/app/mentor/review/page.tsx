@@ -272,7 +272,10 @@ export default function CohortReview() {
     } catch { toast.error('Could not save the review'); }
   }, [session, ensureSession]);
 
-  const patchMultipleEntries = useCallback(async (updates: Record<string, Attendance>) => {
+  // Bulk-apply the Attendance Sheet. `null` means "clear the mark". Only rows
+  // that actually changed are persisted; status follows attendance (a cleared
+  // mark drops back to pending).
+  const patchMultipleEntries = useCallback(async (updates: Record<string, Attendance | null>) => {
     if (!session) return;
     setIsSavingAttendance(true);
     try {
@@ -291,18 +294,18 @@ export default function CohortReview() {
 
       let newEntries = [...s.entries];
       changes.forEach(([mId, newAtt]) => {
-        newEntries = upsert(newEntries, mId, { attendance: newAtt, status: 'reviewed' });
+        newEntries = upsert(newEntries, mId, { attendance: newAtt, status: newAtt ? 'reviewed' : 'pending' });
       });
       setSession({ ...s, entries: newEntries });
 
       await Promise.all(
         changes.map(([mId, newAtt]) =>
-          mentorApi.setReviewEntry(s.id, mId, { attendance: newAtt, status: 'reviewed' })
+          mentorApi.setReviewEntry(s.id, mId, { attendance: newAtt, status: newAtt ? 'reviewed' : 'pending' })
         )
       );
 
-      toast.success(`Attendance updated for ${changes.length} mentees`);
-    } catch (e) {
+      toast.success(`Attendance updated for ${changes.length} mentee${changes.length === 1 ? '' : 's'}`);
+    } catch {
       toast.error('Failed to save some attendance records');
     } finally {
       setIsSavingAttendance(false);
