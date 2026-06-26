@@ -117,7 +117,7 @@ class SubmissionService {
     });
 
     // Re-engagement: a paused mentee who submits work has come back → resume.
-    require('./mentorshipPauseService').autoResumeIfPaused(task.menteeId, 'submitted work').catch(() => {});
+    require('./mentorshipPauseService').autoResumeIfPaused(task.menteeId, 'submitted work').catch(() => { });
 
     // Return complete submission with files
     const fullSubmission = await this.getSubmissionById(submission.id);
@@ -284,7 +284,7 @@ class SubmissionService {
 
     //  ADD: Send notification to mentee
     const updatedSubmission = await this.getSubmissionById(submissionId);
-    
+
     await notificationOrchestrator.dispatch({
       eventKey: NOTIFICATION_EVENTS.EXTENSION_HANDLED,
       recipients: [{ userId: submission.assignedTask.menteeId }],
@@ -364,7 +364,7 @@ class SubmissionService {
 
     // Create feedback
     const feedbackType = inlineFeedback && inlineFeedback.length > 0 ? 'both' : 'general';
-    
+
     await models.TaskFeedback.create({
       assignedTaskId: task.id,
       submissionId: submission.id,
@@ -432,7 +432,7 @@ class SubmissionService {
             pointsToAward,
             'task_completed',
             task.id,
-            `Task completed: "${task.title || task.id}"`
+            `Task completed: "${task.roadmapTask?.title || task.id}"`
           );
         }
 
@@ -747,7 +747,7 @@ class SubmissionService {
       const publicId = publicIdWithExt.replace(/\.[^/.]+$/, '');
       const cloudinaryResourceType = (file.fileType || '').startsWith('video/') ? 'video'
         : (file.fileType || '').startsWith('image/') ? 'image'
-        : 'raw';
+          : 'raw';
       await deleteFromCloudinary(publicId, cloudinaryResourceType);
     } catch (error) {
       console.error('Error deleting from Cloudinary:', error);
