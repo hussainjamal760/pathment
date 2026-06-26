@@ -976,7 +976,7 @@ class SubmissionService {
    * newest first, with the points awarded + quality rating they gave. Lets a
    * mentor see what they've already signed off (and what they scored it).
    */
-  async getMentorReviewedQueue(mentorId, limit = 100) {
+  async getMentorReviewedQueue(mentorId, limit = 500) {
     const tasks = await models.AssignedTask.findAll({
       where: { mentorId, status: 'completed' },
       include: [
