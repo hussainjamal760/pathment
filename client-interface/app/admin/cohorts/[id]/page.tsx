@@ -24,6 +24,15 @@ import type { IntakeFormField } from '@/lib/config/intakeFields';
 
 /** Same level-key normalization the server uses, so locally-derived keys match
  *  what the server stores (and the assessment pool's level tags line up). */
+/** Split a stored UTC instant into local date + time (HH:MM) for the date/time inputs. */
+function splitLocal(iso?: string | null): { date: string; time: string } {
+  if (!iso) return { date: '', time: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: '', time: '' };
+  const p = (n: number) => String(n).padStart(2, '0');
+  return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+
 function normLevels(labels: string[]): { key: string; label: string }[] {
   const seen = new Set<string>();
   const out: { key: string; label: string }[] = [];
@@ -205,8 +214,10 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
   const [required, setRequired] = useState<boolean>(Boolean(cohort?.assessmentRequired));
   const [seats, setSeats] = useState<string>(cohort?.capacity != null ? String(cohort.capacity) : '');
   const [maxApps, setMaxApps] = useState<string>(cohort?.maxApplications != null ? String(cohort.maxApplications) : '');
-  const [opensDate, setOpensDate] = useState<string>(cohort?.applyOpensAt ? String(cohort.applyOpensAt).slice(0, 10) : '');
-  const [closesDate, setClosesDate] = useState<string>(cohort?.applyClosesAt ? String(cohort.applyClosesAt).slice(0, 10) : '');
+  const [opensDate, setOpensDate] = useState<string>(splitLocal(cohort?.applyOpensAt).date);
+  const [opensTime, setOpensTime] = useState<string>(splitLocal(cohort?.applyOpensAt).time);
+  const [closesDate, setClosesDate] = useState<string>(splitLocal(cohort?.applyClosesAt).date);
+  const [closesTime, setClosesTime] = useState<string>(splitLocal(cohort?.applyClosesAt).time);
   const [levelLabels, setLevelLabels] = useState<string[]>((cohort?.levels || []).map((l: any) => l.label));
   const [pool, setPool] = useState<{ assessmentId: string; level: string | null }[]>([]);
   const [formFields, setFormFields] = useState<IntakeFormField[]>(cohort?.intakeFormSchema || []);
@@ -241,8 +252,8 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
     setRequired(Boolean(cohort?.assessmentRequired));
     setSeats(cohort?.capacity != null ? String(cohort.capacity) : '');
     setMaxApps(cohort?.maxApplications != null ? String(cohort.maxApplications) : '');
-    setOpensDate(cohort?.applyOpensAt ? String(cohort.applyOpensAt).slice(0, 10) : '');
-    setClosesDate(cohort?.applyClosesAt ? String(cohort.applyClosesAt).slice(0, 10) : '');
+    setOpensDate(splitLocal(cohort?.applyOpensAt).date); setOpensTime(splitLocal(cohort?.applyOpensAt).time);
+    setClosesDate(splitLocal(cohort?.applyClosesAt).date); setClosesTime(splitLocal(cohort?.applyClosesAt).time);
     setLevelLabels((cohort?.levels || []).map((l: any) => l.label));
     setFormFields(cohort?.intakeFormSchema || []);
   }, [cohort?.assessmentRequired, cohort?.capacity, cohort?.maxApplications, cohort?.applyOpensAt, cohort?.applyClosesAt, cohort?.levels, cohort?.intakeFormSchema]);
@@ -269,16 +280,21 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
     // inputs also enforce this, but a typed value could slip past the picker).
     if (opensDate && opensDate < todayStr) { toast.error('Apply opens can’t be in the past'); return; }
     if (closesDate && closesDate < todayStr) { toast.error('Apply closes can’t be in the past'); return; }
-    if (opensDate && closesDate && closesDate < opensDate) { toast.error('Apply closes must be on or after Apply opens'); return; }
+    const openAt = opensDate ? `${opensDate}T${opensTime || '00:00'}` : '';
+    const closeAt = closesDate ? `${closesDate}T${closesTime || '23:59'}` : '';
+    if (openAt && closeAt && closeAt < openAt) { toast.error('Apply closes must be after Apply opens'); return; }
     setBusy(true);
     try {
       await cohortApi.update(cohortId, {
         capacity: seats === '' ? null : Number(seats),
         maxApplications: maxApps === '' ? null : Number(maxApps),
         timezone: tz,
-        // Send the calendar dates + zone; the server stores start/end-of-day instants.
+        // Send the calendar dates (+ optional times) + zone; the server stores the
+        // precise instants. No time → opens at start-of-day, closes at end-of-day.
         applyOpensDate: opensDate || null,
+        applyOpensTime: opensTime || null,
         applyClosesDate: closesDate || null,
+        applyClosesTime: closesTime || null,
         assessmentRequired: required,
         levels: levelLabels.map((l) => ({ label: l })).filter((l) => l.label.trim()),
         // Drop blank options so empty choices never reach the apply form.
@@ -381,14 +397,20 @@ function IntakePanel({ cohortId, cohort, onChange }: { cohortId: string; cohort:
         <div className="grid sm:grid-cols-2 gap-4 pt-3">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Apply opens</label>
-            <input type="date" min={todayStr} value={opensDate} onChange={(e) => setOpensDate(e.target.value)} className={`${field} [color-scheme:light] dark:[color-scheme:dark]`} />
+            <div className="flex gap-2">
+              <input type="date" min={todayStr} value={opensDate} onChange={(e) => setOpensDate(e.target.value)} className={`${field} flex-1 [color-scheme:light] dark:[color-scheme:dark]`} />
+              <input type="time" value={opensTime} onChange={(e) => setOpensTime(e.target.value)} title="Time (default start of day)" className={`${field} w-28 [color-scheme:light] dark:[color-scheme:dark]`} />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Apply closes</label>
-            <input type="date" min={closesMin} value={closesDate} onChange={(e) => setClosesDate(e.target.value)} className={`${field} [color-scheme:light] dark:[color-scheme:dark]`} />
+            <div className="flex gap-2">
+              <input type="date" min={closesMin} value={closesDate} onChange={(e) => setClosesDate(e.target.value)} className={`${field} flex-1 [color-scheme:light] dark:[color-scheme:dark]`} />
+              <input type="time" value={closesTime} onChange={(e) => setClosesTime(e.target.value)} title="Time (default end of day)" className={`${field} w-28 [color-scheme:light] dark:[color-scheme:dark]`} />
+            </div>
           </div>
         </div>
-        <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-slate-400"><CalendarRange className="w-3 h-3" /> Closes at end-of-day in <strong className="font-medium">{tz}</strong>.</p>
+        <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-slate-400"><CalendarRange className="w-3 h-3" /> Times are in <strong className="font-medium">{tz}</strong>. Leave a time blank to default to start-of-day (opens) / end-of-day 11:59&nbsp;PM (closes).</p>
       </div>
 
       {/* Clone from another cohort */}

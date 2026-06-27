@@ -142,11 +142,17 @@ class CohortIntakeService {
     // "Opens June 1" = start-of-day. A full ISO `applyClosesAt`/`applyOpensAt`
     // still wins if sent directly (back-compat).
     const tz = patch.timezone ?? cohort.timezone ?? 'UTC';
+    // A specific time wins; otherwise the window defaults to the whole day —
+    // opens at start-of-day (00:00), closes at end-of-day (23:59) in the org zone.
     if (data.applyClosesDate !== undefined) {
-      patch.applyClosesAt = data.applyClosesDate ? endOfDayInZone(data.applyClosesDate, tz) : null;
+      patch.applyClosesAt = data.applyClosesDate
+        ? (data.applyClosesTime ? zonedWallClockToUtc(data.applyClosesDate, data.applyClosesTime, tz) : endOfDayInZone(data.applyClosesDate, tz))
+        : null;
     }
     if (data.applyOpensDate !== undefined) {
-      patch.applyOpensAt = data.applyOpensDate ? zonedWallClockToUtc(data.applyOpensDate, '00:00', tz) : null;
+      patch.applyOpensAt = data.applyOpensDate
+        ? zonedWallClockToUtc(data.applyOpensDate, data.applyOpensTime || '00:00', tz)
+        : null;
     }
 
     // Validate ordering/capacity against the MERGED config (so updating one date
