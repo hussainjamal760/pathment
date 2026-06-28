@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { PauseCircle, PlayCircle, X, Loader2, MoonStar, BellRing } from 'lucide-react';
+import { PauseCircle, PlayCircle, X, Loader2, MoonStar, BellRing, ChevronDown } from 'lucide-react';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 
@@ -29,6 +29,7 @@ export function PausedMenteesPanel({ menteeBasePath = '/mentor/mentees' }: { men
   const [paused, setPaused] = useState<Paused[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pausedOpen, setPausedOpen] = useState(false); // collapsed by default — just the headline
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,15 +105,21 @@ export function PausedMenteesPanel({ menteeBasePath = '/mentor/mentees' }: { men
         </div>
       )}
 
-      {/* Currently paused */}
+      {/* Currently paused — collapsed by default; click the header to expand. */}
       {paused.length > 0 && (
         <div className="bg-card border border-slate-200 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <MoonStar className="w-4 h-4 text-slate-500" />
-            <h3 className="text-sm font-semibold text-slate-900">Paused ({paused.length})</h3>
-            <span className="text-xs text-slate-500">Out of reports, still getting win-back reminders. Auto-resume when they come back.</span>
-          </div>
-          <div className="space-y-2">
+          <button
+            onClick={() => setPausedOpen((v) => !v)}
+            aria-expanded={pausedOpen}
+            className="w-full flex items-center gap-2 text-left"
+          >
+            <MoonStar className="w-4 h-4 text-slate-500 shrink-0" />
+            <h3 className="text-sm font-semibold text-slate-900 shrink-0">Paused ({paused.length})</h3>
+            <span className="text-xs text-slate-500 truncate">Out of reports, still getting win-back reminders. Auto-resume when they come back.</span>
+            <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform ${pausedOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {pausedOpen && (
+          <div className="space-y-2 mt-3">
             {paused.map((p) => (
               <div key={`${p.menteeId}:${p.clanId}`} className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 px-3.5 py-2.5">
                 <button onClick={() => router.push(`${menteeBasePath}/${p.menteeId}`)} className="min-w-0 text-left">
@@ -130,6 +137,7 @@ export function PausedMenteesPanel({ menteeBasePath = '/mentor/mentees' }: { men
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
     </div>
