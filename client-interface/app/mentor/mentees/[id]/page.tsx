@@ -22,6 +22,7 @@ import { PersonalityBars } from '@/components/mentor/PersonalityBars';
 import { InsightsPanel } from '@/components/mentor/InsightsPanel';
 import { OneOnOneDrawer, type OneOnOneData } from '@/components/mentor/OneOnOneDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
+import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { NudgeButton } from '@/components/mentor/NudgeButton';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
@@ -147,6 +148,8 @@ export default function MenteeDetail() {
 
   const [loggingOneOnOne, setLoggingOneOnOne] = useState(false);
   const [assigningTask, setAssigningTask] = useState(false);
+  // A clicked work-history task opens in the shared task drawer (like Cohort Review).
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   // Full cohort-review attendance record for this mentee (every meeting they
   // were marked on, newest first) — same data as the cohort-review drawer.
@@ -410,7 +413,7 @@ export default function MenteeDetail() {
                       {grouped[status].map((t: any) => (
                         <button
                           key={t.id}
-                          onClick={() => router.push(`/mentor/tasks/${t.id}`)}
+                          onClick={() => setOpenTaskId(t.id)}
                           className="w-full text-left flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-200 transition-colors"
                         >
                           <span className="min-w-0">
@@ -618,6 +621,14 @@ export default function MenteeDetail() {
           mentee={{ id: menteeId, name: `${mentee?.firstName ?? ''} ${mentee?.lastName ?? ''}`.trim() || 'Mentee' }}
           onClose={() => setAssigningTask(false)}
           onAssigned={fetchMenteeDetails}
+        />
+      )}
+
+      {openTaskId && (
+        <TaskDrawerById
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+          onChanged={() => { fetchMenteeDetails(); refetchProfile(); }}
         />
       )}
 

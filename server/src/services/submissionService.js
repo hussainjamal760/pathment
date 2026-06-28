@@ -200,7 +200,7 @@ class SubmissionService {
       payload: {
         title: 'Extension request received',
         message: `${fullSubmission.assignedTask?.mentee?.firstName || 'Mentee'} requested an extension for "${fullSubmission.assignedTask?.roadmapTask?.title || 'a task'}" for ${extensionData.days || 'additional'} days.`,
-        actionUrl: `/mentor/tasks/${task.id}`,
+        actionUrl: `/mentor/tasks/${task.id}/feedback`,
         actionLabel: 'Review Request',
         relatedEntityType: 'task_submission',
         relatedEntityId: submission.id,

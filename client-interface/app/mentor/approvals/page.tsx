@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   ClipboardCheck, CheckCircle2, Clock, Loader2, ChevronRight, CalendarClock, Check, X,
@@ -10,6 +9,7 @@ import {
 import { useMentorApprovals, type ApprovalItem } from '@/lib/hooks/mentor';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
 import { BulkReviewDrawer } from '@/components/mentor/BulkReviewDrawer';
+import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { Avatar } from '@/components/shared/Avatar';
 import { TablePagination } from '@/components/shared/TablePagination';
 import { usePagination } from '@/lib/hooks/shared/usePagination';
@@ -41,6 +41,7 @@ export default function MentorApprovals() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [extBusy, setExtBusy] = useState<string | null>(null);
   // Mentor-chosen new due date per extension request (YYYY-MM-DD).
   const [extDates, setExtDates] = useState<Record<string, string>>({});
@@ -562,12 +563,12 @@ export default function MentorApprovals() {
                     )}
                   </div>
 
-                  <Link
-                    href={`/mentor/tasks/${item.taskId}`}
+                  <button
+                    onClick={() => setOpenTaskId(item.taskId)}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
                   >
                     View task <ArrowUpRight className="w-3.5 h-3.5" />
-                  </Link>
+                  </button>
                 </div>
                 );
               })}
@@ -657,12 +658,12 @@ export default function MentorApprovals() {
                           </p>
                         )}
                       </div>
-                      <Link
-                        href={`/mentor/tasks/${item.taskId}`}
+                      <button
+                        onClick={() => setOpenTaskId(item.taskId)}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
                       >
                         View task <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -758,6 +759,10 @@ export default function MentorApprovals() {
           onClose={() => setReviewing(null)}
           onReviewed={() => { setSelected(new Set()); refetch(); }}
         />
+      )}
+
+      {openTaskId && (
+        <TaskDrawerById taskId={openTaskId} onClose={() => setOpenTaskId(null)} onChanged={refetch} />
       )}
 
       {bulkOpen && selectedItems.length > 0 && (
