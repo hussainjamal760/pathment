@@ -42,6 +42,7 @@ export default function MentorApprovals() {
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
   const [extBusy, setExtBusy] = useState<string | null>(null);
   // Mentor-chosen new due date per extension request (YYYY-MM-DD).
   const [extDates, setExtDates] = useState<Record<string, string>>({});
@@ -80,6 +81,21 @@ export default function MentorApprovals() {
   // Split the queue: work submissions to review vs pending extension requests.
   const reviewItems = useMemo(() => queue.filter((q) => !q.isExtensionRequest), [queue]);
   const extensionItems = useMemo(() => queue.filter((q) => q.isExtensionRequest), [queue]);
+
+  // Deep link from a "submitted to review" notification (/mentor/approvals?task=ID):
+  // land on To-review and auto-open the review drawer for that task, once the
+  // (fresh) queue has loaded. Then clean the URL so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (autoOpened || loading) return;
+    const taskId = new URLSearchParams(window.location.search).get('task');
+    if (!taskId) return;
+    setTab('review');
+    const item = reviewItems.find((q) => q.taskId === taskId);
+    if (item) setReviewing(item);
+    else toast.message('That submission isn’t awaiting review anymore.');
+    setAutoOpened(true);
+    window.history.replaceState({}, '', '/mentor/approvals');
+  }, [reviewItems, loading, autoOpened]);
 
   // Apply search + late-only + sort to the To-review list (queue is already loaded).
   const filteredReview = useMemo(() => {

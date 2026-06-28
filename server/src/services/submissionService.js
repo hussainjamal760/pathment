@@ -133,7 +133,8 @@ class SubmissionService {
       payload: {
         title: `${submitterName} submitted work to review`,
         message: `${submitterName} ${isResubmission ? 'resubmitted' : 'submitted'} “${submittedTitle}”${isResubmission ? ` (v${newVersion})` : ''}. Review it when you can.`,
-        actionUrl: `/mentor/tasks/${task.id}/feedback`,
+        // Lands on the Approvals "To review" tab and auto-opens the review drawer.
+        actionUrl: `/mentor/approvals?task=${task.id}`,
         actionLabel: 'Review submission',
         relatedEntityType: 'task_submission',
         relatedEntityId: submission.id,
