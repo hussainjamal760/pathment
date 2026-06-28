@@ -345,6 +345,7 @@ class SubmissionService {
       revisionNotes,
       criteriaMet,
       pointsAwarded,
+      pointsPercent,
       decision,
       checkedCriteria
     } = reviewData;
@@ -396,11 +397,17 @@ class SubmissionService {
       updateData.completedAt = new Date();
       // The mentor may award up to the task's standard max (never more, so the
       // leaderboard stays ungameable) and down to 0 when the work fell short.
-      // Defaults to full when no value is sent.
+      // An absolute `pointsAwarded` wins; otherwise `pointsPercent` (0–100) of THIS
+      // task's max — handy for bulk review across tasks of different difficulty.
+      // Defaults to full when neither is sent.
       const requested = Number(pointsAwarded);
+      const pct = Number(pointsPercent);
+      const clamp = (n) => Math.max(0, Math.min(standardPoints, Math.round(n)));
       updateData.pointsAwarded = Number.isFinite(requested)
-        ? Math.max(0, Math.min(standardPoints, Math.round(requested)))
-        : standardPoints;
+        ? clamp(requested)
+        : Number.isFinite(pct)
+          ? clamp(standardPoints * pct / 100)
+          : standardPoints;
     } else {
       updateData.revisionCount = task.revisionCount + 1;
     }

@@ -96,7 +96,7 @@ const bulkApprove = catchAsync(async (req, res) => {
  * Apply the same review decision (approve / request changes) to many submissions.
  */
 const bulkReview = catchAsync(async (req, res) => {
-  const { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded } = req.body;
+  const { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded, pointsPercent } = req.body;
   const ids = Array.isArray(submissionIds) ? submissionIds : [];
   if (ids.length === 0) {
     return res.status(400).json({ success: false, message: 'submissionIds is required', statusCode: 400 });
@@ -110,8 +110,8 @@ const bulkReview = catchAsync(async (req, res) => {
     feedbackText,
     // Revision notes only make sense when changes are requested.
     ...(isApproved ? {} : { revisionNotes }),
-    // Points only count on approval.
-    ...(isApproved ? { pointsAwarded } : {})
+    // Points only count on approval. An absolute value, or a % of each task's max.
+    ...(isApproved ? { pointsAwarded, pointsPercent } : {})
   };
 
   const results = await submissionService.bulkReview(req.user.id, ids, reviewData);

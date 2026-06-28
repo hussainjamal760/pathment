@@ -75,6 +75,7 @@ export const mentorApi = {
       feedbackText?: string;
       revisionNotes?: string;
       pointsAwarded?: number;
+      pointsPercent?: number;
     }
   ) => apiClient.post('/mentor/approvals/bulk-review', { submissionIds, ...payload }),
 

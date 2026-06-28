@@ -7,7 +7,10 @@ export interface BulkReviewPayload {
   rating?: number;
   feedbackText?: string;
   revisionNotes?: string;
+  /** Absolute points (used when all selected tasks share one max). */
   pointsAwarded?: number;
+  /** Percent of each task's own max (used when the selection has mixed maxima). */
+  pointsPercent?: number;
 }
 
 export interface ApprovalItem {
