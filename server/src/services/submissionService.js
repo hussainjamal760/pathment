@@ -831,6 +831,32 @@ class SubmissionService {
   }
 
   /**
+   * The `AssignedTask` filter for a mentor's review queues. The old `{ mentorId }`
+   * only matched tasks THIS user assigned, so a co-mentor (the lead, not them, is
+   * the task's `mentorId`) saw an empty Approvals queue even though they could
+   * review each item. Scope instead to: tasks they assigned, OR tasks for mentees
+   * in any clan where they hold `task.review` (lead/co-mentor/grant/cover) — and a
+   * clan drops out if the lead revoked that co-mentor's review permission, so the
+   * queue exactly mirrors what `canActOnTask` will let them act on.
+   */
+  async _reviewableTaskWhere(mentorId, extra = {}) {
+    const user = await models.User.findByPk(mentorId, { attributes: ['id', 'role'] });
+    const clauses = [{ mentorId }];
+    if (user) {
+      const clanIds = await authzService.clansWhereCan(user, PERMISSIONS.TASK_REVIEW);
+      if (clanIds.length) {
+        const ms = await models.ClanMembership.findAll({
+          where: { clanId: { [Op.in]: clanIds }, status: 'active', role: 'mentee' },
+          attributes: ['userId'],
+        });
+        const menteeIds = [...new Set(ms.map((m) => m.userId))];
+        if (menteeIds.length) clauses.push({ menteeId: { [Op.in]: menteeIds } });
+      }
+    }
+    return { ...extra, [Op.or]: clauses };
+  }
+
+  /**
    * The mentor's approvals queue: pending submissions across their assigned
    * tasks, shaped for the review UI (criteria checklist + submission content).
    */
@@ -841,7 +867,7 @@ class SubmissionService {
         model: models.AssignedTask,
         as: 'assignedTask',
         required: true,
-        where: { mentorId },
+        where: await this._reviewableTaskWhere(mentorId),
         include: [
           { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase', 'difficulty'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
@@ -934,7 +960,7 @@ class SubmissionService {
    */
   async getMentorChangesRequestedQueue(mentorId) {
     const tasks = await models.AssignedTask.findAll({
-      where: { mentorId, status: 'revision_needed' },
+      where: await this._reviewableTaskWhere(mentorId, { status: 'revision_needed' }),
       include: [
         { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'difficulty'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] },
@@ -986,7 +1012,7 @@ class SubmissionService {
    */
   async getMentorReviewedQueue(mentorId, limit = 500) {
     const tasks = await models.AssignedTask.findAll({
-      where: { mentorId, status: 'completed' },
+      where: await this._reviewableTaskWhere(mentorId, { status: 'completed' }),
       include: [
         { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'difficulty'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] },

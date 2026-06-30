@@ -377,6 +377,27 @@ class AuthzService {
     return [...set];
   }
 
+  /**
+   * The clans a user may exercise a permission in — `mentoredClanIds` filtered by
+   * an actual scoped `can()` check. This is what makes a co-mentor's data views
+   * (e.g. the Approvals queue) match what the action layer (`canActOnTask`) will
+   * allow: a clan where the lead revoked `task.review` for this co-mentor drops
+   * out here, so they never see work they couldn't act on. Leads / core-team /
+   * grants keep every clan (no deny list applies to them).
+   */
+  async clansWhereCan(user, permission) {
+    if (!user) return [];
+    const clanIds = await this.mentoredClanIds(user.id);
+    if (!clanIds.length) return [];
+    const assignments = await this.getAssignments(user);
+    const allowed = [];
+    for (const clanId of clanIds) {
+      const resource = await this.scopeOfClan(clanId);
+      if (await this.can(user, permission, resource, { assignments })) allowed.push(clanId);
+    }
+    return allowed;
+  }
+
   /** A mentee: their self scope + the clan/program they're currently placed in. */
   async scopeOfMentee(menteeId) {
     if (!menteeId) return null;
