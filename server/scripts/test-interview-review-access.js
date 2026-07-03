@@ -70,6 +70,7 @@ async function canReview(taskId, userId) {
   // ── Author a tiny kit + assign it as an interview task to the mentee ────────
   const kit = await interviewKitService.createKit(lead.id, {
     title: 'Access-check kit',
+    status: 'published',
     questions: [{ kind: 'text', prompt: 'Why do you want this role?', points: 10 }],
   });
   created.kits.push(kit.id);

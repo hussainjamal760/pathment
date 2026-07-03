@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError, ConflictError } = require('../utils/errors/errorTypes');
 
@@ -92,10 +93,18 @@ class InterviewKitService {
     });
   }
 
-  /** Kits this user can author with — their own, most-recent first. */
-  async listKits(userId) {
+  /**
+   * Kits this user can author with — their own, most-recent first. Pass
+   * `statuses` (e.g. `['published']`) to limit to assignable kits; omit for the
+   * full authoring list (all statuses).
+   */
+  async listKits(userId, { statuses } = {}) {
+    const where = { createdBy: userId };
+    if (Array.isArray(statuses) && statuses.length) {
+      where.status = { [Op.in]: statuses.filter((s) => KIT_STATUSES.includes(s)) };
+    }
     const kits = await models.InterviewKit.findAll({
-      where: { createdBy: userId },
+      where,
       include: [{ model: models.InterviewQuestion, as: 'questions', attributes: ['id', 'kind', 'points'] }],
       order: [['updated_at', 'DESC']],
     });
@@ -221,6 +230,9 @@ class InterviewKitService {
 
     const kit = await models.InterviewKit.findByPk(kitId, { transaction });
     if (!kit) throw new NotFoundError('Interview kit not found');
+    if (kit.status !== 'published') {
+      throw new ValidationError("This interview kit isn't published yet — publish it before assigning.");
+    }
 
     const questionCount = await models.InterviewQuestion.count({ where: { kitId }, transaction });
     if (questionCount === 0) throw new ValidationError('This interview kit has no questions yet');

@@ -91,6 +91,7 @@ export function AssignTaskDrawer({
   // Interview type: pick a kit + per-assignment options (retake / camera / AI).
   const [kits, setKits] = useState<InterviewKitSummary[]>([]);
   const [kitsLoading, setKitsLoading] = useState(false);
+  const kitsFetchedRef = useRef(false);
   const [kitId, setKitId] = useState('');
   const [allowRetake, setAllowRetake] = useState(false);
   const [cameraRequired, setCameraRequired] = useState(false);
@@ -98,16 +99,19 @@ export function AssignTaskDrawer({
   const selectedKit = kits.find((k) => k.id === kitId) || null;
 
   // Load the mentor's interview kits the first time they pick the Interview type.
+  // Guard on a ref (not `kitsLoading`) so toggling loading state doesn't re-run
+  // this effect and cancel the in-flight request via its own cleanup.
   useEffect(() => {
-    if (type !== 'interview' || kits.length || kitsLoading) return;
+    if (type !== 'interview' || kitsFetchedRef.current) return;
     let active = true;
+    kitsFetchedRef.current = true;
     setKitsLoading(true);
-    interviewApi.listKits()
+    interviewApi.listKits('published')
       .then((res: any) => { if (active) setKits(res?.data?.kits ?? []); })
-      .catch(() => { if (active) setKits([]); })
+      .catch(() => { if (active) { setKits([]); kitsFetchedRef.current = false; } })
       .finally(() => { if (active) setKitsLoading(false); });
     return () => { active = false; };
-  }, [type, kits.length, kitsLoading]);
+  }, [type]);
 
   // When a kit is chosen, seed the option toggles from its defaults.
   useEffect(() => {
@@ -365,8 +369,8 @@ export function AssignTaskDrawer({
                     <div className="flex items-center gap-2 text-sm text-slate-400 py-1"><Loader2 className="w-4 h-4 animate-spin" />Loading your kits…</div>
                   ) : kits.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                      You haven&apos;t built any interview kits yet.{' '}
-                      <Link href="/mentor/interviews" className="text-brand-600 hover:text-brand-700 font-medium">Create one →</Link>
+                      No <span className="font-medium">published</span> interview kits to assign.{' '}
+                      <Link href="/mentor/interviews" className="text-brand-600 hover:text-brand-700 font-medium">Build or publish one →</Link>
                     </p>
                   ) : (
                     <>
@@ -378,8 +382,9 @@ export function AssignTaskDrawer({
                       </select>
                       {selectedKit && (
                         <p className="text-[11px] text-slate-400">
-                          {selectedKit.questionCount} question{selectedKit.questionCount === 1 ? '' : 's'} · {selectedKit.totalPoints} pts ·{' '}
+                          {selectedKit.questionCount} question{selectedKit.questionCount === 1 ? '' : 's'} · scored out of {selectedKit.totalPoints} ·{' '}
                           {selectedKit.timingMode === 'total' ? 'one total timer' : 'per-question timing'}
+                          <span className="block">Awards up to {pointsForDifficulty(difficulty)} pts (set by difficulty), pro-rated by their score.</span>
                         </p>
                       )}
                       <div className="space-y-2 pt-1">

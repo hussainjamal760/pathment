@@ -121,8 +121,9 @@ export interface ProctorEvent {
 
 // ── API ──────────────────────────────────────────────────────────────────
 export const interviewApi = {
-  // Authoring
-  listKits: () => apiClient.get('/interviews/kits'),
+  // Authoring. Pass `status` (e.g. 'published') to limit to assignable kits.
+  listKits: (status?: InterviewKitStatus) =>
+    apiClient.get('/interviews/kits', status ? { params: { status } } : undefined),
   getKit: (id: string) => apiClient.get(`/interviews/kits/${id}`),
   createKit: (data: InterviewKitInput) => apiClient.post('/interviews/kits', data),
   updateKit: (id: string, data: Partial<InterviewKitInput>) => apiClient.patch(`/interviews/kits/${id}`, data),

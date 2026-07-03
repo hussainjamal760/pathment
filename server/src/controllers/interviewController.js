@@ -8,9 +8,12 @@ const { catchAsync } = require('../middlewares/errorHandler');
  * (voice / code / text questions) they later assign as `interview` tasks.
  */
 
-// GET /api/interviews/kits
+// GET /api/interviews/kits  (?status=published to limit to assignable kits)
 exports.listKits = catchAsync(async (req, res) => {
-  const kits = await interviewKitService.listKits(req.user.id);
+  const statuses = req.query.status
+    ? String(req.query.status).split(',').map((s) => s.trim()).filter(Boolean)
+    : undefined;
+  const kits = await interviewKitService.listKits(req.user.id, { statuses });
   res.status(200).json(successResponse('Interview kits retrieved', { kits }));
 });
 

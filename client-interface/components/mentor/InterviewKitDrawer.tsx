@@ -184,6 +184,20 @@ export function InterviewKitDrawer({
               <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
               <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What this interview covers (optional)" className={field} />
             </div>
+            <div>
+              <span className="block text-sm font-medium text-slate-700 mb-1.5">Status</span>
+              <div className="flex flex-wrap gap-2">
+                {([['draft', 'Draft'], ['published', 'Published'], ['archived', 'Archived']] as const).map(([val, label]) => (
+                  <button key={val} type="button" onClick={() => setStatus(val)}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium ${status === val ? 'border-brand-400 bg-brand-50 text-brand-700' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Only <span className="font-medium">Published</span> kits can be assigned. Draft = still building; Archived = retired (kept for interviews already assigned).
+              </p>
+            </div>
           </div>
 
           {/* Timing */}
