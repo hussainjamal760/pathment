@@ -50,6 +50,12 @@ export function stopSpeaking(): void {
 /**
  * A live transcriber. Calls onTranscript with the accumulated final text as the
  * candidate speaks. Returns a controller; call stop() when the answer is done.
+ *
+ * Chrome's speech recognition quietly ENDS the session on pauses, silence or an
+ * internal timeout (even with continuous=true), which drops words mid-flow. We
+ * keep a `running` intent and auto-restart on `onend`, accumulating final text
+ * across restarts, so a long answer transcribes continuously. (The recorded
+ * audio is the ground truth regardless — this only improves the live transcript.)
  */
 export function createRecognizer(onTranscript: (fullText: string) => void) {
   if (!recognitionSupported()) return null;
@@ -57,8 +63,11 @@ export function createRecognizer(onTranscript: (fullText: string) => void) {
   const rec = new Ctor();
   rec.continuous = true;
   rec.interimResults = true;
+  rec.maxAlternatives = 1;
   rec.lang = 'en-US';
   let finalText = '';
+  let running = false;   // whether we WANT it capturing
+  let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
   rec.onresult = (event: any) => {
     let interim = '';
@@ -70,9 +79,27 @@ export function createRecognizer(onTranscript: (fullText: string) => void) {
     onTranscript((finalText + interim).trim());
   };
 
+  rec.onerror = (e: any) => {
+    // Permission errors are terminal; 'no-speech'/'network'/'aborted' are transient
+    // and handled by the onend → restart path below.
+    if (e?.error === 'not-allowed' || e?.error === 'service-not-allowed') running = false;
+  };
+
+  rec.onend = () => {
+    // Restart if the candidate is still recording — keeps capturing after Chrome
+    // ends the session on a pause. A tiny delay avoids a tight restart loop.
+    if (!running) return;
+    if (restartTimer) clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => { try { rec.start(); } catch { /* will retry on next end */ } }, 250);
+  };
+
   return {
-    start: () => { try { finalText = ''; rec.start(); } catch { /* already started */ } },
-    stop: () => { try { rec.stop(); } catch { /* noop */ } },
+    start: () => { finalText = ''; running = true; try { rec.start(); } catch { /* already started */ } },
+    stop: () => {
+      running = false;
+      if (restartTimer) { clearTimeout(restartTimer); restartTimer = null; }
+      try { rec.stop(); } catch { /* noop */ }
+    },
     getFinal: () => finalText.trim(),
   };
 }

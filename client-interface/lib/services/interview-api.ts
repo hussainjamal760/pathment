@@ -84,6 +84,7 @@ export interface SavedAnswer {
   code: string | null;
   answerText: string | null;
   timeSpentSeconds: number;
+  startedAt: string | null;
 }
 
 export interface CandidateInterview {
@@ -102,7 +103,10 @@ export interface CandidateInterview {
     attemptNumber: number;
     submittedCount: number;
     savedAnswers: SavedAnswer[];
+    currentPosition: number;
+    sessionStartedAt: string | null;
   };
+  serverNow: string;
 }
 
 export interface SaveAnswerPayload {
@@ -132,6 +136,8 @@ export const interviewApi = {
   // Candidate runner
   getCandidateInterview: (taskId: string) => apiClient.get(`/interviews/assignments/${taskId}`),
   startInterview: (taskId: string) => apiClient.post(`/interviews/assignments/${taskId}/start`, {}),
+  startQuestion: (sessionId: string, questionId: string) =>
+    apiClient.post(`/interviews/sessions/${sessionId}/question/start`, { questionId }),
   saveAnswer: (sessionId: string, payload: SaveAnswerPayload) =>
     apiClient.patch(`/interviews/sessions/${sessionId}/answer`, payload),
   uploadAnswerAudio: (sessionId: string, questionId: string, blob: Blob) => {
@@ -158,6 +164,9 @@ export const interviewApi = {
     apiClient.post(`/interviews/review/${taskId}/ai-draft`, { questionId }),
   finalizeReview: (taskId: string, overallNote?: string) =>
     apiClient.post(`/interviews/review/${taskId}/finalize`, { overallNote }),
+  deleteSnapshots: (taskId: string) => apiClient.delete(`/interviews/review/${taskId}/snapshots`),
+  flagInterview: (taskId: string, flagged: boolean, reason?: string) =>
+    apiClient.post(`/interviews/review/${taskId}/flag`, { flagged, reason }),
 };
 
 // ── Review types ────────────────────────────────────────────────────────────
@@ -194,6 +203,7 @@ export interface InterviewReview {
     flags: { type: string; at: string; meta: Record<string, unknown> }[];
     flagCounts: Record<string, number>;
   };
+  flag: { flagged: boolean; reason: string | null; by: string; at: string } | null;
   items: ReviewItem[];
   totals: { totalPossible: number; totalAwarded: number; gradedCount: number; questionCount: number };
   canReview: boolean;

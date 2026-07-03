@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Mic, MicOff, Loader2, ArrowRight, CheckCircle2, Video, Volume2,
-  Code2, Type, AlertTriangle, Play, RotateCcw,
+  Code2, Type, AlertTriangle, Play, RotateCcw, Maximize2, Eye,
 } from 'lucide-react';
 import {
   interviewApi, type CandidateInterview, type CandidateQuestion,
@@ -16,7 +16,8 @@ import {
   recognitionSupported, recorderSupported, fmtClock,
 } from '@/lib/utils/interviewMedia';
 import { useProctor } from '@/lib/hooks/mentee/useProctor';
-import { Maximize2, Eye } from 'lucide-react';
+import { CodeEditor } from '@/components/shared/CodeEditor';
+import { setActiveInterview, clearActiveInterview } from '@/lib/utils/activeInterview';
 
 type Phase = 'loading' | 'intro' | 'active' | 'submitting' | 'done' | 'error';
 interface Draft { transcript: string; code: string; answerText: string; seconds: number; audioBlob: Blob | null }
@@ -29,6 +30,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const [errorMsg, setErrorMsg] = useState('');
   const [data, setData] = useState<CandidateInterview | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
   const [idx, setIdx] = useState(0);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
@@ -42,6 +44,12 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const camStreamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Server clock minus local clock (ms) so all wall-clock deadlines are immune to
+  // a wrong local clock. Set from the load response and refreshed on each start.
+  const clockSkewRef = useRef(0);
+  // Audio blobs still trying to upload, keyed by questionId (background retry).
+  const pendingAudioRef = useRef<Map<string, Blob>>(new Map());
+  const finishingRef = useRef(false);
 
   const questions = data?.questions ?? [];
   const q: CandidateQuestion | undefined = questions[idx];
@@ -63,6 +71,10 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         if (!active) return;
         const d: CandidateInterview = res?.data;
         setData(d);
+        if (d?.serverNow) clockSkewRef.current = Date.parse(d.serverNow) - Date.now();
+        setSessionStartedAt(d?.state?.sessionStartedAt || null);
+        // Clear a stale "resume" marker if this interview is no longer resumable.
+        if (!d?.state?.activeSessionId) clearActiveInterview();
         // Seed drafts from any saved answers (resume).
         const seed: Record<string, Draft> = {};
         d.questions.forEach((qq) => {
@@ -104,41 +116,77 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     }
   }, [phase]);
 
-  // ── Per-question timer ───────────────────────────────────────────────────────
+  // ── Per-question timer (wall-clock, server-authoritative) ────────────────────
+  // The deadline is the question's server start + its limit. Refreshing/resuming
+  // continues the real countdown instead of restarting it.
   useEffect(() => {
-    if (phase !== 'active' || !q) return;
-    const total = data?.options.timingMode === 'per_question' ? q.timeLimitSeconds : null;
-    setRemaining(total ?? null);
-    if (!total) return;
-    const started = Date.now();
-    const tick = setInterval(() => {
-      const left = total - Math.floor((Date.now() - started) / 1000);
+    if (phase !== 'active' || !q || !sessionId) return;
+    if (data?.options.timingMode !== 'per_question') { setRemaining(null); return; }
+    const limit = q.timeLimitSeconds;
+    if (!limit) { setRemaining(null); return; }
+
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    (async () => {
+      // Authoritative start from the server (idempotent — safe to call on resume).
+      let startedAtMs = Date.now();
+      let skew = clockSkewRef.current;
+      try {
+        const res: any = await interviewApi.startQuestion(sessionId, q.id);
+        if (res?.data?.startedAt) startedAtMs = Date.parse(res.data.startedAt);
+        if (res?.data?.serverNow) { skew = Date.parse(res.data.serverNow) - Date.now(); clockSkewRef.current = skew; }
+      } catch {
+        const seeded = data?.state.savedAnswers.find((a) => a.questionId === q.id)?.startedAt;
+        if (seeded) startedAtMs = Date.parse(seeded);
+      }
+      if (cancelled) return;
+
+      const deadline = startedAtMs + limit * 1000;
+      const compute = () => Math.round((deadline - (Date.now() + skew)) / 1000);
+      const recordSpent = (left: number) =>
+        setDrafts((prev) => (q ? { ...prev, [q.id]: { ...prev[q.id], seconds: Math.min(limit, Math.max(0, limit - left)) } } : prev));
+
+      let left = compute();
       setRemaining(left);
-      // Count elapsed time onto the draft.
-      setDrafts((prev) => q ? { ...prev, [q.id]: { ...prev[q.id], seconds: (prev[q.id]?.seconds || 0) + 1 } } : prev);
-      if (left <= 0) { clearInterval(tick); advance(true); }
-    }, 1000);
-    return () => clearInterval(tick);
+      recordSpent(left);
+      if (left <= 0) { advance(true); return; }
+      interval = setInterval(() => {
+        if (finishingRef.current) { if (interval) clearInterval(interval); return; }
+        left = compute();
+        setRemaining(left);
+        recordSpent(left);
+        if (left <= 0) { if (interval) clearInterval(interval); advance(true); }
+      }, 1000);
+    })();
+
+    return () => { cancelled = true; if (interval) clearInterval(interval); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, idx]);
+  }, [phase, idx, sessionId]);
 
   // ── Global total timer (only in 'total' timing mode) ─────────────────────────
-  // Runs once across the whole interview and force-finishes when it hits zero,
-  // regardless of which question the candidate is on.
+  // Runs off the session's server start, so it survives reloads too.
   useEffect(() => {
     if (phase !== 'active' || data?.options.timingMode !== 'total') return;
     const total = data?.options.totalSeconds;
     if (!total) return;
-    setTotalRemaining(total);
-    const started = Date.now();
+    const startMs = sessionStartedAt ? Date.parse(sessionStartedAt) : Date.now();
+    const skew = clockSkewRef.current;
+    const deadline = startMs + total * 1000;
+    const compute = () => Math.round((deadline - (Date.now() + skew)) / 1000);
+
+    let left = compute();
+    setTotalRemaining(left);
+    if (left <= 0) { finish(); return; }
     const tick = setInterval(() => {
-      const left = total - Math.floor((Date.now() - started) / 1000);
+      if (finishingRef.current) { clearInterval(tick); return; }
+      left = compute();
       setTotalRemaining(left);
       if (left <= 0) { clearInterval(tick); finish(); }
     }, 1000);
     return () => clearInterval(tick);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, sessionStartedAt]);
 
   // Speak the prompt when arriving at a question.
   useEffect(() => {
@@ -164,6 +212,32 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     }, 1200);
   }, [sessionId, drafts]);
 
+  // ── Background audio upload (never blocks the candidate) ──────────────────────
+  const uploadAudioBg = useCallback(async (sid: string, questionId: string, blob: Blob) => {
+    pendingAudioRef.current.set(questionId, blob);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await interviewApi.uploadAnswerAudio(sid, questionId, blob);
+        pendingAudioRef.current.delete(questionId);
+        return true;
+      } catch {
+        await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+    // Leave it in the queue — flushPendingAudio() gives it one more try at submit.
+    return false;
+  }, []);
+
+  const flushPendingAudio = useCallback(async (sid: string) => {
+    for (const [questionId, blob] of Array.from(pendingAudioRef.current.entries())) {
+      try {
+        await interviewApi.uploadAnswerAudio(sid, questionId, blob);
+        pendingAudioRef.current.delete(questionId);
+      } catch { /* give up — the transcript is saved either way */ }
+    }
+    if (pendingAudioRef.current.size) toast.message('Some audio could not be uploaded — your transcripts were saved.');
+  }, []);
+
   // ── Recording (voice questions) ──────────────────────────────────────────────
   const toggleRecording = async () => {
     if (!q) return;
@@ -171,7 +245,10 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       recognizerRef.current?.stop();
       const blob = await recorderRef.current?.stop();
       setRecording(false);
-      if (blob) queueSave(q.id, { audioBlob: blob });
+      if (blob) {
+        setDrafts((prev) => ({ ...prev, [q.id]: { ...prev[q.id], audioBlob: blob } }));
+        if (sessionId) uploadAudioBg(sessionId, q.id, blob); // start uploading right away
+      }
       return;
     }
     const rec = new VoiceRecorder();
@@ -188,11 +265,27 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     if (!(await startCamera())) return;
     try {
       const res: any = await interviewApi.startInterview(taskId);
-      setSessionId(res?.data?.session?.id);
-      setIdx(0);
+      const session = res?.data?.session;
+      setSessionId(session?.id);
+      const startedAt = session?.startedAt || sessionStartedAt;
+      setSessionStartedAt(startedAt || null);
+      finishingRef.current = false;
+      // Mark the interview live so the floating resume bar can nudge them back if
+      // they wander off. Total-time interviews carry a client-epoch deadline.
+      const deadlineTs = (data?.options.timingMode === 'total' && startedAt && data?.options.totalSeconds)
+        ? Date.parse(startedAt) + data.options.totalSeconds * 1000 - clockSkewRef.current
+        : null;
+      setActiveInterview({
+        taskId,
+        title: data?.kit.title || 'Interview',
+        timingMode: data?.options.timingMode || 'per_question',
+        deadlineTs,
+      });
+      // Resume where they left off (never back to Q1), clamped to range.
+      const resumeIdx = Math.min(Math.max(0, data?.state.currentPosition ?? 0), questions.length - 1);
+      setIdx(resumeIdx);
       setPhase('active');
-      // Lock to fullscreen for the proctored session (best-effort).
-      await proctor.requestFullscreen();
+      await proctor.requestFullscreen(); // best-effort fullscreen lock
     } catch (e: any) {
       toast.error(extractApiErrorMessage(e, 'Could not start the interview'));
     }
@@ -215,20 +308,18 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       answerText: d?.answerText || null,
       timeSpentSeconds: d?.seconds || 0,
     }).catch(() => {});
-    if (blob) {
-      await interviewApi.uploadAnswerAudio(sessionId, q.id, blob).catch(() => {
-        toast.error('Your audio failed to upload, but your transcript was saved.');
-      });
-    }
+    // Fire-and-forget: audio uploads in the background with retries; advancing
+    // never waits on it (a slow/dropped upload can't stall the interview).
+    if (blob) uploadAudioBg(sessionId, q.id, blob);
   };
 
   const advance = async (auto = false) => {
-    if (advancing) return;
+    if (advancing || finishingRef.current) return;
     setAdvancing(true);
     stopSpeaking();
     try {
-      await persistCurrent();
       if (idx < questions.length - 1) {
+        await persistCurrent();
         setIdx((i) => i + 1);
       } else {
         await finish();
@@ -240,16 +331,22 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   };
 
   const finish = async () => {
-    if (!sessionId) return;
-    setPhase('submitting');
+    if (!sessionId || finishingRef.current) return;
+    finishingRef.current = true;
+    setPhase('submitting'); // stops the timers immediately (effect cleanup)
+    stopSpeaking();
     try {
-      await proctor.flush(); // push any buffered proctor events before we submit
+      await persistCurrent();          // save the final answer (kick off its audio)
+      await flushPendingAudio(sessionId); // one last try for any pending audio
+      await proctor.flush();           // push buffered proctor events
       await interviewApi.submitInterview(sessionId);
+      clearActiveInterview(); // dismiss the floating resume bar
       camStreamRef.current?.getTracks().forEach((t) => t.stop());
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       setPhase('done');
     } catch (e: any) {
       toast.error(extractApiErrorMessage(e, 'Could not submit the interview'));
+      finishingRef.current = false;
       setPhase('active');
     }
   };
@@ -264,6 +361,18 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   // ── Renders ──────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
     return <Centered><Loader2 className="w-7 h-7 animate-spin text-slate-300" /></Centered>;
+  }
+
+  if (phase === 'submitting') {
+    return (
+      <Centered>
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-brand-500 mx-auto mb-3" />
+          <p className="text-slate-700 font-medium">Submitting your interview…</p>
+          <p className="text-slate-400 text-sm mt-1">Saving your answers and recordings.</p>
+        </div>
+      </Centered>
+    );
   }
 
   if (phase === 'error') {
@@ -318,6 +427,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
               <li className="flex gap-2"><Mic className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />Answer by voice — we transcribe and keep your recording.</li>
               {data?.options.cameraRequired && <li className="flex gap-2"><Video className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />Your camera stays on during the interview.</li>}
               <li className="flex gap-2"><ArrowRight className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />You can&apos;t go back to a question once you move on.</li>
+              <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />The clock runs continuously once you start. Refreshing, closing the app, or losing power/internet will <strong>not</strong> pause it — make sure your power and connection are stable.</li>
               {!data?.options.allowRetake && <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />One attempt only — make it count.</li>}
             </ul>
 
@@ -327,7 +437,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
 
             {cannot ? (
               <div className="mt-6">
-                <p className="text-sm text-slate-500">{submittedBefore ? 'You&apos;ve already completed this interview.' : 'This interview isn&apos;t available.'}</p>
+                <p className="text-sm text-slate-500">{submittedBefore ? 'You’ve already completed this interview.' : 'This interview isn’t available.'}</p>
                 <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-4 px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm">Back to task</button>
               </div>
             ) : (
@@ -429,16 +539,14 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
             <div className="rounded-2xl border border-slate-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2 bg-slate-900 text-slate-300 text-xs">
                 <span className="inline-flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5" />{q.codeLanguage || 'code'}</span>
-                <span className="text-slate-500">Autosaved</span>
+                <span className="text-slate-500">Autosaved · paste disabled</span>
               </div>
-              <textarea
+              <CodeEditor
                 value={draft?.code || ''}
-                onChange={(e) => q && queueSave(q.id, { code: e.target.value })}
-                onPaste={(e) => { e.preventDefault(); proctor.log('paste_blocked', { field: 'code' }); toast.message('Pasting is disabled during the interview.'); }}
-                spellCheck={false}
-                rows={16}
-                placeholder="// write your solution here"
-                className="w-full bg-slate-950 text-slate-100 font-mono text-sm px-4 py-3 focus:outline-none resize-none"
+                language={q.codeLanguage}
+                onChange={(v) => q && queueSave(q.id, { code: v })}
+                onPasteBlocked={() => { proctor.log('paste_blocked', { field: 'code' }); toast.message('Pasting is disabled during the interview.'); }}
+                minHeight="360px"
               />
             </div>
           )}
@@ -460,7 +568,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         <p className="text-xs text-slate-400">{recording ? 'Stop recording before moving on.' : 'You can’t return to this question after moving on.'}</p>
         <button
           onClick={() => advance(false)}
-          disabled={advancing || phase === 'submitting'}
+          disabled={advancing || phase !== 'active'}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium disabled:opacity-50"
         >
           {advancing ? <Loader2 className="w-4 h-4 animate-spin" /> : isLast ? <CheckCircle2 className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
