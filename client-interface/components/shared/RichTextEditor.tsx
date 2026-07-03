@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -30,20 +31,22 @@ export default function RichTextEditor({
   placeholder = 'Start typing...',
   minHeight = '200px'
 }: RichTextEditorProps) {
+  const extensions = useMemo(() => [
+    StarterKit,
+    Link.configure({
+      openOnClick: false,
+      HTMLAttributes: {
+        class: 'text-blue-600 underline'
+      }
+    }),
+    Placeholder.configure({
+      placeholder
+    })
+  ], [placeholder]);
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          class: 'text-blue-600 underline'
-        }
-      }),
-      Placeholder.configure({
-        placeholder
-      })
-    ],
+    extensions,
     content,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
