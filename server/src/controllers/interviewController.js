@@ -55,6 +55,12 @@ exports.startInterview = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Interview session ready', { session }));
 });
 
+// POST /api/interviews/sessions/:sessionId/question/start  { questionId }
+exports.startQuestion = catchAsync(async (req, res) => {
+  const result = await interviewSessionService.startQuestion(req.params.sessionId, req.user.id, req.body.questionId);
+  res.status(200).json(successResponse('Question started', result));
+});
+
 // PATCH /api/interviews/sessions/:sessionId/answer
 exports.saveAnswer = catchAsync(async (req, res) => {
   const { questionId, ...payload } = req.body;
@@ -111,4 +117,16 @@ exports.aiDraftInterviewAnswer = catchAsync(async (req, res) => {
 exports.finalizeInterviewReview = catchAsync(async (req, res) => {
   const result = await interviewSessionService.finalizeReview(req.params.taskId, req.user.id, { overallNote: req.body.overallNote });
   res.status(200).json(successResponse('Interview review finalized', result));
+});
+
+// DELETE /api/interviews/review/:taskId/snapshots
+exports.deleteInterviewSnapshots = catchAsync(async (req, res) => {
+  const result = await interviewSessionService.deleteSnapshots(req.params.taskId, req.user.id);
+  res.status(200).json(successResponse('Proctor snapshots deleted', result));
+});
+
+// POST /api/interviews/review/:taskId/flag  { flagged, reason? }
+exports.flagInterview = catchAsync(async (req, res) => {
+  const result = await interviewSessionService.setFlag(req.params.taskId, req.user.id, { flagged: req.body.flagged, reason: req.body.reason });
+  res.status(200).json(successResponse('Interview flag updated', { flag: result }));
 });

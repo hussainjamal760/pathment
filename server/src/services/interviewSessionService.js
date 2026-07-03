@@ -75,6 +75,7 @@ class InterviewSessionService {
         code: a.code,
         answerText: a.answerText,
         timeSpentSeconds: a.timeSpentSeconds,
+        startedAt: a.startedAt, // wall-clock anchor for resuming this question's timer
       }));
     }
 
@@ -99,8 +100,50 @@ class InterviewSessionService {
         attemptNumber: active ? active.attemptNumber : submittedCount + 1,
         submittedCount,
         savedAnswers: answers,
+        // Resume metadata: where they were, and when the (total-mode) session began.
+        currentPosition: active ? (active.currentPosition || 0) : 0,
+        sessionStartedAt: active ? active.startedAt : null,
       },
+      // Server clock so the client can correct for local clock skew when computing
+      // remaining time (all deadlines are wall-clock, server-authoritative).
+      serverNow: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Stamp when the candidate first started a question (idempotent) and remember it
+   * as the session's current position. The wall-clock deadline is this timestamp +
+   * the question's limit, so a refresh/resume continues the real countdown instead
+   * of restarting it. Returns the authoritative start + the server clock (for skew).
+   */
+  async startQuestion(sessionId, menteeId, questionId) {
+    const session = await this._openSession(sessionId, menteeId);
+    if (!questionId) throw new ValidationError('questionId is required');
+
+    const question = await models.InterviewQuestion.findByPk(questionId);
+    if (!question || question.kitId !== (await this._kitIdForSession(session))) {
+      throw new ValidationError('That question is not part of this interview');
+    }
+
+    const [answer] = await models.InterviewAnswer.findOrCreate({
+      where: { sessionId, questionId },
+      defaults: {
+        sessionId, questionId,
+        position: question.position,
+        kind: question.kind,
+        promptSnapshot: question.prompt,
+        pointsPossible: question.points,
+        codeLanguage: question.kind === 'code' ? question.codeLanguage : null,
+        startedAt: new Date(),
+      },
+    });
+    // Only stamp the start once — resuming must NOT reset the clock.
+    if (!answer.startedAt) await answer.update({ startedAt: new Date() });
+    // Advance the resume position forward-only (you can't go back to a question).
+    if (question.position > (session.currentPosition || 0)) {
+      await session.update({ currentPosition: question.position });
+    }
+    return { startedAt: answer.startedAt, serverNow: new Date().toISOString() };
   }
 
   /** Start a fresh attempt or resume the in-progress one. Enforces retake rules. */
@@ -150,6 +193,15 @@ class InterviewSessionService {
     return session;
   }
 
+  /** Assert ownership only (any status). Used for late-arriving background audio
+   *  uploads that may land just after the candidate hit submit. */
+  async _ownedSession(sessionId, menteeId) {
+    const session = await models.InterviewSession.findByPk(sessionId);
+    if (!session) throw new NotFoundError('Interview session not found');
+    if (session.menteeId !== menteeId) throw new ForbiddenError('This session is not yours');
+    return session;
+  }
+
   /**
    * Upsert a single answer (autosave). Snapshots the question's prompt/kind/points
    * on first write so the candidate's record survives later kit edits.
@@ -192,9 +244,10 @@ class InterviewSessionService {
     return assignment ? assignment.kitId : null;
   }
 
-  /** Upload a recorded audio clip for one question and store its URL. */
+  /** Upload a recorded audio clip for one question and store its URL. Accepts a
+   *  just-submitted session too, so a background/retry upload isn't lost. */
   async attachAudio(sessionId, menteeId, questionId, file) {
-    const session = await this._openSession(sessionId, menteeId);
+    const session = await this._ownedSession(sessionId, menteeId);
     if (!questionId) throw new ValidationError('questionId is required');
     if (!file || !file.buffer) throw new ValidationError('No audio file received');
 
@@ -202,7 +255,17 @@ class InterviewSessionService {
     if (!question) throw new ValidationError('That question is not part of this interview');
 
     // Audio goes under Cloudinary's 'video' resource type (it handles audio there).
-    const result = await uploadToCloudinary(file.buffer, 'pathment/interviews', 'video');
+    // Log the real reason on failure — otherwise the client only sees a generic
+    // "audio failed" and we can never tell config from network from size.
+    let result;
+    try {
+      result = await uploadToCloudinary(file.buffer, 'pathment/interviews', 'video');
+    } catch (err) {
+      console.error('[interview] audio upload to Cloudinary failed:', {
+        message: err?.message, httpCode: err?.http_code, bytes: file.buffer?.length,
+      });
+      throw new ValidationError('Audio upload failed. Please check your connection and try again.');
+    }
 
     const fields = {
       position: question.position,
@@ -340,7 +403,11 @@ class InterviewSessionService {
           avatarUrl: session.mentee.profilePictureUrl,
         } : null,
       } : null,
-      proctor: { snapshots, flags, flagCounts },
+      // Proctoring (webcam snapshots + behavior flags) is reviewer-only — never
+      // shown back to the candidate being proctored.
+      proctor: isOwnerMentee ? { snapshots: [], flags: [], flagCounts: {} } : { snapshots, flags, flagCounts },
+      // Mentor's manual follow-up flag (hidden from the owning mentee).
+      flag: isOwnerMentee ? null : (session?.meta?.flag?.flagged ? session.meta.flag : null),
       items,
       totals: { totalPossible, totalAwarded, gradedCount, questionCount: questions.length },
       canReview: !isOwnerMentee && task.status !== 'completed',
@@ -375,6 +442,47 @@ class InterviewSessionService {
     });
     await answer.update(patch);
     return { questionId, pointsAwarded: answer.pointsAwarded, scoreNote: answer.scoreNote };
+  }
+
+  /** Delete the proctor snapshot images only (mentor). Strips them from the log
+   *  and best-effort removes the files from Cloudinary; behavior flags are kept. */
+  async deleteSnapshots(taskId, mentorId) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    await this._assertReviewer(mentorId, task);
+
+    const session = await this._latestSubmittedSession(taskId);
+    if (!session) throw new NotFoundError('No interview session found');
+
+    const log = session.proctorLog || [];
+    const snapshots = log.filter((e) => e.type === 'snapshot');
+    const kept = log.filter((e) => e.type !== 'snapshot');
+
+    const { deleteFromCloudinary } = require('../utils/cloudinaryUpload');
+    await Promise.all(snapshots.map(async (e) => {
+      const pid = e.meta?.publicId;
+      if (pid) { try { await deleteFromCloudinary(pid, 'image'); } catch (err) { console.error('[interview] snapshot delete failed:', err?.message); } }
+    }));
+
+    await session.update({ proctorLog: kept });
+    return { deleted: snapshots.length };
+  }
+
+  /** Flag (or clear the flag on) an interview for follow-up (mentor). Stored on
+   *  the session meta so it survives and is visible on the review. */
+  async setFlag(taskId, mentorId, { flagged, reason } = {}) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    await this._assertReviewer(mentorId, task);
+
+    const session = await this._latestSubmittedSession(taskId);
+    if (!session) throw new NotFoundError('No interview session found');
+
+    const flag = flagged
+      ? { flagged: true, reason: reason ? String(reason) : null, by: mentorId, at: new Date().toISOString() }
+      : { flagged: false };
+    await session.update({ meta: { ...(session.meta || {}), flag } });
+    return flag;
   }
 
   async _latestSubmittedSession(taskId) {

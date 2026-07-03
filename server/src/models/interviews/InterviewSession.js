@@ -42,6 +42,13 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
       field: 'started_at'
     },
+    // The question index the candidate is currently on — resume returns them here.
+    currentPosition: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+      field: 'current_position'
+    },
     submittedAt: {
       type: DataTypes.DATE,
       allowNull: true,

@@ -78,6 +78,13 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: 0,
       field: 'time_spent_seconds'
     },
+    // When the candidate first landed on this question. The wall-clock deadline is
+    // started_at + the question's time limit, so refreshing never resets the clock.
+    startedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: 'started_at'
+    },
     // ── Grading (Phase 4) — mentor is source of truth; aiDraft is optional. ──
     pointsAwarded: {
       type: DataTypes.INTEGER,

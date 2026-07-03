@@ -88,6 +88,16 @@ const upload = multer({
   }
 });
 
+// A larger-limit variant for media that can legitimately run big — e.g. a long
+// interview voice answer (webm ≈ 1MB/min, so 10MB cut answers off ~10 min).
+const uploadLarge = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 25 * 1024 * 1024 // 25MB
+  }
+});
+
 /**
  * Wrap a multer handler so size/count limits and filter rejections surface as
  * clean 400 messages instead of a generic 500 "Something went wrong on our end".
@@ -97,7 +107,7 @@ const withUploadErrors = (handler) => (req, res, next) => {
     if (!err) return next();
     if (err instanceof multer.MulterError) {
       const messages = {
-        LIMIT_FILE_SIZE: 'One of your files is too large. Each file must be 10MB or smaller.',
+        LIMIT_FILE_SIZE: 'One of your files is too large. Please upload a smaller file.',
         LIMIT_FILE_COUNT: 'Too many files. Please upload fewer files.',
         LIMIT_UNEXPECTED_FILE: 'Unexpected file field in the upload.',
       };
@@ -113,5 +123,7 @@ upload.withUploadErrors = withUploadErrors;
 upload.arraySafe = (field, maxCount) => withUploadErrors(upload.array(field, maxCount));
 /** `upload.singleSafe('file')` — single upload with clean error messages. */
 upload.singleSafe = (field) => withUploadErrors(upload.single(field));
+/** `upload.singleSafeLarge('audio')` — single upload with a 25MB cap. */
+upload.singleSafeLarge = (field) => withUploadErrors(uploadLarge.single(field));
 
 module.exports = upload;

@@ -20,8 +20,9 @@ router.delete('/kits/:id', authenticate, canAuthor, interviewController.deleteKi
 // Candidate runner — any authenticated user; the service asserts task ownership.
 router.get('/assignments/:taskId', authenticate, interviewController.getCandidateInterview);
 router.post('/assignments/:taskId/start', authenticate, interviewController.startInterview);
+router.post('/sessions/:sessionId/question/start', authenticate, interviewController.startQuestion);
 router.patch('/sessions/:sessionId/answer', authenticate, interviewController.saveAnswer);
-router.post('/sessions/:sessionId/audio', authenticate, upload.singleSafe('audio'), interviewController.uploadAnswerAudio);
+router.post('/sessions/:sessionId/audio', authenticate, upload.singleSafeLarge('audio'), interviewController.uploadAnswerAudio);
 router.post('/sessions/:sessionId/proctor', authenticate, interviewController.logProctor);
 router.post('/sessions/:sessionId/snapshot', authenticate, upload.singleSafe('image'), interviewController.uploadSnapshot);
 router.post('/sessions/:sessionId/submit', authenticate, interviewController.submitInterview);
@@ -31,5 +32,7 @@ router.get('/review/:taskId', authenticate, interviewController.getInterviewRevi
 router.patch('/review/:taskId/answer', authenticate, interviewController.gradeInterviewAnswer);
 router.post('/review/:taskId/ai-draft', authenticate, interviewController.aiDraftInterviewAnswer);
 router.post('/review/:taskId/finalize', authenticate, interviewController.finalizeInterviewReview);
+router.delete('/review/:taskId/snapshots', authenticate, interviewController.deleteInterviewSnapshots);
+router.post('/review/:taskId/flag', authenticate, interviewController.flagInterview);
 
 module.exports = router;
