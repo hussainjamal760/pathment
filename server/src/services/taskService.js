@@ -123,13 +123,26 @@ class TaskService {
 
     // Interview tasks carry a kit + options (retake / camera / AI / timing) under
     // `data.interview`. Fail fast BEFORE we create any rows so a bad kit can't
-    // leave an orphan task behind.
+    // leave an orphan task behind. We also derive the time estimate from the kit's
+    // own timing (per-question limits or a total timer) rather than a flat guess.
     const interviewOpts = type === 'interview' ? (data.interview || {}) : null;
+    let interviewEstimateHours = null;
     if (interviewOpts) {
       if (!interviewOpts.kitId) throw new ValidationError('An interview task needs an interview kit');
-      const kitQuestions = await models.InterviewQuestion.count({ where: { kitId: interviewOpts.kitId } });
-      if (kitQuestions === 0) throw new ValidationError('That interview kit has no questions yet');
+      const kit = await models.InterviewKit.findByPk(interviewOpts.kitId, {
+        include: [{ model: models.InterviewQuestion, as: 'questions', attributes: ['timeLimitSeconds'] }],
+      });
+      const kitQuestions = kit?.questions || [];
+      if (!kit || kitQuestions.length === 0) throw new ValidationError('That interview kit has no questions yet');
+      const timingMode = interviewOpts.timingMode || kit.timingMode;
+      const seconds = timingMode === 'total'
+        ? (Number(interviewOpts.totalSeconds || kit.totalSeconds) || 0)
+        : kitQuestions.reduce((s, q) => s + (Number(q.timeLimitSeconds) || 0), 0);
+      // INTEGER hours, floored at 1 so a short interview never reads "0h".
+      interviewEstimateHours = Math.max(1, Math.round(seconds / 3600));
     }
+    // Sensible per-difficulty estimate for non-interview custom tasks (was a flat 5h).
+    const EST_HOURS_BY_DIFFICULTY = { easy: 2, medium: 4, hard: 8, expert: 12 };
 
     let roadmapTask;
 
@@ -149,7 +162,9 @@ class TaskService {
         taskOrder: 0,
         deliverable: deliverable || 'Complete the assigned task',
         acceptanceCriteria: acceptanceCriteria || [],
-        estimatedHours: 5,
+        estimatedHours: type === 'interview'
+          ? (interviewEstimateHours || 1)
+          : (EST_HOURS_BY_DIFFICULTY[difficulty || 'medium'] || 4),
         isMandatory: false,
         isCustomTask: true,
         // Standard points by difficulty (no hand-typed values).
@@ -163,6 +178,12 @@ class TaskService {
       }
     }
 
+    // Anchor the deadline to END OF DAY in the mentee's timezone. The client sends
+    // a date-only value (YYYY-MM-DD), so "today" means their whole day — never an
+    // instant that's already overdue or that drifts a calendar day across zones.
+    const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const resolvedDueDate = await this._resolveDueDate(menteeId, dueDate || defaultDueDate);
+
     // Create assigned task
     const assignedTask = await models.AssignedTask.create({
       roadmapTaskId: roadmapTask.id,
@@ -170,7 +191,7 @@ class TaskService {
       mentorId,
       enrollmentId,
       status: 'assigned',
-      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      dueDate: resolvedDueDate,
       isCustomTask: roadmapTaskId ? false : true, // Roadmap tasks are not custom
       trackId: trackId || null
     });
@@ -192,8 +213,12 @@ class TaskService {
     const mentorName = mentorUser ? `${mentorUser.firstName} ${mentorUser.lastName}`.trim() : 'Your mentor';
     const mentorFirst = mentorUser?.firstName || 'Your mentor';
     const taskTitle = fullTask.roadmapTask?.title || 'a new task';
+    // Format the deadline in the MENTEE's timezone so the notification's calendar
+    // day matches what they see on the task card (not the server's UTC day).
+    const menteeSettings = await models.UserSettings.findOne({ where: { userId: fullTask.menteeId }, attributes: ['timezone'] });
+    const menteeTz = menteeSettings?.timezone || 'UTC';
     const dueStr = fullTask.dueDate
-      ? new Date(fullTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      ? new Date(fullTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: menteeTz })
       : null;
 
     await notificationOrchestrator.dispatch({

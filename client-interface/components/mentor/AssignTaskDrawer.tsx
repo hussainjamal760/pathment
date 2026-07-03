@@ -207,9 +207,14 @@ export function AssignTaskDrawer({
   });
 
   const filteredCohort = cohort.filter((m) => m.name.toLowerCase().includes(search.toLowerCase()));
+  // Send a date-only value (YYYY-MM-DD). The server anchors it to end-of-day in
+  // the mentee's timezone, so "Today" means their whole day — not the current
+  // instant (which would be instantly overdue and drift a day across timezones).
   const dueISO = () => {
-    if (dueExact) return new Date(`${dueExact}T23:59:59`).toISOString();
-    const d = new Date(); d.setDate(d.getDate() + dueDays); return d.toISOString();
+    if (dueExact) return dueExact;
+    const d = new Date(); d.setDate(d.getDate() + dueDays);
+    const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
   const cleanCriteria = criteria.map((c) => c.trim()).filter(Boolean);
 

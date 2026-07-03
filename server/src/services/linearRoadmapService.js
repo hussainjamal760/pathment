@@ -554,7 +554,9 @@ class LinearRoadmapService {
     const mentorUser = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
     const mentorFirst = mentorUser?.firstName || 'Your mentor';
     const stepTitle = step.title || 'a new step';
-    const dueStr = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // Format in the mentee's timezone so the notification day matches the card.
+    const dueTzSettings = await models.UserSettings.findOne({ where: { userId: menteeId }, attributes: ['timezone'] });
+    const dueStr = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: dueTzSettings?.timezone || 'UTC' });
     notificationOrchestrator.dispatch({
       eventKey: NOTIFICATION_EVENTS.TASK_ASSIGNED,
       recipients: [{ userId: menteeId }],
