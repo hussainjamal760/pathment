@@ -7,6 +7,7 @@ const { endOfDayInZone } = require('../utils/timezone');
 const authzService = require('./authzService');
 const { PERMISSIONS } = require('../config/permissions');
 const { pointsForDifficulty } = require('../config/points');
+const interviewKitService = require('./interviewKitService');
 
 /** Guess a resource's kind from its URL (mirrors the roadmap step normalizer). */
 function inferResourceType(url) {
@@ -120,6 +121,16 @@ class TaskService {
       throw new ForbiddenError('You are not the mentor for this mentee');
     }
 
+    // Interview tasks carry a kit + options (retake / camera / AI / timing) under
+    // `data.interview`. Fail fast BEFORE we create any rows so a bad kit can't
+    // leave an orphan task behind.
+    const interviewOpts = type === 'interview' ? (data.interview || {}) : null;
+    if (interviewOpts) {
+      if (!interviewOpts.kitId) throw new ValidationError('An interview task needs an interview kit');
+      const kitQuestions = await models.InterviewQuestion.count({ where: { kitId: interviewOpts.kitId } });
+      if (kitQuestions === 0) throw new ValidationError('That interview kit has no questions yet');
+    }
+
     let roadmapTask;
 
     // If roadmapTaskId provided, use existing roadmap task
@@ -163,6 +174,15 @@ class TaskService {
       isCustomTask: roadmapTaskId ? false : true, // Roadmap tasks are not custom
       trackId: trackId || null
     });
+
+    // Link the interview kit + snapshot the per-assignment options.
+    if (interviewOpts) {
+      await interviewKitService.createAssignmentForTask({
+        assignedTaskId: assignedTask.id,
+        kitId: interviewOpts.kitId,
+        options: interviewOpts,
+      });
+    }
 
     await this.updateEnrollmentTaskStats(enrollmentId);
 
