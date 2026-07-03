@@ -13,12 +13,15 @@ import { StepCustomizeModal } from '@/components/mentor/StepCustomizeModal';
 import RichTextEditor from '@/components/shared/RichTextEditor';
 import { cleanHtml } from '@/lib/utils/html';
 import { pointsForDifficulty } from '@/lib/config/points';
+import { interviewApi, type InterviewKitSummary } from '@/lib/services/interview-api';
+import Link from 'next/link';
+import { Mic } from 'lucide-react';
 
 type AssignSource = 'custom' | 'roadmap';
 
-const TYPES = ['assignment', 'project', 'quiz', 'reading', 'video', 'discussion'] as const;
+const TYPES = ['assignment', 'project', 'quiz', 'reading', 'video', 'discussion', 'interview'] as const;
 const TYPE_LABEL: Record<string, string> = {
-  assignment: 'Assignment', project: 'Project', quiz: 'Quiz', reading: 'Reading', video: 'Video', discussion: 'Discussion',
+  assignment: 'Assignment', project: 'Project', quiz: 'Quiz', reading: 'Reading', video: 'Video', discussion: 'Discussion', interview: 'Interview',
 };
 const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'] as const;
 const DUE_PRESETS: { label: string; days: number }[] = [
@@ -84,6 +87,35 @@ export function AssignTaskDrawer({
   const [resources, setResources] = useState<{ title: string; url: string }[]>([]);
   const [trackId, setTrackId] = useState<string>('');
   const [tracks, setTracks] = useState<Track[]>([]);
+
+  // Interview type: pick a kit + per-assignment options (retake / camera / AI).
+  const [kits, setKits] = useState<InterviewKitSummary[]>([]);
+  const [kitsLoading, setKitsLoading] = useState(false);
+  const [kitId, setKitId] = useState('');
+  const [allowRetake, setAllowRetake] = useState(false);
+  const [cameraRequired, setCameraRequired] = useState(false);
+  const [aiGrading, setAiGrading] = useState(false);
+  const selectedKit = kits.find((k) => k.id === kitId) || null;
+
+  // Load the mentor's interview kits the first time they pick the Interview type.
+  useEffect(() => {
+    if (type !== 'interview' || kits.length || kitsLoading) return;
+    let active = true;
+    setKitsLoading(true);
+    interviewApi.listKits()
+      .then((res: any) => { if (active) setKits(res?.data?.kits ?? []); })
+      .catch(() => { if (active) setKits([]); })
+      .finally(() => { if (active) setKitsLoading(false); });
+    return () => { active = false; };
+  }, [type, kits.length, kitsLoading]);
+
+  // When a kit is chosen, seed the option toggles from its defaults.
+  useEffect(() => {
+    if (!selectedKit) return;
+    setAllowRetake(selectedKit.allowRetakeDefault);
+    setCameraRequired(selectedKit.cameraDefault);
+    setAiGrading(selectedKit.aiGradingDefault);
+  }, [kitId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // bulk targeting
   const [selected, setSelected] = useState<Set<string>>(new Set(mentee ? [mentee.id] : []));
@@ -186,7 +218,9 @@ export function AssignTaskDrawer({
   const targetCount = targetIds.length;
   const blockedCount = rawTargetIds.length - targetCount;
   // Single-mode roadmap where the one mentee already has this roadmap.
-  const canSubmit = targetCount > 0 && (source === 'custom' ? !!title.trim() : (!!roadmapId && selectedSteps.size > 0));
+  const canSubmit = targetCount > 0 && (source === 'custom'
+    ? (!!title.trim() && (type !== 'interview' || !!kitId))
+    : (!!roadmapId && selectedSteps.size > 0));
 
   const submit = async () => {
     if (!canSubmit || saving) return;
@@ -225,6 +259,10 @@ export function AssignTaskDrawer({
         deliverable: deliverable.trim() || undefined,
         acceptanceCriteria: cleanCriteria,
         resources: cleanResources.length ? cleanResources : undefined,
+        // Interview tasks carry the kit + options; the runner/grading use these.
+        ...(type === 'interview' && kitId
+          ? { interview: { kitId, allowRetake, cameraRequired, aiGradingEnabled: aiGrading } }
+          : {}),
       };
       if (mode === 'bulk') {
         const res: any = await taskApi.bulkCreateCustomTasks({ ...base, menteeIds: [...selected] });
@@ -318,6 +356,51 @@ export function AssignTaskDrawer({
                 </div>
               </div>
 
+              {type === 'interview' && (
+                <div className="rounded-xl border border-brand-200 bg-brand-50/50 dark:bg-brand-500/5 p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                    <Mic className="w-4 h-4 text-brand-600" /> Interview kit <span className="text-red-500">*</span>
+                  </div>
+                  {kitsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400 py-1"><Loader2 className="w-4 h-4 animate-spin" />Loading your kits…</div>
+                  ) : kits.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      You haven&apos;t built any interview kits yet.{' '}
+                      <Link href="/mentor/interviews" className="text-brand-600 hover:text-brand-700 font-medium">Create one →</Link>
+                    </p>
+                  ) : (
+                    <>
+                      <select value={kitId} onChange={(e) => setKitId(e.target.value)} className={field} aria-label="Interview kit">
+                        <option value="">Select a kit…</option>
+                        {kits.map((k) => (
+                          <option key={k.id} value={k.id}>{k.title} · {k.questionCount} Q</option>
+                        ))}
+                      </select>
+                      {selectedKit && (
+                        <p className="text-[11px] text-slate-400">
+                          {selectedKit.questionCount} question{selectedKit.questionCount === 1 ? '' : 's'} · {selectedKit.totalPoints} pts ·{' '}
+                          {selectedKit.timingMode === 'total' ? 'one total timer' : 'per-question timing'}
+                        </p>
+                      )}
+                      <div className="space-y-2 pt-1">
+                        {([
+                          ['Allow re-attempt', allowRetake, setAllowRetake, 'Off = strict one-take'],
+                          ['Require camera', cameraRequired, setCameraRequired, 'Proctor snapshots during the interview'],
+                          ['AI draft grading', aiGrading, setAiGrading, 'Uses your BYO AI key; mentor still decides'],
+                        ] as const).map(([label, val, setter, hint]) => (
+                          <label key={label} className="flex items-start gap-2.5 cursor-pointer">
+                            <input type="checkbox" checked={val} onChange={(e) => setter(e.target.checked)}
+                              className="mt-0.5 w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" />
+                            <span className="text-sm text-slate-700">{label}<span className="block text-[11px] text-slate-400">{hint}</span></span>
+                          </label>
+                        ))}
+                      </div>
+                      <Link href="/mentor/interviews" className="inline-block text-xs text-brand-600 hover:text-brand-700">Manage kits →</Link>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Brief</label>
                 <RichTextEditor content={description} onChange={setDescription} placeholder="What should they do? (defaults to the title)" minHeight="120px" />
@@ -367,6 +450,7 @@ export function AssignTaskDrawer({
                 )}
               </div>
 
+              {type !== 'interview' && (<>
               <div>
                 <label htmlFor="assign-task-deliverable" className="block text-sm font-medium text-slate-700 mb-1">Deliverable</label>
                 <input id="assign-task-deliverable" value={deliverable} onChange={(e) => setDeliverable(e.target.value)} placeholder="What should they submit?" className={field} />
@@ -412,6 +496,7 @@ export function AssignTaskDrawer({
                   ))}
                 </div>
               </div>
+              </>)}
               </>)}
 
               {source === 'roadmap' && (
