@@ -97,7 +97,7 @@ class InterviewKitService {
     const kits = await models.InterviewKit.findAll({
       where: { createdBy: userId },
       include: [{ model: models.InterviewQuestion, as: 'questions', attributes: ['id', 'kind', 'points'] }],
-      order: [['updated_at', 'DESC']],
+      order: [['updatedAt', 'DESC']],
     });
     return kits.map((k) => {
       const questions = k.questions || [];

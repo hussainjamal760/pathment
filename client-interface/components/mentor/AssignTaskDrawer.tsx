@@ -99,7 +99,7 @@ export function AssignTaskDrawer({
 
   // Load the mentor's interview kits the first time they pick the Interview type.
   useEffect(() => {
-    if (type !== 'interview' || kits.length || kitsLoading) return;
+    if (type !== 'interview' || kits.length > 0 || kitsLoading) return;
     let active = true;
     setKitsLoading(true);
     interviewApi.listKits()
@@ -107,7 +107,8 @@ export function AssignTaskDrawer({
       .catch(() => { if (active) setKits([]); })
       .finally(() => { if (active) setKitsLoading(false); });
     return () => { active = false; };
-  }, [type, kits.length, kitsLoading]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type]);
 
   // When a kit is chosen, seed the option toggles from its defaults.
   useEffect(() => {
