@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useMentorApprovals, type ApprovalItem } from '@/lib/hooks/mentor';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
+import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
 import { BulkReviewDrawer } from '@/components/mentor/BulkReviewDrawer';
 import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { Avatar } from '@/components/shared/Avatar';
@@ -180,8 +181,12 @@ export default function MentorApprovals() {
     [filteredReviewed, reviewedPg.offset, reviewedPg.limit]
   );
 
+  // Interviews are graded per-answer in their own drawer, never in bulk (bulk
+  // only sets a rating/points), so they're excluded from every selection path.
+  const isBulkable = (q: ApprovalItem) => q.type !== 'interview';
+
   const selectedItems = useMemo(
-    () => queue.filter((q) => selected.has(q.submissionId)),
+    () => queue.filter((q) => selected.has(q.submissionId) && isBulkable(q)),
     [queue, selected]
   );
 
@@ -192,25 +197,29 @@ export default function MentorApprovals() {
       return next;
     });
 
+  const bulkableFiltered = filteredReview.filter(isBulkable);
   const allFilteredSelected =
-    filteredReview.length > 0 && filteredReview.every((q) => selected.has(q.submissionId));
+    bulkableFiltered.length > 0 && bulkableFiltered.every((q) => selected.has(q.submissionId));
   const selectAllFiltered = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allFilteredSelected) filteredReview.forEach((q) => next.delete(q.submissionId));
-      else filteredReview.forEach((q) => next.add(q.submissionId));
+      if (allFilteredSelected) bulkableFiltered.forEach((q) => next.delete(q.submissionId));
+      else bulkableFiltered.forEach((q) => next.add(q.submissionId));
       return next;
     });
   };
 
-  // Select / deselect every item within one task group.
-  const groupAllSelected = (g: { items: ApprovalItem[] }) =>
-    g.items.length > 0 && g.items.every((q) => selected.has(q.submissionId));
+  // Select / deselect every bulkable item within one task group.
+  const groupAllSelected = (g: { items: ApprovalItem[] }) => {
+    const b = g.items.filter(isBulkable);
+    return b.length > 0 && b.every((q) => selected.has(q.submissionId));
+  };
   const toggleGroup = (g: { items: ApprovalItem[] }) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (groupAllSelected(g)) g.items.forEach((q) => next.delete(q.submissionId));
-      else g.items.forEach((q) => next.add(q.submissionId));
+      const b = g.items.filter(isBulkable);
+      if (groupAllSelected(g)) b.forEach((q) => next.delete(q.submissionId));
+      else b.forEach((q) => next.add(q.submissionId));
       return next;
     });
 
@@ -265,9 +274,11 @@ export default function MentorApprovals() {
     <div className="flex items-center gap-4 px-5 py-4">
       <input
         type="checkbox"
-        checked={selected.has(item.submissionId)}
+        checked={selected.has(item.submissionId) && isBulkable(item)}
         onChange={() => toggle(item.submissionId)}
-        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0"
+        disabled={!isBulkable(item)}
+        title={isBulkable(item) ? undefined : 'Interviews are graded individually'}
+        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
       />
 
       <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
@@ -769,7 +780,15 @@ export default function MentorApprovals() {
         )
       )}
 
-      {reviewing && (
+      {reviewing && reviewing.type === 'interview' && (
+        <InterviewReviewDrawer
+          taskId={reviewing.taskId}
+          onClose={() => setReviewing(null)}
+          onFinalized={() => { setSelected(new Set()); refetch(); }}
+        />
+      )}
+
+      {reviewing && reviewing.type !== 'interview' && (
         <ReviewDrawer
           item={reviewing}
           onClose={() => setReviewing(null)}

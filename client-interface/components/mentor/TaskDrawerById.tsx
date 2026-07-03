@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import { MenteeTaskDrawer } from '@/components/mentor/MenteeTaskDrawer';
+import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
 import taskApi from '@/lib/services/task-api';
 
 /**
@@ -30,6 +31,10 @@ export function TaskDrawerById({ taskId, onClose, onChanged }: { taskId: string;
   }
   if (!task) {
     return <Drawer open onClose={onClose} title="Task"><p className="text-sm text-slate-500">Could not load this task.</p></Drawer>;
+  }
+  // Interview tasks show the interview review (answers + scoring), not the generic drawer.
+  if ((task.roadmapTask?.type || task.type) === 'interview') {
+    return <InterviewReviewDrawer taskId={task.id} onClose={onClose} onFinalized={onChanged} />;
   }
   return <MenteeTaskDrawer task={task} onClose={onClose} onChanged={onChanged} />;
 }
