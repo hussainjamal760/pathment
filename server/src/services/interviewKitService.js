@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
 const { NotFoundError, ForbiddenError, ValidationError, ConflictError } = require('../utils/errors/errorTypes');
+const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 
 const QUESTION_KINDS = ['voice', 'code', 'text'];
 const TIMING_MODES = ['per_question', 'total'];
@@ -69,7 +70,36 @@ class InterviewKitService {
       meta.status = data.status;
     }
     if (data.settings !== undefined && data.settings && typeof data.settings === 'object') meta.settings = data.settings;
+    // Interviewer identity for the candidate's TTS: name + pitch/rate + a preferred
+    // voice (best-effort on the candidate's device). Stored under settings.interviewer.
+    if (data.interviewer !== undefined) {
+      const iv = data.interviewer || {};
+      const clamp = (n, lo, hi, dflt) => { const x = Number(n); return Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : dflt; };
+      meta.settings = {
+        ...(meta.settings || {}),
+        interviewer: {
+          name: iv.name ? String(iv.name).slice(0, 40).trim() : null,
+          voiceName: iv.voiceName ? String(iv.voiceName).slice(0, 120) : null,
+          pitch: clamp(iv.pitch, 0, 2, 1),
+          rate: clamp(iv.rate, 0.5, 2, 1),
+        },
+      };
+    }
     return meta;
+  }
+
+  /** Upload a mentor's recorded prompt audio; the URL is stored on a question's
+   *  config so the candidate hears the real voice for that question. */
+  async uploadPromptAudio(userId, file) {
+    if (!file || !file.buffer) throw new ValidationError('No audio file received');
+    let result;
+    try {
+      result = await uploadToCloudinary(file.buffer, 'pathment/interviews/prompts', 'video');
+    } catch (err) {
+      console.error('[interview] prompt audio upload failed:', err?.message);
+      throw new ValidationError('Could not upload the recording. Please try again.');
+    }
+    return { url: result.secure_url, publicId: result.public_id };
   }
 
   // ── CRUD ───────────────────────────────────────────────────────────────────
@@ -185,6 +215,8 @@ class InterviewKitService {
     if (kit.createdBy !== userId) throw new ForbiddenError('You do not have access to this interview kit');
 
     const meta = this._normalizeKitMeta(data);
+    // Merge settings so setting the interviewer doesn't drop other settings keys.
+    if (meta.settings) meta.settings = { ...(kit.settings || {}), ...meta.settings };
 
     return sequelize.transaction(async (transaction) => {
       if (Object.keys(meta).length) await kit.update(meta, { transaction });

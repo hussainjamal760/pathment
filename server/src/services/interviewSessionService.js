@@ -44,6 +44,8 @@ class InterviewSessionService {
       required: q.required,
       codeLanguage: q.codeLanguage,
       starterCode: q.starterCode,
+      // Mentor's own recording for this question (plays instead of TTS if present).
+      promptAudioUrl: (q.config && q.config.promptAudioUrl) || null,
     };
   }
 
@@ -87,6 +89,8 @@ class InterviewSessionService {
         description: kit.description,
         totalPoints: questions.reduce((s, q) => s + (q.points || 0), 0),
       },
+      // Interviewer identity/voice for the candidate's TTS (null → default).
+      interviewer: (kit.settings && kit.settings.interviewer) || null,
       options: {
         allowRetake: assignment.allowRetake,
         cameraRequired: assignment.cameraRequired,

@@ -12,6 +12,7 @@ const upload = require('../middlewares/upload');
 const canAuthor = requirePermissionAnyScope(PERMISSIONS.TASK_ASSIGN);
 
 router.get('/kits', authenticate, canAuthor, interviewController.listKits);
+router.post('/kits/prompt-audio', authenticate, canAuthor, upload.singleSafeLarge('audio'), interviewController.uploadPromptAudio);
 router.post('/kits', authenticate, canAuthor, interviewController.createKit);
 router.get('/kits/:id', authenticate, canAuthor, interviewController.getKit);
 router.patch('/kits/:id', authenticate, canAuthor, interviewController.updateKit);

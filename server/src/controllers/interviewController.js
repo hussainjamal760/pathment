@@ -23,6 +23,12 @@ exports.createKit = catchAsync(async (req, res) => {
   res.status(201).json(successResponse('Interview kit created', { kit }, 201));
 });
 
+// POST /api/interviews/kits/prompt-audio  (multipart: audio) → { url, publicId }
+exports.uploadPromptAudio = catchAsync(async (req, res) => {
+  const result = await interviewKitService.uploadPromptAudio(req.user.id, req.file);
+  res.status(200).json(successResponse('Prompt audio uploaded', result));
+});
+
 // GET /api/interviews/kits/:id
 exports.getKit = catchAsync(async (req, res) => {
   const kit = await interviewKitService.getKit(req.user.id, req.params.id);
