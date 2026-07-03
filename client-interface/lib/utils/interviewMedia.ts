@@ -1,0 +1,124 @@
+/**
+ * Zero-cost browser media helpers for the interview runner:
+ *  - speak()            interviewer voice via the free Web Speech Synthesis API.
+ *  - createRecognizer() live speech-to-text via webkitSpeechRecognition (free, no
+ *                       server round-trip). Groq Whisper is the paid upgrade later.
+ *  - VoiceRecorder      wraps MediaRecorder to capture the raw audio blob (kept
+ *                       permanently) alongside the live transcript.
+ * All are feature-detected so an unsupported browser degrades gracefully.
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+export const speechSupported = () =>
+  typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+export const recognitionSupported = () =>
+  typeof window !== 'undefined' &&
+  ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
+
+export const recorderSupported = () =>
+  typeof window !== 'undefined' && typeof (window as any).MediaRecorder !== 'undefined' &&
+  !!navigator.mediaDevices?.getUserMedia;
+
+/** Speak a prompt aloud. Resolves when finished (or immediately if unsupported). */
+export function speak(text: string, opts: { rate?: number; onEnd?: () => void } = {}): void {
+  if (!speechSupported() || !text) { opts.onEnd?.(); return; }
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = opts.rate ?? 1;
+    u.pitch = 1;
+    // Prefer a natural English voice when available.
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|daniel/i.test(v.name))
+      || voices.find((v) => /^en/i.test(v.lang));
+    if (preferred) u.voice = preferred;
+    if (opts.onEnd) u.onend = opts.onEnd;
+    window.speechSynthesis.speak(u);
+  } catch {
+    opts.onEnd?.();
+  }
+}
+
+export function stopSpeaking(): void {
+  if (speechSupported()) {
+    try { window.speechSynthesis.cancel(); } catch { /* noop */ }
+  }
+}
+
+/**
+ * A live transcriber. Calls onTranscript with the accumulated final text as the
+ * candidate speaks. Returns a controller; call stop() when the answer is done.
+ */
+export function createRecognizer(onTranscript: (fullText: string) => void) {
+  if (!recognitionSupported()) return null;
+  const Ctor = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+  const rec = new Ctor();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = 'en-US';
+  let finalText = '';
+
+  rec.onresult = (event: any) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const t = event.results[i][0].transcript;
+      if (event.results[i].isFinal) finalText += t + ' ';
+      else interim += t;
+    }
+    onTranscript((finalText + interim).trim());
+  };
+
+  return {
+    start: () => { try { finalText = ''; rec.start(); } catch { /* already started */ } },
+    stop: () => { try { rec.stop(); } catch { /* noop */ } },
+    getFinal: () => finalText.trim(),
+  };
+}
+
+/** Records mic audio to a single webm blob. */
+export class VoiceRecorder {
+  private stream: MediaStream | null = null;
+  private recorder: any = null;
+  private chunks: BlobPart[] = [];
+
+  async start(): Promise<boolean> {
+    if (!recorderSupported()) return false;
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.chunks = [];
+      this.recorder = new (window as any).MediaRecorder(this.stream, { mimeType: 'audio/webm' });
+      this.recorder.ondataavailable = (e: any) => { if (e.data?.size > 0) this.chunks.push(e.data); };
+      this.recorder.start();
+      return true;
+    } catch {
+      this.cleanup();
+      return false;
+    }
+  }
+
+  stop(): Promise<Blob | null> {
+    return new Promise((resolve) => {
+      if (!this.recorder) { resolve(null); return; }
+      this.recorder.onstop = () => {
+        const blob = this.chunks.length ? new Blob(this.chunks, { type: 'audio/webm' }) : null;
+        this.cleanup();
+        resolve(blob);
+      };
+      try { this.recorder.stop(); } catch { this.cleanup(); resolve(null); }
+    });
+  }
+
+  private cleanup() {
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.recorder = null;
+  }
+}
+
+/** mm:ss for a seconds count. */
+export const fmtClock = (secs: number): string => {
+  const s = Math.max(0, Math.floor(secs));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};

@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   Calendar,
@@ -17,6 +18,7 @@ import {
   ExternalLink,
   Loader2,
   StickyNote,
+  Mic,
 } from 'lucide-react';
 import { ResourceLink } from '@/components/shared/ResourceLink';
 import { useTaskDetail } from '@/lib/hooks/mentee';
@@ -24,6 +26,7 @@ import { PageHeader, StatusBadge } from '@/components/admin/ui';
 import { useActivityTracker } from '@/lib/hooks/shared/useActivityTracker';
 import { FrictionPanel } from '@/components/mentee/FrictionPanel';
 import { SubmitTaskDrawer } from '@/components/mentee/SubmitTaskDrawer';
+import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,9 +34,11 @@ interface PageProps {
 
 export default function TaskDetailsPage({ params }: PageProps) {
   const resolvedParams = use(params);
+  const router = useRouter();
   const { task, loading, error, refetch } = useTaskDetail(resolvedParams.id);
   const { trackEvent } = useActivityTracker();
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [interviewResultsOpen, setInterviewResultsOpen] = useState(false);
 
   useEffect(() => {
     if (task?.id) {
@@ -85,6 +90,9 @@ export default function TaskDetailsPage({ params }: PageProps) {
   // A mentee can still change their work while it's awaiting review ('submitted')
   // — only a graded/cancelled task is locked. Resubmitting creates a new version.
   const canSubmit = ['in_progress', 'revision_needed', 'assigned', 'submitted'].includes(task.status);
+  // Interview tasks are done in the full-screen runner, not the submit drawer.
+  const isInterview = (task.roadmapTask?.type || task.type) === 'interview';
+  const openInterview = () => router.push(`/mentee/interviews/${task.id}`);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -393,27 +401,59 @@ export default function TaskDetailsPage({ params }: PageProps) {
         <FrictionPanel taskId={task.id} />
       )}
 
-      {/* Action: open the in-context submission drawer if the task needs work */}
-      {canSubmit && (
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={() => setSubmitOpen(true)}
-            className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
-          >
-            {task.status === 'submitted' ? 'Update submission' : task.status === 'revision_needed' ? 'Re-submit Work' : 'Submit Work'}
-          </button>
-          {task.status === 'submitted' && (
-            <p className="text-xs text-slate-400">You can update your work until your mentor reviews it.</p>
-          )}
-        </div>
+      {/* Action: interview tasks launch the runner; everything else uses the drawer */}
+      {isInterview ? (
+        task.status === 'completed' ? (
+          <div className="flex justify-end">
+            <button
+              onClick={() => setInterviewResultsOpen(true)}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
+            >
+              <Mic className="w-4 h-4" /> View interview &amp; feedback
+            </button>
+          </div>
+        ) : task.status !== 'cancelled' && (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={task.status === 'submitted' ? () => setInterviewResultsOpen(true) : openInterview}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
+            >
+              <Mic className="w-4 h-4" />
+              {task.status === 'submitted' ? 'View your answers' : task.status === 'in_progress' ? 'Resume interview' : 'Start interview'}
+            </button>
+            {task.status === 'submitted' && (
+              <p className="text-xs text-slate-400">Your mentor will review your answers.</p>
+            )}
+          </div>
+        )
+      ) : (
+        canSubmit && (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={() => setSubmitOpen(true)}
+              className="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
+            >
+              {task.status === 'submitted' ? 'Update submission' : task.status === 'revision_needed' ? 'Re-submit Work' : 'Submit Work'}
+            </button>
+            {task.status === 'submitted' && (
+              <p className="text-xs text-slate-400">You can update your work until your mentor reviews it.</p>
+            )}
+          </div>
+        )
       )}
 
-      <SubmitTaskDrawer
-        open={submitOpen}
-        task={{ id: task.id, title: taskTitle, status: task.status, deliverable: taskDeliverable, acceptanceCriteria }}
-        onClose={() => setSubmitOpen(false)}
-        onSubmitted={refetch}
-      />
+      {!isInterview && (
+        <SubmitTaskDrawer
+          open={submitOpen}
+          task={{ id: task.id, title: taskTitle, status: task.status, deliverable: taskDeliverable, acceptanceCriteria }}
+          onClose={() => setSubmitOpen(false)}
+          onSubmitted={refetch}
+        />
+      )}
+
+      {isInterview && interviewResultsOpen && (
+        <InterviewReviewDrawer taskId={task.id} onClose={() => setInterviewResultsOpen(false)} />
+      )}
     </div>
   );
 }
