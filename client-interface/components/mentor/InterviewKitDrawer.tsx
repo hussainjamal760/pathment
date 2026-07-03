@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Plus, Trash2, GripVertical, Mic, Code2, Type, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, Plus, Trash2, GripVertical, Mic, Code2, Type, ChevronUp, ChevronDown, Volume2, Play, Square, User } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import {
   interviewApi,
@@ -11,6 +11,7 @@ import {
   type InterviewTimingMode,
 } from '@/lib/services/interview-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
+import { speak, listVoices, VoiceRecorder, recorderSupported } from '@/lib/utils/interviewMedia';
 
 const KIND_META: { kind: InterviewQuestionKind; label: string; icon: typeof Mic }[] = [
   { kind: 'voice', label: 'Voice', icon: Mic },
@@ -57,6 +58,23 @@ export function InterviewKitDrawer({
   const [allowRetakeDefault, setAllowRetakeDefault] = useState(false);
   const [questions, setQuestions] = useState<InterviewQuestionInput[]>([blankQuestion()]);
 
+  // Interviewer identity/voice (TTS): name + pitch + speed + a preferred voice.
+  const [ivName, setIvName] = useState('');
+  const [ivVoice, setIvVoice] = useState('');
+  const [ivPitch, setIvPitch] = useState(1);
+  const [ivRate, setIvRate] = useState(1);
+  const [voices, setVoices] = useState<{ name: string; lang: string }[]>([]);
+
+  // Browser TTS voices load asynchronously — read them now and on voiceschanged.
+  useEffect(() => {
+    const read = () => setVoices(listVoices().filter((v) => /^en/i.test(v.lang)));
+    read();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = read;
+      return () => { window.speechSynthesis.onvoiceschanged = null; };
+    }
+  }, []);
+
   // Load an existing kit for editing.
   useEffect(() => {
     if (!kitId) return;
@@ -75,10 +93,17 @@ export function InterviewKitDrawer({
         setCameraDefault(!!k.cameraDefault);
         setAiGradingDefault(!!k.aiGradingDefault);
         setAllowRetakeDefault(!!k.allowRetakeDefault);
+        const iv = k.settings?.interviewer || {};
+        setIvName(iv.name || '');
+        setIvVoice(iv.voiceName || '');
+        setIvPitch(typeof iv.pitch === 'number' ? iv.pitch : 1);
+        setIvRate(typeof iv.rate === 'number' ? iv.rate : 1);
         setQuestions((k.questions || []).length ? k.questions.map((q: any) => ({
           kind: q.kind, prompt: q.prompt, points: q.points, required: q.required,
           timeLimitSeconds: q.timeLimitSeconds, codeLanguage: q.codeLanguage || undefined,
           starterCode: q.starterCode || '', referenceAnswer: q.referenceAnswer || '',
+          promptAudioUrl: q.config?.promptAudioUrl || null,
+          promptAudioPublicId: q.config?.promptAudioPublicId || null,
         })) : [blankQuestion()]);
       })
       .catch((e: any) => { toast.error(extractApiErrorMessage(e, 'Could not load kit')); onClose(); })
@@ -110,6 +135,11 @@ export function InterviewKitDrawer({
 
   const totalPoints = questions.reduce((s, q) => s + (Number(q.points) || 0), 0);
 
+  const previewVoice = () => {
+    speak(`Hi, I'm ${ivName.trim() || 'your interviewer'}. This is how I'll sound during the interview.`,
+      { pitch: ivPitch, rate: ivRate, voiceName: ivVoice || null });
+  };
+
   const save = async () => {
     if (saving) return;
     if (!title.trim()) { toast.error('Give the kit a title'); return; }
@@ -127,6 +157,7 @@ export function InterviewKitDrawer({
       cameraDefault,
       aiGradingDefault,
       allowRetakeDefault,
+      interviewer: { name: ivName.trim() || null, voiceName: ivVoice || null, pitch: ivPitch, rate: ivRate },
       questions: clean.map((q) => ({
         kind: q.kind,
         prompt: q.prompt,
@@ -136,6 +167,9 @@ export function InterviewKitDrawer({
         codeLanguage: q.kind === 'code' ? (q.codeLanguage || 'javascript') : undefined,
         starterCode: q.kind === 'code' ? (q.starterCode || null) : null,
         referenceAnswer: q.referenceAnswer?.trim() || null,
+        // The mentor's recording (if any) rides in the question config; the
+        // candidate hears it instead of TTS for that question.
+        config: q.promptAudioUrl ? { promptAudioUrl: q.promptAudioUrl, promptAudioPublicId: q.promptAudioPublicId || null } : {},
       })),
     };
 
@@ -236,6 +270,36 @@ export function InterviewKitDrawer({
             </div>
           </div>
 
+          {/* Interviewer voice */}
+          <div>
+            <span className="text-sm font-medium text-slate-700 mb-1.5 inline-flex items-center gap-1.5"><User className="w-4 h-4 text-slate-400" />Interviewer voice</span>
+            <div className="space-y-3 rounded-xl border border-slate-200 p-3.5 bg-slate-50/50">
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-slate-500">Name
+                  <input value={ivName} onChange={(e) => setIvName(e.target.value)} placeholder="e.g. Sheryar" className={`${field} mt-1`} />
+                </label>
+                <label className="text-xs text-slate-500">Voice
+                  <select value={ivVoice} onChange={(e) => setIvVoice(e.target.value)} className={`${field} mt-1`}>
+                    <option value="">Default</option>
+                    {voices.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs text-slate-500">Pitch (frequency) · {ivPitch.toFixed(1)}
+                  <input type="range" min={0} max={2} step={0.1} value={ivPitch} onChange={(e) => setIvPitch(Number(e.target.value))} className="w-full mt-1 accent-brand-600" />
+                </label>
+                <label className="text-xs text-slate-500">Speed · {ivRate.toFixed(1)}×
+                  <input type="range" min={0.5} max={2} step={0.1} value={ivRate} onChange={(e) => setIvRate(Number(e.target.value))} className="w-full mt-1 accent-brand-600" />
+                </label>
+              </div>
+              <button type="button" onClick={previewVoice} className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100">
+                <Volume2 className="w-3.5 h-3.5" /> Preview voice
+              </button>
+              <p className="text-[11px] text-slate-400">Applies to every question. Voice choice is best-effort on the candidate&apos;s device; name, pitch and speed always apply. Record a question below to use your <span className="font-medium">real</span> voice for it.</p>
+            </div>
+          </div>
+
           {/* Questions */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -267,7 +331,13 @@ export function InterviewKitDrawer({
                   </div>
 
                   <textarea value={q.prompt} onChange={(e) => patchQuestion(i, { prompt: e.target.value })} rows={2}
-                    placeholder="The interviewer's question…" className={`${field} mb-2.5`} />
+                    placeholder="The interviewer's question…" className={`${field} mb-2`} />
+
+                  {/* Optional: record this question in your own voice (plays instead of TTS). */}
+                  <PromptRecorder
+                    url={q.promptAudioUrl || null}
+                    onChange={(url, publicId) => patchQuestion(i, { promptAudioUrl: url, promptAudioPublicId: publicId })}
+                  />
 
                   {q.kind === 'code' && (
                     <div className="grid grid-cols-2 gap-2 mb-2.5">
@@ -309,6 +379,66 @@ export function InterviewKitDrawer({
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** Record the mentor's own voice for a question prompt, upload it, and hand back
+ *  the stored URL (played to the candidate instead of TTS for that question). */
+function PromptRecorder({ url, onChange }: { url: string | null; onChange: (url: string | null, publicId?: string | null) => void }) {
+  const [recording, setRecording] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const recRef = useRef<VoiceRecorder | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  if (!recorderSupported()) return null;
+
+  const start = async () => {
+    const rec = new VoiceRecorder();
+    const ok = await rec.start();
+    if (!ok) { toast.error('Microphone access is needed to record.'); return; }
+    recRef.current = rec;
+    setRecording(true);
+  };
+
+  const stop = async () => {
+    const blob = await recRef.current?.stop();
+    setRecording(false);
+    if (!blob) return;
+    setUploading(true);
+    try {
+      const res: any = await interviewApi.uploadPromptAudio(blob);
+      onChange(res?.data?.url || null, res?.data?.publicId || null);
+      toast.success('Recording saved');
+    } catch (e: any) {
+      toast.error(extractApiErrorMessage(e, 'Could not upload the recording'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const play = () => { if (url) { audioRef.current = new Audio(url); audioRef.current.play().catch(() => {}); } };
+
+  return (
+    <div className="flex items-center flex-wrap gap-2 mb-2.5">
+      {recording ? (
+        <button type="button" onClick={stop} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-red-500 text-white animate-pulse">
+          <Square className="w-3.5 h-3.5" />Stop &amp; save
+        </button>
+      ) : (
+        <button type="button" onClick={start} disabled={uploading}
+          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 disabled:opacity-50">
+          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+          {url ? 'Re-record in your voice' : 'Record in your voice'}
+        </button>
+      )}
+      {url && !recording && (
+        <>
+          <button type="button" onClick={play} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"><Play className="w-3.5 h-3.5" />Play</button>
+          <button type="button" onClick={() => onChange(null, null)} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" />Remove</button>
+          <span className="text-[11px] text-emerald-600">Your voice will play for this question</span>
+        </>
+      )}
+    </div>
   );
 }
 

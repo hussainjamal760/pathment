@@ -21,17 +21,24 @@ export const recorderSupported = () =>
   typeof window !== 'undefined' && typeof (window as any).MediaRecorder !== 'undefined' &&
   !!navigator.mediaDevices?.getUserMedia;
 
-/** Speak a prompt aloud. Resolves when finished (or immediately if unsupported). */
-export function speak(text: string, opts: { rate?: number; onStart?: () => void; onEnd?: () => void } = {}): void {
+/** Speak a prompt aloud. Resolves when finished (or immediately if unsupported).
+ *  `pitch` (0–2) and `rate` (0.5–2) always apply; `voiceName` is best-effort —
+ *  the mentor's chosen voice may not exist on the candidate's device, so we match
+ *  by name then fall back to a natural English voice. */
+export function speak(
+  text: string,
+  opts: { rate?: number; pitch?: number; voiceName?: string | null; onStart?: () => void; onEnd?: () => void } = {},
+): void {
   if (!speechSupported() || !text) { opts.onStart?.(); opts.onEnd?.(); return; }
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = opts.rate ?? 1;
-    u.pitch = 1;
-    // Prefer a natural English voice when available.
+    u.pitch = opts.pitch ?? 1;
     const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|daniel/i.test(v.name))
+    const chosen = opts.voiceName ? voices.find((v) => v.name === opts.voiceName) : null;
+    const preferred = chosen
+      || voices.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|daniel/i.test(v.name))
       || voices.find((v) => /^en/i.test(v.lang));
     if (preferred) u.voice = preferred;
     if (opts.onStart) u.onstart = opts.onStart;
@@ -43,6 +50,14 @@ export function speak(text: string, opts: { rate?: number; onStart?: () => void;
     opts.onStart?.();
     opts.onEnd?.();
   }
+}
+
+/** List available TTS voices (for the mentor's picker). May be empty until the
+ *  browser loads them — the caller should also listen to `voiceschanged`. */
+export function listVoices(): { name: string; lang: string }[] {
+  if (!speechSupported()) return [];
+  try { return window.speechSynthesis.getVoices().map((v) => ({ name: v.name, lang: v.lang })); }
+  catch { return []; }
 }
 
 export function stopSpeaking(): void {

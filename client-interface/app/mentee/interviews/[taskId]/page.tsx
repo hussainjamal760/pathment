@@ -24,7 +24,7 @@ import { setActiveInterview, clearActiveInterview } from '@/lib/utils/activeInte
 type Phase = 'loading' | 'intro' | 'lobby' | 'countdown' | 'active' | 'submitting' | 'done' | 'error';
 interface Draft { transcript: string; code: string; answerText: string; seconds: number; audioBlob: Blob | null }
 
-const INTERVIEWER = 'Aria';
+const DEFAULT_NAME = 'Aria';
 const STUDIO = 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950';
 
 export default function InterviewRunnerPage({ params }: { params: Promise<{ taskId: string }> }) {
@@ -61,11 +61,14 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const clockSkewRef = useRef(0);
   const pendingAudioRef = useRef<Map<string, Blob>>(new Map());
   const finishingRef = useRef(false);
+  const promptAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const questions = data?.questions ?? [];
   const q: CandidateQuestion | undefined = questions[idx];
   const draft = q ? drafts[q.id] : undefined;
   const cameraRequired = !!data?.options.cameraRequired;
+  const interviewerName = data?.interviewer?.name || DEFAULT_NAME;
+  const ttsOpts = { pitch: data?.interviewer?.pitch, rate: data?.interviewer?.rate, voiceName: data?.interviewer?.voiceName };
 
   // Live mic level: the preview stream in the green room, the recorder stream while
   // answering by voice.
@@ -200,13 +203,37 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, sessionStartedAt]);
 
-  // Speak the prompt when arriving at a question (animates the interviewer).
-  useEffect(() => {
-    if (phase === 'active' && q) {
+  // Stop any interviewer audio/TTS in flight.
+  const stopAsking = () => {
+    stopSpeaking();
+    if (promptAudioRef.current) { try { promptAudioRef.current.pause(); } catch { /* noop */ } promptAudioRef.current = null; }
+    setSpeaking(false);
+  };
+
+  // Ask a question: play the mentor's own recording if there is one, else read it
+  // aloud with the kit's interviewer voice (name/pitch/speed/voice). Falls back to
+  // TTS if the recording can't play.
+  const askQuestion = (question: CandidateQuestion) => {
+    stopSpeaking();
+    if (promptAudioRef.current) { try { promptAudioRef.current.pause(); } catch { /* noop */ } promptAudioRef.current = null; }
+    if (question.promptAudioUrl) {
+      const el = new Audio(question.promptAudioUrl);
+      promptAudioRef.current = el;
       setSpeaking(true);
-      speak(q.prompt, { onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
+      el.onended = () => setSpeaking(false);
+      const fallback = () => { setSpeaking(false); speak(question.prompt, { ...ttsOpts, onEnd: () => setSpeaking(false) }); };
+      el.onerror = fallback;
+      el.play().catch(fallback);
+    } else {
+      setSpeaking(true);
+      speak(question.prompt, { ...ttsOpts, onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
     }
-    return () => { stopSpeaking(); setSpeaking(false); };
+  };
+
+  // Ask the prompt when arriving at a question (animates the interviewer).
+  useEffect(() => {
+    if (phase === 'active' && q) askQuestion(q);
+    return () => { stopAsking(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, idx]);
 
@@ -296,8 +323,8 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
 
   const testVoice = () => {
     setSpeaking(true);
-    speak(`Hi, I'm ${INTERVIEWER}, your interviewer. When you're ready, click I'm ready to begin.`, {
-      onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false),
+    speak(`Hi, I'm ${interviewerName}, your interviewer. When you're ready, click I'm ready to begin.`, {
+      ...ttsOpts, onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false),
     });
   };
 
@@ -374,7 +401,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const advance = async (auto = false) => {
     if (advancing || finishingRef.current) return;
     setAdvancing(true);
-    stopSpeaking();
+    stopAsking();
     try {
       if (idx < questions.length - 1) {
         await persistCurrent();
@@ -392,7 +419,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     if (!sessionId || finishingRef.current) return;
     finishingRef.current = true;
     setPhase('submitting');
-    stopSpeaking();
+    stopAsking();
     try {
       await persistCurrent();
       await flushPendingAudio(sessionId);
@@ -412,6 +439,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   // Cleanup media on unmount.
   useEffect(() => () => {
     stopSpeaking();
+    promptAudioRef.current?.pause();
     recognizerRef.current?.stop();
     camStreamRef.current?.getTracks().forEach((t) => t.stop());
     previewRef.current?.getTracks().forEach((t) => t.stop());
@@ -454,7 +482,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
             <CheckCircle2 className="w-9 h-9 text-emerald-400" />
           </div>
           <h1 className="text-xl font-semibold text-slate-100">Interview submitted</h1>
-          <p className="text-slate-400 mt-2">Nice work. {INTERVIEWER}&apos;s done — your mentor will review your answers and share feedback on your task page.</p>
+          <p className="text-slate-400 mt-2">Nice work. {interviewerName}&apos;s done — your mentor will review your answers and share feedback on your task page.</p>
           <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-6 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium">Back to task</button>
         </div>
       </Stage>
@@ -470,9 +498,9 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       <Stage>
         <div className="max-w-lg w-full">
           <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-8 text-center">
-            <div className="flex justify-center mb-4"><InterviewerOrb speaking={false} size={64} name={INTERVIEWER} /></div>
+            <div className="flex justify-center mb-4"><InterviewerOrb speaking={false} size={64} name={interviewerName} /></div>
             <h1 className="text-xl font-semibold text-slate-100">{data?.kit.title}</h1>
-            <p className="text-slate-400 mt-1.5 text-sm">Meet <span className="text-brand-300 font-medium">{INTERVIEWER}</span>, your interviewer.{data?.kit.description ? ` ${data.kit.description}` : ''}</p>
+            <p className="text-slate-400 mt-1.5 text-sm">Meet <span className="text-brand-300 font-medium">{interviewerName}</span>, your interviewer.{data?.kit.description ? ` ${data.kit.description}` : ''}</p>
 
             <div className="flex items-center justify-center gap-5 mt-5 text-sm text-slate-300">
               <span>{questions.length} question{questions.length === 1 ? '' : 's'}</span>
@@ -481,7 +509,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
             </div>
 
             <ul className="text-left text-sm text-slate-300 mt-6 space-y-2 bg-slate-900/50 rounded-xl p-4 border border-slate-700/60">
-              <li className="flex gap-2"><Volume2 className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />{INTERVIEWER} reads each question aloud, like a real interviewer.</li>
+              <li className="flex gap-2"><Volume2 className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />{interviewerName} reads each question aloud, like a real interviewer.</li>
               <li className="flex gap-2"><Mic className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />You answer by voice — we transcribe and keep your recording.</li>
               {cameraRequired && <li className="flex gap-2"><Video className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />Your camera stays on during the interview.</li>}
               <li className="flex gap-2"><ArrowRight className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />You can&apos;t go back to a question once you move on.</li>
@@ -513,10 +541,10 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       <Stage>
         <div className="max-w-md w-full rounded-2xl border border-slate-700 bg-slate-800/50 p-6">
           <div className="flex items-center gap-3 mb-4">
-            <InterviewerOrb speaking={speaking} level={0} size={56} name={INTERVIEWER} />
+            <InterviewerOrb speaking={speaking} level={0} size={56} name={interviewerName} />
             <div>
               <h1 className="text-slate-100 font-semibold">Let’s check your setup</h1>
-              <p className="text-slate-400 text-sm">{INTERVIEWER} will meet you on the other side.</p>
+              <p className="text-slate-400 text-sm">{interviewerName} will meet you on the other side.</p>
             </div>
           </div>
 
@@ -529,7 +557,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
           <div className="mt-4 space-y-3">
             <MicCheck level={level} heard={micHeard} />
             <button onClick={testVoice} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-600 text-slate-200 text-sm hover:bg-slate-700/40">
-              <Volume2 className="w-4 h-4" /> Test {INTERVIEWER}’s voice
+              <Volume2 className="w-4 h-4" /> Test {interviewerName}’s voice
             </button>
           </div>
 
@@ -557,7 +585,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     return (
       <Stage>
         <div className="text-center">
-          <InterviewerOrb speaking level={0} size={96} name={INTERVIEWER} />
+          <InterviewerOrb speaking level={0} size={96} name={interviewerName} />
           <p className="text-slate-300 mt-6">Get ready…</p>
           <div key={countdownN} className="text-7xl font-bold text-white mt-1 tabular-nums" style={{ animation: 'intvPop .5s ease' }}>
             {countdownN > 0 ? countdownN : 'Go'}
@@ -616,13 +644,13 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         <div key={idx} className="max-w-3xl mx-auto px-6 py-8" style={{ animation: 'intvIn .35s ease' }}>
           {/* Interviewer asking */}
           <div className="flex items-start gap-4 mb-7">
-            <InterviewerOrb speaking={speaking} level={recording ? level : 0} name={INTERVIEWER} />
+            <InterviewerOrb speaking={speaking} level={recording ? level : 0} name={interviewerName} />
             <div className="min-w-0">
               <div className="text-[11px] uppercase tracking-wide font-medium text-brand-300 mb-1">
-                {speaking ? `${INTERVIEWER} is asking…` : 'Your turn'}
+                {speaking ? `${interviewerName} is asking…` : 'Your turn'}
               </div>
               <h1 className="text-lg sm:text-xl font-medium text-slate-50 leading-relaxed">{q?.prompt}</h1>
-              <button onClick={() => { if (q) { setSpeaking(true); speak(q.prompt, { onEnd: () => setSpeaking(false) }); } }}
+              <button onClick={() => { if (q) askQuestion(q); }}
                 className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-brand-300">
                 <Volume2 className="w-3.5 h-3.5" /> Replay question
               </button>

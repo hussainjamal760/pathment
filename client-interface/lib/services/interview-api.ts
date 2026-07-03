@@ -15,7 +15,16 @@ export interface InterviewQuestionInput {
   codeLanguage?: string;
   starterCode?: string | null;
   referenceAnswer?: string | null;
+  promptAudioUrl?: string | null;
+  promptAudioPublicId?: string | null;
   config?: Record<string, unknown>;
+}
+
+export interface InterviewerSettings {
+  name: string | null;
+  voiceName: string | null;
+  pitch: number; // 0–2
+  rate: number;  // 0.5–2
 }
 
 export interface InterviewKitInput {
@@ -27,6 +36,7 @@ export interface InterviewKitInput {
   aiGradingDefault?: boolean;
   allowRetakeDefault?: boolean;
   status?: InterviewKitStatus;
+  interviewer?: Partial<InterviewerSettings>;
   questions?: InterviewQuestionInput[];
 }
 
@@ -75,6 +85,7 @@ export interface CandidateQuestion {
   required: boolean;
   codeLanguage: string | null;
   starterCode: string | null;
+  promptAudioUrl: string | null;
 }
 
 export interface SavedAnswer {
@@ -90,6 +101,7 @@ export interface SavedAnswer {
 export interface CandidateInterview {
   task: { id: string; status: string; dueDate: string | null };
   kit: { id: string; title: string; description: string | null; totalPoints: number };
+  interviewer: InterviewerSettings | null;
   options: {
     allowRetake: boolean;
     cameraRequired: boolean;
@@ -132,6 +144,11 @@ export const interviewApi = {
   createKit: (data: InterviewKitInput) => apiClient.post('/interviews/kits', data),
   updateKit: (id: string, data: Partial<InterviewKitInput>) => apiClient.patch(`/interviews/kits/${id}`, data),
   deleteKit: (id: string) => apiClient.delete(`/interviews/kits/${id}`),
+  uploadPromptAudio: (blob: Blob) => {
+    const fd = new FormData();
+    fd.append('audio', blob, 'prompt.webm');
+    return apiClient.post('/interviews/kits/prompt-audio', fd);
+  },
 
   // Candidate runner
   getCandidateInterview: (taskId: string) => apiClient.get(`/interviews/assignments/${taskId}`),
