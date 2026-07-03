@@ -178,6 +178,10 @@ export default function MenteeTasks() {
                 <div className="divide-y divide-slate-100">
                   {(groupTasks as any[]).map((task) => {
                     const overdue = isOverdue(task.dueDate) && !['completed', 'submitted'].includes(task.status);
+                    // Interview tasks run in a dedicated full-screen flow — never the
+                    // generic start/submit path (which opens the submit drawer).
+                    const isInterview = (task.roadmapTask?.type || task.type) === 'interview';
+                    const interviewHref = `/mentee/interviews/${task.id}`;
 
                     return (
                 <div key={task.id} className="p-6 hover:bg-slate-50 transition-colors w-full overflow-hidden">
@@ -255,29 +259,47 @@ export default function MenteeTasks() {
                       </div>
                       
                       {task.status === 'assigned' && (
-                        <button
-                          onClick={() => handleStartTask(task.id)}
-                          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
-                        >
-                          Start Task
-                        </button>
+                        isInterview ? (
+                          <button
+                            onClick={() => router.push(interviewHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Start interview
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStartTask(task.id)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Start Task
+                          </button>
+                        )
                       )}
-                      
+
                       {(task.status === 'in_progress' || task.status === 'revision_needed') && (
-                        <button
-                          onClick={() => setSubmitTarget({
-                            id: task.id,
-                            title: task.roadmapTask?.title || 'Task',
-                            status: task.status,
-                            deliverable: task.roadmapTask?.deliverable,
-                            acceptanceCriteria: task.roadmapTask?.acceptanceCriteria || [],
-                          })}
-                          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
-                        >
-                          Submit Work
-                        </button>
+                        isInterview ? (
+                          <button
+                            onClick={() => router.push(interviewHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Resume interview
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setSubmitTarget({
+                              id: task.id,
+                              title: task.roadmapTask?.title || 'Task',
+                              status: task.status,
+                              deliverable: task.roadmapTask?.deliverable,
+                              acceptanceCriteria: task.roadmapTask?.acceptanceCriteria || [],
+                            })}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Submit Work
+                          </button>
+                        )
                       )}
-                      
+
                       {task.status === 'submitted' && (
                         <span className="text-slate-600 text-sm shrink-0">
                           Awaiting review
