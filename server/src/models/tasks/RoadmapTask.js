@@ -25,8 +25,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         // 'assignment' added to match the new-design TaskType
-        // (assignment/project/quiz/reading/video/discussion).
-        isIn: [['reading', 'video', 'exercise', 'project', 'quiz', 'discussion', 'practical', 'assessment', 'custom', 'assignment']]
+        // (assignment/project/quiz/reading/video/discussion). 'interview' =
+        // structured voice/code/text interview backed by an InterviewKit.
+        isIn: [['reading', 'video', 'exercise', 'project', 'quiz', 'discussion', 'practical', 'assessment', 'custom', 'assignment', 'interview']]
       }
     },
     difficulty: {
