@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Mic, MicOff, Loader2, ArrowRight, CheckCircle2, Video, Volume2,
-  Code2, Type, AlertTriangle, Play, RotateCcw, Maximize2, Eye,
+  Code2, Type, AlertTriangle, Play, RotateCcw, Maximize2, Eye, ShieldCheck,
 } from 'lucide-react';
 import {
   interviewApi, type CandidateInterview, type CandidateQuestion,
@@ -13,14 +13,19 @@ import {
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import {
   speak, stopSpeaking, createRecognizer, VoiceRecorder,
-  recognitionSupported, recorderSupported, fmtClock,
+  recognitionSupported, recorderSupported,
 } from '@/lib/utils/interviewMedia';
 import { useProctor } from '@/lib/hooks/mentee/useProctor';
+import { useAudioLevel } from '@/lib/hooks/mentee/useAudioLevel';
 import { CodeEditor } from '@/components/shared/CodeEditor';
+import { InterviewerOrb, Waveform, RingTimer, MicCheck } from '@/components/mentee/interviewStudio';
 import { setActiveInterview, clearActiveInterview } from '@/lib/utils/activeInterview';
 
-type Phase = 'loading' | 'intro' | 'active' | 'submitting' | 'done' | 'error';
+type Phase = 'loading' | 'intro' | 'lobby' | 'countdown' | 'active' | 'submitting' | 'done' | 'error';
 interface Draft { transcript: string; code: string; answerText: string; seconds: number; audioBlob: Blob | null }
+
+const INTERVIEWER = 'Aria';
+const STUDIO = 'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950';
 
 export default function InterviewRunnerPage({ params }: { params: Promise<{ taskId: string }> }) {
   const { taskId } = use(params);
@@ -38,29 +43,40 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const [remaining, setRemaining] = useState<number | null>(null);
   const [totalRemaining, setTotalRemaining] = useState<number | null>(null);
   const [advancing, setAdvancing] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  // Green room / countdown / live meter.
+  const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
+  const [recordingStream, setRecordingStream] = useState<MediaStream | null>(null);
+  const [micHeard, setMicHeard] = useState(false);
+  const [countdownN, setCountdownN] = useState(3);
 
   const recorderRef = useRef<VoiceRecorder | null>(null);
   const recognizerRef = useRef<ReturnType<typeof createRecognizer>>(null);
   const camStreamRef = useRef<MediaStream | null>(null);
+  const previewRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const lobbyVideoRef = useRef<HTMLVideoElement | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Server clock minus local clock (ms) so all wall-clock deadlines are immune to
-  // a wrong local clock. Set from the load response and refreshed on each start.
   const clockSkewRef = useRef(0);
-  // Audio blobs still trying to upload, keyed by questionId (background retry).
   const pendingAudioRef = useRef<Map<string, Blob>>(new Map());
   const finishingRef = useRef(false);
 
   const questions = data?.questions ?? [];
   const q: CandidateQuestion | undefined = questions[idx];
   const draft = q ? drafts[q.id] : undefined;
+  const cameraRequired = !!data?.options.cameraRequired;
 
-  // Proctoring — active only while the interview is running.
+  // Live mic level: the preview stream in the green room, the recorder stream while
+  // answering by voice.
+  const meterStream = phase === 'lobby' ? previewStream : (recording ? recordingStream : null);
+  const level = useAudioLevel(meterStream);
+
   const proctor = useProctor({
     sessionId,
     active: phase === 'active',
     videoRef,
-    cameraRequired: !!data?.options.cameraRequired,
+    cameraRequired,
   });
 
   // ── Load ───────────────────────────────────────────────────────────────────
@@ -73,9 +89,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         setData(d);
         if (d?.serverNow) clockSkewRef.current = Date.parse(d.serverNow) - Date.now();
         setSessionStartedAt(d?.state?.sessionStartedAt || null);
-        // Clear a stale "resume" marker if this interview is no longer resumable.
         if (!d?.state?.activeSessionId) clearActiveInterview();
-        // Seed drafts from any saved answers (resume).
         const seed: Record<string, Draft> = {};
         d.questions.forEach((qq) => {
           const saved = d.state.savedAnswers.find((a) => a.questionId === qq.id);
@@ -94,21 +108,23 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     return () => { active = false; };
   }, [taskId]);
 
-  // ── Camera preview (when required) ───────────────────────────────────────────
-  const startCamera = useCallback(async () => {
-    if (!data?.options.cameraRequired) return true;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false });
-      camStreamRef.current = stream;
-      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
-      return true;
-    } catch {
-      toast.error('Camera access is required for this interview. Please allow it and retry.');
-      return false;
-    }
-  }, [data?.options.cameraRequired]);
+  // Keep a ref of the preview stream so we can stop it on unmount.
+  useEffect(() => { previewRef.current = previewStream; }, [previewStream]);
 
-  // Attach the stream once the <video> mounts in the active phase.
+  // Attach the preview stream to the green-room <video>.
+  useEffect(() => {
+    if (phase === 'lobby' && lobbyVideoRef.current && previewStream) {
+      lobbyVideoRef.current.srcObject = previewStream;
+      lobbyVideoRef.current.play().catch(() => {});
+    }
+  }, [phase, previewStream]);
+
+  // Register "mic works" once the level crosses a small threshold in the lobby.
+  useEffect(() => {
+    if (phase === 'lobby' && level > 0.08) setMicHeard(true);
+  }, [phase, level]);
+
+  // Attach the session camera stream to the PiP <video> when active.
   useEffect(() => {
     if (phase === 'active' && videoRef.current && camStreamRef.current) {
       videoRef.current.srcObject = camStreamRef.current;
@@ -117,8 +133,6 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   }, [phase]);
 
   // ── Per-question timer (wall-clock, server-authoritative) ────────────────────
-  // The deadline is the question's server start + its limit. Refreshing/resuming
-  // continues the real countdown instead of restarting it.
   useEffect(() => {
     if (phase !== 'active' || !q || !sessionId) return;
     if (data?.options.timingMode !== 'per_question') { setRemaining(null); return; }
@@ -129,7 +143,6 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     let interval: ReturnType<typeof setInterval> | null = null;
 
     (async () => {
-      // Authoritative start from the server (idempotent — safe to call on resume).
       let startedAtMs = Date.now();
       let skew = clockSkewRef.current;
       try {
@@ -165,7 +178,6 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   }, [phase, idx, sessionId]);
 
   // ── Global total timer (only in 'total' timing mode) ─────────────────────────
-  // Runs off the session's server start, so it survives reloads too.
   useEffect(() => {
     if (phase !== 'active' || data?.options.timingMode !== 'total') return;
     const total = data?.options.totalSeconds;
@@ -188,10 +200,13 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, sessionStartedAt]);
 
-  // Speak the prompt when arriving at a question.
+  // Speak the prompt when arriving at a question (animates the interviewer).
   useEffect(() => {
-    if (phase === 'active' && q) speak(q.prompt);
-    return () => stopSpeaking();
+    if (phase === 'active' && q) {
+      setSpeaking(true);
+      speak(q.prompt, { onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false) });
+    }
+    return () => { stopSpeaking(); setSpeaking(false); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, idx]);
 
@@ -224,7 +239,6 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
       }
     }
-    // Leave it in the queue — flushPendingAudio() gives it one more try at submit.
     return false;
   }, []);
 
@@ -245,9 +259,10 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       recognizerRef.current?.stop();
       const blob = await recorderRef.current?.stop();
       setRecording(false);
+      setRecordingStream(null);
       if (blob) {
         setDrafts((prev) => ({ ...prev, [q.id]: { ...prev[q.id], audioBlob: blob } }));
-        if (sessionId) uploadAudioBg(sessionId, q.id, blob); // start uploading right away
+        if (sessionId) uploadAudioBg(sessionId, q.id, blob);
       }
       return;
     }
@@ -255,14 +270,62 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     const ok = await rec.start();
     if (!ok) { toast.error('Microphone access is needed to answer by voice.'); return; }
     recorderRef.current = rec;
+    setRecordingStream(rec.getStream());
     recognizerRef.current = createRecognizer((text) => queueSave(q.id, { transcript: text }));
     recognizerRef.current?.start();
     setRecording(true);
   };
 
-  // ── Start / advance / submit ─────────────────────────────────────────────────
+  // ── Green room → countdown → start ───────────────────────────────────────────
+  const enterLobby = async () => {
+    setPhase('lobby');
+    setMicHeard(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setPreviewStream(stream);
+    } catch {
+      if (!cameraRequired) {
+        try { setPreviewStream(await navigator.mediaDevices.getUserMedia({ audio: true })); }
+        catch { setPreviewStream(null); }
+      } else {
+        toast.error('Camera + microphone access is required. Please allow them and retry.');
+        setPreviewStream(null);
+      }
+    }
+  };
+
+  const testVoice = () => {
+    setSpeaking(true);
+    speak(`Hi, I'm ${INTERVIEWER}, your interviewer. When you're ready, click I'm ready to begin.`, {
+      onStart: () => setSpeaking(true), onEnd: () => setSpeaking(false),
+    });
+  };
+
+  const startFromLobby = async () => {
+    // Keep the camera video track for the session; drop preview audio (the recorder
+    // reopens the mic per answer).
+    if (previewStream) {
+      const vids = previewStream.getVideoTracks();
+      previewStream.getAudioTracks().forEach((t) => t.stop());
+      if (vids.length && cameraRequired) camStreamRef.current = new MediaStream(vids);
+      else vids.forEach((t) => t.stop());
+    }
+    setPreviewStream(null);
+    await proctor.requestFullscreen(); // must ride this user gesture
+    setCountdownN(3);
+    setPhase('countdown');
+  };
+
+  // Drive the 3-2-1 and then actually start the session.
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    if (countdownN <= 0) { begin(); return; }
+    const t = setTimeout(() => setCountdownN((n) => n - 1), 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, countdownN]);
+
   const begin = async () => {
-    if (!(await startCamera())) return;
     try {
       const res: any = await interviewApi.startInterview(taskId);
       const session = res?.data?.session;
@@ -270,8 +333,8 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       const startedAt = session?.startedAt || sessionStartedAt;
       setSessionStartedAt(startedAt || null);
       finishingRef.current = false;
-      // Mark the interview live so the floating resume bar can nudge them back if
-      // they wander off. Total-time interviews carry a client-epoch deadline.
+      const resumeIdx = Math.min(Math.max(0, data?.state.currentPosition ?? 0), questions.length - 1);
+      setIdx(resumeIdx);
       const deadlineTs = (data?.options.timingMode === 'total' && startedAt && data?.options.totalSeconds)
         ? Date.parse(startedAt) + data.options.totalSeconds * 1000 - clockSkewRef.current
         : null;
@@ -281,25 +344,22 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         timingMode: data?.options.timingMode || 'per_question',
         deadlineTs,
       });
-      // Resume where they left off (never back to Q1), clamped to range.
-      const resumeIdx = Math.min(Math.max(0, data?.state.currentPosition ?? 0), questions.length - 1);
-      setIdx(resumeIdx);
       setPhase('active');
-      await proctor.requestFullscreen(); // best-effort fullscreen lock
     } catch (e: any) {
       toast.error(extractApiErrorMessage(e, 'Could not start the interview'));
+      setPhase('lobby');
     }
   };
 
   const persistCurrent = async () => {
     if (!q || !sessionId) return;
     const d = drafts[q.id];
-    // Stop any in-flight recording first so we capture the final blob.
     let blob = d?.audioBlob || null;
     if (recording) {
       recognizerRef.current?.stop();
       blob = (await recorderRef.current?.stop()) || blob;
       setRecording(false);
+      setRecordingStream(null);
     }
     await interviewApi.saveAnswer(sessionId, {
       questionId: q.id,
@@ -308,8 +368,6 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       answerText: d?.answerText || null,
       timeSpentSeconds: d?.seconds || 0,
     }).catch(() => {});
-    // Fire-and-forget: audio uploads in the background with retries; advancing
-    // never waits on it (a slow/dropped upload can't stall the interview).
     if (blob) uploadAudioBg(sessionId, q.id, blob);
   };
 
@@ -333,14 +391,14 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const finish = async () => {
     if (!sessionId || finishingRef.current) return;
     finishingRef.current = true;
-    setPhase('submitting'); // stops the timers immediately (effect cleanup)
+    setPhase('submitting');
     stopSpeaking();
     try {
-      await persistCurrent();          // save the final answer (kick off its audio)
-      await flushPendingAudio(sessionId); // one last try for any pending audio
-      await proctor.flush();           // push buffered proctor events
+      await persistCurrent();
+      await flushPendingAudio(sessionId);
+      await proctor.flush();
       await interviewApi.submitInterview(sessionId);
-      clearActiveInterview(); // dismiss the floating resume bar
+      clearActiveInterview();
       camStreamRef.current?.getTracks().forEach((t) => t.stop());
       if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       setPhase('done');
@@ -356,142 +414,196 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     stopSpeaking();
     recognizerRef.current?.stop();
     camStreamRef.current?.getTracks().forEach((t) => t.stop());
+    previewRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
   // ── Renders ──────────────────────────────────────────────────────────────────
   if (phase === 'loading') {
-    return <Centered><Loader2 className="w-7 h-7 animate-spin text-slate-300" /></Centered>;
+    return <Stage><Loader2 className="w-7 h-7 animate-spin text-slate-500" /></Stage>;
   }
 
   if (phase === 'submitting') {
     return (
-      <Centered>
+      <Stage>
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-brand-500 mx-auto mb-3" />
-          <p className="text-slate-700 font-medium">Submitting your interview…</p>
+          <Loader2 className="w-8 h-8 animate-spin text-brand-400 mx-auto mb-3" />
+          <p className="text-slate-100 font-medium">Submitting your interview…</p>
           <p className="text-slate-400 text-sm mt-1">Saving your answers and recordings.</p>
         </div>
-      </Centered>
+      </Stage>
     );
   }
 
   if (phase === 'error') {
     return (
-      <Centered>
+      <Stage>
         <div className="text-center max-w-sm">
-          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-slate-900 font-medium">{errorMsg}</p>
+          <AlertTriangle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+          <p className="text-slate-100 font-medium">{errorMsg}</p>
           <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm">Back to task</button>
         </div>
-      </Centered>
+      </Stage>
     );
   }
 
   if (phase === 'done') {
     return (
-      <Centered>
+      <Stage>
         <div className="text-center max-w-md">
-          <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-9 h-9 text-emerald-600" />
+          <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center mx-auto mb-4">
+            <CheckCircle2 className="w-9 h-9 text-emerald-400" />
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">Interview submitted</h1>
-          <p className="text-slate-500 mt-2">Nice work. Your mentor will review your answers and share feedback. You&apos;ll see it on your task page.</p>
+          <h1 className="text-xl font-semibold text-slate-100">Interview submitted</h1>
+          <p className="text-slate-400 mt-2">Nice work. {INTERVIEWER}&apos;s done — your mentor will review your answers and share feedback on your task page.</p>
           <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-6 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium">Back to task</button>
         </div>
-      </Centered>
+      </Stage>
     );
   }
 
+  // ── Intro (overview) ─────────────────────────────────────────────────────────
   if (phase === 'intro') {
     const submittedBefore = (data?.state.submittedCount || 0) > 0;
     const resuming = !!data?.state.activeSessionId;
     const cannot = !data?.state.canStart && !resuming;
     return (
-      <Centered>
+      <Stage>
         <div className="max-w-lg w-full">
-          <div className="rounded-2xl border border-slate-200 bg-card p-8 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-4">
-              <Mic className="w-7 h-7 text-brand-600" />
-            </div>
-            <h1 className="text-xl font-semibold text-slate-900">{data?.kit.title}</h1>
-            {data?.kit.description && <p className="text-slate-500 mt-1.5">{data.kit.description}</p>}
+          <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-8 text-center">
+            <div className="flex justify-center mb-4"><InterviewerOrb speaking={false} size={64} name={INTERVIEWER} /></div>
+            <h1 className="text-xl font-semibold text-slate-100">{data?.kit.title}</h1>
+            <p className="text-slate-400 mt-1.5 text-sm">Meet <span className="text-brand-300 font-medium">{INTERVIEWER}</span>, your interviewer.{data?.kit.description ? ` ${data.kit.description}` : ''}</p>
 
-            <div className="flex items-center justify-center gap-5 mt-5 text-sm text-slate-600">
+            <div className="flex items-center justify-center gap-5 mt-5 text-sm text-slate-300">
               <span>{questions.length} question{questions.length === 1 ? '' : 's'}</span>
               <span className="tabular-nums">{data?.kit.totalPoints} pts</span>
               <span>{data?.options.timingMode === 'total' ? `${Math.round((data?.options.totalSeconds || 0) / 60)} min total` : 'Timed per question'}</span>
             </div>
 
-            <ul className="text-left text-sm text-slate-600 mt-6 space-y-2 bg-slate-50 rounded-xl p-4">
-              <li className="flex gap-2"><Volume2 className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />Each question is read aloud, like a real interviewer.</li>
-              <li className="flex gap-2"><Mic className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />Answer by voice — we transcribe and keep your recording.</li>
-              {data?.options.cameraRequired && <li className="flex gap-2"><Video className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />Your camera stays on during the interview.</li>}
-              <li className="flex gap-2"><ArrowRight className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />You can&apos;t go back to a question once you move on.</li>
-              <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />The clock runs continuously once you start. Refreshing, closing the app, or losing power/internet will <strong>not</strong> pause it — make sure your power and connection are stable.</li>
-              {!data?.options.allowRetake && <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />One attempt only — make it count.</li>}
+            <ul className="text-left text-sm text-slate-300 mt-6 space-y-2 bg-slate-900/50 rounded-xl p-4 border border-slate-700/60">
+              <li className="flex gap-2"><Volume2 className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />{INTERVIEWER} reads each question aloud, like a real interviewer.</li>
+              <li className="flex gap-2"><Mic className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />You answer by voice — we transcribe and keep your recording.</li>
+              {cameraRequired && <li className="flex gap-2"><Video className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />Your camera stays on during the interview.</li>}
+              <li className="flex gap-2"><ArrowRight className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />You can&apos;t go back to a question once you move on.</li>
+              <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />The clock runs continuously once you start. Refreshing, closing, or losing power/internet will <strong>not</strong> pause it — make sure your power and connection are stable.</li>
+              {!data?.options.allowRetake && <li className="flex gap-2"><AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />One attempt only — make it count.</li>}
             </ul>
-
-            {!recognitionSupported() && (
-              <p className="text-xs text-amber-600 mt-4">Live transcription isn&apos;t supported in this browser — your audio is still recorded for your mentor.</p>
-            )}
 
             {cannot ? (
               <div className="mt-6">
-                <p className="text-sm text-slate-500">{submittedBefore ? 'You’ve already completed this interview.' : 'This interview isn’t available.'}</p>
-                <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-4 px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm">Back to task</button>
+                <p className="text-sm text-slate-400">{submittedBefore ? 'You’ve already completed this interview.' : 'This interview isn’t available.'}</p>
+                <button onClick={() => router.push(`/mentee/tasks/${taskId}`)} className="mt-4 px-5 py-2.5 border border-slate-600 text-slate-200 rounded-xl text-sm">Back to task</button>
               </div>
             ) : (
-              <button onClick={begin} className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium">
-                {resuming ? <><RotateCcw className="w-4 h-4" /> Resume interview</> : <><Play className="w-4 h-4" /> Start interview</>}
+              <button onClick={enterLobby} className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium">
+                {resuming ? <><RotateCcw className="w-4 h-4" /> Resume interview</> : <><Play className="w-4 h-4" /> Continue to setup</>}
               </button>
             )}
           </div>
         </div>
-      </Centered>
+      </Stage>
     );
   }
 
-  // ── Active question ──────────────────────────────────────────────────────────
-  const KindIcon = q?.kind === 'code' ? Code2 : q?.kind === 'text' ? Type : Mic;
-  const isLast = idx === questions.length - 1;
-
-  return (
-    <div className="fixed inset-0 bg-canvas flex flex-col">
-      {/* Top bar: progress + timer + camera */}
-      <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-200 bg-card">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-1.5">
-            <KindIcon className="w-4 h-4 text-brand-600" />
-            Question {idx + 1} of {questions.length}
-            <span className="ml-1 text-slate-400">· {q?.points} pts</span>
+  // ── Green room (device check) ────────────────────────────────────────────────
+  if (phase === 'lobby') {
+    const camReady = !cameraRequired || !!previewStream?.getVideoTracks().length;
+    const hasVideo = !!previewStream?.getVideoTracks().length;
+    return (
+      <Stage>
+        <div className="max-w-md w-full rounded-2xl border border-slate-700 bg-slate-800/50 p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <InterviewerOrb speaking={speaking} level={0} size={56} name={INTERVIEWER} />
+            <div>
+              <h1 className="text-slate-100 font-semibold">Let’s check your setup</h1>
+              <p className="text-slate-400 text-sm">{INTERVIEWER} will meet you on the other side.</p>
+            </div>
           </div>
-          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-            <div className="h-full bg-brand-500 transition-all" style={{ width: `${((idx) / questions.length) * 100}%` }} />
+
+          <div className="rounded-xl overflow-hidden bg-slate-900 aspect-video flex items-center justify-center border border-slate-700">
+            {hasVideo
+              ? <video ref={lobbyVideoRef} muted playsInline className="w-full h-full object-cover" />
+              : <div className="text-slate-500 text-sm inline-flex items-center gap-2"><Video className="w-4 h-4" />{cameraRequired ? 'Waiting for camera…' : 'Camera off'}</div>}
+          </div>
+
+          <div className="mt-4 space-y-3">
+            <MicCheck level={level} heard={micHeard} />
+            <button onClick={testVoice} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-slate-600 text-slate-200 text-sm hover:bg-slate-700/40">
+              <Volume2 className="w-4 h-4" /> Test {INTERVIEWER}’s voice
+            </button>
+          </div>
+
+          <div className="mt-4 flex items-start gap-2 text-xs text-slate-400 bg-slate-900/50 rounded-lg p-3 border border-slate-700/60">
+            <ShieldCheck className="w-4 h-4 text-brand-400 shrink-0 mt-0.5" />
+            Once you begin, the clock runs continuously — it won’t pause if you close or lose connection. You can’t return to a question after moving on.
+          </div>
+
+          <div className="mt-5 flex items-center justify-between gap-3">
+            <button onClick={() => { previewStream?.getTracks().forEach((t) => t.stop()); setPreviewStream(null); setPhase('intro'); }}
+              className="px-4 py-2 text-slate-300 text-sm hover:text-white">Back</button>
+            <button onClick={startFromLobby} disabled={!camReady}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium disabled:opacity-50">
+              I’m ready <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+          {!camReady && <p className="text-xs text-amber-400 mt-2 text-right">Camera access is required — allow it and it’ll appear above.</p>}
+        </div>
+      </Stage>
+    );
+  }
+
+  // ── Countdown ────────────────────────────────────────────────────────────────
+  if (phase === 'countdown') {
+    return (
+      <Stage>
+        <div className="text-center">
+          <InterviewerOrb speaking level={0} size={96} name={INTERVIEWER} />
+          <p className="text-slate-300 mt-6">Get ready…</p>
+          <div key={countdownN} className="text-7xl font-bold text-white mt-1 tabular-nums" style={{ animation: 'intvPop .5s ease' }}>
+            {countdownN > 0 ? countdownN : 'Go'}
           </div>
         </div>
-        {data?.options.timingMode === 'total' && totalRemaining !== null ? (
-          <div title="Time left for the whole interview" className={`text-sm font-semibold tabular-nums px-3 py-1.5 rounded-lg ${totalRemaining <= 30 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-700'}`}>
-            {fmtClock(totalRemaining)} left
+        <StudioKeyframes />
+      </Stage>
+    );
+  }
+
+  // ── Active question (cinematic stage) ────────────────────────────────────────
+  const KindIcon = q?.kind === 'code' ? Code2 : q?.kind === 'text' ? Type : Mic;
+  const isLast = idx === questions.length - 1;
+  const timerRemaining = data?.options.timingMode === 'total' ? totalRemaining : remaining;
+  const timerTotal = data?.options.timingMode === 'total' ? (data?.options.totalSeconds || 0) : (q?.timeLimitSeconds || 0);
+
+  return (
+    <div className={`fixed inset-0 flex flex-col text-slate-100 ${STUDIO}`}>
+      <StudioKeyframes />
+      {/* Top bar */}
+      <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-800">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+            <KindIcon className="w-4 h-4 text-brand-400" />
+            Question {idx + 1} of {questions.length}
+            <span className="ml-1 text-slate-500">· {q?.points} pts</span>
           </div>
-        ) : remaining !== null ? (
-          <div className={`text-sm font-semibold tabular-nums px-3 py-1.5 rounded-lg ${remaining <= 10 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-700'}`}>
-            {fmtClock(remaining)}
+          {/* Segmented progress */}
+          <div className="flex items-center gap-1.5">
+            {questions.map((_, i) => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full ${i < idx ? 'bg-brand-500' : i === idx ? 'bg-brand-400/70' : 'bg-slate-700'}`} />
+            ))}
           </div>
-        ) : null}
+        </div>
+        {timerRemaining !== null && timerTotal > 0 && <RingTimer remaining={timerRemaining} total={timerTotal} />}
         <div
           title={`Proctored${proctor.focusLosses ? ` · left the tab ${proctor.focusLosses}×` : ''}`}
-          className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${proctor.focusLosses ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}
+          className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg ${proctor.focusLosses ? 'bg-amber-500/15 text-amber-300' : 'bg-slate-800 text-slate-400'}`}
         >
           <Eye className="w-3.5 h-3.5" />Proctored{proctor.focusLosses > 0 && <span className="tabular-nums">· {proctor.focusLosses}</span>}
         </div>
-        {data?.options.cameraRequired && (
-          <video ref={videoRef} muted playsInline className="w-24 h-16 rounded-lg object-cover bg-slate-900" />
-        )}
       </div>
 
-      {/* Fullscreen nudge — appears if they leave fullscreen mid-interview */}
+      {/* Fullscreen nudge */}
       {!proctor.isFullscreen && (
-        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+        <div className="flex items-center justify-between gap-3 px-6 py-2.5 bg-amber-500/10 border-b border-amber-500/30 text-sm text-amber-200">
           <span className="inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4" />You left fullscreen. This is noted for your mentor.</span>
           <button onClick={() => proctor.requestFullscreen()} className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-medium">
             <Maximize2 className="w-3.5 h-3.5" />Return to fullscreen
@@ -499,45 +611,54 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         </div>
       )}
 
-      {/* Question + answer */}
+      {/* Stage */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-6 py-8">
-          <div className="flex items-start gap-3 mb-6">
-            <button onClick={() => q && speak(q.prompt)} title="Replay question" className="shrink-0 w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center hover:bg-brand-100">
-              <Volume2 className="w-5 h-5" />
-            </button>
-            <h1 className="text-lg sm:text-xl font-medium text-slate-900 leading-relaxed">{q?.prompt}</h1>
+        <div key={idx} className="max-w-3xl mx-auto px-6 py-8" style={{ animation: 'intvIn .35s ease' }}>
+          {/* Interviewer asking */}
+          <div className="flex items-start gap-4 mb-7">
+            <InterviewerOrb speaking={speaking} level={recording ? level : 0} name={INTERVIEWER} />
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-wide font-medium text-brand-300 mb-1">
+                {speaking ? `${INTERVIEWER} is asking…` : 'Your turn'}
+              </div>
+              <h1 className="text-lg sm:text-xl font-medium text-slate-50 leading-relaxed">{q?.prompt}</h1>
+              <button onClick={() => { if (q) { setSpeaking(true); speak(q.prompt, { onEnd: () => setSpeaking(false) }); } }}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-brand-300">
+                <Volume2 className="w-3.5 h-3.5" /> Replay question
+              </button>
+            </div>
           </div>
 
-          {/* Answer surface by kind */}
+          {/* Answer surface */}
           {q?.kind === 'voice' && (
-            <div className="rounded-2xl border border-slate-200 bg-card p-6">
+            <div className="rounded-2xl border border-slate-700 bg-slate-800/40 p-6">
               <div className="flex flex-col items-center">
+                <Waveform level={level} active={recording} />
                 <button
                   onClick={toggleRecording}
-                  className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${recording ? 'bg-red-500 animate-pulse text-white' : 'bg-brand-600 hover:bg-brand-700 text-white'}`}
+                  className={`mt-4 w-20 h-20 rounded-full flex items-center justify-center transition-colors ${recording ? 'bg-red-500 text-white shadow-[0_0_0_6px_rgba(239,68,68,0.2)]' : 'bg-brand-600 hover:bg-brand-700 text-white'}`}
                 >
                   {recording ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
                 </button>
-                <p className="text-sm text-slate-500 mt-3">{recording ? 'Recording — tap to stop' : draft?.audioBlob ? 'Recorded · tap to re-record' : 'Tap to answer by voice'}</p>
-                {!recorderSupported() && <p className="text-xs text-amber-600 mt-1">Recording isn&apos;t supported here — type your answer below.</p>}
+                <p className="text-sm text-slate-300 mt-3">{recording ? 'Listening… tap to stop' : draft?.audioBlob ? 'Recorded · tap to re-record' : 'Tap to answer by voice'}</p>
+                {!recorderSupported() && <p className="text-xs text-amber-400 mt-1">Recording isn&apos;t supported here — type your answer below.</p>}
               </div>
               <div className="mt-5">
-                <label className="block text-xs font-medium text-slate-500 mb-1">Transcript {recognitionSupported() && <span className="text-slate-400">(auto — edit if needed)</span>}</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Transcript {recognitionSupported() && <span className="text-slate-500">(auto — edit if needed)</span>}</label>
                 <textarea
                   value={draft?.transcript || ''}
                   onChange={(e) => q && queueSave(q.id, { transcript: e.target.value })}
                   rows={5}
                   placeholder="Your spoken answer appears here…"
-                  className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className="w-full bg-slate-900/60 border border-slate-700 text-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 placeholder:text-slate-500"
                 />
               </div>
             </div>
           )}
 
           {q?.kind === 'code' && (
-            <div className="rounded-2xl border border-slate-200 overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2 bg-slate-900 text-slate-300 text-xs">
+            <div className="rounded-2xl border border-slate-700 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-slate-950 text-slate-300 text-xs">
                 <span className="inline-flex items-center gap-1.5"><Code2 className="w-3.5 h-3.5" />{q.codeLanguage || 'code'}</span>
                 <span className="text-slate-500">Autosaved · paste disabled</span>
               </div>
@@ -557,15 +678,15 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
               onChange={(e) => q && queueSave(q.id, { answerText: e.target.value })}
               rows={10}
               placeholder="Type your answer…"
-              className="w-full border border-slate-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full bg-slate-800/40 border border-slate-700 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 placeholder:text-slate-500"
             />
           )}
         </div>
       </div>
 
-      {/* Footer: advance */}
-      <div className="px-6 py-4 border-t border-slate-200 bg-card flex items-center justify-between">
-        <p className="text-xs text-slate-400">{recording ? 'Stop recording before moving on.' : 'You can’t return to this question after moving on.'}</p>
+      {/* Footer */}
+      <div className="px-6 py-4 border-t border-slate-800 flex items-center justify-between">
+        <p className="text-xs text-slate-500">{recording ? 'Stop recording before moving on.' : 'You can’t return to this question after moving on.'}</p>
         <button
           onClick={() => advance(false)}
           disabled={advancing || phase !== 'active'}
@@ -575,10 +696,31 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
           {isLast ? 'Finish interview' : 'Next question'}
         </button>
       </div>
+
+      {/* Picture-in-picture self view */}
+      {cameraRequired && (
+        <div className="fixed bottom-24 right-6 z-10">
+          <video ref={videoRef} muted playsInline className="w-40 h-28 rounded-xl object-cover bg-slate-950 border border-slate-700 shadow-xl" />
+          <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-black/50 text-white">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />REC
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="fixed inset-0 bg-canvas flex items-center justify-center p-6">{children}</div>;
+/** Dark full-screen "studio" backdrop for the transitional phases. */
+function Stage({ children }: { children: React.ReactNode }) {
+  return <div className={`fixed inset-0 flex items-center justify-center p-6 ${STUDIO}`}>{children}</div>;
+}
+
+/** Local keyframes for question-enter + countdown-pop (avoids a global CSS edit). */
+function StudioKeyframes() {
+  return (
+    <style>{`
+      @keyframes intvIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+      @keyframes intvPop { 0% { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.1); } 100% { transform: scale(1); } }
+    `}</style>
+  );
 }

@@ -22,8 +22,8 @@ export const recorderSupported = () =>
   !!navigator.mediaDevices?.getUserMedia;
 
 /** Speak a prompt aloud. Resolves when finished (or immediately if unsupported). */
-export function speak(text: string, opts: { rate?: number; onEnd?: () => void } = {}): void {
-  if (!speechSupported() || !text) { opts.onEnd?.(); return; }
+export function speak(text: string, opts: { rate?: number; onStart?: () => void; onEnd?: () => void } = {}): void {
+  if (!speechSupported() || !text) { opts.onStart?.(); opts.onEnd?.(); return; }
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
@@ -34,9 +34,13 @@ export function speak(text: string, opts: { rate?: number; onEnd?: () => void } 
     const preferred = voices.find((v) => /en(-|_)?(US|GB)/i.test(v.lang) && /natural|google|samantha|daniel/i.test(v.name))
       || voices.find((v) => /^en/i.test(v.lang));
     if (preferred) u.voice = preferred;
-    if (opts.onEnd) u.onend = opts.onEnd;
+    if (opts.onStart) u.onstart = opts.onStart;
+    if (opts.onEnd) { u.onend = opts.onEnd; u.onerror = opts.onEnd; }
     window.speechSynthesis.speak(u);
+    // Fallback: some browsers fire onstart late/never — signal start optimistically.
+    opts.onStart?.();
   } catch {
+    opts.onStart?.();
     opts.onEnd?.();
   }
 }
@@ -123,6 +127,11 @@ export class VoiceRecorder {
       this.cleanup();
       return false;
     }
+  }
+
+  /** The live mic stream (for a level meter / waveform) while recording. */
+  getStream(): MediaStream | null {
+    return this.stream;
   }
 
   stop(): Promise<Blob | null> {
