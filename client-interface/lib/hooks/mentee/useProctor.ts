@@ -16,6 +16,9 @@ import { interviewApi, type ProctorEvent } from '@/lib/services/interview-api';
 export interface ProctorState {
   focusLosses: number;
   isFullscreen: boolean;
+  /** For a camera-required interview: is a live camera frame currently available?
+   *  Goes false when the candidate turns the camera off / it disconnects mid-run. */
+  cameraLive: boolean;
   totalEvents: number;
   requestFullscreen: () => Promise<void>;
   log: (type: string, meta?: Record<string, unknown>) => void;
@@ -41,6 +44,7 @@ export function useProctor({
 }: Options): ProctorState {
   const [focusLosses, setFocusLosses] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [cameraLive, setCameraLive] = useState(true);
   const [totalEvents, setTotalEvents] = useState(0);
 
   const buffer = useRef<ProctorEvent[]>([]);
@@ -120,6 +124,27 @@ export function useProctor({
     return () => { clearInterval(id); flush(); };
   }, [active, flushIntervalMs, flush]);
 
+  // ── Required-camera health ───────────────────────────────────────────────
+  // Detect a camera that was allowed at the start but then turned off / covered /
+  // disconnected mid-interview (browser controls, OS, unplug). The track goes
+  // `muted` or `ended` — we surface that so the runner can block & warn instead of
+  // silently recording black frames.
+  useEffect(() => {
+    if (!active || !cameraRequired) { setCameraLive(true); return; }
+    let down = false;
+    const evaluate = () => {
+      const stream = videoRef.current?.srcObject as MediaStream | null;
+      const track = stream?.getVideoTracks?.()[0] || null;
+      const live = !!track && track.readyState === 'live' && track.enabled && !track.muted;
+      setCameraLive(live);
+      if (!live && !down) { down = true; log('camera_off'); }
+      else if (live && down) { down = false; log('camera_restored'); }
+    };
+    evaluate();
+    const id = setInterval(evaluate, 1000);
+    return () => clearInterval(id);
+  }, [active, cameraRequired, videoRef, log]);
+
   // ── Periodic webcam snapshots ────────────────────────────────────────────
   useEffect(() => {
     if (!active || !cameraRequired) return;
@@ -127,6 +152,9 @@ export function useProctor({
       const video = videoRef.current;
       const sid = sessionRef.current;
       if (!video || !sid || video.readyState < 2 || !video.videoWidth) return;
+      // Never upload a black frame from a camera that's been turned off.
+      const track = (video.srcObject as MediaStream | null)?.getVideoTracks?.()[0];
+      if (!track || track.readyState !== 'live' || track.muted) return;
       const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
@@ -143,5 +171,5 @@ export function useProctor({
     return () => { clearTimeout(first); clearInterval(id); };
   }, [active, cameraRequired, snapshotIntervalMs, videoRef]);
 
-  return { focusLosses, isFullscreen, totalEvents, requestFullscreen, log, flush };
+  return { focusLosses, isFullscreen, cameraLive, totalEvents, requestFullscreen, log, flush };
 }

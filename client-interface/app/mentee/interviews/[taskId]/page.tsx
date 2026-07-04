@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
-  Mic, MicOff, Loader2, ArrowRight, CheckCircle2, Video, Volume2,
+  Mic, MicOff, Loader2, ArrowRight, CheckCircle2, Video, VideoOff, Volume2,
   Code2, Type, AlertTriangle, Play, RotateCcw, Maximize2, Eye, ShieldCheck,
 } from 'lucide-react';
 import {
@@ -341,6 +341,19 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     await proctor.requestFullscreen(); // must ride this user gesture
     setCountdownN(3);
     setPhase('countdown');
+  };
+
+  // Re-acquire the camera after the candidate turned it off mid-interview. The
+  // proctor monitor watches videoRef's stream, so rebinding here clears the block.
+  const recoverCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      camStreamRef.current?.getTracks().forEach((t) => t.stop());
+      camStreamRef.current = stream;
+      if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); }
+    } catch {
+      toast.error('Still no camera access — enable it for this site in your browser, then retry.');
+    }
   };
 
   // Drive the 3-2-1 and then actually start the session.
@@ -732,6 +745,28 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
           <span className="absolute top-1.5 left-1.5 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-black/50 text-white">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />REC
           </span>
+        </div>
+      )}
+
+      {/* Required-camera block: if the camera is turned off mid-interview, stop the
+          candidate here until it's restored (the clock keeps running, and the gap
+          is logged for the mentor). */}
+      {cameraRequired && !proctor.cameraLive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-6">
+          <div className="max-w-md w-full text-center rounded-2xl border border-red-500/40 bg-slate-900 p-8">
+            <div className="w-16 h-16 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+              <VideoOff className="w-9 h-9 text-red-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-slate-100">Your camera is off</h2>
+            <p className="text-slate-400 mt-2 text-sm">
+              This interview requires your camera to stay on, and it looks like it was turned off or disconnected.
+              Turn it back on to continue — <span className="text-amber-300 font-medium">the clock is still running</span> and this pause is recorded for your mentor.
+            </p>
+            <button onClick={recoverCamera} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium">
+              <RotateCcw className="w-4 h-4" /> Retry camera
+            </button>
+            <p className="text-xs text-slate-500 mt-3">Nothing happening? Re-enable camera access for this site from your browser&apos;s address bar, then retry.</p>
+          </div>
         </div>
       )}
     </div>

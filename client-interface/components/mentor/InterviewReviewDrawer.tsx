@@ -19,6 +19,8 @@ const FLAG_LABEL: Record<string, string> = {
   paste_blocked: 'Paste blocked',
   copy_blocked: 'Copy blocked',
   context_menu_blocked: 'Right-click blocked',
+  camera_off: 'Camera turned off',
+  camera_restored: 'Camera restored',
 };
 
 /**
