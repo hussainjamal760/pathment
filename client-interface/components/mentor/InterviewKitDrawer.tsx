@@ -143,6 +143,13 @@ export function InterviewKitDrawer({
   const save = async () => {
     if (saving) return;
     if (!title.trim()) { toast.error('Give the kit a title'); return; }
+    // A recorded question still needs its text — it's the fallback if the audio
+    // can't play, plus what the mentor reads when reviewing.
+    const recordedMissingText = questions.findIndex((qq) => qq.promptAudioUrl && !qq.prompt.trim());
+    if (recordedMissingText >= 0) {
+      toast.error(`Question ${recordedMissingText + 1} has a recording but no text — add the question text.`);
+      return;
+    }
     const clean = questions
       .map((q) => ({ ...q, prompt: q.prompt.trim() }))
       .filter((q) => q.prompt);
@@ -276,7 +283,7 @@ export function InterviewKitDrawer({
             <div className="space-y-3 rounded-xl border border-slate-200 p-3.5 bg-slate-50/50">
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-slate-500">Name
-                  <input value={ivName} onChange={(e) => setIvName(e.target.value)} placeholder="e.g. Sheryar" className={`${field} mt-1`} />
+                  <input value={ivName} onChange={(e) => setIvName(e.target.value)} placeholder="Defaults to your name" className={`${field} mt-1`} />
                 </label>
                 <label className="text-xs text-slate-500">Voice
                   <select value={ivVoice} onChange={(e) => setIvVoice(e.target.value)} className={`${field} mt-1`}>

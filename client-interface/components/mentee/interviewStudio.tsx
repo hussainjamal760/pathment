@@ -92,7 +92,7 @@ export function MicCheck({ level, heard }: { level: number; heard: boolean }) {
     <div className="flex items-center gap-3">
       <Mic className={`w-4 h-4 ${heard ? 'text-emerald-400' : 'text-slate-400'}`} />
       <div className="flex-1 h-2 rounded-full bg-slate-700 overflow-hidden">
-        <div className="h-full bg-gradient-to-r from-brand-400 to-emerald-400 transition-[width] duration-100" style={{ width: `${Math.min(100, level * 140)}%` }} />
+        <div className="h-full bg-gradient-to-r from-brand-400 to-emerald-400 transition-[width] duration-75" style={{ width: `${Math.min(100, level * 100)}%` }} />
       </div>
       <span className={`text-xs ${heard ? 'text-emerald-400' : 'text-slate-400'}`}>{heard ? 'We can hear you ✓' : 'Say hello…'}</span>
     </div>

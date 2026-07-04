@@ -21,7 +21,7 @@ export function useAudioLevel(stream: MediaStream | null): number {
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
-    analyser.smoothingTimeConstant = 0.8;
+    analyser.smoothingTimeConstant = 0.6; // more responsive to speech
     source.connect(analyser);
     const data = new Uint8Array(analyser.frequencyBinCount);
 
@@ -33,8 +33,9 @@ export function useAudioLevel(stream: MediaStream | null): number {
       let sum = 0;
       for (let i = 0; i < data.length; i += 1) { const v = (data[i] - 128) / 128; sum += v * v; }
       const rms = Math.sqrt(sum / data.length);
-      // Gentle boost + clamp so quiet speech still registers visibly.
-      setLevel(Math.min(1, rms * 2.2));
+      // Perceptual (sqrt) curve so normal speech clearly moves the meter — a raw
+      // RMS reading stays tiny (~0.03–0.1) and barely registers.
+      setLevel(Math.min(1, Math.sqrt(rms) * 1.8));
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);

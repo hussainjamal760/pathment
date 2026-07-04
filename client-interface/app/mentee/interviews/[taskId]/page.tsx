@@ -122,9 +122,9 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     }
   }, [phase, previewStream]);
 
-  // Register "mic works" once the level crosses a small threshold in the lobby.
+  // Register "mic works" once the level crosses a speech threshold in the lobby.
   useEffect(() => {
-    if (phase === 'lobby' && level > 0.08) setMicHeard(true);
+    if (phase === 'lobby' && level > 0.15) setMicHeard(true);
   }, [phase, level]);
 
   // Attach the session camera stream to the PiP <video> when active.

@@ -56,6 +56,21 @@ class InterviewSessionService {
   async getForCandidate(taskId, menteeId) {
     const { task, assignment, kit, questions } = await this._loadContext(taskId, menteeId);
 
+    // Interviewer identity: the mentor's kit config, defaulting the NAME to the
+    // kit creator's own name (so it's "Meet <mentor>", not a generic persona).
+    const ivSettings = (kit.settings && kit.settings.interviewer) || {};
+    let defaultName = null;
+    if (!ivSettings.name) {
+      const creator = await models.User.findByPk(kit.createdBy, { attributes: ['firstName', 'lastName'] });
+      if (creator) defaultName = creator.firstName || `${creator.firstName || ''} ${creator.lastName || ''}`.trim() || null;
+    }
+    const interviewer = {
+      name: ivSettings.name || defaultName || 'Aria',
+      voiceName: ivSettings.voiceName || null,
+      pitch: typeof ivSettings.pitch === 'number' ? ivSettings.pitch : 1,
+      rate: typeof ivSettings.rate === 'number' ? ivSettings.rate : 1,
+    };
+
     const sessions = await models.InterviewSession.findAll({
       where: { assignedTaskId: taskId, menteeId },
       order: [['attempt_number', 'DESC']],
@@ -89,8 +104,9 @@ class InterviewSessionService {
         description: kit.description,
         totalPoints: questions.reduce((s, q) => s + (q.points || 0), 0),
       },
-      // Interviewer identity/voice for the candidate's TTS (null → default).
-      interviewer: (kit.settings && kit.settings.interviewer) || null,
+      // Interviewer identity/voice for the candidate's TTS (name defaults to the
+      // kit creator's name; pitch/rate/voice from the mentor's config).
+      interviewer,
       options: {
         allowRetake: assignment.allowRetake,
         cameraRequired: assignment.cameraRequired,
