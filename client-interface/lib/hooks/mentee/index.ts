@@ -22,7 +22,6 @@ export type {
   ProfileData,
   MenteeProfileData,
   LearningPreferences,
-  NotificationSettings,
 } from './useMenteeSettings';
 
 export { useMenteeTasks } from './useMenteeTasks';

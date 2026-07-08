@@ -36,14 +36,6 @@ export interface UserManagementSettings {
   minMentorExperience: number;
 }
 
-export interface NotificationSettings {
-  emailNotifications: boolean;
-  enrollmentAlerts: boolean;
-  systemAlerts: boolean;
-  weeklyReports: boolean;
-  urgentIssues: boolean;
-}
-
 const DEFAULT_PROFILE: ProfileData = { firstName: '', lastName: '', email: '', phone: '', bio: '', city: '', country: '', languages: [], timezone: '' };
 
 const DEFAULT_SYSTEM: SystemSettings = {
@@ -61,29 +53,18 @@ const DEFAULT_USER_MGMT: UserManagementSettings = {
   minMentorExperience: 2,
 };
 
-const DEFAULT_NOTIFICATIONS: NotificationSettings = {
-  emailNotifications: true,
-  enrollmentAlerts: true,
-  systemAlerts: true,
-  weeklyReports: true,
-  urgentIssues: true,
-};
-
 interface UseAdminSettingsReturn {
   loading: boolean;
   saving: boolean;
   profileData: ProfileData;
   systemSettings: SystemSettings;
   userManagementSettings: UserManagementSettings;
-  notificationSettings: NotificationSettings;
   setProfileData: React.Dispatch<React.SetStateAction<ProfileData>>;
   setSystemSettings: React.Dispatch<React.SetStateAction<SystemSettings>>;
   setUserManagementSettings: React.Dispatch<React.SetStateAction<UserManagementSettings>>;
-  setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
   handleProfileUpdate: () => Promise<void>;
   handleSystemSettingsUpdate: () => Promise<void>;
   handleUserManagementUpdate: () => Promise<void>;
-  handleNotificationUpdate: () => Promise<void>;
 }
 
 export function useAdminSettings(): UseAdminSettingsReturn {
@@ -94,7 +75,6 @@ export function useAdminSettings(): UseAdminSettingsReturn {
   const [profileData, setProfileData] = useState<ProfileData>(DEFAULT_PROFILE);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(DEFAULT_SYSTEM);
   const [userManagementSettings, setUserManagementSettings] = useState<UserManagementSettings>(DEFAULT_USER_MGMT);
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATIONS);
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -116,7 +96,6 @@ export function useAdminSettings(): UseAdminSettingsReturn {
       const prefs = data.settings?.preferences;
       if (prefs?.system && typeof prefs.system === 'object') setSystemSettings((prev) => ({ ...prev, ...prefs.system }));
       if (prefs?.userManagement && typeof prefs.userManagement === 'object') setUserManagementSettings((prev) => ({ ...prev, ...prefs.userManagement }));
-      if (prefs?.notifications && typeof prefs.notifications === 'object') setNotificationSettings((prev) => ({ ...prev, ...prefs.notifications }));
     } catch (err: unknown) {
       console.error('Failed to fetch settings:', err);
       toast.error('Failed to load settings');
@@ -171,33 +150,17 @@ export function useAdminSettings(): UseAdminSettingsReturn {
     }
   }, [userManagementSettings]);
 
-  const handleNotificationUpdate = useCallback(async () => {
-    try {
-      setSaving(true);
-      await preferencesApi.update('notifications', notificationSettings as unknown as Record<string, unknown>);
-      toast.success('Notification settings saved');
-    } catch (err: unknown) {
-      console.error('Failed to update notifications:', err);
-      toast.error(extractApiErrorMessage(err, 'Failed to save notification settings'));
-    } finally {
-      setSaving(false);
-    }
-  }, [notificationSettings]);
-
   return {
     loading,
     saving,
     profileData,
     systemSettings,
     userManagementSettings,
-    notificationSettings,
     setProfileData,
     setSystemSettings,
     setUserManagementSettings,
-    setNotificationSettings,
     handleProfileUpdate,
     handleSystemSettingsUpdate,
     handleUserManagementUpdate,
-    handleNotificationUpdate,
   };
 }

@@ -54,7 +54,6 @@ export type {
   ProfileData,
   SystemSettings,
   UserManagementSettings,
-  NotificationSettings,
 } from './useAdminSettings';
 
 export { useMentorProfile } from './useMentorProfile';

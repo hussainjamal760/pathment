@@ -29,16 +29,13 @@ export default function MenteeSettings() {
     profileData,
     menteeProfile,
     learningPreferences,
-    notificationSettings,
     setActiveTab,
     setProfileData,
     setMenteeProfile,
     setLearningPreferences,
-    setNotificationSettings,
     handleProfileUpdate,
     handleMenteeProfileUpdate,
     handleLearningPreferencesUpdate,
-    handleNotificationUpdate,
   } = useMenteeSettings();
 
   if (loading) {

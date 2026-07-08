@@ -21,16 +21,13 @@ export default function MentorSettings() {
     profileData,
     mentorProfile,
     availabilitySettings,
-    notificationSettings,
     setActiveTab,
     setProfileData,
     setMentorProfile,
     setAvailabilitySettings,
-    setNotificationSettings,
     handleProfileUpdate,
     handleMentorProfileUpdate,
     handleAvailabilityUpdate,
-    handleNotificationUpdate,
   } = useMentorSettings();
 
   if (loading) {
