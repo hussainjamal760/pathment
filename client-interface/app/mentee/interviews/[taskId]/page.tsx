@@ -62,6 +62,13 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const pendingAudioRef = useRef<Map<string, Blob>>(new Map());
   const finishingRef = useRef(false);
   const promptAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Fresh mirrors of state for the debounced autosave and the timer-driven
+  // auto-advance flush (their closures would otherwise be stale and save empty
+  // answers over typed ones). recordingQuestionIdRef pins a clip to the question
+  // it was recorded for, even if navigation moves on during the async stop.
+  const draftsRef = useRef(drafts);
+  const recordingRef = useRef(recording);
+  const recordingQuestionIdRef = useRef<string | null>(null);
 
   const questions = data?.questions ?? [];
   const q: CandidateQuestion | undefined = questions[idx];
@@ -113,6 +120,8 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
 
   // Keep a ref of the preview stream so we can stop it on unmount.
   useEffect(() => { previewRef.current = previewStream; }, [previewStream]);
+  useEffect(() => { draftsRef.current = drafts; }, [drafts]);
+  useEffect(() => { recordingRef.current = recording; }, [recording]);
 
   // Attach the preview stream to the green-room <video>.
   useEffect(() => {
@@ -243,7 +252,9 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     if (!sessionId) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      const d = { ...drafts[questionId], ...patch };
+      // Read the freshest draft from the ref, not a stale closure, so we never
+      // autosave an out-of-date snapshot over newer text.
+      const d = { ...draftsRef.current[questionId], ...patch };
       interviewApi.saveAnswer(sessionId, {
         questionId,
         transcript: d.transcript || null,
@@ -252,7 +263,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         timeSpentSeconds: d.seconds,
       }).catch(() => { /* autosave is best-effort */ });
     }, 1200);
-  }, [sessionId, drafts]);
+  }, [sessionId]);
 
   // ── Background audio upload (never blocks the candidate) ──────────────────────
   const uploadAudioBg = useCallback(async (sid: string, questionId: string, blob: Blob) => {
@@ -287,9 +298,13 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       const blob = await recorderRef.current?.stop();
       setRecording(false);
       setRecordingStream(null);
+      // Attribute the clip to the question it was RECORDED for, not whatever
+      // question is on screen now (navigation can move on during the async stop).
+      const owner = recordingQuestionIdRef.current || q.id;
+      recordingQuestionIdRef.current = null;
       if (blob) {
-        setDrafts((prev) => ({ ...prev, [q.id]: { ...prev[q.id], audioBlob: blob } }));
-        if (sessionId) uploadAudioBg(sessionId, q.id, blob);
+        setDrafts((prev) => ({ ...prev, [owner]: { ...prev[owner], audioBlob: blob } }));
+        if (sessionId) uploadAudioBg(sessionId, owner, blob);
       }
       return;
     }
@@ -297,8 +312,17 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     const ok = await rec.start();
     if (!ok) { toast.error('Microphone access is needed to answer by voice.'); return; }
     recorderRef.current = rec;
+    recordingQuestionIdRef.current = q.id;
     setRecordingStream(rec.getStream());
-    recognizerRef.current = createRecognizer((text) => queueSave(q.id, { transcript: text }));
+    // Preserve whatever is already typed for this question: the recognizer builds
+    // from empty, so APPEND its output to the existing transcript instead of
+    // replacing it (that replace was wiping typed answers).
+    const owner = q.id;
+    const base = (draftsRef.current[owner]?.transcript || '').trim();
+    recognizerRef.current = createRecognizer((text) => {
+      const merged = base ? `${base}\n${text}`.trim() : text;
+      queueSave(owner, { transcript: merged });
+    });
     recognizerRef.current?.start();
     setRecording(true);
   };
@@ -393,22 +417,28 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
 
   const persistCurrent = async () => {
     if (!q || !sessionId) return;
-    const d = drafts[q.id];
-    let blob = d?.audioBlob || null;
-    if (recording) {
+    const question = q;
+    let blob = draftsRef.current[question.id]?.audioBlob || null;
+    let audioOwner = question.id;
+    if (recordingRef.current) {
       recognizerRef.current?.stop();
-      blob = (await recorderRef.current?.stop()) || blob;
+      const stopped = await recorderRef.current?.stop();
+      if (stopped) { blob = stopped; audioOwner = recordingQuestionIdRef.current || question.id; }
+      recordingQuestionIdRef.current = null;
       setRecording(false);
       setRecordingStream(null);
     }
+    // Read the draft AFTER the async stop — the recognizer may have just finalised
+    // the transcript — and from the ref so we never serialise a stale/empty snapshot.
+    const d = draftsRef.current[question.id];
     await interviewApi.saveAnswer(sessionId, {
-      questionId: q.id,
+      questionId: question.id,
       transcript: d?.transcript || null,
       code: d?.code || null,
       answerText: d?.answerText || null,
       timeSpentSeconds: d?.seconds || 0,
     }).catch(() => {});
-    if (blob) uploadAudioBg(sessionId, q.id, blob);
+    if (blob) uploadAudioBg(sessionId, audioOwner, blob);
   };
 
   const advance = async (auto = false) => {
@@ -730,7 +760,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
         <p className="text-xs text-slate-500">{recording ? 'Stop recording before moving on.' : 'You can’t return to this question after moving on.'}</p>
         <button
           onClick={() => advance(false)}
-          disabled={advancing || phase !== 'active'}
+          disabled={advancing || phase !== 'active' || recording}
           className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium disabled:opacity-50"
         >
           {advancing ? <Loader2 className="w-4 h-4 animate-spin" /> : isLast ? <CheckCircle2 className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}

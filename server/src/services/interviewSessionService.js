@@ -254,6 +254,12 @@ class InterviewSessionService {
       where: { sessionId, questionId },
       defaults: { sessionId, questionId, ...fields },
     });
+    // Safety net: never let a stray empty autosave (a race, a stale flush) wipe a
+    // previously saved answer. Interview answers are one-shot — a blank incoming
+    // value over existing content is almost always noise, not intentional deletion.
+    for (const f of ['transcript', 'code', 'answerText']) {
+      if ((fields[f] === null || fields[f] === '') && answer[f]) delete fields[f];
+    }
     // findOrCreate doesn't update an existing row — apply the patch.
     await answer.update(fields);
     return { saved: true, questionId };
@@ -273,6 +279,10 @@ class InterviewSessionService {
 
     const question = await models.InterviewQuestion.findByPk(questionId);
     if (!question) throw new ValidationError('That question is not part of this interview');
+    // Audio only belongs to a voice question. A clip landing on a code/text question
+    // is always a client misattribution (a stale/shared recorder ref) — reject it
+    // rather than corrupt that question's row with someone else's recording.
+    if (question.kind !== 'voice') throw new ValidationError('Audio can only be attached to a voice question');
 
     // Audio goes under Cloudinary's 'video' resource type (it handles audio there).
     // Log the real reason on failure — otherwise the client only sees a generic
