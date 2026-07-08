@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   Loader2, Mic, Code2, Type, Volume2, Sparkles, Eye, AlertTriangle, CheckCircle2, Clock, Flag, Trash2, X,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import { CodeEditor } from '@/components/shared/CodeEditor';
@@ -49,7 +50,7 @@ export function InterviewReviewDrawer({
   const [flagged, setFlagged] = useState(false);
   const [flagReason, setFlagReason] = useState('');
   const [deletingSnaps, setDeletingSnaps] = useState(false);
-  const [zoom, setZoom] = useState<{ url: string; at: string } | null>(null);
+  const [zoom, setZoom] = useState<number | null>(null); // index into proctor.snapshots
 
   const load = useCallback(() => {
     setLoading(true);
@@ -74,13 +75,18 @@ export function InterviewReviewDrawer({
 
   useEffect(() => { load(); }, [load]);
 
-  // Escape closes the snapshot lightbox.
+  // Snapshot carousel keyboard nav: Escape closes, ←/→ move between images.
   useEffect(() => {
-    if (!zoom) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setZoom(null); };
+    if (zoom === null) return;
+    const n = review?.proctor.snapshots.length ?? 0;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setZoom(null);
+      else if (e.key === 'ArrowLeft' && n) setZoom((z) => (z === null ? z : (z - 1 + n) % n));
+      else if (e.key === 'ArrowRight' && n) setZoom((z) => (z === null ? z : (z + 1) % n));
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [zoom]);
+  }, [zoom, review]);
 
   const canReview = !!review?.canReview;
 
@@ -246,7 +252,7 @@ export function InterviewReviewDrawer({
               {review.proctor.snapshots.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {review.proctor.snapshots.map((s, i) => (
-                    <button key={i} type="button" onClick={() => setZoom(s)} title={`${new Date(s.at).toLocaleTimeString()} — click to enlarge`}
+                    <button key={i} type="button" onClick={() => setZoom(i)} title={`${new Date(s.at).toLocaleTimeString()} — click to enlarge`}
                       className="shrink-0 rounded-lg overflow-hidden border border-slate-200 hover:ring-2 hover:ring-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={s.url} alt={`Snapshot ${i + 1}`} className="w-20 h-14 object-cover cursor-zoom-in" />
@@ -254,6 +260,17 @@ export function InterviewReviewDrawer({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* AI grading hint — where the key lives + what "AI grade" does. */}
+          {canReview && (
+            <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-3 text-xs text-slate-600 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
+              <span>
+                Hit <span className="font-medium text-slate-800">AI grade</span> on any question to score it against your rubric. Voice answers are re-transcribed with Whisper — more accurate than the live transcript when pronunciation trips it up. It runs on your own AI key: add or manage it in{' '}
+                <a href="/mentor/settings" className="text-brand-700 font-medium hover:underline">Settings → AI Connections</a>.
+              </span>
             </div>
           )}
 
@@ -314,6 +331,17 @@ export function InterviewReviewDrawer({
                   );
                 })()}
 
+                {/* Whisper transcript from the audio — more accurate than the
+                    browser's live STT, shown once AI grading has run. */}
+                {a?.aiDraft?.transcript && (
+                  <details className="mt-2" open>
+                    <summary className="text-xs font-medium text-emerald-700 cursor-pointer inline-flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> AI transcript (from audio)
+                    </summary>
+                    <div className="text-sm text-slate-700 bg-emerald-50/60 border border-emerald-100 rounded-lg p-3 mt-1.5 whitespace-pre-wrap">{a.aiDraft.transcript}</div>
+                  </details>
+                )}
+
                 {/* Reference answer (mentor only) */}
                 {it.referenceAnswer && (
                   <details className="mt-3">
@@ -333,13 +361,14 @@ export function InterviewReviewDrawer({
                           className="w-16 border border-slate-300 rounded-lg px-2 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500" />
                         <span className="text-slate-400">/ {it.points}</span>
                       </label>
-                      {review.options.aiGradingEnabled && (
-                        <button onClick={() => runAiDraft(it)} disabled={aiBusy === it.questionId}
-                          className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-brand-200 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
-                          {aiBusy === it.questionId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                          AI draft
-                        </button>
-                      )}
+                      <button onClick={() => runAiDraft(it)} disabled={aiBusy === it.questionId}
+                        title={it.kind === 'voice'
+                          ? 'Transcribes the audio with Whisper and scores it against the rubric — uses your AI key (Settings → AI Connections)'
+                          : 'Scores this answer against the rubric — uses your AI key (Settings → AI Connections)'}
+                        className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-brand-200 text-brand-700 hover:bg-brand-50 disabled:opacity-50">
+                        {aiBusy === it.questionId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        {it.kind === 'voice' && a?.audioUrl ? 'AI grade (from audio)' : 'AI draft'}
+                      </button>
                     </div>
                     <input value={sc.note} onChange={(e) => saveScore(it, { note: e.target.value })}
                       placeholder="Note on this answer (optional)"
@@ -369,19 +398,49 @@ export function InterviewReviewDrawer({
             </div>
           )}
 
-          {/* Snapshot lightbox — click a proctor image to see it full size. */}
-          {zoom && (
-            <div className="fixed inset-0 z-[70] bg-black/80 flex flex-col items-center justify-center p-6" onClick={() => setZoom(null)}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={zoom.url} alt="Proctor snapshot" className="max-w-full max-h-[85vh] rounded-lg object-contain shadow-2xl" onClick={(e) => e.stopPropagation()} />
-              <div className="mt-3 flex items-center gap-4 text-white/80 text-sm">
-                <span>{new Date(zoom.at).toLocaleString()}</span>
-                <button onClick={() => setZoom(null)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white">
+          {/* Snapshot carousel — page through all proctor images with ←/→, the
+              thumbnail strip, or the arrows. Collapses cleanly for a single image. */}
+          {zoom !== null && review.proctor.snapshots[zoom] && (() => {
+            const snaps = review.proctor.snapshots;
+            const cur = snaps[zoom];
+            const many = snaps.length > 1;
+            const go = (d: number) => setZoom((z) => (z === null ? z : (z + d + snaps.length) % snaps.length));
+            return (
+              <div className="fixed inset-0 z-[70] bg-black/85 flex flex-col items-center justify-center p-6" onClick={() => setZoom(null)}>
+                <button onClick={() => setZoom(null)} aria-label="Close"
+                  className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm">
                   <X className="w-4 h-4" /> Close
                 </button>
+                <div className="flex items-center gap-3 w-full max-w-5xl" onClick={(e) => e.stopPropagation()}>
+                  {many && (
+                    <button onClick={() => go(-1)} aria-label="Previous snapshot"
+                      className="shrink-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"><ChevronLeft className="w-6 h-6" /></button>
+                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={cur.url} alt={`Proctor snapshot ${zoom + 1}`} className="flex-1 min-w-0 max-h-[78vh] rounded-lg object-contain shadow-2xl" />
+                  {many && (
+                    <button onClick={() => go(1)} aria-label="Next snapshot"
+                      className="shrink-0 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"><ChevronRight className="w-6 h-6" /></button>
+                  )}
+                </div>
+                <div className="mt-3 flex items-center gap-4 text-white/80 text-sm" onClick={(e) => e.stopPropagation()}>
+                  {many && <span className="tabular-nums font-medium">{zoom + 1} / {snaps.length}</span>}
+                  <span>{new Date(cur.at).toLocaleString()}</span>
+                </div>
+                {many && (
+                  <div className="mt-3 flex gap-1.5 overflow-x-auto max-w-full pb-1" onClick={(e) => e.stopPropagation()}>
+                    {snaps.map((s, i) => (
+                      <button key={i} onClick={() => setZoom(i)} aria-label={`Snapshot ${i + 1}`}
+                        className={`shrink-0 rounded overflow-hidden border-2 transition-opacity ${i === zoom ? 'border-brand-400' : 'border-transparent opacity-50 hover:opacity-100'}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.url} alt="" className="w-14 h-10 object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </Drawer>

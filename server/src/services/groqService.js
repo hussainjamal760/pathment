@@ -42,8 +42,35 @@ class GroqService {
     return {
       enabled: true,
       client: this._clientFor(cfg.apiKey, cfg.baseURL),
-      model: cfg.model || config.ai.model
+      model: cfg.model || config.ai.model,
+      provider: cfg.provider || config.ai.provider || null,
+      baseURL: cfg.baseURL || config.ai.baseURL || null,
     };
+  }
+
+  /**
+   * Transcribe a recorded audio answer with Whisper — far more accurate than the
+   * browser's live speech-to-text, which garbles accents and pronunciation. Uses
+   * the caller's resolved AI connection. Only Groq and OpenAI expose an
+   * OpenAI-compatible audio.transcriptions endpoint; for any other provider we
+   * return null and the caller falls back to whatever transcript it already had.
+   * @returns {Promise<string|null>} transcript text, or null if unavailable.
+   */
+  async transcribeAudio({ audioUrl, userId = null, feature = 'feedback' } = {}) {
+    if (!audioUrl) return null;
+    const ai = await this._resolve(feature, userId);
+    if (!ai.enabled) return null;
+    const isGroq = ai.provider === 'groq' || /groq\.com/i.test(ai.baseURL || '');
+    const isOpenAI = ai.provider === 'openai' || /api\.openai\.com/i.test(ai.baseURL || '');
+    const model = isGroq ? 'whisper-large-v3' : isOpenAI ? 'whisper-1' : null;
+    if (!model) return null; // provider can't transcribe audio via this endpoint
+
+    const resp = await fetch(audioUrl);
+    if (!resp.ok) throw new Error(`could not fetch audio (${resp.status})`);
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const file = await OpenAI.toFile(buf, 'answer.webm', { type: 'audio/webm' });
+    const out = await ai.client.audio.transcriptions.create({ file, model });
+    return (out?.text || '').trim() || null;
   }
 
   /**

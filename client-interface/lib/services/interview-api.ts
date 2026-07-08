@@ -195,7 +195,7 @@ export interface ReviewAnswer {
   timeSpentSeconds: number;
   pointsAwarded: number | null;
   scoreNote: string | null;
-  aiDraft: { score: number; suggestedPoints: number; note: string; at: string } | null;
+  aiDraft: { score: number; suggestedPoints: number; note: string; transcript?: string | null; at: string } | null;
 }
 export interface ReviewItem {
   questionId: string;

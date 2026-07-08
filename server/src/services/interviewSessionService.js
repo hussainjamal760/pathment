@@ -534,10 +534,11 @@ class InterviewSessionService {
     if (!task) throw new NotFoundError('Task not found');
     await this._assertReviewer(mentorId, task);
 
+    // AI draft is mentor-initiated and runs on the mentor's OWN key, so it's
+    // available whenever this is a real interview — not gated to the assign-time
+    // toggle (that toggle only controls whether it's suggested up front).
     const assignment = await models.InterviewAssignment.findOne({ where: { assignedTaskId: taskId } });
-    if (!assignment || !assignment.aiGradingEnabled) {
-      throw new ForbiddenError('AI grading is not enabled for this interview');
-    }
+    if (!assignment) throw new NotFoundError('This task is not an interview');
 
     const question = await models.InterviewQuestion.findByPk(questionId);
     if (!question) throw new ValidationError('Unknown question');
@@ -545,14 +546,33 @@ class InterviewSessionService {
     if (!session) throw new NotFoundError('No submitted interview to grade');
     const answer = await models.InterviewAnswer.findOne({ where: { sessionId: session.id, questionId } });
 
-    const candidate = [answer?.transcript, answer?.answerText, answer?.code].filter(Boolean).join('\n\n') || '(no answer given)';
     const groqService = require('./groqService');
+
+    // For a voice answer, re-transcribe the actual recording with Whisper — the
+    // browser's live STT frequently garbles accent/pronunciation, and grading that
+    // garbled text is unfair. Fall back to the browser transcript if unavailable.
+    let aiTranscript = null;
+    if (question.kind === 'voice' && answer?.audioUrl) {
+      try {
+        aiTranscript = await groqService.transcribeAudio({ audioUrl: answer.audioUrl, userId: mentorId, feature: 'feedback' });
+      } catch (e) {
+        console.error('[interview] Whisper transcription failed:', e.message);
+      }
+    }
+
+    const spoken = aiTranscript || answer?.transcript;
+    const candidate = [spoken, answer?.answerText, answer?.code].filter(Boolean).join('\n\n') || '(no answer given)';
     const raw = await groqService.generateText({
       feature: 'feedback',
       userId: mentorId,
-      temperature: 0.3,
-      maxTokens: 260,
-      system: 'You are an interview grader. Score the candidate answer against the reference on a 0–100 scale. Reply as strict JSON: {"score":<0-100>,"note":"<one or two sentences>"}. No prose outside the JSON.',
+      temperature: 0.2,
+      maxTokens: 280,
+      system: [
+        'You are a fair, experienced technical interviewer grading ONE answer.',
+        'Use the reference rubric — which may describe "at bar", "above bar", and "red flag" levels — to score the candidate from 0 to 100 on correctness and clarity.',
+        'The answer may be an automatic voice transcription, so overlook spelling, grammar and transcription noise — judge the underlying understanding, not the wording.',
+        'Reply with STRICT JSON only: {"score": <integer 0-100>, "note": "<one or two sentences: what was right and what was missing>"}. No text outside the JSON.',
+      ].join(' '),
       prompt: `Question:\n${question.prompt}\n\nReference answer / rubric:\n${question.referenceAnswer || '(none provided — judge on correctness and clarity)'}\n\nCandidate answer:\n${candidate}`,
     });
 
@@ -564,7 +584,7 @@ class InterviewSessionService {
 
     const pct = Math.max(0, Math.min(100, Number(parsed.score) || 0));
     const suggestedPoints = Math.round((pct / 100) * question.points);
-    const aiDraft = { score: pct, suggestedPoints, note: parsed.note || raw, at: new Date().toISOString() };
+    const aiDraft = { score: pct, suggestedPoints, note: parsed.note || raw, transcript: aiTranscript || null, at: new Date().toISOString() };
 
     const [row] = await models.InterviewAnswer.findOrCreate({
       where: { sessionId: session.id, questionId },
