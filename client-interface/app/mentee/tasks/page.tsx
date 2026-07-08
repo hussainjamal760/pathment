@@ -292,7 +292,7 @@ export default function MenteeTasks() {
                             onClick={() => router.push(interviewHref)}
                             className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
                           >
-                            Resume interview
+                            {task.status === 'revision_needed' ? 'Redo questions' : 'Resume interview'}
                           </button>
                         ) : isQuiz ? (
                           <button

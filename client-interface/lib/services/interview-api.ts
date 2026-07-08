@@ -117,6 +117,8 @@ export interface CandidateInterview {
     savedAnswers: SavedAnswer[];
     currentPosition: number;
     sessionStartedAt: string | null;
+    // When non-empty, the mentor asked the mentee to redo ONLY these questions.
+    redoQuestionIds?: string[];
   };
   serverNow: string;
 }
@@ -181,6 +183,8 @@ export const interviewApi = {
     apiClient.post(`/interviews/review/${taskId}/ai-draft`, { questionId }),
   finalizeReview: (taskId: string, overallNote?: string) =>
     apiClient.post(`/interviews/review/${taskId}/finalize`, { overallNote }),
+  requestRedo: (taskId: string, questionIds: string[], note?: string) =>
+    apiClient.post(`/interviews/review/${taskId}/request-redo`, { questionIds, note }),
   deleteSnapshots: (taskId: string) => apiClient.delete(`/interviews/review/${taskId}/snapshots`),
   flagInterview: (taskId: string, flagged: boolean, reason?: string) =>
     apiClient.post(`/interviews/review/${taskId}/flag`, { flagged, reason }),

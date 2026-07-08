@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -70,7 +70,14 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
   const recordingRef = useRef(recording);
   const recordingQuestionIdRef = useRef<string | null>(null);
 
-  const questions = data?.questions ?? [];
+  // A mentor-requested redo re-presents ONLY the flagged questions.
+  const redoQuestionIds = data?.state?.redoQuestionIds ?? [];
+  const isRedo = redoQuestionIds.length > 0;
+  const questions = useMemo(() => {
+    const all = data?.questions ?? [];
+    return isRedo ? all.filter((qq) => redoQuestionIds.includes(qq.id)) : all;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, isRedo]);
   const q: CandidateQuestion | undefined = questions[idx];
   const draft = q ? drafts[q.id] : undefined;
   const cameraRequired = !!data?.options.cameraRequired;
@@ -397,7 +404,9 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
       const startedAt = session?.startedAt || sessionStartedAt;
       setSessionStartedAt(startedAt || null);
       finishingRef.current = false;
-      const resumeIdx = Math.min(Math.max(0, data?.state.currentPosition ?? 0), questions.length - 1);
+      // A redo always starts at the first flagged question (the saved resume
+      // position refers to the original full attempt, not this short list).
+      const resumeIdx = isRedo ? 0 : Math.min(Math.max(0, data?.state.currentPosition ?? 0), questions.length - 1);
       setIdx(resumeIdx);
       const deadlineTs = (data?.options.timingMode === 'total' && startedAt && data?.options.totalSeconds)
         ? Date.parse(startedAt) + data.options.totalSeconds * 1000 - clockSkewRef.current
@@ -545,6 +554,13 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
             <h1 className="text-xl font-semibold text-slate-100">{data?.kit.title}</h1>
             <p className="text-slate-400 mt-1.5 text-sm">Meet <span className="text-brand-300 font-medium">{interviewerName}</span>, your interviewer.{data?.kit.description ? ` ${data.kit.description}` : ''}</p>
 
+            {isRedo && (
+              <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-left text-sm text-amber-100 flex items-start gap-2">
+                <RotateCcw className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+                <span>Your mentor asked you to redo {questions.length} question{questions.length === 1 ? '' : 's'}. Only {questions.length === 1 ? 'that one' : 'those'} will be asked again — the rest of your answers are kept.</span>
+              </div>
+            )}
+
             <div className="flex items-center justify-center gap-5 mt-5 text-sm text-slate-300">
               <span>{questions.length} question{questions.length === 1 ? '' : 's'}</span>
               <span className="tabular-nums">{data?.kit.totalPoints} pts</span>
@@ -567,7 +583,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
               </div>
             ) : (
               <button onClick={enterLobby} className="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium">
-                {resuming ? <><RotateCcw className="w-4 h-4" /> Resume interview</> : <><Play className="w-4 h-4" /> Continue to setup</>}
+                {resuming ? <><RotateCcw className="w-4 h-4" /> Resume interview</> : isRedo ? <><RotateCcw className="w-4 h-4" /> Continue to redo</> : <><Play className="w-4 h-4" /> Continue to setup</>}
               </button>
             )}
           </div>

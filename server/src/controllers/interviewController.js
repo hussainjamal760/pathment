@@ -125,6 +125,14 @@ exports.finalizeInterviewReview = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Interview review finalized', result));
 });
 
+// POST /api/interviews/review/:taskId/request-redo  { questionIds: [...], note? }
+exports.requestInterviewRedo = catchAsync(async (req, res) => {
+  const result = await interviewSessionService.requestRedo(req.params.taskId, req.user.id, {
+    questionIds: req.body.questionIds, note: req.body.note,
+  });
+  res.status(200).json(successResponse('Sent back for redo', result));
+});
+
 // DELETE /api/interviews/review/:taskId/snapshots
 exports.deleteInterviewSnapshots = catchAsync(async (req, res) => {
   const result = await interviewSessionService.deleteSnapshots(req.params.taskId, req.user.id);

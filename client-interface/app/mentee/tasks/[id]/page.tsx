@@ -423,10 +423,13 @@ export default function TaskDetailsPage({ params }: PageProps) {
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
             >
               <Mic className="w-4 h-4" />
-              {task.status === 'submitted' ? 'View your answers' : task.status === 'in_progress' ? 'Resume interview' : 'Start interview'}
+              {task.status === 'submitted' ? 'View your answers' : task.status === 'in_progress' ? 'Resume interview' : task.status === 'revision_needed' ? 'Redo questions' : 'Start interview'}
             </button>
             {task.status === 'submitted' && (
               <p className="text-xs text-slate-400">Your mentor will review your answers.</p>
+            )}
+            {task.status === 'revision_needed' && (
+              <p className="text-xs text-amber-600">Your mentor asked you to redo a few questions.</p>
             )}
           </div>
         )

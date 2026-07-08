@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   Loader2, Mic, Code2, Type, Volume2, Sparkles, Eye, AlertTriangle, CheckCircle2, Clock, Flag, Trash2, X,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, RotateCcw,
 } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import { CodeEditor } from '@/components/shared/CodeEditor';
@@ -51,6 +51,8 @@ export function InterviewReviewDrawer({
   const [flagReason, setFlagReason] = useState('');
   const [deletingSnaps, setDeletingSnaps] = useState(false);
   const [zoom, setZoom] = useState<number | null>(null); // index into proctor.snapshots
+  const [redoSel, setRedoSel] = useState<Set<string>>(new Set()); // question ids to send back
+  const [redoBusy, setRedoBusy] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -169,6 +171,25 @@ export function InterviewReviewDrawer({
     }
   };
 
+  const toggleRedo = (qid: string) => setRedoSel((s) => {
+    const n = new Set(s); if (n.has(qid)) n.delete(qid); else n.add(qid); return n;
+  });
+
+  const sendRedo = async () => {
+    if (redoBusy || redoSel.size === 0) return;
+    setRedoBusy(true);
+    try {
+      await interviewApi.requestRedo(taskId, [...redoSel], overallNote || undefined);
+      toast.success(`Sent back — the mentee will redo ${redoSel.size} question${redoSel.size === 1 ? '' : 's'}`);
+      onFinalized?.();
+      onClose();
+    } catch (e: any) {
+      toast.error(extractApiErrorMessage(e, 'Could not send back for redo'));
+    } finally {
+      setRedoBusy(false);
+    }
+  };
+
   const totalAwarded = review?.items.reduce((s, it) => s + (Number(scores[it.questionId]?.points) || 0), 0) ?? 0;
   const totalPossible = review?.totals.totalPossible ?? 0;
 
@@ -182,10 +203,17 @@ export function InterviewReviewDrawer({
       footer={canReview ? (
         <>
           <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Close</button>
-          <button onClick={finalize} disabled={finalizing} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
-            {finalizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-            Finalize · {totalAwarded}/{totalPossible} pts
-          </button>
+          {redoSel.size > 0 ? (
+            <button onClick={sendRedo} disabled={redoBusy} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+              {redoBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              Send back to redo · {redoSel.size}
+            </button>
+          ) : (
+            <button onClick={finalize} disabled={finalizing} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm inline-flex items-center gap-2 disabled:opacity-50">
+              {finalizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Finalize · {totalAwarded}/{totalPossible} pts
+            </button>
+          )}
         </>
       ) : (
         <button onClick={onClose} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Close</button>
@@ -287,6 +315,14 @@ export function InterviewReviewDrawer({
                     <span className="text-slate-400 font-normal">· {it.points} pts</span>
                     {a?.timeSpentSeconds ? <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Clock className="w-3 h-3" />{fmtClock(a.timeSpentSeconds)}</span> : null}
                   </div>
+                  {canReview && (
+                    <label className={`inline-flex items-center gap-1.5 text-xs cursor-pointer shrink-0 ${redoSel.has(it.questionId) ? 'text-amber-700 font-medium' : 'text-slate-500 hover:text-slate-700'}`}
+                      title="Ask the mentee to re-answer this question">
+                      <input type="checkbox" checked={redoSel.has(it.questionId)} onChange={() => toggleRedo(it.questionId)}
+                        className="rounded border-slate-300 text-amber-500 focus:ring-amber-400" />
+                      <RotateCcw className="w-3.5 h-3.5" /> Redo
+                    </label>
+                  )}
                 </div>
                 <p className="text-sm text-slate-900 mb-3">{it.prompt}</p>
 

@@ -77,10 +77,15 @@ class InterviewSessionService {
     });
     const active = sessions.find((s) => s.status === 'in_progress') || null;
     const submittedCount = sessions.filter((s) => s.status === 'submitted').length;
+    const latestSubmitted = sessions.find((s) => s.status === 'submitted') || null;
 
-    // Can they take it? Fresh if no attempts; resumable if one's in progress;
-    // otherwise only when retake is allowed.
-    const canStart = !active && (submittedCount === 0 || assignment.allowRetake);
+    // A mentor-requested partial redo re-opens THIS session for just the flagged
+    // questions — allowed regardless of the full-retake setting.
+    const redoQuestionIds = ((active || latestSubmitted)?.meta?.redoQuestionIds || []).map(String);
+
+    // Can they take it? Fresh if no attempts; resumable if one's in progress; a
+    // redo is pending; otherwise only when retake is allowed.
+    const canStart = !active && (submittedCount === 0 || assignment.allowRetake || redoQuestionIds.length > 0);
 
     let answers = [];
     if (active) {
@@ -123,6 +128,8 @@ class InterviewSessionService {
         // Resume metadata: where they were, and when the (total-mode) session began.
         currentPosition: active ? (active.currentPosition || 0) : 0,
         sessionStartedAt: active ? active.startedAt : null,
+        // When non-empty, the mentor asked the mentee to redo ONLY these questions.
+        redoQuestionIds,
       },
       // Server clock so the client can correct for local clock skew when computing
       // remaining time (all deadlines are wall-clock, server-authoritative).
@@ -145,6 +152,10 @@ class InterviewSessionService {
       throw new ValidationError('That question is not part of this interview');
     }
 
+    // A redo re-answers flagged questions with a FRESH per-question timer.
+    const redo = (session.meta?.redoQuestionIds || []).map(String);
+    const isRedo = redo.length > 0 && redo.includes(String(questionId));
+
     const [answer] = await models.InterviewAnswer.findOrCreate({
       where: { sessionId, questionId },
       defaults: {
@@ -157,8 +168,9 @@ class InterviewSessionService {
         startedAt: new Date(),
       },
     });
-    // Only stamp the start once — resuming must NOT reset the clock.
-    if (!answer.startedAt) await answer.update({ startedAt: new Date() });
+    // Only stamp the start once — resuming must NOT reset the clock — EXCEPT a redo,
+    // which restarts that question's clock fresh.
+    if (!answer.startedAt || isRedo) await answer.update({ startedAt: new Date() });
     // Advance the resume position forward-only (you can't go back to a question).
     if (question.position > (session.currentPosition || 0)) {
       await session.update({ currentPosition: question.position });
@@ -174,6 +186,20 @@ class InterviewSessionService {
       where: { assignedTaskId: taskId, menteeId, status: 'in_progress' },
     });
     if (existing) return this._sessionShape(existing);
+
+    // Mentor-requested partial redo: re-open the SUBMITTED session (keeping every
+    // other answer, the proctor log, and the attempt number) rather than starting a
+    // brand-new attempt. This is independent of the full-retake setting.
+    const latestSubmitted = await models.InterviewSession.findOne({
+      where: { assignedTaskId: taskId, menteeId, status: 'submitted' },
+      order: [['attempt_number', 'DESC']],
+    });
+    if (latestSubmitted && (latestSubmitted.meta?.redoQuestionIds || []).length > 0) {
+      await latestSubmitted.update({ status: 'in_progress' });
+      const task = await models.AssignedTask.findByPk(taskId);
+      if (task) await task.update({ status: 'in_progress' });
+      return this._sessionShape(latestSubmitted);
+    }
 
     const submittedCount = await models.InterviewSession.count({
       where: { assignedTaskId: taskId, menteeId, status: 'submitted' },
@@ -229,6 +255,12 @@ class InterviewSessionService {
   async saveAnswer(sessionId, menteeId, questionId, payload = {}) {
     const session = await this._openSession(sessionId, menteeId);
     if (!questionId) throw new ValidationError('questionId is required');
+
+    // During a mentor-requested redo, only the flagged questions may be re-answered.
+    const redo = (session.meta?.redoQuestionIds || []).map(String);
+    if (redo.length > 0 && !redo.includes(String(questionId))) {
+      throw new ForbiddenError('This question is not part of the requested redo.');
+    }
 
     const question = await models.InterviewQuestion.findByPk(questionId);
     if (!question || question.kitId !== (await this._kitIdForSession(session))) {
@@ -524,6 +556,64 @@ class InterviewSessionService {
   }
 
   /**
+   * Mentor asks the mentee to redo ONLY the selected questions (e.g. answers that
+   * came back missing or unclear). Flags them on the session and sends the task
+   * back through the normal request-changes path (status + feedback + notification).
+   * The mentee then re-answers just those questions in the runner, in place —
+   * independent of the full-retake setting.
+   */
+  async requestRedo(taskId, mentorId, { questionIds = [], note } = {}) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    await this._assertReviewer(mentorId, task);
+
+    const requested = [...new Set((questionIds || []).map(String))].filter(Boolean);
+    if (requested.length === 0) throw new ValidationError('Select at least one question to redo.');
+
+    const session = await this._latestSubmittedSession(taskId);
+    if (!session) throw new NotFoundError('No submitted interview to send back');
+    const submissionId = session.meta?.submissionId;
+    if (!submissionId) throw new ValidationError('This interview has no submission to send back');
+
+    // Only keep ids that are genuinely part of this interview's kit.
+    const kitId = await this._kitIdForSession(session);
+    const valid = await models.InterviewQuestion.findAll({ where: { id: requested, kitId }, attributes: ['id'] });
+    const validIds = valid.map((q) => String(q.id));
+    if (validIds.length === 0) throw new ValidationError('None of the selected questions are part of this interview.');
+
+    const n = validIds.length;
+    const redoNote = note || `Please redo ${n} question${n === 1 ? '' : 's'} — the answer${n === 1 ? ' was' : 's were'} missing or unclear.`;
+    await session.update({ meta: { ...(session.meta || {}), redoQuestionIds: validIds, redoNote } });
+
+    // Send the task back WITHOUT the shared review path — a redo has no star
+    // rating (which reviewSubmission requires) and shouldn't finalize a score.
+    await models.TaskSubmission.update({ status: 'revision_needed' }, { where: { id: submissionId } });
+    await task.update({ status: 'revision_needed', revisionCount: (task.revisionCount || 0) + 1 });
+
+    try {
+      const reviewer = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
+      const who = reviewer ? `${reviewer.firstName} ${reviewer.lastName}`.trim() : 'Your mentor';
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.SUBMISSION_REVIEWED,
+        recipients: [{ userId: task.menteeId }],
+        payload: {
+          title: `${who} asked you to redo ${n} question${n === 1 ? '' : 's'}`,
+          message: redoNote,
+          actionUrl: `/mentee/interviews/${task.id}`,
+          actionLabel: 'Redo questions',
+          relatedEntityType: 'task_submission',
+          relatedEntityId: submissionId,
+        },
+        dedupe: { relatedEntityType: 'interview_redo', relatedEntityId: submissionId },
+      });
+    } catch (e) {
+      console.error('interview redo notification failed:', e.message);
+    }
+
+    return { redoQuestionIds: validIds, count: n };
+  }
+
+  /**
    * AI draft grade for one answer (optional assist, gated on the assignment's
    * aiGradingEnabled + a configured BYO key). Suggests a score + short note by
    * comparing the candidate's answer to the reference answer. Stored on the
@@ -642,6 +732,8 @@ class InterviewSessionService {
     if (!task) throw new NotFoundError('Task not found');
 
     const answeredCount = await models.InterviewAnswer.count({ where: { sessionId } });
+    const redoIds = (session.meta?.redoQuestionIds || []);
+    const wasRedo = redoIds.length > 0;
 
     return sequelize.transaction(async (transaction) => {
       await session.update({ status: 'submitted', submittedAt: new Date() }, { transaction });
@@ -658,7 +750,9 @@ class InterviewSessionService {
       const submission = await models.TaskSubmission.create({
         assignedTaskId: task.id,
         version,
-        submissionText: `Interview completed — ${answeredCount} answer${answeredCount === 1 ? '' : 's'} (attempt ${session.attemptNumber}).`,
+        submissionText: wasRedo
+          ? `Interview redo submitted — ${redoIds.length} question${redoIds.length === 1 ? '' : 's'} re-answered.`
+          : `Interview completed — ${answeredCount} answer${answeredCount === 1 ? '' : 's'} (attempt ${session.attemptNumber}).`,
         submissionUrls: [],
         status: 'pending',
         submittedAt: new Date(),
@@ -673,7 +767,8 @@ class InterviewSessionService {
 
       // Persist the session id on the submission meta-less way: store it via meta
       // on the session already; the reviewer resolves the session by task.
-      await session.update({ meta: { ...(session.meta || {}), submissionId: submission.id } }, { transaction });
+      // Clear the redo request now that it's been re-answered and re-submitted.
+      await session.update({ meta: { ...(session.meta || {}), submissionId: submission.id, redoQuestionIds: [] } }, { transaction });
 
       return { submissionId: submission.id, sessionId: session.id, version };
     }).then(async (out) => {
