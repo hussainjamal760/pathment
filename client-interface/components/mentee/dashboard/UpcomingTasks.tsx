@@ -85,7 +85,7 @@ export function UpcomingTasks({ tasks }: { tasks?: Task[] }) {
                 <Badge variant={task.status === 'in_progress' ? 'default' : 'secondary'}>
                   {task.status === 'in_progress' ? 'In Progress' : 'Assigned'}
                 </Badge>
-                <Link href={`/mentee/tasks/submit/${task.id}`}>
+                <Link href={`/mentee/tasks/${task.id}`}>
                   <Button size="sm" variant={task.status === 'in_progress' ? 'default' : 'outline'}>
                     {task.status === 'in_progress' ? 'Submit' : 'Start'}
                   </Button>

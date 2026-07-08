@@ -19,7 +19,9 @@ class SubmissionService {
    * Submit task with files and rich text content
    */
   async submitTaskWithFiles(taskId, menteeId, submissionData, files = []) {
-    const task = await models.AssignedTask.findByPk(taskId);
+    const task = await models.AssignedTask.findByPk(taskId, {
+      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['type'] }],
+    });
 
     if (!task) {
       throw new NotFoundError('Task not found');
@@ -31,6 +33,15 @@ class SubmissionService {
 
     if (task.status === 'completed') {
       throw new ValidationError('Task is already completed');
+    }
+
+    // Interview and quiz tasks are ONLY completed through their own runners
+    // (which create their own submission). A plain "Submit Work" submission must
+    // never attach to them — otherwise a stale client / bookmarked submit page
+    // lets a mentee pile generic text submissions onto an interview or quiz.
+    const taskType = task.roadmapTask?.type;
+    if (taskType === 'interview' || taskType === 'quiz') {
+      throw new ValidationError(`This is a ${taskType} task — complete it through the ${taskType}, not a work submission.`);
     }
 
     // Upload files to Cloudinary
