@@ -317,7 +317,16 @@ export default function MenteeTasks() {
                         )
                       )}
 
-                      {task.status === 'submitted' && (
+                      {isQuiz && (task.status === 'submitted' || task.status === 'completed') && (
+                        <button
+                          onClick={() => router.push(quizHref)}
+                          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                        >
+                          View quiz
+                        </button>
+                      )}
+
+                      {task.status === 'submitted' && !isQuiz && (
                         <span className="text-slate-600 text-sm shrink-0">
                           Awaiting review
                         </span>

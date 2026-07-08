@@ -60,6 +60,9 @@ export default function FeedbackView({ params }: PageProps) {
 
   const taskTitle = task.roadmapTask?.title || task.title || 'Task Feedback';
   const taskDescription = task.roadmapTask?.description || task.description || '';
+  // Descriptions are authored in a rich-text editor (HTML); older ones are plain
+  // text. Render HTML safely, fall back to plain text — otherwise raw <p> tags show.
+  const descriptionIsHtml = /<[a-z][\s\S]*>/i.test(taskDescription);
   const latestSubmission = task.submissions?.[task.submissions.length - 1] || null;
   const feedback = latestSubmission?.feedback || [];
   const latestFeedback = feedback[feedback.length - 1] || null;
@@ -106,9 +109,11 @@ export default function FeedbackView({ params }: PageProps) {
                 Completed
               </span>
             </div>
-            {taskDescription && (
-              <p className="text-slate-600 text-sm">{taskDescription}</p>
-            )}
+            {taskDescription && (descriptionIsHtml ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: taskDescription }} />
+            ) : (
+              <p className="text-slate-600 text-sm whitespace-pre-wrap">{taskDescription}</p>
+            ))}
           </div>
         </div>
 

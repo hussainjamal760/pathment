@@ -239,12 +239,13 @@ export default function QuizRunnerPage({ params }: { params: Promise<{ taskId: s
   // ── Intro ────────────────────────────────────────────────────────────────────
   if (phase === 'intro') {
     const resuming = !!data?.state.activeSessionId;
-    const canStart = !!data?.state.canStart || resuming;
     const last = data?.state.lastResult;
     const auto = opts?.evaluationMode === 'auto';
 
-    // Already completed and can't retake — show the previous result summary.
-    if (!canStart && last) {
+    // Completed at least once (and not mid-attempt) — show the previous result,
+    // plus a Retake button when the assignment allows another attempt.
+    if (last && !resuming) {
+      const canRetake = !!data?.state.canStart;
       return (
         <Stage>
           <div className="max-w-md w-full">
@@ -267,7 +268,14 @@ export default function QuizRunnerPage({ params }: { params: Promise<{ taskId: s
                 <p className="text-sm text-slate-500 mt-5">Your mentor is reviewing your submission.</p>
               )}
 
-              <button onClick={backToTask} className="mt-7 px-5 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">Back to task</button>
+              <div className="mt-7 flex items-center justify-center gap-2">
+                {canRetake && (
+                  <button onClick={startQuiz} className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium inline-flex items-center gap-2">
+                    <RotateCcw className="w-4 h-4" /> Retake quiz
+                  </button>
+                )}
+                <button onClick={backToTask} className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50">Back to task</button>
+              </div>
             </div>
           </div>
         </Stage>
@@ -282,7 +290,11 @@ export default function QuizRunnerPage({ params }: { params: Promise<{ taskId: s
               <ListChecks className="w-7 h-7 text-brand-600" />
             </div>
             <h1 className="text-xl font-semibold text-slate-900">{data?.kit.title}</h1>
-            {data?.kit.description && <p className="text-slate-500 mt-1.5 text-sm">{data.kit.description}</p>}
+            {data?.kit.description && (/<[a-z][\s\S]*>/i.test(data.kit.description) ? (
+              <div className="prose prose-sm max-w-none text-slate-500 mt-1.5" dangerouslySetInnerHTML={{ __html: data.kit.description }} />
+            ) : (
+              <p className="text-slate-500 mt-1.5 text-sm whitespace-pre-wrap">{data.kit.description}</p>
+            ))}
 
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-5 text-sm text-slate-600">
               <span>{questions.length} question{questions.length === 1 ? '' : 's'}</span>

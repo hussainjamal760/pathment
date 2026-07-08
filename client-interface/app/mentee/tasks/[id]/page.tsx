@@ -19,6 +19,7 @@ import {
   Loader2,
   StickyNote,
   Mic,
+  ListChecks,
 } from 'lucide-react';
 import { ResourceLink } from '@/components/shared/ResourceLink';
 import { useTaskDetail } from '@/lib/hooks/mentee';
@@ -93,6 +94,9 @@ export default function TaskDetailsPage({ params }: PageProps) {
   // Interview tasks are done in the full-screen runner, not the submit drawer.
   const isInterview = (task.roadmapTask?.type || task.type) === 'interview';
   const openInterview = () => router.push(`/mentee/interviews/${task.id}`);
+  // Quiz tasks run in the quiz runner (start/resume/retake/view) — never the submit drawer.
+  const isQuiz = (task.roadmapTask?.type || task.type) === 'quiz';
+  const openQuiz = () => router.push(`/mentee/quizzes/${task.id}`);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -426,6 +430,30 @@ export default function TaskDetailsPage({ params }: PageProps) {
             )}
           </div>
         )
+      ) : isQuiz ? (
+        (task.status === 'completed' || task.status === 'submitted') ? (
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={openQuiz}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
+            >
+              <ListChecks className="w-4 h-4" /> View quiz result
+            </button>
+            {task.status === 'submitted' && (
+              <p className="text-xs text-slate-400">Your mentor will confirm your score.</p>
+            )}
+          </div>
+        ) : task.status !== 'cancelled' && (
+          <div className="flex justify-end">
+            <button
+              onClick={openQuiz}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium transition-colors"
+            >
+              <ListChecks className="w-4 h-4" />
+              {task.status === 'in_progress' ? 'Resume quiz' : 'Start quiz'}
+            </button>
+          </div>
+        )
       ) : (
         canSubmit && (
           <div className="flex flex-col items-end gap-1">
@@ -442,7 +470,7 @@ export default function TaskDetailsPage({ params }: PageProps) {
         )
       )}
 
-      {!isInterview && (
+      {!isInterview && !isQuiz && (
         <SubmitTaskDrawer
           open={submitOpen}
           task={{ id: task.id, title: taskTitle, status: task.status, deliverable: taskDeliverable, acceptanceCriteria }}
