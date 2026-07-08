@@ -88,7 +88,7 @@ exports.logProctor = catchAsync(async (req, res) => {
 
 // POST /api/interviews/sessions/:sessionId/snapshot  (multipart: image)
 exports.uploadSnapshot = catchAsync(async (req, res) => {
-  const result = await interviewSessionService.attachSnapshot(req.params.sessionId, req.user.id, req.file);
+  const result = await interviewSessionService.attachSnapshot(req.params.sessionId, req.user.id, req.file, req.body.questionId || null);
   res.status(200).json(successResponse('Snapshot saved', result));
 });
 
@@ -117,6 +117,12 @@ exports.gradeInterviewAnswer = catchAsync(async (req, res) => {
 exports.aiDraftInterviewAnswer = catchAsync(async (req, res) => {
   const result = await interviewSessionService.aiDraftAnswer(req.params.taskId, req.user.id, req.body.questionId);
   res.status(200).json(successResponse('AI draft ready', { aiDraft: result }));
+});
+
+// POST /api/interviews/review/:taskId/ai-draft-all
+exports.aiDraftAllInterview = catchAsync(async (req, res) => {
+  const result = await interviewSessionService.aiDraftAll(req.params.taskId, req.user.id);
+  res.status(200).json(successResponse('AI grading complete', result));
 });
 
 // POST /api/interviews/review/:taskId/finalize  { overallNote? }

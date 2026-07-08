@@ -167,9 +167,10 @@ export const interviewApi = {
   },
   logProctor: (sessionId: string, events: ProctorEvent[]) =>
     apiClient.post(`/interviews/sessions/${sessionId}/proctor`, { events }),
-  uploadSnapshot: (sessionId: string, blob: Blob) => {
+  uploadSnapshot: (sessionId: string, blob: Blob, questionId?: string | null) => {
     const fd = new FormData();
     fd.append('image', blob, `snapshot-${Date.now()}.jpg`);
+    if (questionId) fd.append('questionId', questionId);
     return apiClient.post(`/interviews/sessions/${sessionId}/snapshot`, fd);
   },
   submitInterview: (sessionId: string) =>
@@ -181,6 +182,8 @@ export const interviewApi = {
     apiClient.patch(`/interviews/review/${taskId}/answer`, { questionId, ...data }),
   aiDraftAnswer: (taskId: string, questionId: string) =>
     apiClient.post(`/interviews/review/${taskId}/ai-draft`, { questionId }),
+  aiDraftAll: (taskId: string) =>
+    apiClient.post(`/interviews/review/${taskId}/ai-draft-all`, {}),
   finalizeReview: (taskId: string, overallNote?: string) =>
     apiClient.post(`/interviews/review/${taskId}/finalize`, { overallNote }),
   requestRedo: (taskId: string, questionIds: string[], note?: string) =>
@@ -210,6 +213,7 @@ export interface ReviewItem {
   codeLanguage: string | null;
   referenceAnswer: string | null;
   answer: ReviewAnswer | null;
+  snapshots?: { url: string; at: string; questionId: string | null }[];
 }
 export interface InterviewReview {
   task: { id: string; status: string; pointsAwarded: number | null; menteeId: string };
@@ -220,7 +224,7 @@ export interface InterviewReview {
     mentee: { id: string; name: string; avatarUrl: string | null } | null;
   } | null;
   proctor: {
-    snapshots: { url: string; at: string }[];
+    snapshots: { url: string; at: string; questionId?: string | null }[];
     flags: { type: string; at: string; meta: Record<string, unknown> }[];
     flagCounts: Record<string, number>;
   };

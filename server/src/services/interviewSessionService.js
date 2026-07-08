@@ -361,11 +361,13 @@ class InterviewSessionService {
    * `snapshot` event carrying its URL. Called on an interval (and on suspicious
    * events) while the camera is required, so the mentor can eyeball presence.
    */
-  async attachSnapshot(sessionId, menteeId, file) {
+  async attachSnapshot(sessionId, menteeId, file, questionId = null) {
     const session = await this._openSession(sessionId, menteeId);
     if (!file || !file.buffer) throw new ValidationError('No snapshot received');
     const result = await uploadToCloudinary(file.buffer, 'pathment/interviews/snapshots', 'image');
-    const event = { type: 'snapshot', at: new Date().toISOString(), meta: { url: result.secure_url, publicId: result.public_id } };
+    const meta = { url: result.secure_url, publicId: result.public_id };
+    if (questionId) meta.questionId = String(questionId);
+    const event = { type: 'snapshot', at: new Date().toISOString(), meta };
     await session.update({ proctorLog: [...(session.proctorLog || []), event] });
     return { url: result.secure_url };
   }
@@ -414,13 +416,32 @@ class InterviewSessionService {
     const answerByQ = new Map(answers.map((a) => [a.questionId, a]));
 
     const proctorLog = session ? (session.proctorLog || []) : [];
-    const snapshots = proctorLog.filter((e) => e.type === 'snapshot').map((e) => ({ url: e.meta?.url, at: e.at }));
+    // Bucket each snapshot to the question that was active when it was taken:
+    // prefer an explicit questionId captured at snapshot time (newer interviews),
+    // else fall back to the answer whose `startedAt` most recently preceded it —
+    // so older interviews also get per-question images retroactively.
+    const answerStarts = answers
+      .filter((a) => a.startedAt)
+      .map((a) => ({ questionId: a.questionId, t: new Date(a.startedAt).getTime() }))
+      .sort((x, y) => x.t - y.t);
+    const bucketQuestion = (atIso) => {
+      const t = new Date(atIso).getTime();
+      let qid = null;
+      for (const s of answerStarts) { if (s.t <= t) qid = s.questionId; else break; }
+      return qid;
+    };
+    const snapshots = proctorLog.filter((e) => e.type === 'snapshot').map((e) => ({
+      url: e.meta?.url,
+      at: e.at,
+      questionId: e.meta?.questionId || bucketQuestion(e.at),
+    }));
     const flags = proctorLog.filter((e) => e.type !== 'snapshot');
     const flagCounts = flags.reduce((m, e) => { m[e.type] = (m[e.type] || 0) + 1; return m; }, {});
 
     const items = questions.map((q) => {
       const a = answerByQ.get(q.id);
       return {
+        snapshots: isOwnerMentee ? [] : snapshots.filter((s) => s.questionId === q.id),
         questionId: q.id,
         position: q.position,
         kind: q.kind,
@@ -659,7 +680,8 @@ class InterviewSessionService {
       maxTokens: 280,
       system: [
         'You are a fair, experienced technical interviewer grading ONE answer.',
-        'Use the reference rubric — which may describe "at bar", "above bar", and "red flag" levels — to score the candidate from 0 to 100 on correctness and clarity.',
+        `Score the candidate from 0 to 100 for this question (worth ${question.points} points), using the reference rubric if one is given.`,
+        'Calibrate honestly: 85–100 = clearly above bar, 60–84 = meets the bar, 40–59 = partial or shaky, below 40 = incorrect or a red flag. Give partial credit — a good-but-imperfect answer is not a low score.',
         'The answer may be an automatic voice transcription, so overlook spelling, grammar and transcription noise — judge the underlying understanding, not the wording.',
         'Reply with STRICT JSON only: {"score": <integer 0-100>, "note": "<one or two sentences: what was right and what was missing>"}. No text outside the JSON.',
       ].join(' '),
@@ -685,6 +707,123 @@ class InterviewSessionService {
     });
     await row.update({ aiDraft });
     return aiDraft;
+  }
+
+  /**
+   * Grade EVERY answer in one pass so the mentor doesn't have to click each
+   * question. Voice answers are re-transcribed with Whisper (reusing any
+   * transcript already cached on the answer so re-runs are free), then the
+   * questions are graded in context-sized chunks — one AI request per chunk
+   * instead of one per question. Returns the per-question suggested points/notes;
+   * the mentor still sets the final score (the client applies these as drafts).
+   */
+  async aiDraftAll(taskId, mentorId) {
+    const task = await models.AssignedTask.findByPk(taskId);
+    if (!task) throw new NotFoundError('Task not found');
+    await this._assertReviewer(mentorId, task);
+
+    const assignment = await models.InterviewAssignment.findOne({ where: { assignedTaskId: taskId } });
+    if (!assignment) throw new NotFoundError('This task is not an interview');
+
+    const kit = await models.InterviewKit.findByPk(assignment.kitId, {
+      include: [{ model: models.InterviewQuestion, as: 'questions' }],
+    });
+    const questions = [...((kit && kit.questions) || [])].sort((a, b) => a.position - b.position);
+    if (questions.length === 0) return { drafts: [], graded: 0 };
+
+    const session = await this._latestSubmittedSession(taskId);
+    if (!session) throw new NotFoundError('No submitted interview to grade');
+    const answers = await models.InterviewAnswer.findAll({ where: { sessionId: session.id } });
+    const answerByQ = new Map(answers.map((a) => [a.questionId, a]));
+
+    const groqService = require('./groqService');
+
+    // 1) Transcribe voice answers with Whisper, reusing a cached transcript when we
+    //    already have one. Best-effort per answer — a failure just falls back to the
+    //    browser transcript for that one question.
+    const transcripts = new Map(); // questionId -> transcript text
+    await Promise.all(questions
+      .filter((q) => q.kind === 'voice')
+      .map(async (q) => {
+        const a = answerByQ.get(q.id);
+        if (!a || !a.audioUrl) return;
+        if (a.aiDraft && a.aiDraft.transcript) { transcripts.set(q.id, a.aiDraft.transcript); return; }
+        try {
+          const t = await groqService.transcribeAudio({ audioUrl: a.audioUrl, userId: mentorId, feature: 'feedback' });
+          if (t) transcripts.set(q.id, t);
+        } catch (e) {
+          console.error('[interview] batch Whisper failed:', e.message);
+        }
+      }));
+
+    // 2) Build the gradeable payload for each question.
+    const gradeItems = questions.map((q) => {
+      const a = answerByQ.get(q.id);
+      const spoken = transcripts.get(q.id) || a?.transcript || null;
+      const candidate = [spoken, a?.answerText, a?.code].filter(Boolean).join('\n\n') || '(no answer given)';
+      return { q, a, candidate, transcript: transcripts.get(q.id) || null };
+    });
+
+    // 3) Grade in context-sized chunks — one AI call per chunk, JSON array back.
+    const CHUNK = 8;
+    const scoreByQ = new Map(); // questionId -> { score, note }
+    for (let i = 0; i < gradeItems.length; i += CHUNK) {
+      const batch = gradeItems.slice(i, i + CHUNK);
+      const body = batch.map((it, j) => (
+        `[Q${i + j + 1}] id: ${it.q.id} · worth ${it.q.points} points\n` +
+        `Question: ${it.q.prompt}\n` +
+        `Reference / rubric: ${it.q.referenceAnswer || '(none — judge on correctness and clarity)'}\n` +
+        `Candidate answer: ${it.candidate}`
+      )).join('\n\n---\n\n');
+      let raw;
+      try {
+        raw = await groqService.generateText({
+          feature: 'feedback',
+          userId: mentorId,
+          temperature: 0.2,
+          maxTokens: Math.min(1800, 140 * batch.length + 120),
+          system: [
+            'You are a fair, experienced technical interviewer grading several interview answers at once.',
+            'Each block gives a question, its point value, an optional reference rubric, and the candidate answer (which may be an automatic voice transcription — overlook spelling, grammar and transcription noise and judge the underlying understanding).',
+            'Score EACH answer 0–100 against ITS OWN rubric. Calibrate honestly: 85–100 = clearly above bar, 60–84 = meets the bar, 40–59 = partial or shaky, below 40 = incorrect or a red flag. Give partial credit.',
+            'Reply with STRICT JSON only: an array like [{"id":"<the exact id shown>","score":<integer 0-100>,"note":"<one or two sentences: what was right and what was missing>"}]. One object per question, no text outside the JSON.',
+          ].join(' '),
+          prompt: body,
+        });
+      } catch (e) {
+        console.error('[interview] batch grade chunk failed:', e.message);
+        continue;
+      }
+      try {
+        const match = raw.match(/\[[\s\S]*\]/);
+        const arr = match ? JSON.parse(match[0]) : [];
+        for (const r of arr) {
+          if (r && r.id) scoreByQ.set(String(r.id), { score: r.score, note: r.note });
+        }
+      } catch { /* skip an unparseable chunk; other chunks still land */ }
+    }
+
+    // 4) Persist a draft on each answer and return the suggestions.
+    const at = new Date().toISOString();
+    const drafts = [];
+    for (const it of gradeItems) {
+      const r = scoreByQ.get(String(it.q.id));
+      if (!r && !it.transcript) continue; // nothing new for this question
+      const pct = Math.max(0, Math.min(100, Number(r?.score) || 0));
+      const suggestedPoints = Math.round((pct / 100) * it.q.points);
+      const aiDraft = { score: pct, suggestedPoints, note: r?.note || null, transcript: it.transcript, at };
+      const [row] = await models.InterviewAnswer.findOrCreate({
+        where: { sessionId: session.id, questionId: it.q.id },
+        defaults: {
+          sessionId: session.id, questionId: it.q.id, position: it.q.position,
+          kind: it.q.kind, promptSnapshot: it.q.prompt, pointsPossible: it.q.points, aiDraft,
+        },
+      });
+      await row.update({ aiDraft });
+      drafts.push({ questionId: it.q.id, suggestedPoints, note: aiDraft.note, score: pct });
+    }
+
+    return { drafts, graded: drafts.length };
   }
 
   /**

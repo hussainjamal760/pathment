@@ -32,6 +32,7 @@ router.post('/sessions/:sessionId/submit', authenticate, interviewController.sub
 router.get('/review/:taskId', authenticate, interviewController.getInterviewReview);
 router.patch('/review/:taskId/answer', authenticate, interviewController.gradeInterviewAnswer);
 router.post('/review/:taskId/ai-draft', authenticate, interviewController.aiDraftInterviewAnswer);
+router.post('/review/:taskId/ai-draft-all', authenticate, interviewController.aiDraftAllInterview);
 router.post('/review/:taskId/finalize', authenticate, interviewController.finalizeInterviewReview);
 router.post('/review/:taskId/request-redo', authenticate, interviewController.requestInterviewRedo);
 router.delete('/review/:taskId/snapshots', authenticate, interviewController.deleteInterviewSnapshots);

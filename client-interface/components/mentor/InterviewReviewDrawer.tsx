@@ -46,6 +46,7 @@ export function InterviewReviewDrawer({
   const [scores, setScores] = useState<Record<string, { points: string; note: string }>>({});
   const [overallNote, setOverallNote] = useState('');
   const [aiBusy, setAiBusy] = useState<string | null>(null);
+  const [aiAllBusy, setAiAllBusy] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [flagged, setFlagged] = useState(false);
   const [flagReason, setFlagReason] = useState('');
@@ -118,6 +119,34 @@ export function InterviewReviewDrawer({
       setAiBusy(null);
     }
   };
+
+  // Grade every answer in one pass, then apply each AI suggestion as the working
+  // score (persisted) so the mentor only has to tweak the ones they disagree with.
+  const runAiAll = async () => {
+    if (aiAllBusy || !review) return;
+    setAiAllBusy(true);
+    try {
+      const res: any = await interviewApi.aiDraftAll(taskId);
+      const drafts: { questionId: string; suggestedPoints: number; note: string | null }[] = res?.data?.drafts || [];
+      const byQ = new Map(drafts.map((d) => [d.questionId, d]));
+      for (const it of review.items) {
+        const d = byQ.get(it.questionId);
+        if (!d) continue;
+        await saveScore(it, { points: String(d.suggestedPoints), ...(d.note ? { note: d.note } : {}) });
+      }
+      toast.success(drafts.length
+        ? `AI graded ${drafts.length} answer${drafts.length === 1 ? '' : 's'} — adjust any you disagree with`
+        : 'No answers to grade');
+      load(); // refresh Whisper transcripts + persisted scores
+    } catch (e: any) {
+      toast.error(extractApiErrorMessage(e, 'AI grade all failed'));
+    } finally {
+      setAiAllBusy(false);
+    }
+  };
+
+  const scrollToQ = (qid: string) =>
+    document.getElementById(`q-card-${qid}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const toggleFlag = async () => {
     const next = !flagged;
@@ -236,6 +265,49 @@ export function InterviewReviewDrawer({
             </div>
           </div>
 
+          {/* Review-all summary — score every question in one place, one-click AI
+              grade-all, and jump into a card for the detail. */}
+          {canReview && review.items.length > 0 && (
+            <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                <span className="text-sm font-medium text-slate-700">All answers · quick score</span>
+                <button onClick={runAiAll} disabled={aiAllBusy}
+                  title="Transcribe voice answers with Whisper and score every question against its rubric — uses your AI key (Settings → AI Connections)"
+                  className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">
+                  {aiAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                  {aiAllBusy ? 'Grading…' : 'AI grade all'}
+                </button>
+              </div>
+              <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                {review.items.map((it, i) => {
+                  const a = it.answer;
+                  const sc = scores[it.questionId] || { points: '', note: '' };
+                  const KindIcon = it.kind === 'code' ? Code2 : it.kind === 'text' ? Type : Mic;
+                  const preview = a?.aiDraft?.transcript || a?.transcript || a?.answerText || (a?.code ? '‹code answer›' : '') || 'No answer';
+                  return (
+                    <div key={it.questionId} className="flex items-center gap-2 px-3 py-2">
+                      <button onClick={() => scrollToQ(it.questionId)} title="Jump to this question"
+                        className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-brand-600 w-9">
+                        <KindIcon className="w-3.5 h-3.5" />{i + 1}
+                      </button>
+                      <p className="flex-1 min-w-0 truncate text-xs text-slate-500">{preview}</p>
+                      {a?.aiDraft && (
+                        <span title={a.aiDraft.note || 'AI suggestion'}
+                          className="shrink-0 inline-flex items-center gap-0.5 text-[10px] text-brand-600">
+                          <Sparkles className="w-3 h-3" />{a.aiDraft.suggestedPoints}
+                        </span>
+                      )}
+                      <input type="number" min={0} max={it.points} value={sc.points}
+                        onChange={(e) => saveScore(it, { points: e.target.value })}
+                        className="shrink-0 w-14 border border-slate-300 rounded-lg px-2 py-1 text-sm tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                      <span className="shrink-0 text-xs text-slate-400 w-7">/{it.points}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Flag for follow-up (mentor only) */}
           {canReview && (
             <div className={`rounded-xl border p-3 ${flagged ? 'border-red-200 bg-red-50' : 'border-slate-200'}`}>
@@ -308,7 +380,7 @@ export function InterviewReviewDrawer({
             const a = it.answer;
             const sc = scores[it.questionId] || { points: '', note: '' };
             return (
-              <div key={it.questionId} className="rounded-xl border border-slate-200 p-4">
+              <div key={it.questionId} id={`q-card-${it.questionId}`} className="rounded-xl border border-slate-200 p-4 scroll-mt-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                     <KindIcon className="w-4 h-4 text-brand-600" /> Q{i + 1}
@@ -376,6 +448,28 @@ export function InterviewReviewDrawer({
                     </summary>
                     <div className="text-sm text-slate-700 bg-emerald-50/60 border border-emerald-100 rounded-lg p-3 mt-1.5 whitespace-pre-wrap">{a.aiDraft.transcript}</div>
                   </details>
+                )}
+
+                {/* Webcam snapshots taken while this question was on screen. */}
+                {canReview && it.snapshots && it.snapshots.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] text-slate-400 mb-1 inline-flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> Webcam during this question · {it.snapshots.length}
+                    </p>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                      {it.snapshots.map((s, si) => {
+                        const gi = review.proctor.snapshots.findIndex((x) => x.url === s.url);
+                        return (
+                          <button key={si} type="button" onClick={() => { if (gi >= 0) setZoom(gi); }}
+                            title={`${new Date(s.at).toLocaleTimeString()} — click to enlarge`}
+                            className="shrink-0 rounded-lg overflow-hidden border border-slate-200 hover:ring-2 hover:ring-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={s.url} alt="" className="w-16 h-11 object-cover cursor-zoom-in" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
 
                 {/* Reference answer (mentor only) */}

@@ -30,6 +30,9 @@ interface Options {
   active: boolean;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   cameraRequired: boolean;
+  /** Id of the question on screen — stamped onto each snapshot so the mentor can
+   *  see what the candidate was doing during a specific question. */
+  currentQuestionId?: string | null;
   snapshotIntervalMs?: number;
   flushIntervalMs?: number;
 }
@@ -39,6 +42,7 @@ export function useProctor({
   active,
   videoRef,
   cameraRequired,
+  currentQuestionId = null,
   snapshotIntervalMs = 20000,
   flushIntervalMs = 10000,
 }: Options): ProctorState {
@@ -50,8 +54,10 @@ export function useProctor({
   const buffer = useRef<ProctorEvent[]>([]);
   const sessionRef = useRef(sessionId);
   const activeRef = useRef(active);
+  const questionRef = useRef(currentQuestionId);
   useEffect(() => { sessionRef.current = sessionId; }, [sessionId]);
   useEffect(() => { activeRef.current = active; }, [active]);
+  useEffect(() => { questionRef.current = currentQuestionId; }, [currentQuestionId]);
 
   // ── Event buffering + flush ──────────────────────────────────────────────
   const flush = useCallback(async () => {
@@ -162,7 +168,7 @@ export function useProctor({
       if (!ctx) return;
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
-        if (blob) interviewApi.uploadSnapshot(sid, blob).catch(() => { /* best-effort */ });
+        if (blob) interviewApi.uploadSnapshot(sid, blob, questionRef.current).catch(() => { /* best-effort */ });
       }, 'image/jpeg', 0.6);
     };
     // One shortly after start, then on the interval.

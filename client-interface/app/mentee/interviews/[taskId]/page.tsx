@@ -94,6 +94,7 @@ export default function InterviewRunnerPage({ params }: { params: Promise<{ task
     active: phase === 'active',
     videoRef,
     cameraRequired,
+    currentQuestionId: q?.id ?? null,
   });
 
   // ── Load ───────────────────────────────────────────────────────────────────
