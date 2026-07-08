@@ -38,7 +38,10 @@ class ProfileController {
           model: models.UserSettings,
           as: 'settings',
           required: false,
-          attributes: ['timezone', 'language', 'theme', 'colorTheme', 'preferences']
+          // emailNotifications/pushNotifications MUST be returned — the settings
+          // UI reads them to render the toggles. Omitting them made saved prefs
+          // load as empty → every toggle showed ON again after a refresh.
+          attributes: ['timezone', 'language', 'theme', 'colorTheme', 'preferences', 'emailNotifications', 'pushNotifications']
         }
       ]
     });

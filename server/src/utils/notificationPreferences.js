@@ -16,15 +16,17 @@ const isEmailNotificationEnabled = (settings, notificationType, defaultValue = t
   }
 
   const prefs = settings.emailNotifications;
-  
-  // If specific preference is explicitly defined, use it
-  if (prefs.hasOwnProperty(notificationType)) {
-    return prefs[notificationType];
+
+  // Master switch OFF wins over everything — no email for any event. This must be
+  // checked BEFORE the per-event key, otherwise a stale per-event `true` would keep
+  // sending even though the user turned all email off (mirrors push behaviour).
+  if (prefs.hasOwnProperty('enabled') && !prefs.enabled) {
+    return false;
   }
 
-  // Use default or global enabled flag if present
-  if (prefs.hasOwnProperty('enabled')) {
-    return prefs.enabled;
+  // Otherwise an explicit per-event preference wins.
+  if (prefs.hasOwnProperty(notificationType)) {
+    return prefs[notificationType];
   }
 
   return defaultValue;
