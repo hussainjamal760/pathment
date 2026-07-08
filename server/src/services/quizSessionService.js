@@ -34,7 +34,14 @@ class QuizSessionService {
       const picked = new Set((answer.selectedOptionIds || []).map(String));
       const correct = new Set((question.correctOptionIds || []).map(String));
       const exact = picked.size === correct.size && [...picked].every((id) => correct.has(id));
-      return { isCorrect: exact, points: exact ? points : 0 };
+      // Partial credit: reward each right pick, penalize each wrong pick so
+      // "select everything" can't game it. award = points * max(0, (right - wrong) / totalCorrect).
+      const right = [...picked].filter((id) => correct.has(id)).length;
+      const wrong = picked.size - right;
+      const denom = correct.size || 1;
+      const awarded = exact ? points : Math.round(points * Math.max(0, (right - wrong) / denom));
+      // isCorrect stays true only on a full match; a partial keeps points > 0 but reads as incorrect.
+      return { isCorrect: exact, points: Math.max(0, Math.min(points, awarded)) };
     }
     // short
     const text = this._norm(answer.answerText);
@@ -535,6 +542,14 @@ class QuizSessionService {
     const totalPossible = answers.reduce((s, a) => s + (a.pointsPossible || 0), 0);
     const totalAwarded = answers.reduce((s, a) => s + (Number(a.pointsAwarded) || 0), 0);
     const pct = totalPossible > 0 ? (totalAwarded / totalPossible) * 100 : 0;
+
+    // Keep the mentee-facing submission line in sync with the mentor's final
+    // score — otherwise "Your Submission" keeps showing the stale auto score
+    // (e.g. 5/15 = 33%) while the review/approvals show the adjusted total (7/15 = 47%).
+    await models.TaskSubmission.update(
+      { submissionText: `Quiz reviewed — ${totalAwarded}/${totalPossible} points (${Math.round(pct)}%).` },
+      { where: { id: submissionId } }
+    );
 
     const submissionService = require('./submissionService');
     await submissionService.reviewSubmission(submissionId, mentorId, {

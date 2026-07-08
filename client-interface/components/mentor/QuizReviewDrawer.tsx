@@ -72,6 +72,11 @@ export function QuizReviewDrawer({
   const saveScore = async (it: QuizReviewItem, patch: { points?: string; note?: string }) => {
     const cur = scores[it.questionId] || { points: '', note: '' };
     const next = { ...cur, ...patch };
+    // Clamp to the question's max so the running total (and the input itself)
+    // can never exceed what the question is worth — no more 105/15 (700%).
+    if (patch.points !== undefined && patch.points !== '') {
+      next.points = String(Math.max(0, Math.min(it.points, Number(patch.points) || 0)));
+    }
     setScores((s) => ({ ...s, [it.questionId]: next }));
     if (!canReview) return;
     const pts = next.points === '' ? undefined : Math.max(0, Math.min(it.points, Number(next.points) || 0));
@@ -147,13 +152,13 @@ export function QuizReviewDrawer({
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <div className="text-2xl font-semibold text-slate-900 tabular-nums">
-                  {session?.scorePercent ?? livePercent}<span className="text-slate-400 text-lg">%</span>
+                  {livePercent}<span className="text-slate-400 text-lg">%</span>
                 </div>
-                <div className="text-[11px] text-slate-500">auto score</div>
+                <div className="text-[11px] text-slate-500">score</div>
               </div>
               <div className="text-sm text-slate-600">
                 <div className="tabular-nums">
-                  {session?.autoScore ?? totalAwarded}<span className="text-slate-400"> / {session?.maxScore ?? totalPossible} pts</span>
+                  {totalAwarded}<span className="text-slate-400"> / {totalPossible} pts</span>
                 </div>
                 <div className="text-[11px] text-slate-400">
                   {review.totals.questionCount} question{review.totals.questionCount === 1 ? '' : 's'} · Auto-graded
