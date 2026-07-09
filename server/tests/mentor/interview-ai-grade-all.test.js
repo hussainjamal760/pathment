@@ -86,6 +86,19 @@ describe('interview AI grade-all + snapshot bucketing', () => {
     expect(a1.aiDraft.suggestedPoints).toBe(4);
   });
 
+  it('grades only the requested slice (client chunking)', async () => {
+    // The client pages through in chunks — a call with questionIds must touch
+    // ONLY those questions, so a long interview never times out in one request.
+    const out = await svc.aiDraftAll(task.id, mentor.id, { questionIds: [q2.id] });
+    expect(out.graded).toBe(1);
+    expect(out.drafts.map((d) => String(d.questionId))).toEqual([String(q2.id)]);
+    // Untouched questions have no draft yet.
+    const a1 = await models.InterviewAnswer.findOne({ where: { sessionId: session.id, questionId: q1.id } });
+    expect(a1.aiDraft).toBeFalsy();
+    // A voice answer wasn't in the slice → no Whisper call.
+    expect(groqService.transcribeAudio).not.toHaveBeenCalled();
+  });
+
   it('reuses a cached Whisper transcript instead of re-transcribing', async () => {
     await svc.aiDraftAll(task.id, mentor.id);
     expect(groqService.transcribeAudio).toHaveBeenCalledTimes(1);

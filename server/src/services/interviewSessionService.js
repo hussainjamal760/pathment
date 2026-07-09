@@ -717,7 +717,7 @@ class InterviewSessionService {
    * instead of one per question. Returns the per-question suggested points/notes;
    * the mentor still sets the final score (the client applies these as drafts).
    */
-  async aiDraftAll(taskId, mentorId) {
+  async aiDraftAll(taskId, mentorId, { questionIds } = {}) {
     const task = await models.AssignedTask.findByPk(taskId);
     if (!task) throw new NotFoundError('Task not found');
     await this._assertReviewer(mentorId, task);
@@ -728,7 +728,14 @@ class InterviewSessionService {
     const kit = await models.InterviewKit.findByPk(assignment.kitId, {
       include: [{ model: models.InterviewQuestion, as: 'questions' }],
     });
-    const questions = [...((kit && kit.questions) || [])].sort((a, b) => a.position - b.position);
+    let questions = [...((kit && kit.questions) || [])].sort((a, b) => a.position - b.position);
+    // Grade only a requested slice when given — the client pages through the
+    // interview in small chunks so no single request has to transcribe + grade
+    // dozens of answers (and blow the HTTP timeout).
+    if (Array.isArray(questionIds) && questionIds.length > 0) {
+      const want = new Set(questionIds.map(String));
+      questions = questions.filter((q) => want.has(String(q.id)));
+    }
     if (questions.length === 0) return { drafts: [], graded: 0 };
 
     const session = await this._latestSubmittedSession(taskId);

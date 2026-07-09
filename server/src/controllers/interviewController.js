@@ -121,7 +121,7 @@ exports.aiDraftInterviewAnswer = catchAsync(async (req, res) => {
 
 // POST /api/interviews/review/:taskId/ai-draft-all
 exports.aiDraftAllInterview = catchAsync(async (req, res) => {
-  const result = await interviewSessionService.aiDraftAll(req.params.taskId, req.user.id);
+  const result = await interviewSessionService.aiDraftAll(req.params.taskId, req.user.id, { questionIds: req.body.questionIds });
   res.status(200).json(successResponse('AI grading complete', result));
 });
 

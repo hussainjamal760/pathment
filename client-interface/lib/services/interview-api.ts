@@ -182,8 +182,8 @@ export const interviewApi = {
     apiClient.patch(`/interviews/review/${taskId}/answer`, { questionId, ...data }),
   aiDraftAnswer: (taskId: string, questionId: string) =>
     apiClient.post(`/interviews/review/${taskId}/ai-draft`, { questionId }),
-  aiDraftAll: (taskId: string) =>
-    apiClient.post(`/interviews/review/${taskId}/ai-draft-all`, {}),
+  aiDraftAll: (taskId: string, questionIds?: string[]) =>
+    apiClient.post(`/interviews/review/${taskId}/ai-draft-all`, { questionIds }, { timeout: 90000 }),
   finalizeReview: (taskId: string, overallNote?: string) =>
     apiClient.post(`/interviews/review/${taskId}/finalize`, { overallNote }),
   requestRedo: (taskId: string, questionIds: string[], note?: string) =>

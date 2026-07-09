@@ -47,6 +47,7 @@ export function InterviewReviewDrawer({
   const [overallNote, setOverallNote] = useState('');
   const [aiBusy, setAiBusy] = useState<string | null>(null);
   const [aiAllBusy, setAiAllBusy] = useState(false);
+  const [aiAllProgress, setAiAllProgress] = useState<{ done: number; total: number } | null>(null);
   const [finalizing, setFinalizing] = useState(false);
   const [flagged, setFlagged] = useState(false);
   const [flagReason, setFlagReason] = useState('');
@@ -120,28 +121,51 @@ export function InterviewReviewDrawer({
     }
   };
 
-  // Grade every answer in one pass, then apply each AI suggestion as the working
-  // score (persisted) so the mentor only has to tweak the ones they disagree with.
+  // Grade every ANSWERED question, applying each AI suggestion as the working
+  // score (persisted) so the mentor only tweaks the ones they disagree with.
+  // Runs in small chunks so a long interview never exceeds the request timeout
+  // (transcribing + grading dozens of voice answers in one call would); each
+  // chunk shows progress and a failure only loses that batch, not the whole run.
   const runAiAll = async () => {
     if (aiAllBusy || !review) return;
+    const targets = review.items.filter((it) => {
+      const a = it.answer;
+      return !!(a && (a.audioUrl || a.transcript || a.code || a.answerText));
+    });
+    if (targets.length === 0) { toast.message('No answers to grade yet.'); return; }
+
+    const CHUNK = 4;
     setAiAllBusy(true);
+    setAiAllProgress({ done: 0, total: targets.length });
+    let graded = 0;
+    let failed = 0;
     try {
-      const res: any = await interviewApi.aiDraftAll(taskId);
-      const drafts: { questionId: string; suggestedPoints: number; note: string | null }[] = res?.data?.drafts || [];
-      const byQ = new Map(drafts.map((d) => [d.questionId, d]));
-      for (const it of review.items) {
-        const d = byQ.get(it.questionId);
-        if (!d) continue;
-        await saveScore(it, { points: String(d.suggestedPoints), ...(d.note ? { note: d.note } : {}) });
+      for (let i = 0; i < targets.length; i += CHUNK) {
+        const slice = targets.slice(i, i + CHUNK);
+        try {
+          const res: any = await interviewApi.aiDraftAll(taskId, slice.map((it) => it.questionId));
+          const drafts: { questionId: string; suggestedPoints: number; note: string | null }[] = res?.data?.drafts || [];
+          const byQ = new Map(drafts.map((d) => [d.questionId, d]));
+          for (const it of slice) {
+            const d = byQ.get(it.questionId);
+            if (!d) continue;
+            await saveScore(it, { points: String(d.suggestedPoints), ...(d.note ? { note: d.note } : {}) });
+            graded += 1;
+          }
+        } catch {
+          failed += 1; // keep going; the mentor can re-run to fill the gaps
+        }
+        setAiAllProgress({ done: Math.min(i + CHUNK, targets.length), total: targets.length });
       }
-      toast.success(drafts.length
-        ? `AI graded ${drafts.length} answer${drafts.length === 1 ? '' : 's'} — adjust any you disagree with`
-        : 'No answers to grade');
+      if (graded > 0) {
+        toast.success(`AI graded ${graded} answer${graded === 1 ? '' : 's'}${failed ? ` · ${failed} batch${failed === 1 ? '' : 'es'} timed out — click again to finish` : ''} — adjust any you disagree with`);
+      } else {
+        toast.error('AI grade all failed — check your AI key in Settings → AI Connections');
+      }
       load(); // refresh Whisper transcripts + persisted scores
-    } catch (e: any) {
-      toast.error(extractApiErrorMessage(e, 'AI grade all failed'));
     } finally {
       setAiAllBusy(false);
+      setAiAllProgress(null);
     }
   };
 
@@ -275,7 +299,9 @@ export function InterviewReviewDrawer({
                   title="Transcribe voice answers with Whisper and score every question against its rubric — uses your AI key (Settings → AI Connections)"
                   className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">
                   {aiAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                  {aiAllBusy ? 'Grading…' : 'AI grade all'}
+                  {aiAllBusy
+                    ? (aiAllProgress ? `Grading ${aiAllProgress.done}/${aiAllProgress.total}…` : 'Grading…')
+                    : 'AI grade all'}
                 </button>
               </div>
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
