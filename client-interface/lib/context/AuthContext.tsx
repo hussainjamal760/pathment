@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { User, AuthResponse, LoginCredentials, RegisterData, TwoFactorLoginResponse, UserRole } from '../types';
 import { apiClient } from '../services/api-client';
 import { apiConfig } from '../config/api';
+import { tokenStore } from '../services/token-store';
 
 /** Capabilities a user holds, always falling back to their primary role. */
 function getCapabilities(user: User | null): UserRole[] {
@@ -23,8 +24,8 @@ interface AuthContextType {
   availableRoles: UserRole[];
   /** Switch the active role view (no-op if not one of the user's capabilities). */
   setActiveRole: (role: UserRole) => void;
-  login: (credentials: LoginCredentials) => Promise<{ requiresTwoFactor: boolean }>;
-  verify2FA: (code: string) => Promise<void>;
+  login: (credentials: LoginCredentials, rememberMe?: boolean) => Promise<{ requiresTwoFactor: boolean }>;
+  verify2FA: (code: string, rememberMe?: boolean) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [temporaryToken, setTemporaryToken] = useState<string | null>(null);
+  const [pendingRemember, setPendingRemember] = useState(true);
   const [activeRole, setActiveRoleState] = useState<UserRole | null>(null);
 
   useEffect(() => {
@@ -79,18 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const cachedUser = localStorage.getItem('user');
-      
+      const token = tokenStore.getToken();
+      const cachedUser = tokenStore.getUser<User>();
+
       // If user exists but no token, clear everything (corrupted state)
       if (cachedUser && !token) {
         console.warn('Auth state corrupted: user exists but no token. Clearing...');
-        localStorage.removeItem('user');
+        tokenStore.clearSession();
         setUser(null);
         setIsLoading(false);
         return;
       }
-      
+
       if (token) {
         // Try to get user from API
         try {
@@ -99,13 +101,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = response.data?.user;
           if (userData) {
             setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
+            tokenStore.setUser(userData);
           }
         } catch (apiError: any) {
-          // If API fails, try to get from localStorage cache
+          // If API fails, try to get from the cached user
           if (cachedUser) {
             console.log('Using cached user after API fail');
-            setUser(JSON.parse(cachedUser));
+            setUser(cachedUser);
           } else {
             throw apiError;
           }
@@ -115,20 +117,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
+      tokenStore.clearSession();
       setUser(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = async (credentials: LoginCredentials) => {
+  const login = async (credentials: LoginCredentials, rememberMe = true) => {
     try {
       const response = await apiClient.post<any>(
         apiConfig.endpoints.login,
-        credentials
+        { ...credentials, rememberMe }
       );
 
       // apiClient.post returns response.data directly
@@ -140,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setRequiresTwoFactor(true);
         setTemporaryToken(responseData?.temporaryToken);
         setUser(responseData?.user);
+        setPendingRemember(rememberMe); // carry the choice into the 2FA step
         console.log('2FA required, temporary token set');
         return { requiresTwoFactor: true };
       }
@@ -153,10 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid login response structure');
       }
 
-      localStorage.setItem('token', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(user));
-      
+      tokenStore.setSession({ token: accessToken, refreshToken, user }, rememberMe);
+
       console.log('Login successful, tokens stored');
       setUser(user);
       setRequiresTwoFactor(false);
@@ -172,7 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const verify2FA = async (code: string) => {
+  const verify2FA = async (code: string, rememberMe = pendingRemember) => {
     if (!temporaryToken) {
       throw new Error('No temporary token available. Please login first.');
     }
@@ -198,10 +197,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error('Invalid 2FA verification response');
       }
 
-      localStorage.setItem('token', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-      localStorage.setItem('user', JSON.stringify(currentUser));
-      
+      tokenStore.setSession({ token: accessToken, refreshToken, user: currentUser }, rememberMe);
+
       console.log('2FA verified, tokens stored');
       
       // Clear 2FA state
@@ -227,17 +224,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const refreshToken = tokenStore.getRefreshToken();
       if (refreshToken) {
         await apiClient.post(apiConfig.endpoints.logout, { refreshToken });
       }
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('activeRole');
+      tokenStore.clearSession();
+      if (typeof window !== 'undefined') localStorage.removeItem('activeRole');
       setUser(null);
     }
   };
@@ -250,7 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) {
       const updatedUser = { ...user, ...updates };
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      tokenStore.setUser(updatedUser);
     }
   };
 

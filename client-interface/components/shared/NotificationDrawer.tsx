@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Bell, X, Check, Trash2, Clock, ListTodo, MessageSquare, Award, Trophy, Zap, ChevronRight } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { messagingApi } from '@/lib/services/messaging-api';
+import { getToken } from '@/lib/services/token-store';
 
 interface Notification {
   id: string;
@@ -114,7 +115,7 @@ export default function NotificationDrawer({
 
     const newSocket = io(socketUrl, {
       auth: {
-        token: localStorage.getItem('token')
+        token: getToken()
       }
     });
 

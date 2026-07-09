@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { getToken } from '@/lib/services/token-store';
 
 export interface Submission {
   id: number;
@@ -44,7 +45,7 @@ export function useSubmissionReview(): UseSubmissionReviewReturn {
       setIsLoading(true);
       setError(null);
 
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (!token) {
         throw new Error('No authentication token found');
       }

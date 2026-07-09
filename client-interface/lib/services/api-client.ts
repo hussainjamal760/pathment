@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { apiConfig } from '../config/api';
 import { normalizeAxiosError } from '../utils/api-error';
+import { tokenStore } from './token-store';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -115,31 +116,19 @@ class ApiClient {
   }
 
   private getToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('token');
-    }
-    return null;
+    return tokenStore.getToken();
   }
 
   private getRefreshToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('refreshToken');
-    }
-    return null;
+    return tokenStore.getRefreshToken();
   }
 
   private setToken(token: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', token);
-    }
+    tokenStore.setToken(token);
   }
 
   private clearTokens(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-    }
+    tokenStore.clearSession();
   }
 
   async get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {

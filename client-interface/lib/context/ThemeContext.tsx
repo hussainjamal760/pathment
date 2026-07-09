@@ -6,6 +6,7 @@ import {
   ACCENT_STORAGE_KEY, DEFAULT_ACCENT, THEME_PRESETS, isAccentKey, type AccentKey, type ThemePreset,
 } from '../config/themes';
 import { appearanceApi } from '../services/appearance-api';
+import { getToken } from '../services/token-store';
 
 type Theme = 'light' | 'dark';
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -81,7 +82,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     // Cross-device sync (best-effort).
     try {
-      if (localStorage.getItem('token')) {
+      if (getToken()) {
         appearanceApi.get().then((res: any) => {
           const data = res?.data ?? res ?? {};
           if (isAccentKey(data.colorTheme) && data.colorTheme !== accentRef.current) {
@@ -101,7 +102,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       if (next.mode) localStorage.setItem(themeConfig.storageKey, next.mode);
       if (next.accent) localStorage.setItem(ACCENT_STORAGE_KEY, next.accent);
-      if (localStorage.getItem('token')) {
+      if (getToken()) {
         appearanceApi.update({
           ...(next.accent ? { colorTheme: next.accent } : {}),
           ...(next.resolvedTheme ? { theme: next.resolvedTheme } : {}),

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 
 import { messagingApi } from '@/lib/services/messaging-api';
 import { connectSocket, disconnectSocket, getSocket } from '@/lib/services/socket-client';
+import { getToken } from '@/lib/services/token-store';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useClan, ALL_CLANS } from '@/lib/context/ClanContext';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
@@ -186,7 +187,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
   }, [isBootstrapping, selectedConversationId]);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = getToken();
     if (!token) {
       return;
     }

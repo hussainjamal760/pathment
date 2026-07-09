@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
+import { getToken } from '@/lib/services/token-store';
 import { UserRole } from '@/lib/types';
 import {
   LogOut,
@@ -128,7 +129,7 @@ export default function Navigation({ role }: NavigationProps) {
   useEffect(() => {
     if (!user?.id) return;
     const socketUrl = apiBaseUrl.endsWith('/api') ? apiBaseUrl.slice(0, -4) : apiBaseUrl;
-    const socket = io(socketUrl, { auth: { token: localStorage.getItem('token') } });
+    const socket = io(socketUrl, { auth: { token: getToken() } });
 
     socket.on('notification:new', (data: { type?: string }) => {
       if (data?.type === 'message') setUnreadMessageCount((p) => p + 1);
