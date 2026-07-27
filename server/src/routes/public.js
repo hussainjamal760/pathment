@@ -16,9 +16,12 @@ router.get('/programs/:id', publicController.getProgram);
 // Apply behind a cohort intake link
 router.get('/cohorts/:slug', publicController.getCohort);
 router.post('/cohorts/:slug/apply', publicController.apply);
+router.post('/cohorts/:slug/resume', publicController.resume);
 
 // Applicant status + assessment (magic-link token)
 router.get('/applications/:token', publicController.getStatus);
+router.patch('/applications/:token', publicController.updateInfo);
+router.post('/applications/:token/withdraw', publicController.withdraw);
 router.post('/applications/:token/assessment', publicController.submitAssessment);
 router.post('/applications/:token/upload', upload.singleSafe('file'), publicController.uploadFile);
 

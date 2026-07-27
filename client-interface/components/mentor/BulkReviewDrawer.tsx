@@ -38,10 +38,15 @@ export function BulkReviewDrawer({
   const [feedback, setFeedback] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Points are STANDARD by difficulty (fixed per task, not chosen here). The
-  // selection may span tasks of different difficulty → different point values.
+  // The selection may span tasks of different difficulty → different maxima.
   const maxima = useMemo(() => [...new Set(items.map((i) => i.maxPoints ?? 10))], [items]);
   const mixedMax = maxima.length > 1;
+  const singleMax = mixedMax ? 0 : (maxima[0] ?? 10);
+
+  // Editable points: an absolute value when all tasks share one max, or a
+  // percentage of each task's own max when the selection is mixed.
+  const [points, setPoints] = useState<number>(maxima[0] ?? 10);
+  const [pointsPct, setPointsPct] = useState<number>(100);
 
   // How many distinct tasks the selection spans (peer-group key, title fallback).
   const taskCount = useMemo(
@@ -61,7 +66,7 @@ export function BulkReviewDrawer({
       decision: isApprove ? 'approved' : 'changes',
       feedbackText: feedback.trim() || (isApprove ? 'Approved.' : 'Changes requested.'),
       ...(isApprove
-        ? { rating }
+        ? { rating, ...(mixedMax ? { pointsPercent: pointsPct } : { pointsAwarded: points }) }
         : { revisionNotes: feedback.trim() }),
     };
     try {
@@ -155,15 +160,35 @@ export function BulkReviewDrawer({
             </div>
 
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Points</h3>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium tabular-nums">
-                {mixedMax ? `${Math.min(...maxima)}–${Math.max(...maxima)} pts` : `${maxima[0] ?? 0} pts`}
-              </span>
-              <p className="mt-1 text-xs text-slate-400">
-                {mixedMax
-                  ? 'Each task awards its own standard points by difficulty.'
-                  : 'Set by task difficulty. Awarded in full on approval.'}
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">Points</h3>
+                {!mixedMax
+                  ? <button onClick={() => setPoints(singleMax)} className="text-xs font-medium text-brand-600 hover:text-brand-700">Full ({singleMax})</button>
+                  : <button onClick={() => setPointsPct(100)} className="text-xs font-medium text-brand-600 hover:text-brand-700">Full (100%)</button>}
+              </div>
+
+              {!mixedMax ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min={0} max={singleMax} value={points} onChange={(e) => setPoints(Number(e.target.value))} className="flex-1 accent-brand-600" />
+                    <input type="number" min={0} max={singleMax} value={points}
+                      onChange={(e) => setPoints(Math.max(0, Math.min(singleMax, Number(e.target.value) || 0)))}
+                      className="w-16 border border-slate-300 dark:border-slate-700 dark:bg-slate-800 rounded-lg px-2 py-1 text-sm text-center tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500" />
+                    <span className="text-sm text-slate-400">/ {singleMax}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">Awarded to every selected task. Defaults to full; lower it if the work fell short.</p>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min={0} max={100} step={5} value={pointsPct} onChange={(e) => setPointsPct(Number(e.target.value))} className="flex-1 accent-brand-600" />
+                    <span className="w-12 text-sm text-right tabular-nums text-slate-700 dark:text-slate-300">{pointsPct}%</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {pointsPct}% of each task&apos;s full points → {Math.round(Math.min(...maxima) * pointsPct / 100)}–{Math.round(Math.max(...maxima) * pointsPct / 100)} pts (clamped to each task&apos;s max).
+                  </p>
+                </>
+              )}
             </div>
           </>
         )}

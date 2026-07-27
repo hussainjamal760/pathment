@@ -178,6 +178,13 @@ export default function MenteeTasks() {
                 <div className="divide-y divide-slate-100">
                   {(groupTasks as any[]).map((task) => {
                     const overdue = isOverdue(task.dueDate) && !['completed', 'submitted'].includes(task.status);
+                    // Interview & quiz tasks run in a dedicated flow — never the
+                    // generic start/submit path (which opens the submit drawer).
+                    const taskType = task.roadmapTask?.type || task.type;
+                    const isInterview = taskType === 'interview';
+                    const interviewHref = `/mentee/interviews/${task.id}`;
+                    const isQuiz = taskType === 'quiz';
+                    const quizHref = `/mentee/quizzes/${task.id}`;
 
                     return (
                 <div key={task.id} className="p-6 hover:bg-slate-50 transition-colors w-full overflow-hidden">
@@ -255,30 +262,71 @@ export default function MenteeTasks() {
                       </div>
                       
                       {task.status === 'assigned' && (
-                        <button
-                          onClick={() => handleStartTask(task.id)}
-                          className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
-                        >
-                          Start Task
-                        </button>
+                        isInterview ? (
+                          <button
+                            onClick={() => router.push(interviewHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Start interview
+                          </button>
+                        ) : isQuiz ? (
+                          <button
+                            onClick={() => router.push(quizHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Start quiz
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStartTask(task.id)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Start Task
+                          </button>
+                        )
                       )}
-                      
+
                       {(task.status === 'in_progress' || task.status === 'revision_needed') && (
+                        isInterview ? (
+                          <button
+                            onClick={() => router.push(interviewHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            {task.status === 'revision_needed' ? 'Redo questions' : 'Resume interview'}
+                          </button>
+                        ) : isQuiz ? (
+                          <button
+                            onClick={() => router.push(quizHref)}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Resume quiz
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setSubmitTarget({
+                              id: task.id,
+                              title: task.roadmapTask?.title || 'Task',
+                              status: task.status,
+                              deliverable: task.roadmapTask?.deliverable,
+                              acceptanceCriteria: task.roadmapTask?.acceptanceCriteria || [],
+                            })}
+                            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
+                          >
+                            Submit Work
+                          </button>
+                        )
+                      )}
+
+                      {isQuiz && (task.status === 'submitted' || task.status === 'completed') && (
                         <button
-                          onClick={() => setSubmitTarget({
-                            id: task.id,
-                            title: task.roadmapTask?.title || 'Task',
-                            status: task.status,
-                            deliverable: task.roadmapTask?.deliverable,
-                            acceptanceCriteria: task.roadmapTask?.acceptanceCriteria || [],
-                          })}
+                          onClick={() => router.push(quizHref)}
                           className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm transition-colors w-full sm:w-auto break-words"
                         >
-                          Submit Work
+                          View quiz
                         </button>
                       )}
-                      
-                      {task.status === 'submitted' && (
+
+                      {task.status === 'submitted' && !isQuiz && (
                         <span className="text-slate-600 text-sm shrink-0">
                           Awaiting review
                         </span>

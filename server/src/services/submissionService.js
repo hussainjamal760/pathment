@@ -19,7 +19,9 @@ class SubmissionService {
    * Submit task with files and rich text content
    */
   async submitTaskWithFiles(taskId, menteeId, submissionData, files = []) {
-    const task = await models.AssignedTask.findByPk(taskId);
+    const task = await models.AssignedTask.findByPk(taskId, {
+      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['type'] }],
+    });
 
     if (!task) {
       throw new NotFoundError('Task not found');
@@ -31,6 +33,15 @@ class SubmissionService {
 
     if (task.status === 'completed') {
       throw new ValidationError('Task is already completed');
+    }
+
+    // Interview and quiz tasks are ONLY completed through their own runners
+    // (which create their own submission). A plain "Submit Work" submission must
+    // never attach to them — otherwise a stale client / bookmarked submit page
+    // lets a mentee pile generic text submissions onto an interview or quiz.
+    const taskType = task.roadmapTask?.type;
+    if (taskType === 'interview' || taskType === 'quiz') {
+      throw new ValidationError(`This is a ${taskType} task — complete it through the ${taskType}, not a work submission.`);
     }
 
     // Upload files to Cloudinary
@@ -119,6 +130,15 @@ class SubmissionService {
     // Re-engagement: a paused mentee who submits work has come back → resume.
     require('./mentorshipPauseService').autoResumeIfPaused(task.menteeId, 'submitted work').catch(() => { });
 
+    // Assign the next roadmap step NOW (at submission), not at approval — so the
+    // mentee has work to do while the mentor reviews. Within-roadmap only;
+    // roadmap completion + chaining to a linked next roadmap still happen on
+    // approval. Non-fatal; never block the submission on it.
+    if (task.roadmapTaskId) {
+      require('./linearRoadmapService').advanceOnSubmission(task.menteeId, task.roadmapTaskId)
+        .catch((err) => console.error('Roadmap advance-on-submission failed (non-fatal):', err.message));
+    }
+
     // Return complete submission with files
     const fullSubmission = await this.getSubmissionById(submission.id);
 
@@ -133,7 +153,8 @@ class SubmissionService {
       payload: {
         title: `${submitterName} submitted work to review`,
         message: `${submitterName} ${isResubmission ? 'resubmitted' : 'submitted'} “${submittedTitle}”${isResubmission ? ` (v${newVersion})` : ''}. Review it when you can.`,
-        actionUrl: `/mentor/tasks/${task.id}/feedback`,
+        // Lands on the Approvals "To review" tab and auto-opens the review drawer.
+        actionUrl: `/mentor/approvals?task=${task.id}`,
         actionLabel: 'Review submission',
         relatedEntityType: 'task_submission',
         relatedEntityId: submission.id,
@@ -200,7 +221,7 @@ class SubmissionService {
       payload: {
         title: 'Extension request received',
         message: `${fullSubmission.assignedTask?.mentee?.firstName || 'Mentee'} requested an extension for "${fullSubmission.assignedTask?.roadmapTask?.title || 'a task'}" for ${extensionData.days || 'additional'} days.`,
-        actionUrl: `/mentor/tasks/${task.id}`,
+        actionUrl: `/mentor/tasks/${task.id}/feedback`,
         actionLabel: 'Review Request',
         relatedEntityType: 'task_submission',
         relatedEntityId: submission.id,
@@ -345,6 +366,7 @@ class SubmissionService {
       revisionNotes,
       criteriaMet,
       pointsAwarded,
+      pointsPercent,
       decision,
       checkedCriteria
     } = reviewData;
@@ -396,11 +418,17 @@ class SubmissionService {
       updateData.completedAt = new Date();
       // The mentor may award up to the task's standard max (never more, so the
       // leaderboard stays ungameable) and down to 0 when the work fell short.
-      // Defaults to full when no value is sent.
+      // An absolute `pointsAwarded` wins; otherwise `pointsPercent` (0–100) of THIS
+      // task's max — handy for bulk review across tasks of different difficulty.
+      // Defaults to full when neither is sent.
       const requested = Number(pointsAwarded);
+      const pct = Number(pointsPercent);
+      const clamp = (n) => Math.max(0, Math.min(standardPoints, Math.round(n)));
       updateData.pointsAwarded = Number.isFinite(requested)
-        ? Math.max(0, Math.min(standardPoints, Math.round(requested)))
-        : standardPoints;
+        ? clamp(requested)
+        : Number.isFinite(pct)
+          ? clamp(standardPoints * pct / 100)
+          : standardPoints;
     } else {
       updateData.revisionCount = task.revisionCount + 1;
     }
@@ -415,108 +443,118 @@ class SubmissionService {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       try {
-        if (isApproved) {
-          try {
-            const linearRoadmapService = require('./linearRoadmapService');
-            await linearRoadmapService.advanceOnApproval(task.menteeId, task.roadmapTaskId);
-          } catch (err) {
-            console.error('Roadmap auto-advance failed (non-fatal):', err.message);
-          }
+        // The NEXT within-roadmap step was already assigned at submission time (so
+    // the mentee wasn't idle). advanceOnApproval still runs here to (a) safety-
+    // net that assignment (idempotent — no double-assign), and (b) finalize the
+    // roadmap on the LAST step: mark it complete and chain to a linked next
+    // roadmap. Runs before the stats recompute so a completed last step doesn't
+    // momentarily read 100% and flag ready-to-complete before the chain fires.
+    if (isApproved) {
+      try {
+        const linearRoadmapService = require('./linearRoadmapService');
+        await linearRoadmapService.advanceOnApproval(task.menteeId, task.roadmapTaskId);
+      } catch (err) {
+        console.error('Roadmap auto-advance failed (non-fatal):', err.message);
+      }
+    }
+
+    // Update enrollment task stats so tasksCompleted/tasksTotal/overallProgressPercentage stay current
+    const taskService = require('./taskService');
+    await taskService.updateEnrollmentTaskStats(task.enrollmentId);
+
+    // Keep gamification and mentee-profile progress in sync when a task is approved.
+    if (isApproved) {
+      await this.updateMenteeGamificationProgress(task.menteeId);
+
+      const gamificationService = require('./gamificationService');
+      const pointsToAward = updateData.pointsAwarded;
+
+      try {
+        if (pointsToAward > 0) {
+          await gamificationService.awardPoints(
+            task.menteeId,
+            pointsToAward,
+            'task_completed',
+            task.id,
+            `Task completed: "${task.roadmapTask?.title || task.id}"`
+          );
         }
 
-        try {
-          const taskService = require('./taskService');
-          await taskService.updateEnrollmentTaskStats(task.enrollmentId);
-        } catch (err) {
-          console.error('Task stats update failed:', err.message);
-        }
+        await gamificationService.updateStreak(task.menteeId);
 
-        if (isApproved) {
-          try {
-            await this.updateMenteeGamificationProgress(task.menteeId);
-
-            const gamificationService = require('./gamificationService');
-            const pointsToAward = updateData.pointsAwarded;
-
-            if (pointsToAward > 0) {
-              await gamificationService.awardPoints(
-                task.menteeId,
-                pointsToAward,
-                'task_completed',
-                task.id,
-                `Task completed: "${task.roadmapTask?.title || task.id}"`
-              );
-            }
-
-            await gamificationService.updateStreak(task.menteeId);
-            await gamificationService.checkAndAwardBadges(task.menteeId);
-          } catch (gamificationError) {
-            // Do not fail review flow if gamification side-effects fail.
-            console.error('[Gamification] reviewSubmission side-effect failed:', {
-              submissionId,
-              taskId: task.id,
-              menteeId: task.menteeId,
-              error: gamificationError.message
-            });
-          }
-        }
-
-        try {
-          await this.updateMentorReviewStats(mentorId);
-        } catch (err) {
-          console.error('Mentor stats update failed:', err.message);
-        }
-
-        const reviewedTitle = task.roadmapTask?.title || 'your task';
-        const ratingNum = Number(rating);
-        const ratingStr = Number.isFinite(ratingNum) && ratingNum > 0 ? `${ratingNum % 1 === 0 ? ratingNum : ratingNum.toFixed(1)}★` : null;
-
-        await notificationOrchestrator.dispatch({
-          eventKey: NOTIFICATION_EVENTS.SUBMISSION_REVIEWED,
-          recipients: [{ userId: task.menteeId }],
-          payload: {
-            title: isApproved ? `“${reviewedTitle}” approved 🎉` : `Changes requested on “${reviewedTitle}”`,
-            message: isApproved
-              ? `Your mentor approved “${reviewedTitle}”${ratingStr ? ` · ${ratingStr}` : ''}. Nice work - keep the momentum going.`
-              : `Your mentor asked for another pass on “${reviewedTitle}”. Read their notes and resubmit when ready.`,
-            actionUrl: `/mentee/tasks/${task.id}`,
-            actionLabel: isApproved ? 'See review' : 'View notes & resubmit',
-            relatedEntityType: 'task_submission',
-            relatedEntityId: submission.id,
-            emailSubject: isApproved ? `Approved: “${reviewedTitle}”` : `Revision requested: “${reviewedTitle}”`
-          },
-          dedupe: {
-            relatedEntityType: 'submission_reviewed',
-            relatedEntityId: submission.id
-          }
+        // Re-check task-based badges after profile counters are refreshed.
+        await gamificationService.checkAndAwardBadges(task.menteeId);
+      } catch (gamificationError) {
+        // Do not fail review flow if gamification side-effects fail.
+        console.error('[Gamification] reviewSubmission side-effect failed:', {
+          submissionId,
+          taskId: task.id,
+          menteeId: task.menteeId,
+          error: gamificationError.message
         });
+      }
+    }
 
-        if (feedbackText && String(feedbackText).trim()) {
-          const reviewer = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
-          const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}`.trim() : 'Your mentor';
-          await notificationOrchestrator.dispatch({
-            eventKey: NOTIFICATION_EVENTS.FEEDBACK_SENT,
-            recipients: [{ userId: task.menteeId }],
-            payload: {
-              title: `${reviewerName} left you feedback`,
-              message: `New feedback on “${reviewedTitle}”. Take a look when you get a moment.`,
-              actionUrl: `/mentee/tasks/${task.id}`,
-              actionLabel: 'Read feedback',
-              relatedEntityType: 'task_feedback',
-              relatedEntityId: submission.id,
-              emailSubject: `${reviewerName} left feedback on “${reviewedTitle}”`
-            },
-            dedupe: {
-              relatedEntityType: 'feedback_sent',
-              relatedEntityId: submission.id
-            }
-          });
+    // Update mentor stats
+    await this.updateMentorReviewStats(mentorId);
+
+    // The task's roadmapTask is already loaded on `submission.assignedTask` at the
+    // top of this method, so the title comes for free — no need to re-run the
+    // heavy 7-table getSubmissionById join just to notify (that read was a big
+    // chunk of this endpoint's latency, and the client ignores the response body).
+    const reviewedTitle = task.roadmapTask?.title || 'your task';
+    const ratingNum = Number(rating);
+    const ratingStr = Number.isFinite(ratingNum) && ratingNum > 0 ? `${ratingNum % 1 === 0 ? ratingNum : ratingNum.toFixed(1)}★` : null;
+
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.SUBMISSION_REVIEWED,
+      recipients: [{ userId: task.menteeId }],
+      payload: {
+        title: isApproved ? `“${reviewedTitle}” approved 🎉` : `Changes requested on “${reviewedTitle}”`,
+        message: isApproved
+          ? `Your mentor approved “${reviewedTitle}”${ratingStr ? ` · ${ratingStr}` : ''}. Nice work - keep the momentum going.`
+          : `Your mentor asked for another pass on “${reviewedTitle}”. Read their notes and resubmit when ready.`,
+        actionUrl: `/mentee/tasks/${task.id}`,
+        actionLabel: isApproved ? 'See review' : 'View notes & resubmit',
+        relatedEntityType: 'task_submission',
+        relatedEntityId: submission.id,
+        emailSubject: isApproved ? `Approved: “${reviewedTitle}”` : `Revision requested: “${reviewedTitle}”`
+      },
+      dedupe: {
+        relatedEntityType: 'submission_reviewed',
+        relatedEntityId: submission.id
+      }
+    });
+
+    if (feedbackText && String(feedbackText).trim()) {
+      const reviewer = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
+      const reviewerName = reviewer ? `${reviewer.firstName} ${reviewer.lastName}`.trim() : 'Your mentor';
+      await notificationOrchestrator.dispatch({
+        eventKey: NOTIFICATION_EVENTS.FEEDBACK_SENT,
+        recipients: [{ userId: task.menteeId }],
+        payload: {
+          title: `${reviewerName} left you feedback`,
+          message: `New feedback on “${reviewedTitle}”. Take a look when you get a moment.`,
+          actionUrl: `/mentee/tasks/${task.id}`,
+          actionLabel: 'Read feedback',
+          relatedEntityType: 'task_feedback',
+          relatedEntityId: submission.id,
+          emailSubject: `${reviewerName} left feedback on “${reviewedTitle}”`
+        },
+        dedupe: {
+          relatedEntityType: 'feedback_sent',
+          relatedEntityId: submission.id
         }
+      });
+    }
+
       } catch (err) {
         console.error('Background side-effects failed:', err.message);
       }
     })();
 
+    // The client only checks for success (it reloads / redirects), so return the
+    // in-hand submission rather than re-reading the full joined row.
     return submission;
   }
 
@@ -832,6 +870,114 @@ class SubmissionService {
   }
 
   /**
+   * The `AssignedTask` filter for a mentor's review queues. The old `{ mentorId }`
+   * only matched tasks THIS user assigned, so a co-mentor (the lead, not them, is
+   * the task's `mentorId`) saw an empty Approvals queue even though they could
+   * review each item. Scope instead to: tasks they assigned, OR tasks for mentees
+   * in any clan where they hold `task.review` (lead/co-mentor/grant/cover) — and a
+   * clan drops out if the lead revoked that co-mentor's review permission, so the
+   * queue exactly mirrors what `canActOnTask` will let them act on.
+   */
+  async _reviewableTaskWhere(mentorId, extra = {}) {
+    const user = await models.User.findByPk(mentorId, { attributes: ['id', 'role'] });
+    const clauses = [{ mentorId }];
+    if (user) {
+      const clanIds = await authzService.clansWhereCan(user, PERMISSIONS.TASK_REVIEW);
+      if (clanIds.length) {
+        const ms = await models.ClanMembership.findAll({
+          where: { clanId: { [Op.in]: clanIds }, status: 'active', role: 'mentee' },
+          attributes: ['userId'],
+        });
+        // Never queue your own work: a co-mentor who is also a mentee of the clan
+        // is in this roster, and `canActOnTask` will refuse to let them review it.
+        const menteeIds = [...new Set(ms.map((m) => m.userId))].filter((id) => id !== mentorId);
+        if (menteeIds.length) clauses.push({ menteeId: { [Op.in]: menteeIds } });
+      }
+    }
+    return { ...extra, [Op.or]: clauses };
+  }
+
+  /**
+   * Which of THIS mentor's clans each mentee sits in, so the approvals lists can
+   * be scoped by the sidebar clan switcher the same way the cohort views are.
+   * Mirrors getCohort's clan-attach: one clan per mentee (their active mentee
+   * membership in a clan this mentor runs). Batched — no per-item queries.
+   */
+  async _clanByMentee(mentorId, menteeIds = []) {
+    const map = new Map();
+    if (!menteeIds.length) return map;
+    const cohortService = require('./cohortService');
+    const { clanIds, clanNameById } = await cohortService.mentorClanMap(mentorId);
+    if (!clanIds.length) return map;
+    const rows = await models.ClanMembership.findAll({
+      where: {
+        clanId: { [Op.in]: clanIds },
+        userId: { [Op.in]: menteeIds },
+        status: 'active',
+        role: 'mentee',
+      },
+      attributes: ['userId', 'clanId'],
+    });
+    for (const r of rows) {
+      if (!map.has(r.userId)) map.set(r.userId, { id: r.clanId, name: clanNameById.get(r.clanId) || null });
+    }
+    return map;
+  }
+
+  /**
+   * How many submissions are waiting on this mentor — the number behind the
+   * sidebar "Approvals" badge. Deliberately mirrors the "To review" tab exactly:
+   * work awaiting review of EVERY task type (project / assignment / interview /
+   * quiz / video), collapsed to one per assignment, EXCLUDING pending extension
+   * requests (those live in their own tab).
+   *
+   * Returns a per-clan breakdown alongside the total so the badge can follow the
+   * sidebar clan switcher without a refetch. Lighter than the full queue: no
+   * roadmap/user/settings includes, just the columns the count needs.
+   */
+  async getMentorApprovalsCount(mentorId) {
+    const submissions = await models.TaskSubmission.findAll({
+      where: { status: 'pending' },
+      attributes: ['id', 'assignedTaskId', 'version', 'extensionRequested', 'extensionStatus'],
+      include: [{
+        model: models.AssignedTask,
+        as: 'assignedTask',
+        required: true,
+        attributes: ['id', 'status', 'menteeId'],
+        where: await this._reviewableTaskWhere(mentorId),
+      }],
+    });
+
+    // Same shape as the queue: keep only the latest version per assignment, so a
+    // resubmission doesn't count twice.
+    const latestByTask = new Map();
+    for (const s of submissions) {
+      const t = s.assignedTask;
+      const counts = t?.status === 'submitted' || Boolean(s.extensionRequested && s.extensionStatus === 'pending');
+      if (!counts) continue;
+      const prev = latestByTask.get(s.assignedTaskId);
+      if (!prev || (s.version || 0) > (prev.version || 0)) latestByTask.set(s.assignedTaskId, s);
+    }
+
+    // Work to review only — an extension request is a separate tab/action.
+    const toReview = [...latestByTask.values()]
+      .filter((s) => !(s.extensionRequested && s.extensionStatus === 'pending'));
+
+    const clanByMentee = await this._clanByMentee(
+      mentorId,
+      [...new Set(toReview.map((s) => s.assignedTask?.menteeId).filter(Boolean))]
+    );
+
+    const byClan = {};
+    for (const s of toReview) {
+      const clanId = clanByMentee.get(s.assignedTask?.menteeId)?.id;
+      if (clanId) byClan[clanId] = (byClan[clanId] || 0) + 1;
+    }
+
+    return { total: toReview.length, byClan };
+  }
+
+  /**
    * The mentor's approvals queue: pending submissions across their assigned
    * tasks, shaped for the review UI (criteria checklist + submission content).
    */
@@ -842,7 +988,7 @@ class SubmissionService {
         model: models.AssignedTask,
         as: 'assignedTask',
         required: true,
-        where: { mentorId },
+        where: await this._reviewableTaskWhere(mentorId),
         include: [
           { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase', 'difficulty'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
@@ -883,6 +1029,7 @@ class SubmissionService {
       ? await models.UserSettings.findAll({ where: { userId: { [Op.in]: menteeIds } }, attributes: ['userId', 'timezone'] })
       : [];
     const tzByUser = new Map(tzRows.map((r) => [r.userId, r.timezone || 'UTC']));
+    const clanByMentee = await this._clanByMentee(mentorId, menteeIds);
 
     return latest.map((s) => {
       const t = s.assignedTask;
@@ -890,6 +1037,8 @@ class SubmissionService {
       return {
         submissionId: s.id,
         taskId: t.id,
+        // The clan this mentee is in (for the sidebar clan-scope filter).
+        clan: clanByMentee.get(t.menteeId) || null,
         // Stable peer-grouping key for the client's "group by task" view. Title
         // can be per-mentee overridden, so don't group by title.
         roadmapTaskId: t.roadmapTaskId || null,
@@ -935,7 +1084,7 @@ class SubmissionService {
    */
   async getMentorChangesRequestedQueue(mentorId) {
     const tasks = await models.AssignedTask.findAll({
-      where: { mentorId, status: 'revision_needed' },
+      where: await this._reviewableTaskWhere(mentorId, { status: 'revision_needed' }),
       include: [
         { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'difficulty'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] },
@@ -949,6 +1098,11 @@ class SubmissionService {
       order: [['updatedAt', 'DESC']],
     });
 
+    const clanByMentee = await this._clanByMentee(
+      mentorId,
+      [...new Set(tasks.map((t) => t.menteeId).filter(Boolean))]
+    );
+
     return tasks.map((t) => {
       const m = t.mentee;
       // Latest "changes requested" feedback (newest first). isApproved=false covers
@@ -958,6 +1112,7 @@ class SubmissionService {
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null;
       return {
         taskId: t.id,
+        clan: clanByMentee.get(t.menteeId) || null,
         roadmapTaskId: t.roadmapTaskId || null,
         title: t.titleOverride || t.roadmapTask?.title || 'Task',
         type: t.roadmapTask?.type || null,
@@ -987,7 +1142,7 @@ class SubmissionService {
    */
   async getMentorReviewedQueue(mentorId, limit = 500) {
     const tasks = await models.AssignedTask.findAll({
-      where: { mentorId, status: 'completed' },
+      where: await this._reviewableTaskWhere(mentorId, { status: 'completed' }),
       include: [
         { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'difficulty'] },
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] },
@@ -1002,6 +1157,11 @@ class SubmissionService {
       limit,
     });
 
+    const clanByMentee = await this._clanByMentee(
+      mentorId,
+      [...new Set(tasks.map((t) => t.menteeId).filter(Boolean))]
+    );
+
     return tasks.map((t) => {
       const m = t.mentee;
       const latestFb = (t.feedback || [])
@@ -1009,6 +1169,7 @@ class SubmissionService {
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null;
       return {
         taskId: t.id,
+        clan: clanByMentee.get(t.menteeId) || null,
         roadmapTaskId: t.roadmapTaskId || null,
         title: t.titleOverride || t.roadmapTask?.title || 'Task',
         type: t.roadmapTask?.type || null,

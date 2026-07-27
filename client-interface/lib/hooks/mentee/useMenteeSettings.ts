@@ -39,14 +39,6 @@ export interface LearningPreferences {
   preferredSchedule: string;
 }
 
-export interface NotificationSettings {
-  emailNotifications: boolean;
-  taskReminders: boolean;
-  mentorMessages: boolean;
-  programUpdates: boolean;
-  weeklyProgress: boolean;
-}
-
 export interface UseMenteeSettingsReturn {
   loading: boolean;
   saving: boolean;
@@ -54,16 +46,13 @@ export interface UseMenteeSettingsReturn {
   profileData: ProfileData;
   menteeProfile: MenteeProfileData;
   learningPreferences: LearningPreferences;
-  notificationSettings: NotificationSettings;
   setActiveTab: (tab: string) => void;
   setProfileData: React.Dispatch<React.SetStateAction<ProfileData>>;
   setMenteeProfile: React.Dispatch<React.SetStateAction<MenteeProfileData>>;
   setLearningPreferences: React.Dispatch<React.SetStateAction<LearningPreferences>>;
-  setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
   handleProfileUpdate: () => Promise<void>;
   handleMenteeProfileUpdate: () => Promise<void>;
   handleLearningPreferencesUpdate: () => Promise<void>;
-  handleNotificationUpdate: () => Promise<void>;
 }
 
 export function useMenteeSettings(): UseMenteeSettingsReturn {
@@ -101,14 +90,6 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
     preferredSchedule: 'flexible',
   });
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>({
-    emailNotifications: true,
-    taskReminders: true,
-    mentorMessages: true,
-    programUpdates: true,
-    weeklyProgress: true,
-  });
-
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
@@ -141,9 +122,6 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
       }
 
       const prefs = data.settings?.preferences;
-      if (prefs?.notifications && typeof prefs.notifications === 'object') {
-        setNotificationSettings((prev) => ({ ...prev, ...prefs.notifications }));
-      }
       if (prefs?.learning && typeof prefs.learning === 'object') {
         setLearningPreferences((prev) => ({ ...prev, ...prefs.learning }));
       }
@@ -199,18 +177,6 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
     }
   }, [learningPreferences]);
 
-  const handleNotificationUpdate = useCallback(async () => {
-    try {
-      setSaving(true);
-      await preferencesApi.update('notifications', notificationSettings as unknown as Record<string, unknown>);
-      toast.success('Notification settings saved');
-    } catch (err) {
-      toast.error(extractApiErrorMessage(err, 'Failed to save notification settings'));
-    } finally {
-      setSaving(false);
-    }
-  }, [notificationSettings]);
-
   return {
     loading,
     saving,
@@ -218,15 +184,12 @@ export function useMenteeSettings(): UseMenteeSettingsReturn {
     profileData,
     menteeProfile,
     learningPreferences,
-    notificationSettings,
     setActiveTab,
     setProfileData,
     setMenteeProfile,
     setLearningPreferences,
-    setNotificationSettings,
     handleProfileUpdate,
     handleMenteeProfileUpdate,
     handleLearningPreferencesUpdate,
-    handleNotificationUpdate,
   };
 }

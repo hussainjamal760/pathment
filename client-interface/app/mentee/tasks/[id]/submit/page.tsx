@@ -50,6 +50,15 @@ export default function TaskSubmission({ params }: PageProps) {
     }
   }, [task, resolvedParams.id, router]);
 
+  // Interview / quiz tasks are done in their own runner and must NEVER accept a
+  // generic "Submit Work" submission (that produced stray text submissions on
+  // interview tasks). Bounce them into the right runner regardless of status.
+  const taskType = task?.roadmapTask?.type || task?.type;
+  useEffect(() => {
+    if (taskType === 'interview') router.replace(`/mentee/interviews/${resolvedParams.id}`);
+    else if (taskType === 'quiz') router.replace(`/mentee/quizzes/${resolvedParams.id}`);
+  }, [taskType, resolvedParams.id, router]);
+
   const addLink = () => {
     setLinks([...links, '']);
   };

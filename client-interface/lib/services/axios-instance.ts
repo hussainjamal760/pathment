@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 import { toast } from 'sonner';
 import { normalizeAxiosError } from '../utils/api-error';
+import { tokenStore } from './token-store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -12,7 +13,7 @@ const axiosInstance: AxiosInstance = axios.create({
 // Request interceptor - add auth token
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const token = tokenStore.getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -28,7 +29,7 @@ axiosInstance.interceptors.response.use(
     normalizeAxiosError(error);
     const originalRequest = error.config;
     const requestUrl = String(originalRequest?.url || '').toLowerCase();
-    const hasAccessToken = typeof window !== 'undefined' && Boolean(localStorage.getItem('token'));
+    const hasAccessToken = Boolean(tokenStore.getToken());
     const isPublicAuthRequest = [
       '/auth/login',
       '/auth/register',
@@ -49,16 +50,16 @@ axiosInstance.interceptors.response.use(
       const errorMessage = error.response?.data?.message || '';
       if (errorMessage.toLowerCase().includes('expired')) {
         // Token expired - try to refresh
-        const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
-        
+        const refreshToken = tokenStore.getRefreshToken();
+
         if (refreshToken) {
           try {
             const response = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
             const newToken = response.data?.data?.accessToken || response.data?.accessToken;
-            
+
             if (newToken) {
               // Save new token
-              localStorage.setItem('token', newToken);
+              tokenStore.setToken(newToken);
               // Retry original request
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               return axiosInstance(originalRequest);
@@ -82,10 +83,8 @@ axiosInstance.interceptors.response.use(
 
 function handleAuthFailure() {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    
+    tokenStore.clearSession();
+
     toast.error('Your session has expired. Please log in again.');
     
     setTimeout(() => {

@@ -7,6 +7,8 @@ const { endOfDayInZone } = require('../utils/timezone');
 const authzService = require('./authzService');
 const { PERMISSIONS } = require('../config/permissions');
 const { pointsForDifficulty } = require('../config/points');
+const interviewKitService = require('./interviewKitService');
+const quizKitService = require('./quizKitService');
 
 /** Guess a resource's kind from its URL (mirrors the roadmap step normalizer). */
 function inferResourceType(url) {
@@ -120,6 +122,43 @@ class TaskService {
       throw new ForbiddenError('You are not the mentor for this mentee');
     }
 
+    // Interview tasks carry a kit + options (retake / camera / AI / timing) under
+    // `data.interview`. Fail fast BEFORE we create any rows so a bad kit can't
+    // leave an orphan task behind. We also derive the time estimate from the kit's
+    // own timing (per-question limits or a total timer) rather than a flat guess.
+    const interviewOpts = type === 'interview' ? (data.interview || {}) : null;
+    let interviewEstimateHours = null;
+    if (interviewOpts) {
+      if (!interviewOpts.kitId) throw new ValidationError('An interview task needs an interview kit');
+      const kit = await models.InterviewKit.findByPk(interviewOpts.kitId, {
+        include: [{ model: models.InterviewQuestion, as: 'questions', attributes: ['timeLimitSeconds'] }],
+      });
+      const kitQuestions = kit?.questions || [];
+      if (!kit || kitQuestions.length === 0) throw new ValidationError('That interview kit has no questions yet');
+      const timingMode = interviewOpts.timingMode || kit.timingMode;
+      const seconds = timingMode === 'total'
+        ? (Number(interviewOpts.totalSeconds || kit.totalSeconds) || 0)
+        : kitQuestions.reduce((s, q) => s + (Number(q.timeLimitSeconds) || 0), 0);
+      // INTEGER hours, floored at 1 so a short interview never reads "0h".
+      interviewEstimateHours = Math.max(1, Math.round(seconds / 3600));
+    }
+    // Quiz tasks carry a kit + options (evaluation mode / retake / timer…) under
+    // `data.quiz`. Same fail-fast + kit-derived estimate as interviews.
+    const quizOpts = type === 'quiz' ? (data.quiz || {}) : null;
+    let quizEstimateHours = null;
+    if (quizOpts) {
+      if (!quizOpts.kitId) throw new ValidationError('A quiz task needs a quiz kit');
+      const kit = await models.QuizKit.findByPk(quizOpts.kitId, {
+        include: [{ model: models.QuizQuestion, as: 'questions', attributes: ['id'] }],
+      });
+      const kitQuestions = kit?.questions || [];
+      if (!kit || kitQuestions.length === 0) throw new ValidationError('That quiz has no questions yet');
+      const seconds = Number(quizOpts.timeLimitSeconds || kit.timeLimitSeconds) || (kitQuestions.length * 45);
+      quizEstimateHours = Math.max(1, Math.round(seconds / 3600));
+    }
+    // Sensible per-difficulty estimate for non-interview custom tasks (was a flat 5h).
+    const EST_HOURS_BY_DIFFICULTY = { easy: 2, medium: 4, hard: 8, expert: 12 };
+
     let roadmapTask;
 
     // If roadmapTaskId provided, use existing roadmap task
@@ -138,7 +177,11 @@ class TaskService {
         taskOrder: 0,
         deliverable: deliverable || 'Complete the assigned task',
         acceptanceCriteria: acceptanceCriteria || [],
-        estimatedHours: 5,
+        estimatedHours: type === 'interview'
+          ? (interviewEstimateHours || 1)
+          : type === 'quiz'
+            ? (quizEstimateHours || 1)
+            : (EST_HOURS_BY_DIFFICULTY[difficulty || 'medium'] || 4),
         isMandatory: false,
         isCustomTask: true,
         // Standard points by difficulty (no hand-typed values).
@@ -152,6 +195,12 @@ class TaskService {
       }
     }
 
+    // Anchor the deadline to END OF DAY in the mentee's timezone. The client sends
+    // a date-only value (YYYY-MM-DD), so "today" means their whole day — never an
+    // instant that's already overdue or that drifts a calendar day across zones.
+    const defaultDueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const resolvedDueDate = await this._resolveDueDate(menteeId, dueDate || defaultDueDate);
+
     // Create assigned task
     const assignedTask = await models.AssignedTask.create({
       roadmapTaskId: roadmapTask.id,
@@ -159,10 +208,28 @@ class TaskService {
       mentorId,
       enrollmentId,
       status: 'assigned',
-      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      dueDate: resolvedDueDate,
       isCustomTask: roadmapTaskId ? false : true, // Roadmap tasks are not custom
       trackId: trackId || null
     });
+
+    // Link the interview kit + snapshot the per-assignment options.
+    if (interviewOpts) {
+      await interviewKitService.createAssignmentForTask({
+        assignedTaskId: assignedTask.id,
+        kitId: interviewOpts.kitId,
+        options: interviewOpts,
+      });
+    }
+
+    // Link the quiz kit + snapshot the per-assignment options (evaluation mode etc.).
+    if (quizOpts) {
+      await quizKitService.createAssignmentForTask({
+        assignedTaskId: assignedTask.id,
+        kitId: quizOpts.kitId,
+        options: quizOpts,
+      });
+    }
 
     await this.updateEnrollmentTaskStats(enrollmentId);
 
@@ -172,8 +239,12 @@ class TaskService {
     const mentorName = mentorUser ? `${mentorUser.firstName} ${mentorUser.lastName}`.trim() : 'Your mentor';
     const mentorFirst = mentorUser?.firstName || 'Your mentor';
     const taskTitle = fullTask.roadmapTask?.title || 'a new task';
+    // Format the deadline in the MENTEE's timezone so the notification's calendar
+    // day matches what they see on the task card (not the server's UTC day).
+    const menteeSettings = await models.UserSettings.findOne({ where: { userId: fullTask.menteeId }, attributes: ['timezone'] });
+    const menteeTz = menteeSettings?.timezone || 'UTC';
     const dueStr = fullTask.dueDate
-      ? new Date(fullTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      ? new Date(fullTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: menteeTz })
       : null;
 
     await notificationOrchestrator.dispatch({
@@ -203,16 +274,20 @@ class TaskService {
    * mentee is an active 'mentee' member (the clan-based model).
    */
   async _isMentorForMentee(mentorId, menteeId) {
+    // Nobody mentors themselves. A co-mentor of the clan they also learn in
+    // matches every clan check below, which would let them assign (and then
+    // review) their own work.
+    if (mentorId === menteeId) return false;
+
     const match = await models.MentorMenteeMatch.findOne({
       where: { mentorId, menteeId, status: 'active' }
     });
     if (match) return true;
 
-    const mentorClans = await models.ClanMembership.findAll({
-      where: { userId: mentorId, status: 'active', role: { [Op.in]: ['lead_mentor', 'co_mentor', 'core_team'] } },
-      attributes: ['clanId']
-    });
-    const clanIds = mentorClans.map((c) => c.clanId);
+    // Every clan they mentor, from any source — a team membership, an IAM grant,
+    // or accepted cross-clan cover. The old membership-only lookup silently
+    // refused task assignment to co-mentors granted through Roles & Access.
+    const clanIds = await authzService.mentoredClanIds(mentorId);
     if (!clanIds.length) return false;
 
     const menteeMembership = await models.ClanMembership.findOne({
@@ -606,10 +681,43 @@ class TaskService {
   }
 
   /**
+   * Has the mentee finished the program's ROADMAP(s)? This — not "every assigned
+   * task is done" — is what makes an enrollment ready for completion sign-off.
+   *
+   * A mentee is auto-nominated for completion when the linear roadmap they're
+   * working through is finished. RoadmapProgress.completed flips true the moment
+   * the LAST roadmap step is approved (see linearRoadmapService.advanceOnApproval),
+   * which is the same thing as "all roadmap tasks completed" — so it covers both
+   * nomination scenarios. We require at least one tracked program roadmap and that
+   * ALL of them are completed, so a mid-chain roadmap (a next one auto-assigned)
+   * keeps the enrollment active.
+   *
+   * Custom one-off tasks have no roadmap (roadmapId is null) and therefore never
+   * trigger this. That's the fix for the bug where assigning a single custom task
+   * and approving it read 100% and prematurely flagged the whole program complete.
+   * A mentor signs off a custom-only / ahead-of-schedule path manually instead
+   * (the "Complete level" button → requestCompletion / approveCompletion).
+   */
+  async _isProgramRoadmapComplete(enrollment) {
+    if (!enrollment) return false;
+    const progresses = await models.RoadmapProgress.findAll({
+      where: { menteeId: enrollment.menteeId },
+      include: [{ model: models.Roadmap, as: 'roadmap', attributes: ['programId'], required: true }]
+    });
+    const programProgresses = progresses.filter(
+      (p) => p.roadmap && p.roadmap.programId === enrollment.programId
+    );
+    if (!programProgresses.length) return false;
+    return programProgresses.every((p) => p.completed === true);
+  }
+
+  /**
    * Update enrollment task statistics.
-   * tasksTotal is the FULL program roadmap task count (not just assigned tasks)
-   * so the percentage reflects true progress through the whole program from day 1.
-   * Also auto-advances week/level and marks program_completed when all done.
+   * tasksCompleted/tasksTotal/overallProgressPercentage track the mentee's
+   * assigned workload (the progress bar). Completion sign-off, however, is gated
+   * on finishing the program ROADMAP (see _isProgramRoadmapComplete) — NOT on the
+   * assigned-task ratio — so a lone custom task can't prematurely flag the program
+   * as complete. Flags the enrollment ready for the mentor's sign-off when done.
    */
   async updateEnrollmentTaskStats(enrollmentId) {
     // Load enrollment to know which program we're in
@@ -647,16 +755,19 @@ class TaskService {
       ? Math.round((tasksCompleted / tasksTotal) * 100)
       : 0;
 
-    // Completion is the MENTOR's call. When every program task (roadmap + custom)
-    // is done we don't silently complete - we flag the enrollment as ready for
-    // sign-off ('pending_completion', marked system-requested) so the mentor is
-    // prompted to confirm. If work reopens, only the system-flagged ones revert.
-    const allProgramTasksDone = tasksTotal > 0 && tasksCompleted >= tasksTotal;
+    // Completion is the MENTOR's call, and it's gated on finishing the program
+    // ROADMAP — not on "every assigned task is done". When the roadmap is complete
+    // (its last step approved, or all steps completed) we don't silently complete:
+    // we flag the enrollment as ready for sign-off ('pending_completion', marked
+    // system-requested) so the mentor is prompted to confirm. If the roadmap is no
+    // longer complete (e.g. a next roadmap got chained in), only the system-flagged
+    // ones revert — a mentor's own manual nomination is left untouched.
+    const roadmapComplete = await this._isProgramRoadmapComplete(enrollment);
     const currentEnrollment = await models.Enrollment.findByPk(enrollmentId);
     const current = currentEnrollment?.status;
 
     let statusUpdate = {};
-    if (allProgramTasksDone) {
+    if (roadmapComplete) {
       if (current === 'active' || current === 'matched') {
         statusUpdate = {
           status: 'pending_completion',
@@ -667,7 +778,7 @@ class TaskService {
         };
       }
     } else if (current === 'pending_completion' && currentEnrollment?.completionRequestedByRole === 'system') {
-      // Auto-flagged as ready, but new work appeared - send it back to active.
+      // Auto-flagged as ready, but the roadmap is no longer complete - send it back.
       statusUpdate = {
         status: 'active',
         completionRequestedAt: null,
@@ -697,7 +808,7 @@ class TaskService {
     }
 
     // Auto-advance week / level when the current week's tasks are all done
-    if (!allProgramTasksDone) {
+    if (!roadmapComplete) {
       await this._checkAndAdvanceProgress(enrollment, assignedTasks);
     }
 

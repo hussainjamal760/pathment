@@ -14,6 +14,7 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const { login, verify2FA, user, isLoading, requiresTwoFactor } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,7 +52,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const result = await login(formData);
+      const result = await login(formData, rememberMe);
       // Use returned result instead of state to avoid stale value race.
       if (!result.requiresTwoFactor) {
         toast.success('Welcome back!');
@@ -75,7 +76,7 @@ export default function LoginPage() {
 
   const handle2FAVerify = async (code: string) => {
     try {
-      await verify2FA(code);
+      await verify2FA(code, rememberMe);
       // After successful 2FA, redirect to dashboard
       if (user) {
         router.push(`/${user.role}/dashboard`);
@@ -198,15 +199,23 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Remember Me */}
-          <div className="flex items-center">
+          {/* Remember Me — checked: stay signed in on this device for 30 days.
+              Unchecked: session-only, signs you out when the browser is closed. */}
+          <div className="flex items-start">
             <input
               type="checkbox"
               id="remember"
-              className="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 mt-0.5 text-brand-600 border-slate-300 rounded focus:ring-brand-500"
             />
             <label htmlFor="remember" className="ml-2 text-slate-700 text-sm">
-              Remember me for 30 days
+              Keep me signed in for 30 days
+              <span className="block text-xs text-slate-400">
+                {rememberMe
+                  ? 'Stays signed in on this device.'
+                  : 'Signs out when you close the browser — best on shared computers.'}
+              </span>
             </label>
           </div>
 

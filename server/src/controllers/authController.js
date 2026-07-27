@@ -42,8 +42,8 @@ class AuthController {
    * POST /api/auth/login
    */
   login = catchAsync(async (req, res) => {
-    const { email, password } = req.body;
-    const result = await authService.login(email, password);
+    const { email, password, rememberMe } = req.body;
+    const result = await authService.login(email, password, rememberMe === true);
 
     // Check if 2FA is required
     if (result.requiresTwoFactor) {
@@ -301,7 +301,7 @@ class AuthController {
       throw new AuthenticationError('Invalid temporary token');
     }
 
-    const result = await authService.verify2FADuringLogin(userId, code);
+    const result = await authService.verify2FADuringLogin(userId, code, req.body.rememberMe === true);
 
     res.status(200).json(
       successResponse('2FA verified successfully', {

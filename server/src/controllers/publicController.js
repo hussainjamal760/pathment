@@ -24,6 +24,12 @@ const apply = catchAsync(async (req, res) => {
   res.status(201).json(successResponse('Application submitted', result, 201));
 });
 
+// "Already applied? Continue" — re-issue the magic link by email (privacy-safe).
+const resume = catchAsync(async (req, res) => {
+  const result = await publicIntakeService.resumeByEmail(req.params.slug, req.body?.email);
+  res.status(200).json(successResponse('Resume link sent', result));
+});
+
 // ─── Status / assessment (magic link) ────────────────────────────────────────
 const getStatus = catchAsync(async (req, res) => {
   const status = await publicIntakeService.getApplicationStatus(req.params.token);
@@ -33,6 +39,17 @@ const getStatus = catchAsync(async (req, res) => {
 const submitAssessment = catchAsync(async (req, res) => {
   const result = await publicIntakeService.submitAssessment(req.params.token, req.body?.answers || {});
   res.status(200).json(successResponse('Assessment submitted', result));
+});
+
+// Applicant self-serve: edit submitted info, or withdraw — both before the deadline.
+const updateInfo = catchAsync(async (req, res) => {
+  const result = await publicIntakeService.updateApplicationInfo(req.params.token, req.body || {});
+  res.status(200).json(successResponse('Application updated', result));
+});
+
+const withdraw = catchAsync(async (req, res) => {
+  const result = await publicIntakeService.withdrawApplication(req.params.token);
+  res.status(200).json(successResponse('Application withdrawn', result));
 });
 
 const uploadFile = catchAsync(async (req, res) => {
@@ -45,7 +62,10 @@ module.exports = {
   getProgram,
   getCohort,
   apply,
+  resume,
   getStatus,
   submitAssessment,
+  updateInfo,
+  withdraw,
   uploadFile
 };

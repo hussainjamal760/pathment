@@ -54,6 +54,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       field: 'submitted_at'
     },
+    // How many times the applicant (re)submitted. The stored row is always the
+    // LATEST answers — this just tells the reviewer it's the final of N.
+    submissionCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: 'submission_count'
+    },
     gradedAt: {
       type: DataTypes.DATE,
       field: 'graded_at'
@@ -61,6 +69,13 @@ module.exports = (sequelize, DataTypes) => {
     gradedBy: {
       type: DataTypes.UUID,
       field: 'graded_by'
+    },
+    // AI grading result — a SUGGESTION the admin reviews, never the final score.
+    // { perQuestion: { [questionId]: { score, note } }, overall, summary, model, at }
+    aiDraft: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'ai_draft'
     }
   }, {
     tableName: 'assessment_submissions',

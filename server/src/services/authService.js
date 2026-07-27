@@ -287,7 +287,7 @@ class AuthService {
   /**
    * Login user
    */
-  async login(email, password) {
+  async login(email, password, rememberMe = false) {
     const normalizedEmail = email.trim().toLowerCase();
 
     // Find user
@@ -350,13 +350,19 @@ class AuthService {
       email: user.email, 
       role: user.role 
     });
-    const refreshToken = generateRefreshToken({ id: user.id });
+    // "Remember me" drives the session length: 30 days when checked, otherwise a
+    // short 1-day session (the client also holds these tokens in session storage
+    // so they vanish when the browser closes).
+    const refreshTtl = rememberMe
+      ? { str: '30d', ms: 30 * 24 * 60 * 60 * 1000 }
+      : { str: '1d', ms: 24 * 60 * 60 * 1000 };
+    const refreshToken = generateRefreshToken({ id: user.id }, refreshTtl.str);
 
     // Store refresh token
     await models.RefreshToken.create({
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + refreshTtl.ms)
     });
 
     // Remove password from response
@@ -637,7 +643,7 @@ class AuthService {
   /**
    * Verify 2FA code during login
    */
-  async verify2FADuringLogin(userId, code) {
+  async verify2FADuringLogin(userId, code, rememberMe = false) {
     const securityService = require('./securityService');
     
     // Verify 2FA code (TOTP or backup code)
@@ -662,13 +668,16 @@ class AuthService {
       email: user.email, 
       role: user.role 
     });
-    const refreshToken = generateRefreshToken({ id: user.id });
+    const refreshTtl = rememberMe
+      ? { str: '30d', ms: 30 * 24 * 60 * 60 * 1000 }
+      : { str: '1d', ms: 24 * 60 * 60 * 1000 };
+    const refreshToken = generateRefreshToken({ id: user.id }, refreshTtl.str);
 
     // Store refresh token
     await models.RefreshToken.create({
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      expiresAt: new Date(Date.now() + refreshTtl.ms)
     });
 
     // Remove password from response

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { getInitials } from '@/lib/utils/formatting';
 
 /**
@@ -41,9 +42,14 @@ export function Avatar({ name, src, initials, size = 'md', href, className = '',
   const dim = SIZES[size];
   const ringCls = ring ? 'ring-2 ring-white dark:ring-slate-800' : '';
 
-  const inner = src ? (
+  // A broken / unreachable photo URL renders as an empty (black) circle — fall
+  // back to initials when the image fails so an avatar is never a blank void.
+  const [imgFailed, setImgFailed] = useState(false);
+  useEffect(() => { setImgFailed(false); }, [src]);
+
+  const inner = src && !imgFailed ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={name || 'Profile photo'} className={`${dim} rounded-full object-cover ${ringCls} ${className}`} />
+    <img src={src} alt={name || 'Profile photo'} onError={() => setImgFailed(true)} className={`${dim} rounded-full object-cover bg-brand-100 ${ringCls} ${className}`} />
   ) : (
     <span className={`${dim} rounded-full bg-brand-100 text-brand-700 font-semibold flex items-center justify-center select-none ${ringCls} ${className}`}>
       {label}

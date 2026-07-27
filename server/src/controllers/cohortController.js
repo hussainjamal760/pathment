@@ -67,6 +67,16 @@ const getApprovals = catchAsync(async (req, res) => {
 });
 
 /**
+ * GET /api/mentor/approvals/count
+ * Just the number waiting on this mentor (+ a per-clan breakdown) for the
+ * sidebar badge — cheap enough to call on every page.
+ */
+const getApprovalsCount = catchAsync(async (req, res) => {
+  const counts = await submissionService.getMentorApprovalsCount(req.user.id);
+  res.status(200).json(successResponse('Approvals count retrieved', counts));
+});
+
+/**
  * GET /api/mentor/approvals/changes-requested
  * Tasks the mentor sent back for changes that are awaiting a resubmission.
  */
@@ -96,7 +106,7 @@ const bulkApprove = catchAsync(async (req, res) => {
  * Apply the same review decision (approve / request changes) to many submissions.
  */
 const bulkReview = catchAsync(async (req, res) => {
-  const { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded } = req.body;
+  const { submissionIds, decision, rating, feedbackText, revisionNotes, pointsAwarded, pointsPercent } = req.body;
   const ids = Array.isArray(submissionIds) ? submissionIds : [];
   if (ids.length === 0) {
     return res.status(400).json({ success: false, message: 'submissionIds is required', statusCode: 400 });
@@ -110,8 +120,8 @@ const bulkReview = catchAsync(async (req, res) => {
     feedbackText,
     // Revision notes only make sense when changes are requested.
     ...(isApproved ? {} : { revisionNotes }),
-    // Points only count on approval.
-    ...(isApproved ? { pointsAwarded } : {})
+    // Points only count on approval. An absolute value, or a % of each task's max.
+    ...(isApproved ? { pointsAwarded, pointsPercent } : {})
   };
 
   const results = await submissionService.bulkReview(req.user.id, ids, reviewData);
@@ -197,4 +207,4 @@ const getMenteeAttendanceHistory = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Attendance history', { history }));
 });
 
-module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, getChangesRequested, getReviewed, bulkApprove, bulkReview, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance, getMenteeAttendanceHistory };
+module.exports = { getCohort, getCohortActivity, getCohortReportSummary, getMenteeProfile, getApprovals, getApprovalsCount, getChangesRequested, getReviewed, bulkApprove, bulkReview, nudge, getMyProgress, updatePersonality, addInsight, logMeetingNote, addCollaborator, removeCollaborator, setAttendance, getReviewAttendance, getMenteeAttendanceHistory };

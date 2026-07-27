@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { toast } from 'sonner';
 import {
   ClipboardCheck, CheckCircle2, Clock, Loader2, ChevronRight, CalendarClock, Check, X,
@@ -9,11 +8,20 @@ import {
 } from 'lucide-react';
 import { useMentorApprovals, type ApprovalItem } from '@/lib/hooks/mentor';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
+import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
+import { QuizReviewDrawer } from '@/components/mentor/QuizReviewDrawer';
 import { BulkReviewDrawer } from '@/components/mentor/BulkReviewDrawer';
+import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { Avatar } from '@/components/shared/Avatar';
 import { TablePagination } from '@/components/shared/TablePagination';
+import { SelectMenu } from '@/components/shared/SelectMenu';
 import { usePagination } from '@/lib/hooks/shared/usePagination';
 import { todayInZone, dateInZone, addDaysToDateStr, zoneLabel } from '@/lib/utils/datetime';
+
+const TASK_TYPE_LABEL: Record<string, string> = {
+  assignment: 'Assignment', project: 'Project', quiz: 'Quiz', reading: 'Reading',
+  video: 'Video', discussion: 'Discussion', interview: 'Interview', custom: 'Custom',
+};
 
 function timeAgo(iso: string): string {
   const d = new Date(iso).getTime();
@@ -38,9 +46,13 @@ type Tab = 'review' | 'changes' | 'extensions' | 'reviewed';
 export default function MentorApprovals() {
   const { queue, changesRequested, reviewed, loading, error, refetch, bulkReview, handleExtension } = useMentorApprovals();
   const [tab, setTab] = useState<Tab>('review');
+  // Task-type filter, shared across every tab (assignment / quiz / interview / …).
+  const [typeFilter, setTypeFilter] = useState('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [autoOpened, setAutoOpened] = useState(false);
   const [extBusy, setExtBusy] = useState<string | null>(null);
   // Mentor-chosen new due date per extension request (YYYY-MM-DD).
   const [extDates, setExtDates] = useState<Record<string, string>>({});
@@ -80,6 +92,35 @@ export default function MentorApprovals() {
   const reviewItems = useMemo(() => queue.filter((q) => !q.isExtensionRequest), [queue]);
   const extensionItems = useMemo(() => queue.filter((q) => q.isExtensionRequest), [queue]);
 
+  // Task types present anywhere (for the shared type-filter dropdown).
+  const typeOptions = useMemo(() => {
+    const present = new Set<string>();
+    [...queue, ...changesRequested, ...reviewed].forEach((it) => { if (it.type) present.add(it.type); });
+    const opts = [{ value: 'all', label: 'All types' }];
+    [...present].sort().forEach((t) => opts.push({ value: t, label: TASK_TYPE_LABEL[t] || (t.charAt(0).toUpperCase() + t.slice(1)) }));
+    return opts;
+  }, [queue, changesRequested, reviewed]);
+  const showTypeFilter = typeOptions.length > 1;
+  const filteredExtensions = useMemo(
+    () => (typeFilter === 'all' ? extensionItems : extensionItems.filter((it) => it.type === typeFilter)),
+    [extensionItems, typeFilter]
+  );
+
+  // Deep link from a "submitted to review" notification (/mentor/approvals?task=ID):
+  // land on To-review and auto-open the review drawer for that task, once the
+  // (fresh) queue has loaded. Then clean the URL so a refresh doesn't reopen it.
+  useEffect(() => {
+    if (autoOpened || loading) return;
+    const taskId = new URLSearchParams(window.location.search).get('task');
+    if (!taskId) return;
+    setTab('review');
+    const item = reviewItems.find((q) => q.taskId === taskId);
+    if (item) setReviewing(item);
+    else toast.message('That submission isn’t awaiting review anymore.');
+    setAutoOpened(true);
+    window.history.replaceState({}, '', '/mentor/approvals');
+  }, [reviewItems, loading, autoOpened]);
+
   // Apply search + late-only + sort to the To-review list (queue is already loaded).
   const filteredReview = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -92,11 +133,12 @@ export default function MentorApprovals() {
       );
     }
     if (lateOnly) list = list.filter((it) => it.isLate);
+    if (typeFilter !== 'all') list = list.filter((it) => it.type === typeFilter);
     const sorted = [...list].sort(
       (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
     );
     return newestFirst ? sorted.reverse() : sorted;
-  }, [reviewItems, search, lateOnly, newestFirst]);
+  }, [reviewItems, search, lateOnly, newestFirst, typeFilter]);
 
   // Cluster filtered items by task (roadmapTaskId, falling back to title).
   const groups = useMemo(() => {
@@ -121,6 +163,7 @@ export default function MentorApprovals() {
     const q = changesSearch.trim().toLowerCase();
     let list = changesRequested;
     if (decisionFilter !== 'all') list = list.filter((it) => it.decision === decisionFilter);
+    if (typeFilter !== 'all') list = list.filter((it) => it.type === typeFilter);
     if (q) {
       list = list.filter(
         (it) =>
@@ -132,7 +175,7 @@ export default function MentorApprovals() {
       (a, b) => new Date(a.requestedAt).getTime() - new Date(b.requestedAt).getTime()
     );
     return changesNewestFirst ? sorted.reverse() : sorted;
-  }, [changesRequested, changesSearch, changesNewestFirst, decisionFilter]);
+  }, [changesRequested, changesSearch, changesNewestFirst, decisionFilter, typeFilter]);
 
   // Reviewed: counts per filter (for the chips), then filter + search + sort.
   const reviewedCounts = useMemo(() => ({
@@ -150,21 +193,26 @@ export default function MentorApprovals() {
     else if (reviewedFilter === 'late') list = list.filter((it) => it.isLate);
     else if (reviewedFilter === 'top') list = list.filter((it) => (it.rating ?? 0) >= 5);
     else if (reviewedFilter === 'low') list = list.filter((it) => (it.rating ?? 0) > 0 && (it.rating ?? 0) <= 3);
+    if (typeFilter !== 'all') list = list.filter((it) => it.type === typeFilter);
     if (q) list = list.filter((it) => it.title.toLowerCase().includes(q) || (it.mentee?.name || '').toLowerCase().includes(q));
     const sorted = [...list].sort((a, b) => new Date(a.reviewedAt).getTime() - new Date(b.reviewedAt).getTime());
     return reviewedNewestFirst ? sorted.reverse() : sorted;
-  }, [reviewed, reviewedSearch, reviewedFilter, reviewedNewestFirst]);
+  }, [reviewed, reviewedSearch, reviewedFilter, reviewedNewestFirst, typeFilter]);
 
   // Keep pagination total in sync, and snap back to page 1 when filters change.
   useEffect(() => { reviewedPg.setTotal(filteredReviewed.length); }, [filteredReviewed.length, reviewedPg.setTotal]);
-  useEffect(() => { reviewedPg.reset(); }, [reviewedSearch, reviewedFilter, reviewedNewestFirst, reviewedPg.reset]);
+  useEffect(() => { reviewedPg.reset(); }, [reviewedSearch, reviewedFilter, reviewedNewestFirst, typeFilter, reviewedPg.reset]);
   const pagedReviewed = useMemo(
     () => filteredReviewed.slice(reviewedPg.offset, reviewedPg.offset + reviewedPg.limit),
     [filteredReviewed, reviewedPg.offset, reviewedPg.limit]
   );
 
+  // Interviews are graded per-answer in their own drawer, never in bulk (bulk
+  // only sets a rating/points), so they're excluded from every selection path.
+  const isBulkable = (q: ApprovalItem) => q.type !== 'interview' && q.type !== 'quiz';
+
   const selectedItems = useMemo(
-    () => queue.filter((q) => selected.has(q.submissionId)),
+    () => queue.filter((q) => selected.has(q.submissionId) && isBulkable(q)),
     [queue, selected]
   );
 
@@ -175,25 +223,29 @@ export default function MentorApprovals() {
       return next;
     });
 
+  const bulkableFiltered = filteredReview.filter(isBulkable);
   const allFilteredSelected =
-    filteredReview.length > 0 && filteredReview.every((q) => selected.has(q.submissionId));
+    bulkableFiltered.length > 0 && bulkableFiltered.every((q) => selected.has(q.submissionId));
   const selectAllFiltered = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allFilteredSelected) filteredReview.forEach((q) => next.delete(q.submissionId));
-      else filteredReview.forEach((q) => next.add(q.submissionId));
+      if (allFilteredSelected) bulkableFiltered.forEach((q) => next.delete(q.submissionId));
+      else bulkableFiltered.forEach((q) => next.add(q.submissionId));
       return next;
     });
   };
 
-  // Select / deselect every item within one task group.
-  const groupAllSelected = (g: { items: ApprovalItem[] }) =>
-    g.items.length > 0 && g.items.every((q) => selected.has(q.submissionId));
+  // Select / deselect every bulkable item within one task group.
+  const groupAllSelected = (g: { items: ApprovalItem[] }) => {
+    const b = g.items.filter(isBulkable);
+    return b.length > 0 && b.every((q) => selected.has(q.submissionId));
+  };
   const toggleGroup = (g: { items: ApprovalItem[] }) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (groupAllSelected(g)) g.items.forEach((q) => next.delete(q.submissionId));
-      else g.items.forEach((q) => next.add(q.submissionId));
+      const b = g.items.filter(isBulkable);
+      if (groupAllSelected(g)) b.forEach((q) => next.delete(q.submissionId));
+      else b.forEach((q) => next.add(q.submissionId));
       return next;
     });
 
@@ -248,9 +300,11 @@ export default function MentorApprovals() {
     <div className="flex items-center gap-4 px-5 py-4">
       <input
         type="checkbox"
-        checked={selected.has(item.submissionId)}
+        checked={selected.has(item.submissionId) && isBulkable(item)}
         onChange={() => toggle(item.submissionId)}
-        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0"
+        disabled={!isBulkable(item)}
+        title={isBulkable(item) ? undefined : 'Interviews are graded individually'}
+        className="w-4 h-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
       />
 
       <div className="w-9 h-9 bg-brand-100 rounded-full flex items-center justify-center shrink-0">
@@ -388,6 +442,9 @@ export default function MentorApprovals() {
                 <Layers className="w-4 h-4" />
                 Group by task
               </button>
+              {showTypeFilter && (
+                <SelectMenu value={typeFilter} onChange={setTypeFilter} options={typeOptions} ariaLabel="Filter by task type" className="min-w-[150px]" />
+              )}
             </div>
           )}
 
@@ -499,6 +556,9 @@ export default function MentorApprovals() {
                   <ArrowDownUp className="w-4 h-4" />
                   {changesNewestFirst ? 'Newest first' : 'Oldest first'}
                 </button>
+                {showTypeFilter && (
+                  <SelectMenu value={typeFilter} onChange={setTypeFilter} options={typeOptions} ariaLabel="Filter by task type" className="min-w-[150px]" />
+                )}
               </div>
             </div>
           )}
@@ -562,12 +622,12 @@ export default function MentorApprovals() {
                     )}
                   </div>
 
-                  <Link
-                    href={`/mentor/tasks/${item.taskId}`}
+                  <button
+                    onClick={() => setOpenTaskId(item.taskId)}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
                   >
                     View task <ArrowUpRight className="w-3.5 h-3.5" />
-                  </Link>
+                  </button>
                 </div>
                 );
               })}
@@ -615,6 +675,9 @@ export default function MentorApprovals() {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:border-brand-300 hover:text-brand-700">
                 <ArrowDownUp className="w-4 h-4" />{reviewedNewestFirst ? 'Newest first' : 'Oldest first'}
               </button>
+              {showTypeFilter && (
+                <SelectMenu value={typeFilter} onChange={setTypeFilter} options={typeOptions} ariaLabel="Filter by task type" className="min-w-[150px]" />
+              )}
             </div>
 
             {filteredReviewed.length === 0 ? (
@@ -657,12 +720,12 @@ export default function MentorApprovals() {
                           </p>
                         )}
                       </div>
-                      <Link
-                        href={`/mentor/tasks/${item.taskId}`}
+                      <button
+                        onClick={() => setOpenTaskId(item.taskId)}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 text-sm text-slate-700 hover:border-brand-300 hover:text-brand-700 shrink-0"
                       >
                         View task <ArrowUpRight className="w-3.5 h-3.5" />
-                      </Link>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -681,8 +744,19 @@ export default function MentorApprovals() {
             <p className="text-slate-600">No extension requests right now.</p>
           </div>
         ) : (
-          <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
-            {extensionItems.map((item) => {
+          <div className="space-y-3">
+            {showTypeFilter && (
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectMenu value={typeFilter} onChange={setTypeFilter} options={typeOptions} ariaLabel="Filter by task type" className="min-w-[150px]" />
+              </div>
+            )}
+            {filteredExtensions.length === 0 ? (
+              <div className="bg-card rounded-2xl border border-slate-200 py-12 text-center">
+                <p className="text-slate-600">No extension requests match this filter.</p>
+              </div>
+            ) : (
+            <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
+            {filteredExtensions.map((item) => {
               const busy = extBusy === item.submissionId;
               return (
                 <div key={item.submissionId} className="flex items-start gap-4 px-5 py-4">
@@ -748,16 +822,38 @@ export default function MentorApprovals() {
                 </div>
               );
             })}
+            </div>
+            )}
           </div>
         )
       )}
 
-      {reviewing && (
+      {reviewing && reviewing.type === 'interview' && (
+        <InterviewReviewDrawer
+          taskId={reviewing.taskId}
+          onClose={() => setReviewing(null)}
+          onFinalized={() => { setSelected(new Set()); refetch(); }}
+        />
+      )}
+
+      {reviewing && reviewing.type === 'quiz' && (
+        <QuizReviewDrawer
+          taskId={reviewing.taskId}
+          onClose={() => setReviewing(null)}
+          onReviewed={() => { setSelected(new Set()); refetch(); }}
+        />
+      )}
+
+      {reviewing && reviewing.type !== 'interview' && reviewing.type !== 'quiz' && (
         <ReviewDrawer
           item={reviewing}
           onClose={() => setReviewing(null)}
           onReviewed={() => { setSelected(new Set()); refetch(); }}
         />
+      )}
+
+      {openTaskId && (
+        <TaskDrawerById taskId={openTaskId} onClose={() => setOpenTaskId(null)} onChanged={refetch} />
       )}
 
       {bulkOpen && selectedItems.length > 0 && (

@@ -5,7 +5,7 @@ import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import type { Cohort } from './useCohorts';
 
 export type ApplicationStatus =
-  | 'pending' | 'assessment_sent' | 'under_review' | 'accepted' | 'rejected' | 'waitlisted';
+  | 'pending' | 'assessment_sent' | 'under_review' | 'accepted' | 'rejected' | 'waitlisted' | 'withdrawn';
 
 export interface Application {
   id: string;
@@ -17,8 +17,29 @@ export interface Application {
   programPreference?: string | null;
   source: string;
   status: ApplicationStatus;
+  /** The level the applicant selected (null when the cohort has no levels). */
+  level?: string | null;
+  assignedAssessmentId?: string | null;
   assessmentScore?: number | null;
+  /** Max points of the applicant's submission + AI's holistic score (list view). */
+  maxScore?: number | null;
+  aiOverall?: number | null;
+  /** Evidence-based placement: the level the rules landed on + the proof. */
+  recommendedLevel?: string | null;
+  levelEvidence?: {
+    /** True when NO criterion could be judged — the criteria don't match what
+     *  this cohort actually asks, so the placement is a fallback not a finding. */
+    evidenceThin?: boolean;
+    judgedCount?: number;
+    criteriaCount?: number;
+    criteria: Record<string, { verdict: boolean | null; quote: string; note: string }>;
+    reason: string;
+    coherence?: string;
+    selfSelected?: string | null;
+    matchesSelfSelected?: boolean;
+  } | null;
   reviewerNotes?: string | null;
+  decisionReason?: string | null;
   decidedAt?: string | null;
   inviteId?: string | null;
   responses?: Record<string, unknown>;
@@ -31,6 +52,8 @@ export interface ImportReport {
   created: number;
   updated: number;
   skipped: { email: string; reason: string }[];
+  /** True when the cohort is now at/over its application cap. */
+  capReached?: boolean;
 }
 
 export function useCohortApplications(cohortId: string) {
@@ -38,6 +61,7 @@ export function useCohortApplications(cohortId: string) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'all'>('all');
+  const [passThreshold, setPassThreshold] = useState<number | null>(null);
 
   const fetchCohort = useCallback(async () => {
     try {
@@ -51,15 +75,18 @@ export function useCohortApplications(cohortId: string) {
   const fetchApplications = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await applicationApi.list(cohortId, statusFilter === 'all' ? undefined : statusFilter);
+      // Fetch the WHOLE cohort once; the page filters client-side so every tab
+      // can show a real count and switching filters is instant (no round-trip).
+      const res = await applicationApi.list(cohortId);
       setApplications(res?.data?.applications ?? []);
+      setPassThreshold(res?.data?.passThreshold ?? null);
     } catch {
       toast.error('Failed to load applications');
       setApplications([]);
     } finally {
       setLoading(false);
     }
-  }, [cohortId, statusFilter]);
+  }, [cohortId]);
 
   useEffect(() => { fetchCohort(); }, [fetchCohort]);
   useEffect(() => { fetchApplications(); }, [fetchApplications]);
@@ -68,9 +95,9 @@ export function useCohortApplications(cohortId: string) {
     await Promise.all([fetchCohort(), fetchApplications()]);
   }, [fetchCohort, fetchApplications]);
 
-  const importRows = useCallback(async (rows: Record<string, string>[]): Promise<ImportReport | null> => {
+  const importRows = useCallback(async (rows: Record<string, string>[], allowExceed = false): Promise<ImportReport | null> => {
     try {
-      const res = await applicationApi.import(cohortId, rows);
+      const res = await applicationApi.import(cohortId, rows, allowExceed);
       const report: ImportReport = res?.data?.report;
       toast.success(`${report.created} added, ${report.updated} updated, ${report.skipped.length} skipped`);
       await refetch();
@@ -81,7 +108,7 @@ export function useCohortApplications(cohortId: string) {
     }
   }, [cohortId, refetch]);
 
-  const updateApplication = useCallback(async (id: string, data: { status?: string; assessmentScore?: number; reviewerNotes?: string }) => {
+  const updateApplication = useCallback(async (id: string, data: { status?: string; assessmentScore?: number; reviewerNotes?: string; decisionReason?: string }) => {
     try {
       await applicationApi.update(id, data);
       await refetch();
@@ -116,6 +143,7 @@ export function useCohortApplications(cohortId: string) {
     loading,
     statusFilter,
     setStatusFilter,
+    passThreshold,
     refetch,
     importRows,
     updateApplication,

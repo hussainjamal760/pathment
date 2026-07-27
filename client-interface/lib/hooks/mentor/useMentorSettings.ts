@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/services/api-client';
 import { apiConfig } from '@/lib/config/api';
-import { preferencesApi } from '@/lib/services/preferences-api';
 import { useAuth } from '@/lib/context/AuthContext';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { validateProfileFields } from '@/lib/utils/validation';
@@ -38,13 +37,6 @@ export interface MentorAvailabilitySettings {
   currentMenteeCount: number;
 }
 
-export interface MentorNotificationSettings {
-  emailNotifications: boolean;
-  taskReminders: boolean;
-  menteeMessages: boolean;
-  weeklyReports: boolean;
-}
-
 export interface UseMentorSettingsReturn {
   loading: boolean;
   saving: boolean;
@@ -52,16 +44,13 @@ export interface UseMentorSettingsReturn {
   profileData: MentorProfileData;
   mentorProfile: MentorProfessionalProfile;
   availabilitySettings: MentorAvailabilitySettings;
-  notificationSettings: MentorNotificationSettings;
   setActiveTab: (v: string) => void;
   setProfileData: React.Dispatch<React.SetStateAction<MentorProfileData>>;
   setMentorProfile: React.Dispatch<React.SetStateAction<MentorProfessionalProfile>>;
   setAvailabilitySettings: React.Dispatch<React.SetStateAction<MentorAvailabilitySettings>>;
-  setNotificationSettings: React.Dispatch<React.SetStateAction<MentorNotificationSettings>>;
   handleProfileUpdate: () => Promise<void>;
   handleMentorProfileUpdate: () => Promise<void>;
   handleAvailabilityUpdate: () => Promise<void>;
-  handleNotificationUpdate: () => Promise<void>;
 }
 
 export function useMentorSettings(): UseMentorSettingsReturn {
@@ -96,13 +85,6 @@ export function useMentorSettings(): UseMentorSettingsReturn {
     isAcceptingMentees: true,
     maxMentees: 5,
     currentMenteeCount: 0,
-  });
-
-  const [notificationSettings, setNotificationSettings] = useState<MentorNotificationSettings>({
-    emailNotifications: true,
-    taskReminders: true,
-    menteeMessages: true,
-    weeklyReports: true,
   });
 
   const fetchSettings = useCallback(async () => {
@@ -141,10 +123,6 @@ export function useMentorSettings(): UseMentorSettingsReturn {
         });
       }
 
-      const savedNotif = data.settings?.preferences?.notifications;
-      if (savedNotif && typeof savedNotif === 'object') {
-        setNotificationSettings((prev) => ({ ...prev, ...savedNotif }));
-      }
     } catch (error: any) {
       console.error('Failed to fetch settings:', error);
       toast.error('Failed to load settings');
@@ -204,19 +182,6 @@ export function useMentorSettings(): UseMentorSettingsReturn {
     }
   }, [availabilitySettings, fetchSettings]);
 
-  const handleNotificationUpdate = useCallback(async () => {
-    try {
-      setSaving(true);
-      await preferencesApi.update('notifications', notificationSettings as unknown as Record<string, unknown>);
-      toast.success('Notification settings saved');
-    } catch (error: any) {
-      console.error('Failed to update notifications:', error);
-      toast.error(extractApiErrorMessage(error, 'Failed to save notification settings'));
-    } finally {
-      setSaving(false);
-    }
-  }, [notificationSettings]);
-
   return {
     loading,
     saving,
@@ -224,15 +189,12 @@ export function useMentorSettings(): UseMentorSettingsReturn {
     profileData,
     mentorProfile,
     availabilitySettings,
-    notificationSettings,
     setActiveTab,
     setProfileData,
     setMentorProfile,
     setAvailabilitySettings,
-    setNotificationSettings,
     handleProfileUpdate,
     handleMentorProfileUpdate,
     handleAvailabilityUpdate,
-    handleNotificationUpdate,
   };
 }

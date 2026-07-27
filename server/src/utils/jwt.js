@@ -10,20 +10,21 @@ const crypto = require('crypto');
  * @param {Object} payload - Token payload (user id, role, etc.)
  * @returns {String} JWT token
  */
-const generateAccessToken = (payload) => {
+const generateAccessToken = (payload, expiresIn) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m'
+    expiresIn: expiresIn || process.env.JWT_ACCESS_EXPIRY || '15m'
   });
 };
 
 /**
  * Generate refresh token
  * @param {Object} payload - Token payload (user id)
+ * @param {String} [expiresIn] - Optional lifetime override (e.g. '30d' / '1d')
  * @returns {String} JWT token
  */
-const generateRefreshToken = (payload) => {
+const generateRefreshToken = (payload, expiresIn) => {
   return jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d'
+    expiresIn: expiresIn || process.env.JWT_REFRESH_EXPIRY || '7d'
   });
 };
 

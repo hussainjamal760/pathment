@@ -82,5 +82,4 @@ export type {
   MentorProfileData,
   MentorProfessionalProfile,
   MentorAvailabilitySettings,
-  MentorNotificationSettings,
 } from './useMentorSettings';

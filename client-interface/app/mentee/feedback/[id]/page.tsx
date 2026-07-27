@@ -20,6 +20,8 @@ import {
   User,
 } from 'lucide-react';
 import { useTaskDetail } from '@/lib/hooks/mentee';
+import { toExternalHref } from '@/lib/utils/url';
+import { RichContent } from '@/components/shared/RichContent';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -58,6 +60,9 @@ export default function FeedbackView({ params }: PageProps) {
 
   const taskTitle = task.roadmapTask?.title || task.title || 'Task Feedback';
   const taskDescription = task.roadmapTask?.description || task.description || '';
+  // Descriptions are authored in a rich-text editor (HTML); older ones are plain
+  // text. Render HTML safely, fall back to plain text — otherwise raw <p> tags show.
+  const descriptionIsHtml = /<[a-z][\s\S]*>/i.test(taskDescription);
   const latestSubmission = task.submissions?.[task.submissions.length - 1] || null;
   const feedback = latestSubmission?.feedback || [];
   const latestFeedback = feedback[feedback.length - 1] || null;
@@ -104,9 +109,11 @@ export default function FeedbackView({ params }: PageProps) {
                 Completed
               </span>
             </div>
-            {taskDescription && (
-              <p className="text-slate-600 text-sm">{taskDescription}</p>
-            )}
+            {taskDescription && (descriptionIsHtml ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: taskDescription }} />
+            ) : (
+              <p className="text-slate-600 text-sm whitespace-pre-wrap">{taskDescription}</p>
+            ))}
           </div>
         </div>
 
@@ -248,9 +255,9 @@ export default function FeedbackView({ params }: PageProps) {
           {latestSubmission.submissionText && (
             <div className="mb-6">
               <h3 className="text-slate-700 text-sm font-medium mb-2">Description</h3>
-              <div
-                className="prose prose-sm max-w-none text-slate-600 bg-slate-50 rounded-xl p-4 border border-slate-100 leading-relaxed"
-                dangerouslySetInnerHTML={{ __html: latestSubmission.submissionText }}
+              <RichContent
+                html={latestSubmission.submissionText}
+                className="text-slate-600 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-100 dark:border-slate-700 leading-relaxed"
               />
             </div>
           )}
@@ -264,7 +271,7 @@ export default function FeedbackView({ params }: PageProps) {
                   {latestSubmission.submissionUrls.map((link: string, idx: number) => (
                     <a
                       key={idx}
-                      href={link}
+                      href={toExternalHref(link)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-2 text-brand-600 hover:text-brand-700 text-sm"

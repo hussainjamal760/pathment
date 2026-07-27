@@ -32,6 +32,17 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING(255),
       field: 'program_preference'
     },
+    // The level the applicant selected (key into the cohort's `levels`). Drives
+    // which assessment pool they're assigned from. null when the cohort has no levels.
+    level: {
+      type: DataTypes.STRING(40)
+    },
+    // The assessment randomly assigned to this applicant from the matching pool.
+    // Stored so a returning applicant always sees the SAME assessment (stable).
+    assignedAssessmentId: {
+      type: DataTypes.UUID,
+      field: 'assigned_assessment_id'
+    },
     // Where this record came from. Importer sets 'import'; manual add 'manual'.
     source: {
       type: DataTypes.STRING(20),
@@ -47,16 +58,34 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       defaultValue: 'pending',
       validate: {
-        isIn: [['pending', 'assessment_sent', 'under_review', 'accepted', 'rejected', 'waitlisted']]
+        isIn: [['pending', 'assessment_sent', 'under_review', 'accepted', 'rejected', 'waitlisted', 'withdrawn']]
       }
     },
     assessmentScore: {
       type: DataTypes.DECIMAL(5, 2),
       field: 'assessment_score'
     },
+    // Level the rules landed on from evidence (may differ from the applicant's
+    // self-selected `level`), plus the per-criterion proof behind it.
+    recommendedLevel: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+      field: 'recommended_level'
+    },
+    levelEvidence: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: 'level_evidence'
+    },
     reviewerNotes: {
       type: DataTypes.TEXT,
       field: 'reviewer_notes'
+    },
+    // The reason surfaced to the APPLICANT on a decision (e.g. why rejected).
+    // Separate from reviewer_notes, which stays internal.
+    decisionReason: {
+      type: DataTypes.TEXT,
+      field: 'decision_reason'
     },
     reviewedBy: {
       type: DataTypes.UUID,
@@ -117,6 +146,7 @@ module.exports = (sequelize, DataTypes) => {
     Application.belongsTo(models.User, { foreignKey: 'reviewed_by', as: 'reviewer' });
     Application.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
     Application.belongsTo(models.RegistrationInvite, { foreignKey: 'invite_id', as: 'invite' });
+    Application.belongsTo(models.Assessment, { foreignKey: 'assigned_assessment_id', as: 'assignedAssessment' });
     Application.hasMany(models.AssessmentSubmission, { foreignKey: 'application_id', as: 'assessmentSubmissions' });
   };
 

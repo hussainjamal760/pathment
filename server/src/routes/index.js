@@ -36,6 +36,8 @@ const accessRoutes = require('./access');
 const aiConnectionRoutes = require('./aiConnections');
 const programReviewRoutes = require('./programReviews');
 const changelogRoutes = require('./changelog');
+const interviewRoutes = require('./interviews');
+const quizRoutes = require('./quizzes');
 
 /**
  * API Routes
@@ -73,6 +75,8 @@ router.use('/mentees', menteeRoutes);
 
 // Task routes
 router.use('/tasks', taskRoutes);
+router.use('/interviews', interviewRoutes);
+router.use('/quizzes', quizRoutes);
 
 // Submission routes
 router.use('/submissions', submissionRoutes);

@@ -120,7 +120,7 @@ class NotificationScheduler {
         payload: {
           title: 'Task deadline passed',
           message: `Deadline passed for "${task.roadmapTask?.title || 'Task'}".`,
-          actionUrl: `/mentor/tasks/${task.id}`,
+          actionUrl: `/mentor/tasks/${task.id}/feedback`,
           actionLabel: 'Review Task',
           relatedEntityType: 'assigned_task',
           relatedEntityId: task.id,

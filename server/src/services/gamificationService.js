@@ -179,9 +179,14 @@ class GamificationService {
     const menteeProfile = await models.MenteeProfile.findOne({ where: { userId } });
     if (!menteeProfile) return;
 
-    const activeBadges = await models.Badge.findAll({ where: { isActive: true } });
-    const userBadges = await models.UserBadge.findAll({ where: { userId } });
-    const ownedBadgeIds = new Set(userBadges.map(ub => ub.badgeId));
+    // Bulk-fetch the two lists once, not a findOne per badge (that was the N+1
+    // that made task approval slow). Reuse the loaded profile for every criteria
+    // check so checkBadgeCriteria doesn't re-query it per badge either.
+    const [activeBadges, ownedBadges] = await Promise.all([
+      models.Badge.findAll({ where: { isActive: true } }),
+      models.UserBadge.findAll({ where: { userId }, attributes: ['badgeId'] })
+    ]);
+    const ownedBadgeIds = new Set(ownedBadges.map((ub) => ub.badgeId));
 
     for (const badge of activeBadges) {
       if (ownedBadgeIds.has(badge.id)) continue;
@@ -199,6 +204,8 @@ class GamificationService {
   async checkBadgeCriteria(userId, badge, menteeProfile = null) {
     const { criteriaType, criteriaValue } = badge;
 
+    // Callers that already hold the profile (checkAndAwardBadges) pass it in to
+    // avoid a per-badge re-query; standalone callers still fetch it.
     if (!menteeProfile) {
       menteeProfile = await models.MenteeProfile.findOne({ where: { userId } });
     }
@@ -256,7 +263,10 @@ class GamificationService {
     });
 
     const rank = higherRankedCount + 1;
+    const points = Number(menteeProfile.totalPoints || 0);
 
+    // Each period is a distinct row (unique by user/program/periodType/start), so
+    // the four upserts don't touch each other — run them in parallel.
     await Promise.all(periods.map(async (period) => {
       const existing = await models.LeaderboardEntry.findOne({
         where: {
@@ -268,18 +278,13 @@ class GamificationService {
       });
 
       if (existing) {
-        await existing.update({
-          rank,
-          points: Number(menteeProfile.totalPoints || 0),
-          periodEnd: period.end,
-          isVisible: true
-        });
+        await existing.update({ rank, points, periodEnd: period.end, isVisible: true });
       } else {
         await models.LeaderboardEntry.create({
           userId,
           programId,
           rank,
-          points: Number(menteeProfile.totalPoints || 0),
+          points,
           periodType: period.type,
           periodStart: period.start,
           periodEnd: period.end,

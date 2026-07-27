@@ -22,11 +22,13 @@ import { PersonalityBars } from '@/components/mentor/PersonalityBars';
 import { InsightsPanel } from '@/components/mentor/InsightsPanel';
 import { OneOnOneDrawer, type OneOnOneData } from '@/components/mentor/OneOnOneDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
+import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { NudgeButton } from '@/components/mentor/NudgeButton';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
 import { Drawer } from '@/components/shared/Drawer';
 import { Avatar } from '@/components/shared/Avatar';
+import { MenteeScheduleView } from '@/components/shared/MenteeScheduleView';
 
 // ── Small presentational helpers (current indigo/slate design system) ────────
 const RISK_PILL: Record<CohortRisk, { label: string; className: string; dot: string }> = {
@@ -146,6 +148,8 @@ export default function MenteeDetail() {
 
   const [loggingOneOnOne, setLoggingOneOnOne] = useState(false);
   const [assigningTask, setAssigningTask] = useState(false);
+  // A clicked work-history task opens in the shared task drawer (like Cohort Review).
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   // Full cohort-review attendance record for this mentee (every meeting they
   // were marked on, newest first) — same data as the cohort-review drawer.
@@ -325,7 +329,7 @@ export default function MenteeDetail() {
             <div>
               <p className="text-amber-900 font-medium text-sm">
                 {enrollment.completionRequestedByRole === 'system'
-                  ? `${mentee?.firstName} ${mentee?.lastName} has finished every task - ready for your sign-off`
+                  ? `${mentee?.firstName} ${mentee?.lastName} has finished their roadmap - ready for your sign-off`
                   : `${mentee?.firstName} ${mentee?.lastName} has requested completion`}
               </p>
               <p className="text-amber-700 text-xs mt-1">
@@ -372,6 +376,9 @@ export default function MenteeDetail() {
         </div>
       )}
 
+      {/* ── Weekly schedule (read-only; mentor fills it in Schedules) ─── */}
+      <MenteeScheduleView menteeId={menteeId} />
+
       {/* ── Work history ─────────────────────────────────────────────── */}
       <div className="bg-card rounded-2xl border border-slate-200">
         <div className="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
@@ -406,7 +413,7 @@ export default function MenteeDetail() {
                       {grouped[status].map((t: any) => (
                         <button
                           key={t.id}
-                          onClick={() => router.push(`/mentor/tasks/${t.id}`)}
+                          onClick={() => setOpenTaskId(t.id)}
                           className="w-full text-left flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-brand-200 transition-colors"
                         >
                           <span className="min-w-0">
@@ -614,6 +621,14 @@ export default function MenteeDetail() {
           mentee={{ id: menteeId, name: `${mentee?.firstName ?? ''} ${mentee?.lastName ?? ''}`.trim() || 'Mentee' }}
           onClose={() => setAssigningTask(false)}
           onAssigned={fetchMenteeDetails}
+        />
+      )}
+
+      {openTaskId && (
+        <TaskDrawerById
+          taskId={openTaskId}
+          onClose={() => setOpenTaskId(null)}
+          onChanged={() => { fetchMenteeDetails(); refetchProfile(); }}
         />
       )}
 
