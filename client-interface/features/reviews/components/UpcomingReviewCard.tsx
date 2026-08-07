@@ -5,6 +5,7 @@ import { Calendar, User, Users, Sparkles } from 'lucide-react';
 import { menteeApi } from '@/lib/services/mentee-api';
 import { useCountdown } from '@/lib/hooks/useCountdown';
 import { CountdownTicker } from '@/components/shared/CountdownTicker';
+import { formatMeeting } from '@/lib/utils/datetime';
 
 interface UpcomingReview {
   scheduleId: string;
@@ -44,15 +45,7 @@ export function UpcomingReviewCard() {
     return null;
   }
 
-  const scheduledDate = new Date(upcoming.scheduledAt);
-  const formattedDate = new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  }).format(scheduledDate);
+  const formattedDate = formatMeeting(upcoming.scheduledAt);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 p-5 text-white shadow-xl mb-6">
