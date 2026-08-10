@@ -70,6 +70,12 @@ This document tracks the phased rollout of the Retrieval-Augmented Generation (R
 - **Phase 4: Frontend UI Tab**: Built a new `Knowledge Base` tab within the Mentor Settings (`app/mentor/settings/page.tsx`). Implemented the `DocumentsTab.tsx` component which features a clean drag-and-drop zone for PDF uploads, dynamic status polling (`Processing` ➔ `Ready`), and a list view to manage active documents.
 - **Phase 5: Client-Side API Integration**: Wired the frontend UI into `messaging-api.ts` to seamlessly manage form data uploads, document retrieval, and safe deletions connected directly to the new API endpoints.
 
+## ✅ Post-Deployment UI & Pipeline Tuning
+- **Schema Hotfix**: Created migration `094_add_processed_to_edit_histories.js` to add a missing `processed` column, fixing a crash in the `styleLearningWorker` polling loop.
+- **Auto-Reply Tuning**: Lowered `RAG_AUTO_REPLY_CONFIDENCE_THRESHOLD` to `0.70` via environment variables to allow more aggressive auto-replies for high-quality drafts.
+- **Anti-Hallucination Fallback**: Updated `promptBuilderService.js` to strictly embody the mentor persona. Enforced an `[ABSTAIN_NO_CONTEXT]` trigger so the Orchestrator instantly aborts generation (Confidence = 0, Tier = Abstain) if asked about tasks outside the vector context, preventing confident "I don't know" drafts.
+- **Drafts UI Redesign**: Overhauled `MessageCenter.tsx` to render the "Pending AI Drafts" as a sleek, floating glassmorphic widget overlay. Added expand/collapse functionality with a minimal notification bubble when minimized, completely fixing chat layout squishing.
+
 ## 📌 Open Items & Future Work
 - **Process-Crash Durability for Generation Queue**: In Phase 6, the `ragOrchestratorService.queueReplyGeneration` call is wired as a pure in-memory Promise chain (fire-and-forget `.catch()`). This perfectly isolates latency, but if the Node server restarts or crashes exactly during a generation cycle, the job is silently lost and the mentee will not get an AI reply. 
   - **Action Item**: Introduce a persistent job queue (e.g., BullMQ or a `rag_jobs` table with `FOR UPDATE SKIP LOCKED`) specifically for the orchestrator generation pipeline to ensure true fault tolerance.
