@@ -23,4 +23,9 @@ router.post('/notifications/read-all', messagingController.markAllNotificationsR
 router.post('/notifications/:notificationId/read', validateParams(messagingSchemas.markNotificationReadParams), messagingController.markNotificationRead);
 router.delete('/notifications/:notificationId', validateParams(messagingSchemas.markNotificationReadParams), messagingController.deleteNotification);
 
+// AI Draft Routes
+router.get('/drafts', messagingController.getPendingDrafts);
+router.post('/messages/approve', messagingController.approveDraft);
+router.post('/drafts/:draftId/reject', messagingController.rejectDraft);
+
 module.exports = router;

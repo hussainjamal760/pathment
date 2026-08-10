@@ -439,6 +439,25 @@ class MessagingService {
         recipientIds,
         notifications: createdNotifications
       };
+    }).then(result => {
+      // FIRE AND FORGET AI ORCHESTRATION
+      // Ensure we don't crash if it fails
+      if (result && result.message && result.message.sender) {
+        // Only trigger RAG orchestration if a mentee is sending a message
+        if (result.message.sender.role === 'mentee') {
+          const ragOrchestratorService = require('./ragOrchestratorService');
+          const ragLogger = require('../utils/ragLogger');
+          
+          ragOrchestratorService.queueReplyGeneration(result.message.id)
+            .catch(err => {
+              ragLogger.error('rag_orchestration_fire_and_forget_failed', {
+                messageId: result.message.id,
+                error: err.message
+              });
+            });
+        }
+      }
+      return result;
     });
   }
 
@@ -491,6 +510,145 @@ class MessagingService {
       });
 
       return { updatedCount };
+    });
+  }
+
+  async getPendingDrafts(mentorId) {
+    // Need to find all pending MessageDrafts where the mentor is the recipient of the original message
+    const drafts = await models.MessageDraft.findAll({
+      where: { status: 'pending' },
+      include: [
+        {
+          model: models.Message,
+          as: 'originalMessage',
+          where: { recipientId: mentorId },
+          include: [
+            {
+              model: models.User,
+              as: 'sender',
+              attributes: ['id', 'firstName', 'lastName', 'email', 'profilePictureUrl', 'role']
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'ASC']]
+    });
+    return drafts;
+  }
+
+  async approveDraft(mentorId, { draftId, finalText }) {
+    return sequelize.transaction(async (transaction) => {
+      // 1. Fetch Draft and verify ownership
+      const draft = await models.MessageDraft.findByPk(draftId, {
+        include: [{
+          model: models.Message,
+          as: 'originalMessage',
+          required: true
+        }],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!draft) {
+        throw new NotFoundError('Message Draft not found');
+      }
+      if (draft.originalMessage.recipientId !== mentorId) {
+        throw new ForbiddenError('You can only approve drafts intended for you');
+      }
+      if (draft.status !== 'pending') {
+        throw new ValidationError('Draft is no longer pending');
+      }
+
+      // 2. Compute Edit Distance
+      const { calculateEditDistance } = require('../utils/editDistance');
+      const editDistance = calculateEditDistance(draft.draftContent || '', finalText || '');
+
+      // 3. Create the actual Message
+      const message = await models.Message.create({
+        senderId: mentorId,
+        recipientId: draft.originalMessage.senderId,
+        threadId: draft.originalMessage.threadId,
+        parentMessageId: draft.originalMessage.id,
+        messageText: finalText,
+        metadata: { generatedBy: 'ai', approvedBy: mentorId, editDistance }
+      }, { transaction });
+
+      // Update Conversation last message
+      await models.Conversation.update({
+        lastMessageId: message.id,
+        lastMessageAt: message.createdAt
+      }, { 
+        where: { id: draft.originalMessage.threadId },
+        transaction 
+      });
+
+      // 4. Update Draft Status
+      await draft.update({ status: 'approved' }, { transaction });
+
+      // 5. Log to MentorEditHistories
+      await models.MentorEditHistory.create({
+        mentorId,
+        messageDraftId: draft.id,
+        originalContent: draft.draftContent,
+        finalContent: finalText,
+        editDistance
+      }, { transaction });
+
+      // Fetch hydrated message to emit socket event
+      const hydratedMessage = await models.Message.findByPk(message.id, {
+        include: [
+          {
+            model: models.User,
+            as: 'sender',
+            attributes: ['id', 'firstName', 'lastName', 'email', 'profilePictureUrl', 'role']
+          },
+          {
+            model: models.MessageAttachment,
+            as: 'attachments'
+          }
+        ],
+        transaction
+      });
+
+      return hydratedMessage;
+    }).then(hydratedMessage => {
+      try {
+        const { emitToConversation } = require('../socket');
+        emitToConversation(hydratedMessage.threadId, 'message:new', {
+          message: hydratedMessage.toJSON()
+        });
+      } catch (err) {
+        // Socket errors shouldn't crash the request
+        console.error('Socket emit failed for approved message:', err);
+      }
+      return hydratedMessage;
+    });
+  }
+
+  async rejectDraft(mentorId, draftId) {
+    return sequelize.transaction(async (transaction) => {
+      const draft = await models.MessageDraft.findByPk(draftId, {
+        include: [{
+          model: models.Message,
+          as: 'originalMessage',
+          required: true
+        }],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!draft) {
+        throw new NotFoundError('Message Draft not found');
+      }
+      if (draft.originalMessage.recipientId !== mentorId) {
+        throw new ForbiddenError('You can only reject drafts intended for you');
+      }
+      if (draft.status !== 'pending') {
+        throw new ValidationError('Draft is no longer pending');
+      }
+
+      await draft.update({ status: 'rejected' }, { transaction });
+      return draft;
     });
   }
 

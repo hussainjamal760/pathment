@@ -45,6 +45,7 @@ class GroqService {
       model: cfg.model || config.ai.model,
       provider: cfg.provider || config.ai.provider || null,
       baseURL: cfg.baseURL || config.ai.baseURL || null,
+      apiKey: cfg.apiKey,
     };
   }
 

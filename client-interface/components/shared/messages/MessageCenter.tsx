@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Check, CheckCheck, Loader2, MessageSquare, RefreshCw, Send } from 'lucide-react';
+import { Check, CheckCheck, Loader2, MessageSquare, RefreshCw, Send, Bot, Wand2, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { messagingApi } from '@/lib/services/messaging-api';
@@ -75,6 +75,12 @@ export default function MessageCenter({ role }: MessageCenterProps) {
   const [isSending, setIsSending] = useState(false);
 
   const [composer, setComposer] = useState('');
+  const [pendingDrafts, setPendingDrafts] = useState<any[]>([]);
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null);
+  const [draftEditorText, setDraftEditorText] = useState('');
+  const [isApprovingDraft, setIsApprovingDraft] = useState(false);
+  const [isRejectingDraft, setIsRejectingDraft] = useState(false);
+
   const messageListEndRef = useRef<HTMLDivElement | null>(null);
 
   const participantId = searchParams.get('participantId');
@@ -145,6 +151,16 @@ export default function MessageCenter({ role }: MessageCenterProps) {
     }
   };
 
+  const loadPendingDrafts = async () => {
+    if (role !== 'mentor') return;
+    try {
+      const drafts = await messagingApi.listPendingDrafts();
+      setPendingDrafts(drafts);
+    } catch (error) {
+      console.error('Failed to load pending drafts', error);
+    }
+  };
+
   useEffect(() => {
     const boot = async () => {
       setIsBootstrapping(true);
@@ -167,7 +183,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
             await loadMessages(initialConversationId);
           }
         }
-
+        await loadPendingDrafts();
       } catch (error: unknown) {
         toast.error(getErrorMessage(error, 'Could not open messages'));
       } finally {
@@ -244,6 +260,16 @@ export default function MessageCenter({ role }: MessageCenterProps) {
       });
     };
 
+    const onAiDraftNew = (payload: { draft: any; conversationId: string }) => {
+      // New AI Draft just arrived via websocket
+      setPendingDrafts((prev) => {
+        if (prev.some((d) => d.id === payload.draft.id)) return prev;
+        return [...prev, payload.draft];
+      });
+      // Optionally notify
+      toast.success('New AI Draft received', { icon: <Bot className="w-4 h-4 text-brand-600" /> });
+    };
+
     // Recipient came online (or opened a tab) → my sent ticks flip to delivered (✓✓).
     const onDelivered = (payload: { messageIds?: string[] }) => {
       const ids = new Set(payload?.messageIds || []);
@@ -288,12 +314,14 @@ export default function MessageCenter({ role }: MessageCenterProps) {
     };
 
     socket.on('message:new', onMessage);
+    socket.on('ai_draft:new', onAiDraftNew);
     socket.on('message:delivered', onDelivered);
     socket.on('conversation:read', onConversationRead);
     socket.on('message:reaction', onReaction);
 
     return () => {
       socket.off('message:new', onMessage);
+      socket.off('ai_draft:new', onAiDraftNew);
       socket.off('message:delivered', onDelivered);
       socket.off('conversation:read', onConversationRead);
       socket.off('message:reaction', onReaction);
@@ -377,6 +405,36 @@ export default function MessageCenter({ role }: MessageCenterProps) {
       }
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, 'Could not start conversation'));
+    }
+  };
+
+  const handleApproveDraft = async (draftId: string) => {
+    setIsApprovingDraft(true);
+    try {
+      await messagingApi.approveDraft(draftId, draftEditorText);
+      setPendingDrafts(prev => prev.filter(d => d.id !== draftId));
+      setEditingDraftId(null);
+      setDraftEditorText('');
+      toast.success('Draft approved and sent');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Could not approve draft'));
+    } finally {
+      setIsApprovingDraft(false);
+    }
+  };
+
+  const handleRejectDraft = async (draftId: string) => {
+    setIsRejectingDraft(true);
+    try {
+      await messagingApi.rejectDraft(draftId);
+      setPendingDrafts(prev => prev.filter(d => d.id !== draftId));
+      setEditingDraftId(null);
+      setDraftEditorText('');
+      toast.success('Draft rejected');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Could not reject draft'));
+    } finally {
+      setIsRejectingDraft(false);
     }
   };
 
@@ -464,10 +522,88 @@ export default function MessageCenter({ role }: MessageCenterProps) {
         </div>
 
         <div className="xl:col-span-8 bg-card border border-slate-200 rounded-2xl flex flex-col overflow-hidden xl:h-full min-h-0">
-          <div className="p-4 border-b border-slate-200 flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-brand-600" />
-            <h2 className="text-slate-900 truncate">{selectedTitle}</h2>
+          <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-brand-600" />
+              <h2 className="text-slate-900 truncate">{selectedTitle}</h2>
+            </div>
           </div>
+
+          {/* Pending Drafts Panel */}
+          {role === 'mentor' && pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).length > 0 && (
+            <div className="bg-brand-50/50 border-b border-brand-100 p-4 shrink-0">
+              <div className="flex items-center gap-2 mb-3">
+                <Wand2 className="w-4 h-4 text-brand-600" />
+                <h3 className="text-sm font-semibold text-brand-900">Pending AI Drafts</h3>
+              </div>
+              <div className="space-y-3">
+                {pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).map(draft => {
+                  const isEditing = editingDraftId === draft.id;
+                  const confidenceColor = draft.confidenceScore >= 0.8 ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50';
+                  
+                  return (
+                    <div key={draft.id} className="bg-white border border-brand-200 rounded-xl p-3 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-medium text-slate-500">
+                          Replying to: <span className="text-slate-700 italic">"{draft.originalMessage?.messageText}"</span>
+                        </span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${confidenceColor}`}>
+                          {Math.round(draft.confidenceScore * 100)}% Confidence
+                        </span>
+                      </div>
+                      
+                      {isEditing ? (
+                        <div className="mt-2">
+                          <textarea
+                            value={draftEditorText}
+                            onChange={(e) => setDraftEditorText(e.target.value)}
+                            className="w-full text-sm resize-none border border-brand-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                            rows={3}
+                          />
+                          <div className="flex items-center gap-2 mt-2 justify-end">
+                            <button
+                              onClick={() => { setEditingDraftId(null); setDraftEditorText(''); }}
+                              className="text-xs px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-md font-medium"
+                              disabled={isApprovingDraft}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() => handleApproveDraft(draft.id)}
+                              disabled={!draftEditorText.trim() || isApprovingDraft}
+                              className="text-xs px-3 py-1.5 bg-brand-600 text-white hover:bg-brand-700 rounded-md font-medium inline-flex items-center gap-1.5"
+                            >
+                              {isApprovingDraft ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                              Approve & Send
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="mt-1">
+                          <p className="text-sm text-slate-800 whitespace-pre-wrap">{draft.draftContent}</p>
+                          <div className="flex justify-end gap-2 mt-2">
+                            <button
+                              onClick={() => handleRejectDraft(draft.id)}
+                              disabled={isRejectingDraft}
+                              className="text-xs font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded-md transition-colors"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => { setEditingDraftId(draft.id); setDraftEditorText(draft.draftContent); }}
+                              className="text-xs font-medium text-brand-600 hover:text-brand-700 hover:bg-brand-50 px-2 py-1 rounded-md transition-colors"
+                            >
+                              Review & Edit
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 p-4 overflow-y-auto bg-slate-50">
             {isMessagesLoading ? (

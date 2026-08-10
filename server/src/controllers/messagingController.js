@@ -150,6 +150,32 @@ exports.deleteNotification = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Notification deleted successfully', {}));
 });
 
+exports.getPendingDrafts = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can access drafts', null));
+  }
+  const drafts = await messagingService.getPendingDrafts(req.user.id);
+  res.status(200).json(successResponse('Drafts fetched', { drafts }));
+});
+
+exports.approveDraft = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can approve drafts', null));
+  }
+  const { draftId, finalText } = req.body;
+  const message = await messagingService.approveDraft(req.user.id, { draftId, finalText });
+  res.status(200).json(successResponse('Draft approved', { message }));
+});
+
+exports.rejectDraft = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can reject drafts', null));
+  }
+  const { draftId } = req.params;
+  const draft = await messagingService.rejectDraft(req.user.id, draftId);
+  res.status(200).json(successResponse('Draft rejected', { draft }));
+});
+
 exports.searchUsers = catchAsync(async (req, res) => {
   const users = await messagingService.searchUsers(req.user.id, req.query.q, {
     role: req.query.role,

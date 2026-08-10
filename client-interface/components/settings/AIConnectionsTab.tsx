@@ -26,6 +26,9 @@ const FEATURE_META: { key: AIFeature; label: string; hint: string }[] = [
   { key: 'coaching', label: 'Coaching suggestions', hint: 'Mentor talking points' },
   { key: 'feedback', label: 'Draft feedback', hint: 'Suggest task feedback' },
   { key: 'roadmap', label: 'Roadmap generation', hint: 'Draft roadmap steps from a brief' },
+  { key: 'rag_generation', label: 'RAG Reply Drafts', hint: 'Generate drafted mentor replies' },
+  { key: 'rag_grounding', label: 'RAG Fact-Checking', hint: 'Verify drafted replies' },
+  { key: 'rag_embedding', label: 'RAG Vectors (OpenAI)', hint: 'Generate embeddings for documents' },
 ];
 
 const STATUS_META: Record<AIKeyStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {

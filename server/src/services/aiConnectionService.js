@@ -20,7 +20,7 @@ const PROVIDER_BASE = {
   groq: 'https://api.groq.com/openai/v1',
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/',
   openrouter: 'https://openrouter.ai/api/v1',
   custom: null
 };
@@ -34,7 +34,7 @@ const PROVIDER_DEFAULT_MODEL = {
   openrouter: 'meta-llama/llama-3.3-70b-instruct',
   // anthropic + custom: no safe default — the connection should set one.
 };
-const FEATURES = ['summary', 'delay', 'atrisk', 'nudge', 'stall', 'coaching', 'feedback', 'roadmap', 'assessment'];
+const FEATURES = ['summary', 'delay', 'atrisk', 'nudge', 'stall', 'coaching', 'feedback', 'roadmap', 'assessment', 'rag_generation', 'rag_grounding', 'rag_embedding'];
 
 const isAdmin = (user) => {
   const caps = Array.isArray(user?.capabilities) && user.capabilities.length ? user.capabilities : [user?.role];
@@ -126,9 +126,7 @@ class AIConnectionService {
       const key = decrypt(row.keyEncrypted);
       const base = row.baseUrl || PROVIDER_BASE[row.provider];
       let url; let headers = {};
-      if (row.provider === 'gemini') {
-        url = `${base}/models?key=${encodeURIComponent(key)}`;
-      } else if (row.provider === 'anthropic') {
+      if (row.provider === 'anthropic') {
         url = `${base}/models`;
         headers = { 'x-api-key': key, 'anthropic-version': '2023-06-01' };
       } else {
@@ -186,15 +184,29 @@ class AIConnectionService {
 
   /**
    * Resolve the AI config the app should use: a mentor's personal routing for
-   * `feature` wins, then org routing, then any connected org key, then null
-   * (the caller falls back to env). `userId` enables the personal path.
+   * `feature` wins, then org routing, then any personal connected key, then
+   * any connected org key, then null (the caller falls back to env).
    */
   async resolveActiveConfig(feature = null, userId = null) {
-    // 1) Personal routing for this user + feature.
-    if (userId && feature) {
-      const personal = await this._readRouting(userId);
+    // If userId is a raw string (from RAG/embedding calls), look up the user
+    // so we can compute the correct ownerId (which may differ from userId).
+    let ownerId = userId;
+    if (userId && typeof userId === 'string') {
+      try {
+        const user = await models.User.findByPk(userId, { attributes: ['id', 'role', 'capabilities'] });
+        if (user) {
+          ownerId = ownerFor(user);
+        }
+      } catch { /* fallback to userId as ownerId */ }
+    } else if (userId && typeof userId === 'object') {
+      ownerId = ownerFor(userId);
+    }
+
+    // 1) Personal routing for this owner + feature.
+    if (ownerId && feature) {
+      const personal = await this._readRouting(ownerId);
       if (personal[feature]) {
-        const row = await models.AIConnection.findOne({ where: { id: personal[feature], ownerId: userId } });
+        const row = await models.AIConnection.findOne({ where: { id: personal[feature], ownerId } });
         if (row) return this._toConfig(row);
       }
     }
@@ -206,7 +218,15 @@ class AIConnectionService {
         if (row) return this._toConfig(row);
       }
     }
-    // 3) Any org connection - prefer a connected one, else most recent.
+    // 3) Any personal connection for this owner - prefer a connected one, else most recent.
+    if (ownerId) {
+      const personalRows = await models.AIConnection.findAll({ where: { ownerId }, order: [['created_at', 'DESC']] });
+      if (personalRows.length) {
+        const chosen = personalRows.find((r) => r.status === 'connected') || personalRows[0];
+        return this._toConfig(chosen);
+      }
+    }
+    // 4) Any org connection - prefer a connected one, else most recent.
     const orgRows = await models.AIConnection.findAll({ where: { ownerId: null }, order: [['created_at', 'DESC']] });
     if (orgRows.length) {
       const chosen = orgRows.find((r) => r.status === 'connected') || orgRows[0];
