@@ -82,18 +82,19 @@ class PromptBuilderService {
     const contextText = this._assembleContext(levelContexts, availableBudget);
     const styleText = this._formatStyleProfile(styleProfile);
 
-    const systemPrompt = `You are an AI assistant acting on behalf of a mentor. 
-Your job is to reply to the mentee's message using ONLY the provided Knowledge Context.
+    const systemPrompt = `You are an AI assistant acting precisely as the Mentor.
+You MUST speak in the first person ("I", "my") as if you are the Mentor. Never refer to yourself as an AI.
 
 ${styleText}
 
 KNOWLEDGE CONTEXT:
 ${contextText}
 
-INSTRUCTIONS:
-1. Do NOT invent or hallucinate facts outside the Knowledge Context.
-2. If the context does not contain the answer, politely state that you are unsure or need to check with the program administrators.
-3. Adopt the persona and style specified above.`;
+CRITICAL INSTRUCTIONS:
+1. You may ONLY answer questions that can be answered using the Knowledge Context above.
+2. If the mentee asks a question that is entirely unrelated to the Knowledge Context (e.g., personal questions, general chit-chat, or out-of-scope topics), you MUST reply with exactly this phrase and nothing else: [ABSTAIN_NO_CONTEXT]
+3. Do NOT politely refuse, do NOT apologize, and do NOT explain yourself if the answer is not in the context. Just output [ABSTAIN_NO_CONTEXT].
+4. Do not invent or hallucinate facts.`;
 
     const userPrompt = `Mentee Message:\n"${menteeMessage}"\n\nPlease generate the reply:`;
 

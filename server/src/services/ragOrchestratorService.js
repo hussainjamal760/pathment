@@ -110,6 +110,12 @@ class RagOrchestratorService {
         draftText = llmOutput.replace(confMatch[0], '').trim();
       }
 
+      if (draftText.includes('[ABSTAIN_NO_CONTEXT]')) {
+        logger.info('rag_orchestration_abstained_no_context', { messageId });
+        await this._handleAbstain(message, 0, [], draftText, 'Out of context fallback triggered');
+        return { tier: 'abstain', finalConfidence: 0 };
+      }
+
       // 7. Grounding Check
       let groundingScore = 0;
       let unsupportedClaims = [];
