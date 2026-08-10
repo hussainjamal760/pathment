@@ -1,4 +1,5 @@
 const express = require('express');
+const upload = require('../middlewares/upload');
 const router = express.Router();
 
 const messagingController = require('../controllers/messagingController');
@@ -30,5 +31,10 @@ router.delete('/notifications/:notificationId', validateParams(messagingSchemas.
 router.get('/drafts', messagingController.getPendingDrafts);
 router.post('/messages/approve', messagingController.approveDraft);
 router.post('/drafts/:draftId/reject', messagingController.rejectDraft);
+
+// Mentor RAG Documents Routes
+router.get('/mentor/documents', messagingController.getMentorDocuments);
+router.post('/mentor/documents', upload.singleSafe('file'), messagingController.uploadMentorDocument);
+router.delete('/mentor/documents/:documentId', messagingController.deleteMentorDocument);
 
 module.exports = router;

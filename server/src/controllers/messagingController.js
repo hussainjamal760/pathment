@@ -203,4 +203,33 @@ exports.searchUsers = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Users fetched successfully', { users }));
 });
 
+exports.getMentorDocuments = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can access documents', null));
+  }
+  const documents = await messagingService.getMentorDocuments(req.user.id);
+  res.status(200).json(successResponse('Documents fetched', { documents }));
+});
+
+exports.uploadMentorDocument = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can upload documents', null));
+  }
+  
+  const document = await messagingService.uploadMentorDocument(req.user.id, req.file, {
+    programId: req.body.programId,
+    visibility: req.body.visibility || 'mentor'
+  });
+  
+  res.status(201).json(successResponse('Document uploaded and processing', { document }, 201));
+});
+
+exports.deleteMentorDocument = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json(successResponse('Only mentors can delete documents', null));
+  }
+  await messagingService.deleteMentorDocument(req.user.id, req.params.documentId);
+  res.status(200).json(successResponse('Document deleted successfully', {}));
+});
+
 module.exports = exports;

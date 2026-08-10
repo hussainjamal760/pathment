@@ -21,8 +21,8 @@ class RagOrchestratorService {
             model: models.Conversation,
             as: 'conversation',
             include: [
-              { 
-                model: models.Enrollment, 
+              {
+                model: models.Enrollment,
                 as: 'relatedEnrollment',
                 include: [{ model: models.Program, as: 'program' }]
               },
@@ -41,7 +41,7 @@ class RagOrchestratorService {
       // Determine scopes from conversation
       const conversation = message.conversation;
       const programId = conversation.relatedEnrollment ? conversation.relatedEnrollment.programId : null;
-      
+
       // Identify the mentor in the conversation (assuming 1 mentor, 1 mentee)
       let mentorId = null;
       let menteeId = message.senderId; // the one who sent the message
@@ -53,7 +53,7 @@ class RagOrchestratorService {
 
       // 2. Fetch Unlocked Roadmap Nodes (simulated for now)
       // In a real app, query the Roadmap/Node progress for this mentee
-      const unlockedRoadmapNodeIds = []; 
+      const unlockedRoadmapNodeIds = [];
 
       // 3. Fetch Style Profile
       let styleProfile = null;

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Bot, Check, Wand2, Loader2 } from 'lucide-react';
+import { Bot, Check, Wand2, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { messagingApi } from '@/lib/services/messaging-api';
@@ -45,6 +45,7 @@ export default function MessageCenter({ role }: MessageCenterProps) {
   const [draftEditorText, setDraftEditorText] = useState('');
   const [isApprovingDraft, setIsApprovingDraft] = useState(false);
   const [isRejectingDraft, setIsRejectingDraft] = useState(false);
+  const [isDraftsExpanded, setIsDraftsExpanded] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'archived'>('all');
   const [hasMore, setHasMore] = useState(true);
@@ -682,23 +683,31 @@ export default function MessageCenter({ role }: MessageCenterProps) {
 
         {/* Chat Thread Pane */}
         <div
-          className={`xl:col-span-8 h-full min-h-0 flex flex-col ${
+          className={`xl:col-span-8 h-full min-h-0 flex flex-col relative ${
             activeMobilePane === 'chat' ? 'block' : 'hidden xl:block'
           }`}
         >
-          {/* Pending Drafts Panel */}
+          {/* Pending Drafts Panel (Floating Widget) */}
           {role === 'mentor' && pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).length > 0 && (
-            <div className="bg-brand-50/50 border-b border-brand-100 p-4 shrink-0 overflow-y-auto max-h-[40vh]">
-              <div className="flex items-center gap-2 mb-3">
-                <Wand2 className="w-4 h-4 text-brand-600" />
-                <h3 className="text-sm font-semibold text-brand-900">Pending AI Drafts</h3>
-              </div>
-              <div className="space-y-3">
-                {pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).map(draft => {
-                  const isEditing = editingDraftId === draft.id;
-                  const confidenceColor = draft.confidenceScore >= 0.8 ? 'text-green-600 bg-green-50' : 'text-amber-600 bg-amber-50';
+            isDraftsExpanded ? (
+              <div className="absolute bottom-20 right-6 z-20 w-[420px] bg-white/80 backdrop-blur-xl border border-brand-200 shadow-2xl rounded-2xl p-4 overflow-y-auto max-h-[50vh] transition-all animate-in slide-in-from-right-4">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-brand-100 rounded-lg">
+                      <Wand2 className="w-4 h-4 text-brand-600" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">AI Drafts</h3>
+                  </div>
+                  <button onClick={() => setIsDraftsExpanded(false)} className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).map(draft => {
+                    const isEditing = editingDraftId === draft.id;
+                    const confidenceColor = draft.confidenceScore >= 0.8 ? 'text-emerald-700 bg-emerald-100/50' : 'text-amber-700 bg-amber-100/50';
 
-                  return (
+                    return (
                     <div key={draft.id} className="bg-white border border-brand-200 rounded-xl p-3 shadow-sm">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-medium text-slate-500">
@@ -760,6 +769,18 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                 })}
               </div>
             </div>
+            ) : (
+              <button 
+                onClick={() => setIsDraftsExpanded(true)}
+                className="absolute bottom-20 right-6 z-20 flex items-center gap-2 bg-brand-600 text-white px-3 py-2 rounded-xl shadow-xl hover:bg-brand-700 transition-all animate-in fade-in zoom-in-95"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="text-xs font-semibold">
+                  {pendingDrafts.filter(d => d.originalMessage?.threadId === selectedConversationId).length} Draft(s)
+                </span>
+                <Wand2 className="w-4 h-4" />
+              </button>
+            )
           )}
 
           <ChatWindow

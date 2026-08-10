@@ -63,6 +63,13 @@ This document tracks the phased rollout of the Retrieval-Augmented Generation (R
 - **Audit Logging**: Any shifts in tone or vocabulary are immediately tracked via `ragLogger.info('style_profile_updated')` showing the precise before, after, and shift values.
 - **Verification**: Built `styleLearningWorker.test.js` to test adversarial scenarios (e.g., an edit distance of `500`) and verified that the resulting style shift was safely capped at `0.10`.
 
+## ✅ Mentor PDF Upload (Custom Knowledge Base) - Complete
+- **Phase 1: Database Migration**: Created `093_create_mentor_documents.js` migration and `MentorDocument.js` Sequelize model to track uploaded PDFs safely, associating them directly with a mentor.
+- **Phase 2: PDF Parsing Utility & Integration**: Installed `pdf-parse` and created a safe buffer-to-text wrapper (`pdfParser.js`). Wired the `ragIngestionWorker.js` via `ragIngestionService.js` to automatically update the `MentorDocument` table's status (`completed` or `failed`) immediately upon finishing chunking/embedding.
+- **Phase 3: REST API Endpoints**: Created secure endpoints in `messaging.js` (`GET /mentor/documents`, `POST /mentor/documents`, `DELETE /mentor/documents/:documentId`) hooked up to `messagingController.js` and `messagingService.js`. The POST route safely accepts `.pdf` uploads via multer in memory, syncs them to Cloudinary (`raw` resource), extracts the text, creates a database row, and kicks off asynchronous ingestion without blocking the UI.
+- **Phase 4: Frontend UI Tab**: Built a new `Knowledge Base` tab within the Mentor Settings (`app/mentor/settings/page.tsx`). Implemented the `DocumentsTab.tsx` component which features a clean drag-and-drop zone for PDF uploads, dynamic status polling (`Processing` ➔ `Ready`), and a list view to manage active documents.
+- **Phase 5: Client-Side API Integration**: Wired the frontend UI into `messaging-api.ts` to seamlessly manage form data uploads, document retrieval, and safe deletions connected directly to the new API endpoints.
+
 ## 📌 Open Items & Future Work
 - **Process-Crash Durability for Generation Queue**: In Phase 6, the `ragOrchestratorService.queueReplyGeneration` call is wired as a pure in-memory Promise chain (fire-and-forget `.catch()`). This perfectly isolates latency, but if the Node server restarts or crashes exactly during a generation cycle, the job is silently lost and the mentee will not get an AI reply. 
   - **Action Item**: Introduce a persistent job queue (e.g., BullMQ or a `rag_jobs` table with `FOR UPDATE SKIP LOCKED`) specifically for the orchestrator generation pipeline to ensure true fault tolerance.

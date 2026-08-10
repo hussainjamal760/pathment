@@ -45,7 +45,7 @@ class PromptBuilderService {
    */
   _formatStyleProfile(styleProfile) {
     if (!styleProfile) return 'Adopt a helpful and professional tone.';
-    
+
     const parts = [];
     if (styleProfile.tone) {
       parts.push(`Tone: ${styleProfile.tone}`);

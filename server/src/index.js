@@ -128,6 +128,10 @@ async function start() {
     // Postgres-backed queue, keeping us inside the Upstash command budget.
     require('./workers/emailWorker').start();
 
+    // Start RAG background processing workers
+    require('./workers/ragIngestionWorker').start();
+    require('./workers/styleLearningWorker').start();
+
     // Start HTTP + Socket.IO server
     initSocket(server);
     if (process.env.NOTIFICATION_SCHEDULER_DISABLED !== 'true') {

@@ -119,6 +119,13 @@ class RagIngestionService {
         UPDATE rag_ingestion_jobs SET status = 'completed', updated_at = NOW() WHERE id = :id
       `, { replacements: { id: job.id } });
 
+      // If it's a mentor document, mark it completed
+      if (job.source_type === 'mentor_document') {
+        await sequelize.query(`
+          UPDATE mentor_documents SET status = 'completed', updated_at = NOW() WHERE id = :sourceId
+        `, { replacements: { sourceId: job.source_id } });
+      }
+
       logger.info('rag_job_completed', { jobId: job.id, chunksProcessed: enrichedChunks.length });
       return { success: true, chunksProcessed: enrichedChunks.length };
 
@@ -136,6 +143,12 @@ class RagIngestionService {
         replacements: { status, attemptCount, lastError, nextAttemptAt, id: job.id }
       });
       
+      if (isDead && job.source_type === 'mentor_document') {
+        await sequelize.query(`
+          UPDATE mentor_documents SET status = 'failed', error_message = :lastError, updated_at = NOW() WHERE id = :sourceId
+        `, { replacements: { sourceId: job.source_id, lastError } });
+      }
+
       logger.error('rag_job_failed', { jobId: job.id, attempt: attemptCount, isDead, error: e.message });
       return { success: false, isDead };
     }

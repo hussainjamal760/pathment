@@ -963,6 +963,69 @@ class MessagingService {
 
     return participant;
   }
+  async uploadMentorDocument(mentorId, file, { programId = null, visibility = 'mentor' } = {}) {
+    if (!file) throw new ValidationError('No file uploaded');
+    
+    const { extractTextFromBuffer } = require('../utils/pdfParser');
+    const parsedText = await extractTextFromBuffer(file.buffer);
+    if (!parsedText || !parsedText.trim()) {
+      throw new ValidationError('Could not extract text from the PDF. The file might be scanned or empty.');
+    }
+
+    const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+    const uploadResult = await uploadToCloudinary(file.buffer, 'pathment/mentor_docs', 'raw');
+
+    return sequelize.transaction(async (transaction) => {
+      const document = await models.MentorDocument.create({
+        mentorId,
+        fileName: file.originalname,
+        fileUrl: uploadResult.secure_url,
+        cloudinaryPublicId: uploadResult.public_id,
+        status: 'processing'
+      }, { transaction });
+
+      const ragIngestionService = require('./ragIngestionService');
+      await ragIngestionService.enqueueIngestion({
+        sourceType: 'mentor_document',
+        sourceId: document.id,
+        text: parsedText,
+        mentorId,
+        programId,
+        visibility
+      });
+
+      return document;
+    });
+  }
+
+  async getMentorDocuments(mentorId) {
+    return models.MentorDocument.findAll({
+      where: { mentorId },
+      order: [['createdAt', 'DESC']]
+    });
+  }
+
+  async deleteMentorDocument(mentorId, documentId) {
+    const document = await models.MentorDocument.findOne({
+      where: { id: documentId, mentorId }
+    });
+    if (!document) throw new NotFoundError('Document not found');
+
+    const { deleteFromCloudinary } = require('../utils/cloudinaryUpload');
+    if (document.cloudinaryPublicId) {
+      await deleteFromCloudinary(document.cloudinaryPublicId, 'raw').catch(err => console.error('Cloudinary delete error:', err));
+    }
+
+    await models.KnowledgeChunk.destroy({
+      where: {
+        sourceId: documentId,
+        sourceType: 'mentor_document'
+      }
+    });
+
+    await document.destroy();
+    return { success: true };
+  }
 }
 
 module.exports = new MessagingService();
