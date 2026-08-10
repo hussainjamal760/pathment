@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { aiConnectionsApi, type AIConnection, type AIRouting, type AIFeature, type AIProvider } from '@/lib/services/ai-connections-api';
 
-const EMPTY_ROUTING: AIRouting = { summary: null, delay: null, atrisk: null, nudge: null, stall: null, coaching: null, feedback: null, roadmap: null };
+const EMPTY_ROUTING: AIRouting = { summary: null, delay: null, atrisk: null, nudge: null, stall: null, coaching: null, feedback: null, roadmap: null, rag_generation: null, rag_grounding: null, rag_embedding: null };
 
 export function useAIConnections() {
   const [connections, setConnections] = useState<AIConnection[]>([]);
