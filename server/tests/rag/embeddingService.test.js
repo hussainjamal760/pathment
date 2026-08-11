@@ -15,6 +15,13 @@ jest.mock('../../src/services/groqService', () => ({
   _resolve: jest.fn()
 }));
 
+const mockEmbed = jest.fn();
+jest.mock('../../src/services/embeddingProviders', () => ({
+  getAdapter: jest.fn(() => ({
+    embed: mockEmbed
+  }))
+}));
+
 describe('EmbeddingService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -26,12 +33,11 @@ describe('EmbeddingService', () => {
       models.KnowledgeChunk.findAll.mockResolvedValue([]);
       
       // Mock groq resolve
-      const mockCreate = jest.fn().mockResolvedValue({
-        data: [{ embedding: [0.1, 0.2] }]
-      });
+      mockEmbed.mockResolvedValue([[0.1, 0.2]]);
       groqService._resolve.mockResolvedValue({
         enabled: true,
-        client: { embeddings: { create: mockCreate } },
+        client: { apiKey: 'fake-key' },
+        provider: 'gemini',
         model: 'test-model'
       });
 
@@ -49,13 +55,13 @@ describe('EmbeddingService', () => {
       const chunkText = 'this text is already embedded';
       const hash = embeddingService.computeContentHash(chunkText);
       
-      // Mock DB so it says this hash already exists
-      models.KnowledgeChunk.findAll.mockResolvedValue([{ content_hash: hash }]);
+      // Mock DB so it says this hash already exists with an embedding
+      models.KnowledgeChunk.findAll.mockResolvedValue([{ content_hash: hash, embedding: [0.1, 0.2] }]);
       
-      const mockCreate = jest.fn();
       groqService._resolve.mockResolvedValue({
         enabled: true,
-        client: { embeddings: { create: mockCreate } },
+        client: { apiKey: 'fake-key' },
+        provider: 'gemini',
         model: 'test-model'
       });
 
@@ -63,10 +69,10 @@ describe('EmbeddingService', () => {
       const result = await embeddingService.embedChunks(chunks);
       
       // Ensure we skipped the API call entirely
-      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbed).not.toHaveBeenCalled();
       
       expect(result[0].skipped).toBe(true);
-      expect(result[0].embedding).toBeNull();
+      expect(result[0].embedding).toEqual([0.1, 0.2]);
     });
 
     it('should retry transient errors and eventually succeed', async () => {
@@ -76,14 +82,15 @@ describe('EmbeddingService', () => {
       const error429 = new Error('Rate limit exceeded');
       error429.status = 429;
 
-      const mockCreate = jest.fn()
+      mockEmbed
         .mockRejectedValueOnce(error429)
         .mockRejectedValueOnce(error429)
-        .mockResolvedValueOnce({ data: [{ embedding: [0.99] }] });
+        .mockResolvedValueOnce([[0.99]]);
 
       groqService._resolve.mockResolvedValue({
         enabled: true,
-        client: { embeddings: { create: mockCreate } },
+        client: { apiKey: 'fake-key' },
+        provider: 'gemini',
         model: 'test-model'
       });
 
@@ -93,7 +100,7 @@ describe('EmbeddingService', () => {
       const chunks = [{ text: 'retry test', chunkIndex: 0 }];
       const result = await embeddingService.embedChunks(chunks);
 
-      expect(mockCreate).toHaveBeenCalledTimes(3);
+      expect(mockEmbed).toHaveBeenCalledTimes(3);
       expect(result[0].embedding).toEqual([0.99]);
     });
 
@@ -104,11 +111,12 @@ describe('EmbeddingService', () => {
       const error400 = new Error('Bad Request');
       error400.status = 400;
 
-      const mockCreate = jest.fn().mockRejectedValueOnce(error400);
+      mockEmbed.mockRejectedValueOnce(error400);
 
       groqService._resolve.mockResolvedValue({
         enabled: true,
-        client: { embeddings: { create: mockCreate } },
+        client: { apiKey: 'fake-key' },
+        provider: 'gemini',
         model: 'test-model'
       });
 
@@ -119,7 +127,7 @@ describe('EmbeddingService', () => {
         .toThrow('Embedding API failed permanently');
       
       // Should not retry
-      expect(mockCreate).toHaveBeenCalledTimes(1);
+      expect(mockEmbed).toHaveBeenCalledTimes(1);
     });
   });
 });

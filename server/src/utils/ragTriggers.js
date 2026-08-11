@@ -1,22 +1,12 @@
-const ragIngestionService = require('../services/ragIngestionService');
+const EventEmitter = require('events');
 const logger = require('./ragLogger');
 
-/**
- * Trigger RAG ingestion for a given source without blocking the main event loop.
- * Fire-and-forget helper.
- */
-function triggerIngestion(payload) {
-  // Fire and forget
-  ragIngestionService.enqueueIngestion(payload)
-    .catch(err => {
-      logger.error('trigger_ingestion_failed', { 
-        error: err.message, 
-        sourceType: payload.sourceType, 
-        sourceId: payload.sourceId 
-      });
-    });
-}
+class RagEventBus extends EventEmitter {}
+const ragEvents = new RagEventBus();
 
-module.exports = {
-  triggerIngestion
-};
+// Catch unhandled errors in listeners to prevent crashing the process
+ragEvents.on('error', (err) => {
+  logger.error('rag_event_bus_error', { error: err.message });
+});
+
+module.exports = ragEvents;

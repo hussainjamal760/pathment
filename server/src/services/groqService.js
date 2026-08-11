@@ -29,9 +29,14 @@ class GroqService {
   async _resolve(feature = null, userId = null) {
     let cfg = null;
     try {
-      // Lazy require avoids any load-order cycle (db ↔ services).
-      const aiConnectionService = require('./aiConnectionService');
-      cfg = await aiConnectionService.resolveActiveConfig(feature, userId);
+      if (feature && feature.startsWith('rag_')) {
+        const { resolveRagConfig } = require('./ragConfigResolver');
+        cfg = await resolveRagConfig(feature, userId);
+      } else {
+        // Lazy require avoids any load-order cycle (db ↔ services).
+        const aiConnectionService = require('./aiConnectionService');
+        cfg = await aiConnectionService.resolveActiveConfig(feature, userId);
+      }
     } catch (e) {
       console.error('[AI] connection resolve failed, falling back to env:', e.message);
     }
@@ -44,8 +49,7 @@ class GroqService {
       client: this._clientFor(cfg.apiKey, cfg.baseURL),
       model: cfg.model || config.ai.model,
       provider: cfg.provider || config.ai.provider || null,
-      baseURL: cfg.baseURL || config.ai.baseURL || null,
-      apiKey: cfg.apiKey,
+      baseURL: cfg.baseURL || config.ai.baseURL || null
     };
   }
 

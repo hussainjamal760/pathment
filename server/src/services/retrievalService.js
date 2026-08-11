@@ -58,19 +58,27 @@ class RetrievalService {
       `;
 
       // 4. Vector Search (Cosine similarity <=> operator in pgvector)
+      // Mitigation for HNSW post-filtering starvation (P30):
+      // We over-fetch 150 candidates from the ANN index *first*, then apply the 
+      // visibility filter, then trim to the target LIMIT. This prevents restrictive 
+      // visibility filters from starving the results while still utilizing the index.
       const vectorQuery = `
-        SELECT id, content, (embedding <=> :vector::vector) as distance
-        FROM knowledge_chunks
+        SELECT * FROM (
+          SELECT id, content, visibility, source_type, program_id, mentor_id, source_id, (embedding <=> :vector::vector) as distance
+          FROM knowledge_chunks
+          ORDER BY embedding <=> :vector::vector
+          LIMIT 150
+        ) as ann_candidates
         WHERE (${authWhere})
-        ORDER BY embedding <=> :vector::vector
         LIMIT 50
       `;
 
       // 5. FTS Search
       const ftsQuery = `
-        SELECT id, content, ts_rank(search_vector, websearch_to_tsquery('english', :queryText)) as rank
+        SELECT id, content, visibility, source_type, mentor_id, ts_rank(search_vector, websearch_to_tsquery('english', :queryText)) as rank
         FROM knowledge_chunks
         WHERE (${authWhere})
+          AND search_vector @@ websearch_to_tsquery('english', :queryText)
         ORDER BY rank DESC
         LIMIT 50
       `;
@@ -102,7 +110,7 @@ class RetrievalService {
       await Promise.all(promises);
 
       // 6. Reciprocal Rank Fusion (RRF)
-      const k = ragConfig.rrfK || 60;
+      const k = ragConfig.rrfK;
       const scores = new Map(); // id -> { content, score, vectorRank, ftsRank }
 
       // Process Vector results (Rank 1 = index 0)
@@ -112,6 +120,9 @@ class RetrievalService {
         scores.set(row.id, { 
           id: row.id, 
           content: row.content, 
+          visibility: row.visibility,
+          source_type: row.source_type,
+          mentor_id: row.mentor_id,
           score, 
           vectorRank: rank, 
           ftsRank: null 
@@ -133,6 +144,9 @@ class RetrievalService {
           scores.set(row.id, { 
             id: row.id, 
             content: row.content, 
+            visibility: row.visibility,
+            source_type: row.source_type,
+            mentor_id: row.mentor_id,
             score: rrfAddition, 
             vectorRank: null, 
             ftsRank: rank 
@@ -144,7 +158,7 @@ class RetrievalService {
       const sorted = Array.from(scores.values()).sort((a, b) => b.score - a.score);
 
       // 7. Token-Aware Trimming
-      const maxTokens = ragConfig.contextTokenBudget || 1500;
+      const maxTokens = ragConfig.contextTokenBudget;
       let currentTokens = 0;
       const finalChunks = [];
       const finalRanks = []; // for logging
@@ -158,7 +172,13 @@ class RetrievalService {
         }
         
         currentTokens += tokens;
-        finalChunks.push({ id: item.id, content: item.content });
+        finalChunks.push({ 
+          id: item.id, 
+          content: item.content,
+          visibility: item.visibility,
+          source_type: item.source_type,
+          mentor_id: item.mentor_id
+        });
         finalRanks.push({ id: item.id, score: item.score, vec: item.vectorRank, fts: item.ftsRank });
       }
 

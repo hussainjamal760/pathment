@@ -14,12 +14,30 @@ module.exports = (sequelize, DataTypes) => {
     tone: {
       type: DataTypes.JSONB,
       allowNull: false,
-      defaultValue: {}
+      defaultValue: { brevity: 0.5, formality: 0.5 }
     },
     vocabulary: {
       type: DataTypes.JSONB,
       allowNull: false,
       defaultValue: {}
+    },
+    vocabularyPreferences: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {},
+      field: 'vocabulary_preferences'
+    },
+    phrasePatterns: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
+      field: 'phrase_patterns'
+    },
+    styleExamples: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: [],
+      field: 'style_examples'
     },
     signature: {
       type: DataTypes.TEXT,
@@ -29,6 +47,12 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.TEXT,
       allowNull: true,
       field: 'custom_instructions'
+    },
+    autoReplyEnabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: 'auto_reply_enabled'
     }
   }, {
     tableName: 'mentor_style_profiles',

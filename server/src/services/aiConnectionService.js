@@ -20,7 +20,7 @@ const PROVIDER_BASE = {
   groq: 'https://api.groq.com/openai/v1',
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta/',
   openrouter: 'https://openrouter.ai/api/v1',
   custom: null
 };
@@ -169,6 +169,35 @@ class AIConnectionService {
     return clean;
   }
 
+  async getQuota(user) {
+    if (!user || user.role !== 'mentor') return null;
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const [quota] = await models.RagGenerationQuota.findOrCreate({
+      where: { mentorId: user.id },
+      defaults: { count: 0, windowStart: currentMonthStart, limit: 100 }
+    });
+    
+    return { count: quota.count, limit: quota.limit };
+  }
+
+  async setQuotaLimit(user, limit) {
+    if (!user || user.role !== 'mentor') return null;
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const [quota] = await models.RagGenerationQuota.findOrCreate({
+      where: { mentorId: user.id },
+      defaults: { count: 0, windowStart: currentMonthStart, limit: 100 }
+    });
+    
+    quota.limit = limit;
+    await quota.save();
+    
+    return { count: quota.count, limit: quota.limit };
+  }
+
   // ── resolution for the live AI client ────────────────────────────────────
   _toConfig(row) {
     return {
@@ -218,15 +247,7 @@ class AIConnectionService {
         if (row) return this._toConfig(row);
       }
     }
-    // 3) Any personal connection for this owner - prefer a connected one, else most recent.
-    if (ownerId) {
-      const personalRows = await models.AIConnection.findAll({ where: { ownerId }, order: [['created_at', 'DESC']] });
-      if (personalRows.length) {
-        const chosen = personalRows.find((r) => r.status === 'connected') || personalRows[0];
-        return this._toConfig(chosen);
-      }
-    }
-    // 4) Any org connection - prefer a connected one, else most recent.
+    // 3) Any org connection - prefer a connected one, else most recent.
     const orgRows = await models.AIConnection.findAll({ where: { ownerId: null }, order: [['created_at', 'DESC']] });
     if (orgRows.length) {
       const chosen = orgRows.find((r) => r.status === 'connected') || orgRows[0];

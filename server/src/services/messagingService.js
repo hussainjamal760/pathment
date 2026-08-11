@@ -487,28 +487,147 @@ class MessagingService {
         message: hydratedMessage,
         conversationId,
         recipientIds,
+        recipientRoleById,
         notifications: createdNotifications
       };
-    }).then(result => {
+    }).then(async result => {
       // FIRE AND FORGET AI ORCHESTRATION
       // Ensure we don't crash if it fails
       if (result && result.message && result.message.sender) {
         // Only trigger RAG orchestration if a mentee is sending a message
         if (result.message.sender.role === 'mentee') {
-          const ragOrchestratorService = require('./ragOrchestratorService');
           const ragLogger = require('../utils/ragLogger');
+          const { models } = require('../db');
           
-          ragOrchestratorService.queueReplyGeneration(result.message.id)
-            .catch(err => {
-              ragLogger.error('rag_orchestration_fire_and_forget_failed', {
-                messageId: result.message.id,
-                error: err.message
-              });
+          const mentorIds = result.recipientIds.filter(id => result.recipientRoleById[id] === 'mentor');
+          if (mentorIds.length === 0) {
+            ragLogger.info('rag_skipped_no_mentor_in_conversation', { messageId: result.message.id });
+            return result;
+          }
+          
+          const mentorId = mentorIds[0];
+          if (!mentorId) {
+            ragLogger.info('rag_skipped_null_mentor_id', { messageId: result.message.id });
+            return result;
+          }
+
+          const styleProfile = await models.MentorStyleProfile.findOne({ where: { mentorId } });
+          if (!styleProfile || !styleProfile.autoReplyEnabled) {
+            ragLogger.info('rag_skipped_mentor_opted_out', { messageId: result.message.id, mentorId });
+            return result;
+          }
+
+          const now = new Date();
+          const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+          const [quota] = await models.RagGenerationQuota.findOrCreate({
+            where: { mentorId },
+            defaults: { count: 0, windowStart: currentMonthStart, limit: 100 }
+          });
+
+          if (quota.windowStart < currentMonthStart) {
+            quota.count = 0;
+            quota.windowStart = currentMonthStart;
+          }
+
+          if (quota.count >= quota.limit) {
+            ragLogger.warn('rag_skipped_cost_ceiling_exceeded', { messageId: result.message.id, mentorId });
+            return result;
+          }
+
+          quota.count += 1;
+          await quota.save();
+
+          // P21: Construct plain context object for the orchestrator
+          const conversationForRag = await models.Conversation.findByPk(result.conversationId, {
+            include: [{
+              model: models.Enrollment,
+              as: 'relatedEnrollment',
+              attributes: ['programId']
+            }]
+          });
+
+          const programId = conversationForRag?.relatedEnrollment?.programId || null;
+
+          const context = {
+            query: result.message.messageText,
+            mentorId,
+            menteeId: result.message.senderId,
+            programId,
+            conversationId: result.conversationId
+          };
+
+          const ragTriggers = require('../utils/ragTriggers');
+          try {
+            ragTriggers.emit('rag:orchestrate', context, result.message);
+          } catch (err) {
+            ragLogger.error('rag_orchestration_fire_and_forget_failed', {
+              messageId: result.message.id,
+              error: err.message
             });
+          }
         }
       }
       return result;
     });
+  }
+
+  async _handleRagDecision(originalMessage, decision) {
+    const { models } = require('../db');
+    const logger = require('../utils/ragLogger');
+    const { tier, draftText, confidence, chunkIds, unsupportedClaims, groundingScore, groundingCheckError } = decision;
+
+    if (tier === 'auto-reply') {
+      const message = await models.Message.create({
+        threadId: originalMessage.threadId,
+        senderId: originalMessage.recipientId || null, // The mentor
+        recipientId: originalMessage.senderId,
+        messageText: draftText,
+        metadata: { generatedBy: 'ai', confidence, autoReplied: true, isAiGenerated: true }
+      });
+
+      try {
+        const { emitToConversation } = require('../socket');
+        emitToConversation(originalMessage.threadId, 'message:new', {
+          message: message.toJSON()
+        });
+      } catch (err) {
+        logger.error('rag_socket_emit_failed', { event: 'message:new', error: err.message });
+      }
+    } else if (tier === 'review') {
+      const draft = await models.MessageDraft.create({
+        messageId: originalMessage.id,
+        mentorId: originalMessage.recipientId || null,
+        menteeId: originalMessage.senderId,
+        draftContent: draftText,
+        confidenceScore: confidence,
+        groundingScore,
+        retrievedChunkIds: chunkIds,
+        unsupportedSpans: unsupportedClaims,
+        status: 'pending'
+      });
+
+      try {
+        const { emitToUser } = require('../socket');
+        const mentorId = originalMessage.recipientId || null;
+        if (mentorId) {
+          emitToUser(mentorId, 'ai_draft:new', {
+            draft: typeof draft.toJSON === 'function' ? draft.toJSON() : draft,
+            conversationId: originalMessage.threadId
+          });
+        }
+      } catch (err) {
+        logger.error('rag_socket_emit_failed', { event: 'ai_draft:new', error: err.message });
+      }
+    } else {
+      logger.info('rag_orchestration_abstained', {
+        messageId: originalMessage.id,
+        confidence,
+        unsupportedClaims,
+        groundingCheckError,
+        draftText
+      });
+    }
   }
 
   async markConversationRead(userId, conversationId) {
@@ -563,6 +682,8 @@ class MessagingService {
     });
   }
 
+
+
   async getPendingDrafts(mentorId) {
     // Need to find all pending MessageDrafts where the mentor is the recipient of the original message
     const drafts = await models.MessageDraft.findAll({
@@ -583,7 +704,8 @@ class MessagingService {
       ],
       order: [['createdAt', 'ASC']]
     });
-    return drafts;
+    
+    return drafts.map(d => typeof d.toJSON === 'function' ? d.toJSON() : d);
   }
 
   async approveDraft(mentorId, { draftId, finalText }) {
@@ -965,6 +1087,22 @@ class MessagingService {
   }
   async uploadMentorDocument(mentorId, file, { programId = null, visibility = 'mentor' } = {}) {
     if (!file) throw new ValidationError('No file uploaded');
+
+    if (programId) {
+      const clanCount = await models.ClanMembership.count({
+        where: { userId: mentorId, status: 'active' },
+        include: [{
+          model: models.Clan,
+          as: 'clan',
+          where: { programId },
+          required: true
+        }]
+      });
+      if (clanCount === 0) {
+        const { ForbiddenError } = require('../utils/errors');
+        throw new ForbiddenError('You are not an active member of this program.');
+      }
+    }
     
     const { extractTextFromBuffer } = require('../utils/pdfParser');
     const parsedText = await extractTextFromBuffer(file.buffer);
@@ -991,7 +1129,8 @@ class MessagingService {
         text: parsedText,
         mentorId,
         programId,
-        visibility
+        visibility,
+        transaction
       });
 
       return document;
@@ -1016,14 +1155,26 @@ class MessagingService {
       await deleteFromCloudinary(document.cloudinaryPublicId, 'raw').catch(err => console.error('Cloudinary delete error:', err));
     }
 
-    await models.KnowledgeChunk.destroy({
-      where: {
-        sourceId: documentId,
-        sourceType: 'mentor_document'
-      }
+    await sequelize.transaction(async (t) => {
+      // 1. Delete pending ingestion jobs for this document to prevent it from coming back
+      await sequelize.query(`
+        DELETE FROM rag_ingestion_jobs 
+        WHERE source_id = :documentId AND source_type = 'mentor_document'
+      `, { replacements: { documentId }, transaction: t });
+
+      // 2. Delete existing chunks
+      await models.KnowledgeChunk.destroy({
+        where: {
+          sourceId: documentId,
+          sourceType: 'mentor_document'
+        },
+        transaction: t
+      });
+
+      // 3. Delete the document record itself
+      await document.destroy({ transaction: t });
     });
 
-    await document.destroy();
     return { success: true };
   }
 }

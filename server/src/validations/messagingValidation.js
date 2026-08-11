@@ -35,6 +35,20 @@ const messagingSchemas = {
 
   conversationParams: Joi.object({
     conversationId: uuid
+  }),
+
+  approveDraft: Joi.object({
+    draftId: uuid,
+    finalText: Joi.string().trim().min(1).max(5000).required()
+  }),
+
+  rejectDraftParams: Joi.object({
+    draftId: uuid
+  }),
+
+  uploadMentorDocument: Joi.object({
+    programId: Joi.string().uuid().allow('', null).optional(),
+    visibility: Joi.string().valid('mentor', 'program', 'roadmap').default('mentor')
   })
 };
 

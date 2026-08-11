@@ -713,11 +713,18 @@ export default function MessageCenter({ role }: MessageCenterProps) {
                         <span className="text-xs font-medium text-slate-500">
                           Replying to: <span className="text-slate-700 italic">"{draft.originalMessage?.messageText}"</span>
                         </span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${confidenceColor}`}>
-                          {Math.round(draft.confidenceScore * 100)}% Confidence
-                        </span>
+                        <div className="flex gap-2 items-center">
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${confidenceColor}`}>
+                            {Math.round(draft.confidenceScore * 100)}% Confidence
+                          </span>
+                          {draft.groundingScore !== undefined && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-indigo-100 text-indigo-700">
+                              {Math.round(draft.groundingScore * 100)}% Grounded
+                            </span>
+                          )}
+                        </div>
                       </div>
-
+                      
                       {isEditing ? (
                         <div className="mt-2">
                           <textarea

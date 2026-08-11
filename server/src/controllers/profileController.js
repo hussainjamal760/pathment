@@ -60,6 +60,14 @@ class ProfileController {
         const ids = await cohortService.resolveMenteeIds(userId);
         out.mentorProfile.currentMenteeCount = ids.length;
       } catch { /* fall back to the stored value */ }
+
+      // Fetch AI auto-reply status if it exists
+      try {
+        const style = await models.MentorStyleProfile.findOne({ where: { mentor_id: userId } });
+        out.autoReplyEnabled = style ? style.autoReplyEnabled : false;
+      } catch {
+        out.autoReplyEnabled = false;
+      }
     }
 
     res.json(successResponse('Profile retrieved successfully', out));
@@ -471,6 +479,37 @@ await user.update({
         currentMenteeCount: mentorProfile.currentMenteeCount
       }
     ));
+  });
+
+  /**
+   * Update mentor's auto-reply setting
+   * PATCH /api/profile/mentor/auto-reply
+   */
+  updateAutoReply = catchAsync(async (req, res) => {
+    const userId = req.user.id;
+    const { autoReplyEnabled } = req.body;
+
+    const user = await models.User.findByPk(userId);
+    if (user.role !== 'mentor') {
+      throw new ForbiddenError('Only mentors can update auto-reply settings');
+    }
+
+    if (typeof autoReplyEnabled !== 'boolean') {
+      throw new ValidationError('autoReplyEnabled must be a boolean');
+    }
+
+    let styleProfile = await models.MentorStyleProfile.findOne({ where: { mentor_id: userId } });
+    if (!styleProfile) {
+      styleProfile = await models.MentorStyleProfile.create({
+        mentor_id: userId,
+        autoReplyEnabled
+      });
+    } else {
+      styleProfile.autoReplyEnabled = autoReplyEnabled;
+      await styleProfile.save();
+    }
+
+    res.json(successResponse('Auto-reply settings updated successfully', { autoReplyEnabled }));
   });
 }
 

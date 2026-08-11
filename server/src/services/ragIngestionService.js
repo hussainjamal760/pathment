@@ -7,9 +7,14 @@ class RagIngestionService {
   /**
    * Enqueue a text payload to be chunked and embedded by the async worker.
    */
-  async enqueueIngestion({ sourceType, sourceId, text, mentorId = null, programId = null, visibility = 'public' }) {
+  async enqueueIngestion({ sourceType, sourceId, text, mentorId = null, programId = null, visibility = 'public', transaction = null }) {
     if (!text || !sourceType || !sourceId) {
       return { queued: false, reason: 'invalid_payload' };
+    }
+
+    if (visibility === 'roadmap') {
+      logger.warn('rag_ingestion_rejected', { reason: 'roadmap_tier_unsupported', sourceType, sourceId });
+      return { queued: false, reason: 'roadmap_tier_unsupported' };
     }
 
     try {
@@ -20,7 +25,8 @@ class RagIngestionService {
         RETURNING id
       `, {
         replacements: { sourceType, sourceId, text, mentorId, programId, visibility },
-        type: sequelize.QueryTypes.INSERT
+        type: sequelize.QueryTypes.INSERT,
+        transaction
       });
       
       logger.info('rag_job_enqueued', { jobId: job[0][0].id, sourceType, sourceId });
@@ -46,6 +52,19 @@ class RagIngestionService {
     logger.info('rag_job_started', { jobId: job.id, attempt: attemptCount });
 
     try {
+      // 0. Second line of defense: Check if source document still exists
+      if (job.source_type === 'mentor_document') {
+        const docExists = await sequelize.query(`
+          SELECT 1 FROM mentor_documents WHERE id = :sourceId
+        `, { replacements: { sourceId: job.source_id }, type: sequelize.QueryTypes.SELECT });
+        
+        if (!docExists || docExists.length === 0) {
+          logger.warn('rag_job_skipped_document_deleted', { jobId: job.id, sourceId: job.source_id });
+          await sequelize.query(`UPDATE rag_ingestion_jobs SET status = 'cancelled', updated_at = NOW() WHERE id = :id`, { replacements: { id: job.id } });
+          return { success: false, reason: 'document_deleted' };
+        }
+      }
+
       // 1. Chunk Text
       const chunks = chunkingService.chunkText(job.text);
       if (!chunks.length) {
@@ -59,18 +78,40 @@ class RagIngestionService {
       // 2. Hash & Embed (Skips API if hash exists)
       const enrichedChunks = await embeddingService.embedChunks(chunks, job.mentor_id);
 
-      // 3. Upsert into KnowledgeChunks
+      // 3. Determine New Version & Supersede Old Chunks
+      const versionRows = await sequelize.query(`
+        SELECT COALESCE(MAX(source_version), 0) as max_ver 
+        FROM knowledge_chunks 
+        WHERE source_type = :source_type AND source_id = :source_id
+      `, {
+        replacements: { source_type: job.source_type, source_id: job.source_id },
+        type: sequelize.QueryTypes.SELECT
+      });
+      const newVersion = parseInt(versionRows[0]?.max_ver || 0) + 1;
+
+      // The app convention (e.g. deleteMentorDocument) is to hard-delete records. 
+      // Thus, we delete prior-version chunks outright (Option B) instead of soft-deleting.
+      if (newVersion > 1) {
+        await sequelize.query(`
+          DELETE FROM knowledge_chunks 
+          WHERE source_type = :source_type AND source_id = :source_id AND source_version < :new_version
+        `, {
+          replacements: { source_type: job.source_type, source_id: job.source_id, new_version: newVersion }
+        });
+      }
+
+      // 4. Upsert into KnowledgeChunks
       // We use INSERT ... ON CONFLICT DO UPDATE (or DO NOTHING) to safely handle duplicates.
       // We'll insert one by one or in batch. Sequelize allows bulkCreate with updateOnDuplicate.
       
       const recordsToUpsert = enrichedChunks.map(c => ({
         source_type: job.source_type,
         source_id: job.source_id,
-        source_version: 1, // Basic versioning for now
+        source_version: newVersion,
         chunk_index: c.chunkIndex,
         content_hash: c.contentHash,
         content: c.text,
-        embedding: c.skipped ? undefined : c.embedding ? `[${c.embedding.join(',')}]` : null, // format for pgvector if not skipped
+        embedding: c.embedding ? `[${c.embedding.join(',')}]` : null, // always insert embedding if present
         mentor_id: job.mentor_id,
         program_id: job.program_id,
         visibility: job.visibility

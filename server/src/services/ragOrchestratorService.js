@@ -12,48 +12,18 @@ class RagOrchestratorService {
    * 
    * @param {string} messageId - The ID of the incoming Mentee message
    */
-  async queueReplyGeneration(messageId) {
+  async generateDecision(context) {
     try {
-      // 1. Fetch Message & Authorization Scope
-      const message = await models.Message.findByPk(messageId, {
-        include: [
-          {
-            model: models.Conversation,
-            as: 'conversation',
-            include: [
-              {
-                model: models.Enrollment,
-                as: 'relatedEnrollment',
-                include: [{ model: models.Program, as: 'program' }]
-              },
-              {
-                model: models.ConversationParticipant,
-                as: 'participants',
-                include: [{ model: models.User, as: 'user' }]
-              }
-            ]
-          }
-        ]
-      });
-
-      if (!message) throw new Error(`Message ${messageId} not found`);
-
-      // Determine scopes from conversation
-      const conversation = message.conversation;
-      const programId = conversation.relatedEnrollment ? conversation.relatedEnrollment.programId : null;
-
-      // Identify the mentor in the conversation (assuming 1 mentor, 1 mentee)
-      let mentorId = null;
-      let menteeId = message.senderId; // the one who sent the message
-      for (const p of conversation.participants) {
-        if (p.user.role === 'mentor') {
-          mentorId = p.user.id;
-        }
-      }
+      const { query, mentorId, menteeId, programId, conversationId } = context;
 
       // 2. Fetch Unlocked Roadmap Nodes (simulated for now)
-      // In a real app, query the Roadmap/Node progress for this mentee
+      // TODO: Wire to real roadmap progress (models/tasks/RoadmapProgress).
+      // Currently stubbed because we lack the integer step -> node UUID resolver.
       const unlockedRoadmapNodeIds = [];
+      logger.warn('roadmap_retrieval_stubbed', { 
+        conversationId, 
+        warning: 'Roadmap-scoped retrieval is not yet supported. Any roadmap chunks will be silently filtered out.' 
+      });
 
       // 3. Fetch Style Profile
       let styleProfile = null;
@@ -63,7 +33,7 @@ class RagOrchestratorService {
 
       // 4. Retrieve Context (Hybrid Search + RRF)
       const retrievedChunks = await retrievalService.retrieveContext({
-        query: message.messageText,
+        query,
         userId: menteeId,
         mentorId,
         programId,
@@ -84,42 +54,39 @@ class RagOrchestratorService {
       const { systemPrompt, userPrompt } = promptBuilderService.buildPrompt({
         levelContexts,
         styleProfile: styleProfile ? styleProfile.toJSON() : null,
-        menteeMessage: message.messageText
+        menteeMessage: query
       });
 
       // 6. Call LLM
-      // Note: We instruct groqService to provide a self-reported confidence. 
-      // To simulate this without complex JSON schema in generation, we can ask for a format,
-      // or we can simulate the self-reported confidence for this implementation.
-      // We will assume groqService.generateText handles standard generation.
       const llmOutput = await groqService.generateText({
         system: systemPrompt,
-        prompt: userPrompt + '\n\nAppend your confidence score at the very end in brackets like [CONFIDENCE: 0.95]',
+        prompt: userPrompt,
         feature: 'rag_generation',
         userId: mentorId,
         temperature: 0.4,
         maxTokens: 800
       });
 
-      // Extract self-reported confidence
-      let llmConfidence = 0.85; // default
-      let draftText = llmOutput;
-      const confMatch = llmOutput.match(/\[CONFIDENCE:\s*([0-9.]+)\]/);
-      if (confMatch) {
-        llmConfidence = parseFloat(confMatch[1]);
-        draftText = llmOutput.replace(confMatch[0], '').trim();
-      }
+      let draftText = llmOutput.trim();
 
       if (draftText.includes('[ABSTAIN_NO_CONTEXT]')) {
-        logger.info('rag_orchestration_abstained_no_context', { messageId });
-        await this._handleAbstain(message, 0, [], draftText, 'Out of context fallback triggered');
-        return { tier: 'abstain', finalConfidence: 0 };
+        logger.info('rag_orchestration_abstained_no_context', { conversationId });
+        return { 
+          tier: 'abstain', 
+          draftText, 
+          confidence: 0, 
+          chunkIds: retrievedChunks.map(c => c.id), 
+          unsupportedClaims: [], 
+          groundingScore: 0, 
+          groundingCheckError: 'Out of context fallback triggered' 
+        };
       }
 
-      // 7. Grounding Check
       let groundingScore = 0;
       let unsupportedClaims = [];
       let groundingCheckError = null;
+      let finalConfidence = 0;
+      let tier = 'abstain';
 
       try {
         const groundingResult = await groundingService.checkGrounding({
@@ -131,12 +98,8 @@ class RagOrchestratorService {
         unsupportedClaims = groundingResult.unsupportedClaims;
       } catch (error) {
         groundingCheckError = error.message;
-        logger.error('grounding_check_failed', { messageId, error: error.message, draftText });
+        logger.error('grounding_check_failed', { conversationId, error: error.message, draftText });
       }
-
-      // 8. Branching Logic
-      let finalConfidence = 0;
-      let tier = 'abstain';
 
       if (groundingCheckError) {
         // Strict fallback to abstain on grounding error
@@ -144,93 +107,36 @@ class RagOrchestratorService {
         tier = 'abstain';
       } else {
         const confResult = groundingService.computeFinalConfidence({
-          llmConfidence,
-          groundingScore
+          groundingScore,
+          autoReplyEnabled: styleProfile?.autoReplyEnabled === true
         });
         finalConfidence = confResult.finalConfidence;
         tier = confResult.tier;
       }
 
       logger.info('rag_orchestration_complete', {
-        messageId,
-        llmConfidence,
+        conversationId,
         groundingScore,
         finalConfidence,
         tier
       });
 
-      // 9. Execute Terminal Persistence Action
-      if (tier === 'auto-reply') {
-        await this._handleAutoReply(message, draftText, finalConfidence);
-      } else if (tier === 'review') {
-        await this._handleDraftReview(message, draftText, finalConfidence);
-      } else {
-        await this._handleAbstain(message, finalConfidence, unsupportedClaims, draftText, groundingCheckError);
-      }
-
-      return { tier, finalConfidence };
+      return {
+        tier,
+        draftText,
+        confidence: finalConfidence,
+        chunkIds: retrievedChunks.map(c => c.id),
+        unsupportedClaims,
+        groundingScore,
+        groundingCheckError
+      };
 
     } catch (error) {
-      logger.error('rag_orchestration_failed', { messageId, error: error.message });
+      logger.error('rag_orchestration_failed', { conversationId: context?.conversationId, error: error.message });
       throw error;
     }
   }
 
-  async _handleAutoReply(originalMessage, draftText, confidence) {
-    // Insert a sent message on behalf of the AI/Mentor
-    const message = await models.Message.create({
-      threadId: originalMessage.threadId,
-      senderId: originalMessage.recipientId || null, // The mentor
-      recipientId: originalMessage.senderId,
-      messageText: draftText,
-      metadata: { generatedBy: 'ai', confidence, autoReplied: true, isAiGenerated: true }
-    });
-
-    try {
-      const { emitToConversation } = require('../socket');
-      emitToConversation(originalMessage.threadId, 'message:new', {
-        message: message.toJSON()
-      });
-    } catch (err) {
-      logger.error('rag_socket_emit_failed', { event: 'message:new', error: err.message });
-    }
-  }
-
-  async _handleDraftReview(originalMessage, draftText, confidence) {
-    // Insert into MessageDrafts for the mentor to review
-    const draft = await models.MessageDraft.create({
-      messageId: originalMessage.id,
-      mentorId: originalMessage.recipientId || null,
-      menteeId: originalMessage.senderId,
-      draftContent: draftText,
-      confidenceScore: confidence,
-      status: 'pending'
-    });
-
-    try {
-      const { emitToUser } = require('../socket');
-      const mentorId = originalMessage.recipientId || null;
-      if (mentorId) {
-        emitToUser(mentorId, 'ai_draft:new', {
-          draft: draft.toJSON(),
-          conversationId: originalMessage.threadId
-        });
-      }
-    } catch (err) {
-      logger.error('rag_socket_emit_failed', { event: 'ai_draft:new', error: err.message });
-    }
-  }
-
-  async _handleAbstain(originalMessage, confidence, unsupportedClaims, draftText, groundingCheckError = null) {
-    // Log the abstention and take no action, leaving the message for human intervention
-    logger.info('rag_orchestration_abstained', {
-      messageId: originalMessage.id,
-      confidence,
-      unsupportedClaims,
-      groundingCheckError,
-      draftText
-    });
-  }
 }
 
 module.exports = new RagOrchestratorService();

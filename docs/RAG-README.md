@@ -39,6 +39,10 @@ This document tracks the phased rollout of the Retrieval-Augmented Generation (R
 - **Resilience**: The grounding call includes an internal retry loop. If grounding fails entirely due to an LLM outage, the system safely falls back to a strict `abstain` state with `groundingScore: 0` and logs the original draft for support visibility.
 - **Verification**: Built `groundingService.test.js` to ensure the logic accurately penalizes unsupported claims and overrides the naive LLM confidence levels properly.
 
+## ✅ Phase 4.5: Embedding Provider Standardization (P16)
+- **Model Pinning**: Pinned the embedding model exclusively to `gemini-embedding-001` (768 dimensions) via `ragConfig.js` to prevent mathematical cross-provider vector corruption. Removed all padding and truncation logic.
+- **Backfill Notice**: Migration `096_pin_gemini_embeddings.js` wipes all existing 1536-dimensional embeddings (setting them to NULL) and alters the column type to `vector(768)`. **Manual Action Required**: Any pre-existing mentor documents must be re-embedded through the admin panel or an offline script to populate the new 768-dimensional latent space.
+
 ## ✅ Phase 5: Prompt Construction & LLM Orchestration
 - **Prompt Assembly (`promptBuilderService.js`)**: Dynamically groups retrieved chunks by predetermined trust tiers (e.g., Mentor > Roadmap > Program) and smartly prioritizes context insertion, trimming from the bottom-up to securely fit within the LLM's defined context token budget.
 - **Unified Orchestrator (`ragOrchestratorService.js`)**: Encapsulates the complete journey (Message ➔ Retrieve Context ➔ Build Prompt ➔ Generate ➔ Grounding Check ➔ Branch) ensuring separation of concerns.
@@ -73,9 +77,14 @@ This document tracks the phased rollout of the Retrieval-Augmented Generation (R
 ## ✅ Post-Deployment UI & Pipeline Tuning
 - **Schema Hotfix**: Created migration `094_add_processed_to_edit_histories.js` to add a missing `processed` column, fixing a crash in the `styleLearningWorker` polling loop.
 - **Auto-Reply Tuning**: Lowered `RAG_AUTO_REPLY_CONFIDENCE_THRESHOLD` to `0.70` via environment variables to allow more aggressive auto-replies for high-quality drafts.
+- **Security Hotfix (Prompt Injection)**: Disconnected LLM self-reporting confidence to prevent unsupervised auto-replies triggered by malicious prompt injections. Migrated the gating metric to an out-of-band mathematical embedding similarity score. Added a database-level toggle (`auto_reply_enabled`) directly into the `mentor_style_profiles` to give mentors granular control over auto-replies, ignoring the env variables if disabled.
 - **Anti-Hallucination Fallback**: Updated `promptBuilderService.js` to strictly embody the mentor persona. Enforced an `[ABSTAIN_NO_CONTEXT]` trigger so the Orchestrator instantly aborts generation (Confidence = 0, Tier = Abstain) if asked about tasks outside the vector context, preventing confident "I don't know" drafts.
 - **Drafts UI Redesign**: Overhauled `MessageCenter.tsx` to render the "Pending AI Drafts" as a sleek, floating glassmorphic widget overlay. Added expand/collapse functionality with a minimal notification bubble when minimized, completely fixing chat layout squishing.
 
 ## 📌 Open Items & Future Work
+- **Roadmap-Scoped Retrieval Deferred**: The `roadmap` visibility tier is currently not supported. It is stubbed out in `ragOrchestratorService` because `RoadmapProgress` only stores an integer `currentStep`, lacking a direct resolver to the string IDs needed for `unlockedRoadmapNodeIds`. Ingestion of `visibility='roadmap'` is explicitly rejected until this mapping is implemented.
 - **Process-Crash Durability for Generation Queue**: In Phase 6, the `ragOrchestratorService.queueReplyGeneration` call is wired as a pure in-memory Promise chain (fire-and-forget `.catch()`). This perfectly isolates latency, but if the Node server restarts or crashes exactly during a generation cycle, the job is silently lost and the mentee will not get an AI reply. 
   - **Action Item**: Introduce a persistent job queue (e.g., BullMQ or a `rag_jobs` table with `FOR UPDATE SKIP LOCKED`) specifically for the orchestrator generation pipeline to ensure true fault tolerance.
+
+- **Security Debt: `pdf-parse@1.1.1` Usage (P14)**: The `pdf-parse` library used in `pdfParser.js` for document uploads is unmaintained (last published 6 years ago) and has known debug-path related vulnerabilities/issues.
+  - **Action Item**: Research and swap out `pdf-parse` with a maintained drop-in replacement fork or transition to a modern alternative like `pdfjs-dist` to ensure safe, reliable buffer parsing.

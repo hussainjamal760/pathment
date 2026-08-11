@@ -19,7 +19,7 @@ class ChunkingService {
     }
 
     const tokenSize = options.tokenSize || ragConfig.chunkTokenSize;
-    const overlap = options.overlap || ragConfig.chunkOverlap;
+    const overlap = options.overlap || ragConfig.chunkTokenOverlap;
 
     // Approximate words per token (1 word ≈ 1.3 tokens roughly).
     // So if tokenSize = 250, that's roughly 190 words.

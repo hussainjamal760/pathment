@@ -44,4 +44,28 @@ describe('ChunkingService', () => {
     const firstWordsOfSecond = secondChunkWords.slice(0, 10);
     expect(lastWordsOfFirst).toEqual(firstWordsOfSecond);
   });
+
+  it('should split long text into overlapping chunks with no options provided', () => {
+    // Generate 1500 words to ensure it exceeds the default token size
+    const words = Array.from({ length: 1500 }, (_, i) => `word${i}`);
+    const text = words.join(' ');
+    
+    // Call with NO options object
+    const chunks = chunkingService.chunkText(text);
+    
+    expect(chunks.length).toBeGreaterThan(1);
+    
+    // Check overlap on consecutive chunks
+    const firstChunkWords = chunks[0].text.split(' ');
+    const secondChunkWords = chunks[1].text.split(' ');
+    
+    // Calculate expected overlap in words using the exact math from chunkingService
+    // default chunkTokenOverlap is 50, so 50 / 1.3 ≈ 38 words
+    const expectedOverlapWords = Math.floor(ragConfig.chunkTokenOverlap / 1.3);
+    
+    const lastWordsOfFirst = firstChunkWords.slice(-expectedOverlapWords);
+    const firstWordsOfSecond = secondChunkWords.slice(0, expectedOverlapWords);
+    
+    expect(lastWordsOfFirst).toEqual(firstWordsOfSecond);
+  });
 });

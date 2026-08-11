@@ -15,20 +15,7 @@ async function up() {
   const qi = sequelize.getQueryInterface();
   console.log('▶ Running migration 094: Add processed to mentor_edit_histories');
 
-  try {
-    await qi.addColumn('mentor_edit_histories', 'processed', {
-      type: Sequelize.BOOLEAN,
-      allowNull: false,
-      defaultValue: false
-    });
-    console.log('  ✓ Column "processed" added successfully');
-  } catch (e) {
-    if (/already exists/i.test(e.message) || /column "processed" of relation "mentor_edit_histories" already exists/i.test(e.message)) {
-      console.log('  ℹ Column "processed" already exists, skipping');
-    } else {
-      throw e;
-    }
-  }
+  // Column addition removed: 093_rag_style_learning.js now exclusively handles adding the 'processed' column.
 
   // Create an index to speed up the worker's polling query
   try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { KeyRound, Plus, Trash2, Loader2, Zap, CheckCircle2, AlertTriangle, Circle } from 'lucide-react';
 import { useAIConnections } from '@/lib/hooks/admin';
 import type { AIProvider, AIFeature, AIKeyStatus } from '@/lib/services/ai-connections-api';
@@ -28,7 +28,8 @@ const FEATURE_META: { key: AIFeature; label: string; hint: string }[] = [
   { key: 'roadmap', label: 'Roadmap generation', hint: 'Draft roadmap steps from a brief' },
   { key: 'rag_generation', label: 'RAG Reply Drafts', hint: 'Generate drafted mentor replies' },
   { key: 'rag_grounding', label: 'RAG Fact-Checking', hint: 'Verify drafted replies' },
-  { key: 'rag_embedding', label: 'RAG Vectors (OpenAI)', hint: 'Generate embeddings for documents' },
+  { key: 'rag_embedding', label: 'RAG Vectors (Gemini Only)', hint: 'Generate embeddings for documents' },
+  { key: 'auto_reply', label: 'Automatic Replies', hint: 'Draft check-ins and responses automatically using AI.' },
 ];
 
 const STATUS_META: Record<AIKeyStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
@@ -39,14 +40,79 @@ const STATUS_META: Record<AIKeyStatus, { label: string; cls: string; Icon: typeo
 
 const field = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500';
 
-export default function AIConnectionsTab() {
-  const { connections, routing, loading, busyId, addKey, removeKey, testKey, setRoute } = useAIConnections();
+interface AIConnectionsTabProps {
+  isMentor?: boolean;
+  autoReplyEnabled?: boolean;
+  onAutoReplyChange?: (enabled: boolean) => void;
+}
+
+export default function AIConnectionsTab({ isMentor, autoReplyEnabled, onAutoReplyChange }: AIConnectionsTabProps = {}) {
+  const { connections, routing, quota, loading, busyId, addKey, removeKey, testKey, setRoute, setQuotaLimit } = useAIConnections();
   const [adding, setAdding] = useState(false);
+  const [editingQuota, setEditingQuota] = useState(false);
+  const [tempQuotaLimit, setTempQuotaLimit] = useState(100);
+
+  // Initialize temp quota limit when quota loads
+  useEffect(() => { 
+    if (quota) setTempQuotaLimit(quota.limit); 
+  }, [quota]);
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-8">
+      {/* Auto-Reply Quota */}
+      {quota && (
+        <section>
+          <h2 className="text-slate-900 flex items-center gap-2 mb-2"><Zap className="w-5 h-5 text-brand-600" /> Auto-Reply Quota</h2>
+          <p className="text-slate-500 text-sm mb-4">Control how many automatic AI replies can be sent on your behalf each month.</p>
+          
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-slate-800">
+                {quota.count} of {quota.limit} messages used this month
+              </span>
+              <button 
+                onClick={() => setEditingQuota(!editingQuota)}
+                className="text-sm font-medium text-brand-600 hover:text-brand-700"
+              >
+                {editingQuota ? 'Cancel' : 'Edit Limit'}
+              </button>
+            </div>
+            
+            <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4">
+              <div 
+                className={`h-2.5 rounded-full ${quota.count >= quota.limit ? 'bg-red-500' : 'bg-brand-600'}`}
+                style={{ width: `${Math.min(100, (quota.count / Math.max(1, quota.limit)) * 100)}%` }}
+              ></div>
+            </div>
+
+            {editingQuota && (
+              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+                <div className="flex-1 max-w-xs">
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Monthly Limit</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={tempQuotaLimit} 
+                    onChange={(e) => setTempQuotaLimit(parseInt(e.target.value) || 0)}
+                    className={field} 
+                  />
+                </div>
+                <div className="pt-5">
+                  <button 
+                    onClick={() => { setQuotaLimit(tempQuotaLimit); setEditingQuota(false); }}
+                    className="px-4 py-2 bg-brand-600 hover:bg-brand-800 text-white rounded-lg text-sm font-medium"
+                  >
+                    Save Limit
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* Connections */}
       <section>
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -103,15 +169,26 @@ export default function AIConnectionsTab() {
                 <p className="text-sm font-medium text-slate-800">{f.label}</p>
                 <p className="text-xs text-slate-400">{f.hint}</p>
               </div>
-              <select
-                value={routing[f.key] ?? ''}
-                onChange={(e) => setRoute(f.key, e.target.value || null)}
-                disabled={connections.length === 0}
-                className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-w-[160px] disabled:opacity-50"
-              >
-                <option value="">Off</option>
-                {connections.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              {f.key === 'auto_reply' && isMentor ? (
+                <select
+                  value={autoReplyEnabled ? 'on' : 'off'}
+                  onChange={(e) => onAutoReplyChange?.(e.target.value === 'on')}
+                  className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 w-[120px]"
+                >
+                  <option value="off">Off</option>
+                  <option value="on">On</option>
+                </select>
+              ) : (
+                <select
+                  value={routing[f.key] ?? ''}
+                  onChange={(e) => setRoute(f.key, e.target.value || null)}
+                  disabled={connections.length === 0}
+                  className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 max-w-[160px] disabled:opacity-50"
+                >
+                  <option value="">Off</option>
+                  {connections.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              )}
             </div>
           ))}
         </div>

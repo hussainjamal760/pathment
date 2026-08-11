@@ -98,6 +98,25 @@ const uploadLarge = multer({
   }
 });
 
+// PDF-only file filter
+const pdfFileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (file.mimetype === 'application/pdf' || ext === '.pdf') {
+    cb(null, true);
+  } else {
+    cb(new ValidationError(`File type not supported: ${file.originalname || file.mimetype}. Please upload a PDF document.`), false);
+  }
+};
+
+// PDF-only Multer configuration (10MB limit)
+const uploadPdf = multer({
+  storage: storage,
+  fileFilter: pdfFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB max file size
+  }
+});
+
 /**
  * Wrap a multer handler so size/count limits and filter rejections surface as
  * clean 400 messages instead of a generic 500 "Something went wrong on our end".
@@ -125,5 +144,7 @@ upload.arraySafe = (field, maxCount) => withUploadErrors(upload.array(field, max
 upload.singleSafe = (field) => withUploadErrors(upload.single(field));
 /** `upload.singleSafeLarge('audio')` — single upload with a 25MB cap. */
 upload.singleSafeLarge = (field) => withUploadErrors(uploadLarge.single(field));
+/** `upload.singlePdfSafe('file')` — single PDF upload with a 10MB cap and strict filter. */
+upload.singlePdfSafe = (field) => withUploadErrors(uploadPdf.single(field));
 
 module.exports = upload;

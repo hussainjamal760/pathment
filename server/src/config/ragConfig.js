@@ -1,8 +1,8 @@
 require('dotenv').config();
 
 module.exports = {
-  embeddingModel: process.env.RAG_EMBEDDING_MODEL || 'text-embedding-3-small',
-  embeddingDimensions: parseInt(process.env.RAG_EMBEDDING_DIMENSIONS) || 1536,
+  embeddingModel: process.env.RAG_EMBEDDING_MODEL || 'gemini-embedding-001',
+  embeddingDimensions: parseInt(process.env.RAG_EMBEDDING_DIMENSIONS) || 768,
   chunkTokenSize: parseInt(process.env.RAG_CHUNK_TOKEN_SIZE) || 250,
   chunkTokenOverlap: parseInt(process.env.RAG_CHUNK_TOKEN_OVERLAP) || 50,
   rrfK: parseInt(process.env.RAG_RRF_K) || 60,
@@ -13,8 +13,10 @@ module.exports = {
   groundingSimilarityThreshold: parseFloat(process.env.RAG_GROUNDING_SIMILARITY_THRESHOLD) || 0.75, // Used for quick embedding checks
   groundingCombinationStrategy: process.env.RAG_GROUNDING_COMBINATION_STRATEGY || 'min', // Options: 'min', 'average', 'weighted'
   // Style Learning config
-  editDistanceSignificanceThreshold: parseInt(process.env.RAG_EDIT_DISTANCE_SIGNIFICANCE_THRESHOLD) || 10,
+  editDistanceSignificanceThreshold: parseInt(process.env.RAG_EDIT_DISTANCE_SIGNIFICANCE_THRESHOLD) || 5, // Lowered from 10 to capture smaller corrections
   maxStyleDeltaPerUpdate: parseFloat(process.env.RAG_MAX_STYLE_DELTA_PER_UPDATE) || 0.10,
   styleLearningBatchSize: parseInt(process.env.RAG_STYLE_LEARNING_BATCH_SIZE) || 10,
-  styleLearningPollIntervalMs: parseInt(process.env.RAG_STYLE_LEARNING_POLL_INTERVAL_MS) || 5000
+  styleLearningPollIntervalMs: parseInt(process.env.RAG_STYLE_LEARNING_POLL_INTERVAL_MS) || 5000,
+  // NOT YET SUPPORTED: 'roadmap' visibility tier is currently deferred.
+  // Ingestion of roadmap chunks is rejected, and retrieval is stubbed.
 };

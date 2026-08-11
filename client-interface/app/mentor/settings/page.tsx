@@ -29,6 +29,7 @@ export default function MentorSettings() {
     handleProfileUpdate,
     handleMentorProfileUpdate,
     handleAvailabilityUpdate,
+    handleAutoReplyUpdate,
   } = useMentorSettings();
 
   if (loading) {
@@ -331,7 +332,11 @@ export default function MentorSettings() {
 
           {/* AI Connections Tab */}
           {activeTab === 'ai' && (
-            <AIConnectionsTab />
+            <AIConnectionsTab
+              isMentor={true}
+              autoReplyEnabled={profileData.autoReplyEnabled}
+              onAutoReplyChange={handleAutoReplyUpdate}
+            />
           )}
 
           {activeTab === 'security' && (

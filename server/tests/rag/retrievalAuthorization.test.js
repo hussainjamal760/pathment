@@ -73,8 +73,8 @@ describe('Retrieval Authorization Boundaries', () => {
       try {
         await sequelize.query(`
           INSERT INTO knowledge_chunks 
-          (id, source_type, source_id, source_version, chunk_index, content_hash, content, visibility, program_id, mentor_id, embedding, search_vector, created_at, updated_at)
-          VALUES (:id, :type, :srcId, 1, 0, :hash, :content, :vis, :pId, :mId, :emb::vector, to_tsvector('english', :content), NOW(), NOW())
+          (id, source_type, source_id, source_version, chunk_index, content_hash, content, visibility, program_id, mentor_id, embedding, created_at, updated_at)
+          VALUES (:id, :type, :srcId, 1, 0, :hash, :content, :vis, :pId, :mId, :emb::vector, NOW(), NOW())
         `, {
           replacements: {
             id: c.id,
@@ -168,5 +168,28 @@ describe('Retrieval Authorization Boundaries', () => {
     expect(contents).not.toContain('program A data');
     expect(contents).not.toContain('mentor X secrets');
     expect(contents).not.toContain('locked roadmap module');
+  });
+
+  it('should preserve visibility, source_type, and mentor_id fields in the returned results', async () => {
+    const results = await retrievalService.retrieveContext({ 
+      query: 'data secrets module',
+      programId: '00000000-0000-0000-0000-00000000000b',
+      mentorId: '11111111-1111-1111-1111-11111111111b',
+      unlockedRoadmapNodeIds: ['module_unlocked']
+    });
+    
+    expect(results.length).toBeGreaterThan(0);
+    for (const res of results) {
+      expect(res.visibility).toBeDefined();
+      expect(res.source_type).toBeDefined();
+    }
+
+    const mentorChunk = results.find(r => r.visibility === 'mentor');
+    expect(mentorChunk).toBeDefined();
+    expect(mentorChunk.mentor_id).toBe('11111111-1111-1111-1111-11111111111b');
+    
+    const programChunk = results.find(r => r.visibility === 'program');
+    expect(programChunk).toBeDefined();
+    expect(programChunk.source_type).toBe('document');
   });
 });

@@ -3,11 +3,12 @@ const { successResponse } = require('../utils/responses');
 const aiConnectionService = require('../services/aiConnectionService');
 
 const list = catchAsync(async (req, res) => {
-  const [connections, routing] = await Promise.all([
+  const [connections, routing, quota] = await Promise.all([
     aiConnectionService.list(req.user),
-    aiConnectionService.getRouting(req.user)
+    aiConnectionService.getRouting(req.user),
+    req.user.role === 'mentor' ? aiConnectionService.getQuota(req.user) : Promise.resolve(null)
   ]);
-  res.status(200).json(successResponse('AI connections retrieved', { connections, routing }));
+  res.status(200).json(successResponse('AI connections retrieved', { connections, routing, quota }));
 });
 
 const create = catchAsync(async (req, res) => {
@@ -28,4 +29,12 @@ const setRouting = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Routing updated', { routing }));
 });
 
-module.exports = { list, create, remove, test, setRouting };
+const setQuotaLimit = catchAsync(async (req, res) => {
+  if (req.user.role !== 'mentor') {
+    return res.status(403).json({ success: false, message: 'Only mentors can set quota limits' });
+  }
+  const quota = await aiConnectionService.setQuotaLimit(req.user, req.body.limit);
+  res.status(200).json(successResponse('Quota limit updated', { quota }));
+});
+
+module.exports = { list, create, remove, test, setRouting, setQuotaLimit };

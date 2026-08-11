@@ -8,6 +8,10 @@ const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { initSocket } = require('./socket');
 const notificationScheduler = require('./services/notificationScheduler');
 const requestContext = require('./middlewares/requestContext');
+const { initRagListeners } = require('./utils/ragListeners');
+
+// Initialize pub/sub listeners for RAG domain events
+initRagListeners();
 
 const app = express();
 // Behind nginx/Vercel: trust the proxy so req.ip is the real client IP

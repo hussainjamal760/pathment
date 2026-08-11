@@ -2,6 +2,7 @@ const messagingService = require('../services/messagingService');
 const { successResponse } = require('../utils/responses');
 const { catchAsync } = require('../middlewares/errorHandler');
 const { emitToConversation, emitToUser } = require('../socket');
+const { ForbiddenError } = require('../utils/errors/errorTypes');
 
 const serializeNotification = (notification) => {
   const item = notification?.toJSON ? notification.toJSON() : notification;
@@ -169,26 +170,17 @@ exports.deleteNotification = catchAsync(async (req, res) => {
 });
 
 exports.getPendingDrafts = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can access drafts', null));
-  }
   const drafts = await messagingService.getPendingDrafts(req.user.id);
   res.status(200).json(successResponse('Drafts fetched', { drafts }));
 });
 
 exports.approveDraft = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can approve drafts', null));
-  }
   const { draftId, finalText } = req.body;
   const message = await messagingService.approveDraft(req.user.id, { draftId, finalText });
   res.status(200).json(successResponse('Draft approved', { message }));
 });
 
 exports.rejectDraft = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can reject drafts', null));
-  }
   const { draftId } = req.params;
   const draft = await messagingService.rejectDraft(req.user.id, draftId);
   res.status(200).json(successResponse('Draft rejected', { draft }));
@@ -204,18 +196,11 @@ exports.searchUsers = catchAsync(async (req, res) => {
 });
 
 exports.getMentorDocuments = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can access documents', null));
-  }
   const documents = await messagingService.getMentorDocuments(req.user.id);
   res.status(200).json(successResponse('Documents fetched', { documents }));
 });
 
 exports.uploadMentorDocument = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can upload documents', null));
-  }
-  
   const document = await messagingService.uploadMentorDocument(req.user.id, req.file, {
     programId: req.body.programId,
     visibility: req.body.visibility || 'mentor'
@@ -225,9 +210,6 @@ exports.uploadMentorDocument = catchAsync(async (req, res) => {
 });
 
 exports.deleteMentorDocument = catchAsync(async (req, res) => {
-  if (req.user.role !== 'mentor') {
-    return res.status(403).json(successResponse('Only mentors can delete documents', null));
-  }
   await messagingService.deleteMentorDocument(req.user.id, req.params.documentId);
   res.status(200).json(successResponse('Document deleted successfully', {}));
 });

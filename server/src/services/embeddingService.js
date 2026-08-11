@@ -56,19 +56,35 @@ class EmbeddingService {
 
     const allHashes = enrichedChunks.map(c => c.contentHash);
 
-    // 2. Query DB to find existing hashes
+    // 2. Query DB to find existing hashes for THIS mentor only
     const existingRows = await models.KnowledgeChunk.findAll({
-      where: { content_hash: allHashes },
-      attributes: ['content_hash'],
+      where: { 
+        content_hash: allHashes,
+        mentor_id: userId
+      },
+      attributes: ['content_hash', 'embedding'],
       raw: true
     });
-    const existingHashes = new Set(existingRows.map(r => r.content_hash));
+    const hashToEmbedding = {};
+    for (const row of existingRows) {
+      if (row.embedding) {
+        hashToEmbedding[row.content_hash] = row.embedding;
+      }
+    }
 
-    // 3. Mark skipped chunks
+    // 3. Mark skipped chunks and copy existing embeddings
     const toEmbed = [];
     for (const chunk of enrichedChunks) {
-      if (existingHashes.has(chunk.contentHash)) {
+      if (hashToEmbedding[chunk.contentHash]) {
         chunk.skipped = true;
+        let vec = hashToEmbedding[chunk.contentHash];
+        // Sequelize/pgvector might return a string "[0.1, 0.2]" or a Float32Array depending on driver
+        if (typeof vec === 'string') {
+          try { vec = JSON.parse(vec); } catch(e) {}
+        } else if (vec instanceof Float32Array) {
+          vec = Array.from(vec);
+        }
+        chunk.embedding = vec;
       } else {
         toEmbed.push(chunk);
       }
@@ -79,83 +95,24 @@ class EmbeddingService {
       const textsToEmbed = toEmbed.map(c => c.text);
       let embeddings = [];
       
-      const { enabled, client, model, provider, apiKey } = await groqService._resolve('rag_embedding', userId);
+      const { enabled, client, model, provider } = await groqService._resolve('rag_embedding', userId);
 
       // If AI isn't configured, we log warning and return chunks with null embeddings.
-      if (!enabled || (!client && provider !== 'gemini')) {
+      if (!enabled || !client) {
         logger.warn('AI services not configured for embeddings. Ingesting chunks without vector embeddings.');
         return enrichedChunks;
-      }
-
-      let embedModel = ragConfig.embeddingModel || model || 'text-embedding-3-small';
-      if (provider === 'gemini') {
-        embedModel = 'gemini-embedding-001';
       }
 
       // 5. Exponential Backoff Retry Loop
       let attempt = 0;
       const maxAttempts = 3;
+      
+      const { getAdapter } = require('./embeddingProviders');
+      const adapter = getAdapter(provider, client?.apiKey);
 
       while (attempt < maxAttempts) {
         try {
-          if (provider === 'gemini') {
-            const embedPromises = textsToEmbed.map(async (t) => {
-              const geminiReqBody = {
-                model: 'models/gemini-embedding-001',
-                content: { parts: [{ text: t }] }
-              };
-              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(geminiReqBody)
-              });
-              if (!res.ok) {
-                const errBody = await res.text();
-                throw new Error(`Gemini API Error: ${res.status} ${errBody}`);
-              }
-              const data = await res.json();
-              return data.embedding; // The response format for embedContent is { embedding: { values: [...] } }
-            });
-            
-            const geminiEmbeddings = await Promise.all(embedPromises);
-            
-            embeddings = geminiEmbeddings.map(d => {
-              let vec = d.values;
-              if (vec && vec.length > 1536) {
-                vec = vec.slice(0, 1536);
-              } else if (vec && vec.length < 1536) {
-                const padded = new Array(1536).fill(0);
-                for (let j = 0; j < vec.length; j++) {
-                  padded[j] = vec[j];
-                }
-                vec = padded;
-              }
-              return vec;
-            });
-          } else {
-            // Calling the OpenAI-compatible embeddings API endpoint
-            const reqBody = {
-              model: embedModel,
-              input: textsToEmbed,
-              dimensions: ragConfig.embeddingDimensions || 1536
-            };
-            const response = await client.embeddings.create(reqBody);
-
-            // response.data is an array of objects { embedding: [...] }
-            embeddings = response.data.map(d => {
-              let vec = d.embedding;
-              if (vec && vec.length > 1536) {
-                vec = vec.slice(0, 1536);
-              } else if (vec && vec.length < 1536) {
-                const padded = new Array(1536).fill(0);
-                for (let j = 0; j < vec.length; j++) {
-                  padded[j] = vec[j];
-                }
-                vec = padded;
-              }
-              return vec;
-            });
-          }
+          embeddings = await adapter.embed(textsToEmbed);
           break; // success
         } catch (error) {
           attempt++;

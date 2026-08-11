@@ -6,6 +6,8 @@ const messagingController = require('../controllers/messagingController');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { validateBody, validateParams, validateQuery } = require('../middlewares/validate');
 const { messagingSchemas } = require('../validations/messagingValidation');
+const { requirePermissionAnyScope } = require('../middlewares/authz');
+const { PERMISSIONS } = require('../config/permissions');
 
 router.use(authenticate, authorize(['admin', 'mentor', 'mentee']));
 
@@ -27,14 +29,15 @@ router.post('/notifications/read-all', messagingController.markAllNotificationsR
 router.post('/notifications/:notificationId/read', validateParams(messagingSchemas.markNotificationReadParams), messagingController.markNotificationRead);
 router.delete('/notifications/:notificationId', validateParams(messagingSchemas.markNotificationReadParams), messagingController.deleteNotification);
 
+
 // AI Draft Routes
-router.get('/drafts', messagingController.getPendingDrafts);
-router.post('/messages/approve', messagingController.approveDraft);
-router.post('/drafts/:draftId/reject', messagingController.rejectDraft);
+router.get('/drafts', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), messagingController.getPendingDrafts);
+router.post('/messages/approve', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), validateBody(messagingSchemas.approveDraft), messagingController.approveDraft);
+router.post('/drafts/:draftId/reject', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), validateParams(messagingSchemas.rejectDraftParams), messagingController.rejectDraft);
 
 // Mentor RAG Documents Routes
-router.get('/mentor/documents', messagingController.getMentorDocuments);
-router.post('/mentor/documents', upload.singleSafe('file'), messagingController.uploadMentorDocument);
-router.delete('/mentor/documents/:documentId', messagingController.deleteMentorDocument);
+router.get('/mentor/documents', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), messagingController.getMentorDocuments);
+router.post('/mentor/documents', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), upload.singlePdfSafe('file'), validateBody(messagingSchemas.uploadMentorDocument), messagingController.uploadMentorDocument);
+router.delete('/mentor/documents/:documentId', requirePermissionAnyScope(PERMISSIONS.MENTEE_MANAGE), messagingController.deleteMentorDocument);
 
 module.exports = router;
