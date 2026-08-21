@@ -22,6 +22,12 @@ const FLAG_LABEL: Record<string, string> = {
   context_menu_blocked: 'Right-click blocked',
   camera_off: 'Camera turned off',
   camera_restored: 'Camera restored',
+  // From the phone app — same log, different vocabulary. Without these a mobile
+  // interview showed raw event keys next to the web's readable ones.
+  app_background: 'Left the app',
+  app_foreground: 'Came back to the app',
+  camera_live: 'Camera on',
+  snapshot_failed: 'A photo failed to send',
 };
 
 /**
