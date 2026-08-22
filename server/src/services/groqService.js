@@ -56,7 +56,7 @@ class GroqService {
    * return null and the caller falls back to whatever transcript it already had.
    * @returns {Promise<string|null>} transcript text, or null if unavailable.
    */
-  async transcribeAudio({ audioUrl, userId = null, feature = 'feedback' } = {}) {
+  async transcribeAudio({ audioUrl, userId = null, feature = 'feedback', prompt } = {}) {
     if (!audioUrl) return null;
     const ai = await this._resolve(feature, userId);
     if (!ai.enabled) return null;
@@ -69,7 +69,16 @@ class GroqService {
     if (!resp.ok) throw new Error(`could not fetch audio (${resp.status})`);
     const buf = Buffer.from(await resp.arrayBuffer());
     const file = await OpenAI.toFile(buf, 'answer.webm', { type: 'audio/webm' });
-    const out = await ai.client.audio.transcriptions.create({ file, model });
+
+    // Anchor prompt to bias Whisper against random hallucinations in case of silence/noise
+    // and guide it towards English/Urdu/Hinglish switching.
+    const defaultPrompt = "Umm, let me think. Main isko explain karta hoon. So basically, the code does this...";
+
+    const out = await ai.client.audio.transcriptions.create({
+      file,
+      model,
+      prompt: prompt || defaultPrompt,
+    });
     return (out?.text || '').trim() || null;
   }
 
