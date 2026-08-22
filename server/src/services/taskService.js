@@ -10,6 +10,7 @@ const { pointsForDifficulty } = require('../config/points');
 const { difficultyWeight } = require('../config/scoring');
 const interviewKitService = require('./interviewKitService');
 const quizKitService = require('./quizKitService');
+const { toStringList } = require('../utils/multipartFields');
 
 /**
  * The statuses a mentee may set on their own task.
@@ -578,7 +579,7 @@ class TaskService {
       assignedTaskId: taskId,
       version,
       submissionText: submissionData.submissionText,
-      submissionUrls: submissionData.submissionUrls || []
+      submissionUrls: toStringList(submissionData.submissionUrls)
     });
 
     // Update task status
