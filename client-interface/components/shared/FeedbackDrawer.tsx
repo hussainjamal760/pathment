@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Bug, Lightbulb, MessageSquarePlus, Paperclip, Loader2, X, Send } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
+import { FileDragDrop } from './FileDragDrop';
 import { feedbackApi, type FeedbackType, type FeedbackReport } from '@/lib/services/feedback-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 
@@ -33,7 +34,6 @@ export function FeedbackDrawer({ open, onClose }: { open: boolean; onClose: () =
   const [submitting, setSubmitting] = useState(false);
   const [mine, setMine] = useState<FeedbackReport[]>([]);
   const [loadingMine, setLoadingMine] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
 
   const loadMine = useCallback(async () => {
     setLoadingMine(true);
@@ -43,42 +43,6 @@ export function FeedbackDrawer({ open, onClose }: { open: boolean; onClose: () =
   useEffect(() => { if (open && tab === 'mine') loadMine(); }, [open, tab, loadMine]);
   // Reset the form whenever the drawer opens fresh.
   useEffect(() => { if (open) { setTab('send'); setType('bug'); setTitle(''); setDescription(''); setFile(null); } }, [open]);
-
-  const pickFile = useCallback((f: File | null) => {
-    if (f && f.size > MAX) { toast.error('File is too large (max 10MB).'); return; }
-    if (f && !(f.type.startsWith('image/') || f.type.startsWith('video/'))) { toast.error('Attach an image or a short video clip.'); return; }
-    setFile(f);
-  }, []);
-
-  const handlePaste = useCallback((e: ClipboardEvent) => {
-    if (tab !== 'send') return;
-
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.kind === 'file' && (item.type.startsWith('image/') || item.type.startsWith('video/'))) {
-        const fileBlob = item.getAsFile();
-        if (fileBlob) {
-          const ext = item.type.split('/')[1] || 'png';
-          const pastedFile = new File([fileBlob], `pasted-image-${Date.now()}.${ext}`, { type: item.type });
-          pickFile(pastedFile);
-          e.preventDefault();
-          break;
-        }
-      }
-    }
-  }, [tab, pickFile]);
-
-  useEffect(() => {
-    if (open && tab === 'send') {
-      window.addEventListener('paste', handlePaste);
-      return () => {
-        window.removeEventListener('paste', handlePaste);
-      };
-    }
-  }, [open, tab, handlePaste]);
 
   const submit = async () => {
     if (!title.trim()) { toast.error('Add a short title.'); return; }
@@ -135,39 +99,32 @@ export function FeedbackDrawer({ open, onClose }: { open: boolean; onClose: () =
               placeholder="What happened, what did you expect, steps to reproduce…"
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                pickFile(e.dataTransfer.files[0]);
-              }
-            }}
-          >
+          <div>
             <label className="block text-sm text-slate-700 mb-1">Screenshot or short clip <span className="text-slate-400">(optional)</span></label>
-            {file ? (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-card">
-                <span className="inline-flex items-center gap-2 min-w-0"><Paperclip className="w-4 h-4 text-slate-400 shrink-0" /><span className="truncate">{file.name}</span></span>
-                <button onClick={() => setFile(null)} className="text-slate-400 hover:text-red-500 shrink-0"><X className="w-4 h-4" /></button>
-              </div>
-            ) : (
-              <label className={`flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg text-sm text-slate-500 cursor-pointer transition-colors ${
-                isDragging ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 hover:border-brand-400'
-              }`}>
-                <Paperclip className="w-4 h-4 pointer-events-none" />
-                <span className="pointer-events-none">Attach image or video (max 10MB)</span>
-                <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => pickFile(e.target.files?.[0] ?? null)} />
-              </label>
-            )}
-            <p className="mt-1 text-xs text-slate-400">We also capture the page you're on and your browser to help us debug.</p>
+            <FileDragDrop
+              onFilesSelected={(files) => setFile(files[0] || null)}
+              multiple={false}
+              accept="image/*,video/*"
+              maxSize={MAX}
+              enablePaste={true}
+            >
+              {({ isDragging, openFilePicker }) => (
+                file ? (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 border border-slate-200 rounded-lg text-sm bg-card">
+                    <span className="inline-flex items-center gap-2 min-w-0"><Paperclip className="w-4 h-4 text-slate-400 shrink-0" /><span className="truncate">{file.name}</span></span>
+                    <button type="button" onClick={() => setFile(null)} className="text-slate-400 hover:text-red-500 shrink-0"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={openFilePicker} className={`w-full flex items-center gap-2 px-3 py-2 border border-dashed rounded-lg text-sm text-slate-500 cursor-pointer transition-colors ${
+                    isDragging ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 hover:border-brand-400'
+                  }`}>
+                    <Paperclip className="w-4 h-4 pointer-events-none" />
+                    <span className="pointer-events-none">Attach image or video (max 10MB)</span>
+                  </button>
+                )
+              )}
+            </FileDragDrop>
+            <p className="mt-1 text-xs text-slate-400">We also capture the page you&apos;re on and your browser to help us debug.</p>
           </div>
           <div className="flex justify-end pt-2">
             <button onClick={submit} disabled={submitting}
@@ -181,7 +138,7 @@ export function FeedbackDrawer({ open, onClose }: { open: boolean; onClose: () =
           {loadingMine ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-brand-500" /></div>
           ) : mine.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10">You haven't submitted any feedback yet.</p>
+            <p className="text-sm text-slate-400 text-center py-10">You haven&apos;t submitted any feedback yet.</p>
           ) : (
             <div className="space-y-2">
               {mine.map((r) => (
