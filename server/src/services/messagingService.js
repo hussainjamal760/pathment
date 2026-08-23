@@ -200,8 +200,16 @@ class MessagingService {
           required: true
         }
       ],
+      // NULLS LAST is not the default. Postgres sorts NULLs first on DESC, so a
+      // conversation nobody has written in yet outranked every live thread and
+      // the inbox opened on empty rows. A conversation with no messages is the
+      // least recent thing there is, not the most.
       order: [
-        [{ model: models.Conversation, as: 'conversation' }, 'lastMessageAt', 'DESC'],
+        [
+          sequelize.literal(
+            '"conversation"."last_message_at" DESC NULLS LAST'
+          )
+        ],
         ['createdAt', 'DESC']
       ],
       limit,
