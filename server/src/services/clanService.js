@@ -500,7 +500,17 @@ class ClanService {
     const role = strongestRole(memberships.map((m) => m.role))
       || (canManageTeam ? 'lead_mentor' : 'co_mentor');
 
-    return { role, canManageTeam, canAddMentees };
+    // The permissions this person actually holds HERE, resolved the same way the
+    // route guards resolve them. The union endpoint cannot answer this: somebody
+    // who leads one clan and co-mentors another holds `task.review` in the union
+    // whether or not the second clan's lead revoked it, so a client gating on the
+    // union offers a co-mentor a button the API is going to refuse.
+    const permissions = [];
+    await Promise.all(CO_MENTOR_PERMISSIONS.map(async (key) => {
+      if (await authzService.can(user, key, resource)) permissions.push(key);
+    }));
+
+    return { role, canManageTeam, canAddMentees, permissions: permissions.sort() };
   }
 
   /**
