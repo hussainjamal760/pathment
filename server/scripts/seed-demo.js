@@ -722,6 +722,20 @@ async function seed() {
           status: t.status === "completed" ? "approved" : "pending",
           submittedAt: submittedAt || daysAgo(1),
         });
+        // An attachment on the work still awaiting review, so a mentor opening
+        // the review sheet has something to open. Every submission in this seed
+        // carried a link and no files at all, which made a review screen that
+        // shows attachments look like it shows nothing.
+        if (t.status === "submitted" && models.TaskSubmissionFile) {
+          await models.TaskSubmissionFile.create({
+            submissionId: submission.id,
+            fileName: "retry-path-before-and-after.png",
+            fileUrl: "https://res.cloudinary.com/demo/image/upload/sample.png",
+            fileType: "image/png",
+            fileSizeBytes: 374000,
+          });
+        }
+
         if (t.status === "completed") {
           await models.TaskFeedback.create({
             assignedTaskId: at.id,
