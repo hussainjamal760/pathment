@@ -233,3 +233,82 @@ describe('an extension request', () => {
     expect(rows.filter((one) => !one.isExtensionRequest)).toHaveLength(1);
   });
 });
+
+/**
+ * A mentor marking work they can actually open.
+ *
+ * The queue has carried the links and the attached files all along, and the
+ * review sheet showed the note and nothing else, so a mentor rated work with no
+ * way to reach it. These pin the fields that sheet now reads.
+ */
+describe('what the mentee actually sent', () => {
+  test('the links come with the submission', async () => {
+    const task = await assignTask('submitted');
+    await models.TaskSubmission.create({
+      assignedTaskId: task.id,
+      version: 1,
+      submissionText: 'Repo and notes',
+      submissionUrls: ['https://github.com/noor/api', 'https://noor-api.vercel.app'],
+      status: 'pending',
+      submittedAt: new Date(),
+    });
+
+    const response = await request(app)
+      .get('/api/mentor/approvals')
+      .set('Authorization', authHeader(mentor));
+
+    expect(response.body.data.queue[0].submissionUrls).toEqual([
+      'https://github.com/noor/api',
+      'https://noor-api.vercel.app',
+    ]);
+  });
+
+  test('the attachments come with it, with what is needed to open one', async () => {
+    const task = await assignTask('submitted');
+    const submission = await models.TaskSubmission.create({
+      assignedTaskId: task.id,
+      version: 1,
+      submissionText: 'Screenshots attached',
+      status: 'pending',
+      submittedAt: new Date(),
+    });
+    await models.TaskSubmissionFile.create({
+      submissionId: submission.id,
+      fileName: 'retry-path.png',
+      fileUrl: 'https://res.cloudinary.com/demo/image/upload/retry-path.png',
+      fileType: 'image/png',
+      fileSizeBytes: 374_000,
+    });
+
+    const response = await request(app)
+      .get('/api/mentor/approvals')
+      .set('Authorization', authHeader(mentor));
+
+    const files = response.body.data.queue[0].files;
+    expect(files).toHaveLength(1);
+    expect(files[0].fileName).toBe('retry-path.png');
+    expect(files[0].fileUrl).toMatch(/^https:/);
+    // A BIGINT, which the driver hands back as a string so precision is never
+    // quietly lost. The phone formats it through Number for exactly this
+    // reason, and asserting the string here is what says so out loud.
+    expect(Number(files[0].fileSizeBytes)).toBe(374_000);
+  });
+
+  test('is an empty list rather than missing when nothing was attached', async () => {
+    const task = await assignTask('submitted');
+    await models.TaskSubmission.create({
+      assignedTaskId: task.id,
+      version: 1,
+      submissionText: 'Just a note',
+      status: 'pending',
+      submittedAt: new Date(),
+    });
+
+    const response = await request(app)
+      .get('/api/mentor/approvals')
+      .set('Authorization', authHeader(mentor));
+
+    expect(response.body.data.queue[0].files).toEqual([]);
+    expect(response.body.data.queue[0].submissionUrls).toEqual([]);
+  });
+});
