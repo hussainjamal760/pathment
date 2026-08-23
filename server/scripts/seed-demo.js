@@ -737,6 +737,83 @@ async function seed() {
       }
     }
 
+    // ── The two review states nothing else in this seed produces ────────────
+    //
+    // A mentor's review screen has four tabs and only two of them had anything
+    // to show: work awaiting review, and work already graded. Sent back and
+    // Extensions were empty on every demo account, which reads as two broken
+    // tabs rather than as two empty ones.
+    //
+    // One of each, on the first mentee of each clan, so both tabs demonstrate
+    // themselves without burying the queue that matters.
+    if (s.local === 0 && local.tasks.length >= 2) {
+      const sentBackTask = local.tasks[local.tasks.length - 1];
+      const at = await models.AssignedTask.create({
+        roadmapTaskId: sentBackTask.id,
+        menteeId: m.id,
+        mentorId: mentor.id,
+        enrollmentId: enrollment.id,
+        status: "revision_needed",
+        assignedAt: daysAgo(9),
+        dueDate: daysAhead(3),
+        startedAt: daysAgo(7),
+        submittedAt: daysAgo(2),
+        currentSubmissionVersion: 1,
+        revisionCount: 1,
+        pointsAwarded: 0,
+      });
+      const sub = await models.TaskSubmission.create({
+        assignedTaskId: at.id,
+        version: 1,
+        submissionText: "First pass is up. I know the error handling is thin.",
+        submissionUrls: ["https://github.com/demo/pathment-fellowship"],
+        status: "revision_needed",
+        submittedAt: daysAgo(2),
+        reviewedAt: daysAgo(1),
+      });
+      await models.TaskFeedback.create({
+        assignedTaskId: at.id,
+        submissionId: sub.id,
+        mentorId: mentor.id,
+        feedbackText: "The shape is right and the naming is clear.",
+        revisionNotes: "1. Handle the offline case\n2. Rename the hook so it says what it returns",
+        rating: 3,
+        isApproved: false,
+        decision: "changes",
+        feedbackType: "general",
+      });
+    }
+
+    if (s.local === 1 && local.tasks.length >= 3) {
+      // An extension request does NOT move the task to submitted, because the
+      // mentee has not done the work. It is a pending submission carrying the
+      // ask, which is what puts it on the mentor's Extensions tab.
+      const askTask = local.tasks[local.tasks.length - 2];
+      const at = await models.AssignedTask.create({
+        roadmapTaskId: askTask.id,
+        menteeId: m.id,
+        mentorId: mentor.id,
+        enrollmentId: enrollment.id,
+        status: "in_progress",
+        assignedAt: daysAgo(11),
+        dueDate: daysAhead(1),
+        startedAt: daysAgo(6),
+        currentSubmissionVersion: 0,
+        pointsAwarded: 0,
+      });
+      await models.TaskSubmission.create({
+        assignedTaskId: at.id,
+        version: 1,
+        submissionText: "",
+        status: "pending",
+        extensionRequested: true,
+        extensionStatus: "pending",
+        extensionReason: "My shifts moved and I lose the two evenings I had set aside.",
+        extensionDays: 3,
+        submittedAt: daysAgo(1),
+      });
+    }
+
     // Mentee's position in the linear roadmap (drives the mentee progress view +
     // the "already assigned" lock). currentStep = how many they've cleared.
     if (models.RoadmapProgress && plan.tasks.length) {
