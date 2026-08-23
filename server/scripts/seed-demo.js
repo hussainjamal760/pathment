@@ -1220,18 +1220,43 @@ async function seed() {
       readAt: o.read ? daysAgo(Math.max(0, (o.ago ?? 1) - 1)) : null,
       sentAt: daysAgo(o.ago ?? 1), createdAt: daysAgo(o.ago ?? 1), updatedAt: daysAgo(o.ago ?? 1),
     });
+    /**
+     * A notification points at the thing it is about, not at the list it is in.
+     *
+     * Every one of these named a screen: "/mentee/tasks", "/mentor/mentees",
+     * "/mentee/dashboard". So tapping "Feedback received" opened the plan, and
+     * tapping "Your mentor checked in" opened the home screen, and a tester
+     * reasonably read the whole list as taking them nowhere. The ids are all in
+     * scope here; nothing was using them.
+     */
+    const firstTaskOf = async (localMentee) => {
+      const user = byLocal(localMentee);
+      if (!user) return null;
+      const task = await models.AssignedTask.findOne({
+        where: { menteeId: user.id },
+        order: [["createdAt", "DESC"]],
+      });
+      return task ? task.id : null;
+    };
+
+    const mayaTask = await firstTaskOf("mentee.maya");
+    const noorTask = await firstTaskOf("mentee.noor");
+    const priyaTask = await firstTaskOf("mentee.priya");
+    const mayaId = byLocal("mentee.maya")?.id ?? null;
+    const noorId = byLocal("mentee.noor")?.id ?? null;
+
     // Mentors
     await notify(omar.id, "task", "Priya submitted 2 tasks for review", "Priya Sharma has work waiting on your review.", { actionUrl: "/mentor/approvals", actionLabel: "Review", ago: 1 });
-    await notify(omar.id, "system", "Noor logged a blocker", "“Stuck on JWT refresh-token flow” — Noor Hassan.", { actionUrl: "/mentor/mentees", ago: 1 });
+    await notify(omar.id, "system", "Noor logged a blocker", "“Stuck on JWT refresh-token flow” — Noor Hassan.", { actionUrl: noorId ? `/mentor/mentees/${noorId}` : "/mentor/mentees", ago: 1 });
     await notify(aisha.id, "task", "Maya submitted a task", "Maya Patel submitted “React components & state”.", { actionUrl: "/mentor/approvals", actionLabel: "Review", ago: 2, read: true });
-    await notify(aisha.id, "milestone", "Maya is ready for more", "Maya is well ahead of pace — consider a stretch goal.", { actionUrl: "/mentor/mentees", ago: 3, read: true });
+    await notify(aisha.id, "milestone", "Maya is ready for more", "Maya is well ahead of pace — consider a stretch goal.", { actionUrl: mayaId ? `/mentor/mentees/${mayaId}` : "/mentor/mentees", ago: 3, read: true });
     // Admin
     await notify(admin.id, "milestone", "Maya nominated for co-mentor", "Aisha nominated Maya Patel. Awaiting your approval.", { actionUrl: "/admin/promotions", actionLabel: "Open", ago: 2 });
     // Mentees
-    await notify(byLocal("mentee.maya").id, "feedback", "Your task was approved 🎉", "Aisha approved “React components & state”. Nice work!", { actionUrl: "/mentee/tasks", actionLabel: "View", ago: 2, read: true });
-    await notify(byLocal("mentee.noor").id, "task", "New task assigned", "Omar assigned “REST APIs with Node & Express”.", { actionUrl: "/mentee/tasks", actionLabel: "Start", ago: 1 });
+    await notify(byLocal("mentee.maya").id, "feedback", "Your task was approved 🎉", "Aisha approved “React components & state”. Nice work!", { actionUrl: mayaTask ? `/mentee/tasks/${mayaTask}` : "/mentee/tasks", actionLabel: "View", ago: 2, read: true });
+    await notify(byLocal("mentee.noor").id, "task", "New task assigned", "Omar assigned “REST APIs with Node & Express”.", { actionUrl: noorTask ? `/mentee/tasks/${noorTask}` : "/mentee/tasks", actionLabel: "Start", ago: 1 });
     await notify(byLocal("mentee.sara").id, "system", "Your mentor checked in", "Aisha sent you a nudge — jump back in when you can.", { actionUrl: "/mentee/dashboard", ago: 1 });
-    await notify(byLocal("mentee.priya").id, "feedback", "Feedback received", "Omar left feedback on your submission.", { actionUrl: "/mentee/tasks", ago: 1 });
+    await notify(byLocal("mentee.priya").id, "feedback", "Feedback received", "Omar left feedback on your submission.", { actionUrl: priyaTask ? `/mentee/tasks/${priyaTask}` : "/mentee/tasks", ago: 1 });
     console.log("✅ Notifications created (mentors, admin & mentees)\n");
   }
 
