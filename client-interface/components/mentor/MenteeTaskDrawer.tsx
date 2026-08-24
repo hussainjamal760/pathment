@@ -11,6 +11,7 @@ import taskApi from '@/lib/services/task-api';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 import { pointsForDifficulty } from '@/lib/config/points';
+import { isMissingDescription, looksLikeHtml } from '@/lib/utils/html';
 
 const STATUS_CLS: Record<string, string> = {
   assigned: 'bg-slate-100 text-slate-600', not_started: 'bg-slate-100 text-slate-600',
@@ -25,19 +26,22 @@ const DIFF_CLS: Record<string, string> = {
 
 /**
  * In-context detail + management for ONE mentee's assigned task, opened from the
- * Cohort Review "Assigned work" list. Shows the full (override-merged) content,
+ * Clan Review "Assigned work" list. Shows the full (override-merged) content,
  * the mentor note, and lets the mentor edit-for-this-mentee, reassign a
  * cancelled task, or unassign — without leaving the review flow.
  */
 export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onClose: () => void; onChanged: () => void }) {
   const router = useRouter();
   const confirm = useConfirm();
-  const [editing, setEditing] = useState(false);
+  // Open in the edit form directly (one click from the review list). Closing
+  // the editor returns to this read-only view so Unassign / Review stay available.
+  const [editing, setEditing] = useState(true);
   const [busy, setBusy] = useState(false);
   const rt = task.roadmapTask || {};
   const title = rt.title || task.title || 'Task';
   const description = rt.description || task.description || '';
-  const isHtml = description ? /<[a-z][\s\S]*>/i.test(description) : false;
+  const isHtml = looksLikeHtml(description);
+  const missingDescription = isMissingDescription(description, title);
   const criteria: string[] = rt.acceptanceCriteria || task.acceptanceCriteria || [];
   const resources: any[] = rt.resources || [];
   const due = task.dueDate ? new Date(task.dueDate) : null;
@@ -63,7 +67,7 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
 
   return (
     <>
-      <Drawer open onClose={onClose} title={title} subtitle="Assigned task · this mentee"
+      {!editing && <Drawer open onClose={onClose} title={title} subtitle="Assigned task · this mentee"
         footer={
           <div className="flex flex-wrap justify-end gap-2">
             {canUnassign && (
@@ -124,9 +128,11 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
             </div>
           )}
 
-          {description && (isHtml
+          {missingDescription
+            ? <p className="text-sm text-slate-400">No description provided.</p>
+            : isHtml
             ? <div className="prose prose-sm max-w-none dark:prose-invert text-slate-600 dark:text-slate-300" dangerouslySetInnerHTML={{ __html: description }} />
-            : <p className="text-sm text-slate-600 whitespace-pre-wrap">{description}</p>)}
+            : <p className="text-sm text-slate-600 whitespace-pre-wrap">{description}</p>}
 
           {rt.deliverable && (
             <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
@@ -155,7 +161,7 @@ export function MenteeTaskDrawer({ task, onClose, onChanged }: { task: any; onCl
             </div>
           )}
         </div>
-      </Drawer>
+      </Drawer>}
 
       {editing && <TaskEditDrawer task={task} onClose={() => setEditing(false)} onSaved={() => { onChanged(); onClose(); }} />}
     </>

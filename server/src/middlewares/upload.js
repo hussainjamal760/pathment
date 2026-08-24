@@ -34,11 +34,22 @@ const allowedTypes = [
   'video/x-matroska',
   'video/mpeg',
   'video/3gpp',
-  // Audio
+  // Audio. The browser records webm; a phone records AAC in an MP4 container,
+  // which arrives as .m4a under any of the four names below depending on the
+  // device. Leaving them out is what made every voice answer from the mobile
+  // app fail with "File type not supported" after the mentee had already spoken.
   'audio/mpeg',
   'audio/wav',
+  'audio/x-wav',
   'audio/webm',
   'audio/ogg',
+  'audio/m4a',
+  'audio/x-m4a',
+  'audio/mp4',
+  'audio/aac',
+  'audio/3gpp',
+  'audio/amr',
+  'audio/x-caf',
   // Archives (incl. Windows/Edge .zip variants)
   'application/zip',
   'application/x-zip-compressed',
@@ -63,7 +74,7 @@ const allowedExtensions = [
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.md',
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg',
   '.mp4', '.mov', '.webm', '.avi', '.mkv', '.mpeg', '.mpg', '.3gp',
-  '.mp3', '.wav', '.ogg',
+  '.mp3', '.wav', '.ogg', '.m4a', '.aac', '.amr', '.caf',
   '.zip', '.rar', '.7z', '.gz', '.tar',
   '.html', '.css', '.js', '.json', '.xml',
 ];
@@ -125,5 +136,40 @@ upload.arraySafe = (field, maxCount) => withUploadErrors(upload.array(field, max
 upload.singleSafe = (field) => withUploadErrors(upload.single(field));
 /** `upload.singleSafeLarge('audio')` — single upload with a 25MB cap. */
 upload.singleSafeLarge = (field) => withUploadErrors(uploadLarge.single(field));
+/**
+ * Pictures and clips only, for the places that mean "show me what you saw".
+ *
+ * The shared filter is deliberately broad because a task submission can be a
+ * zip of source or an html file. A feedback attachment cannot: both clients
+ * only ever offer a screenshot or a short recording, so anything else arriving
+ * there is either a mistake or somebody posting straight at the endpoint, and
+ * neither should end up in the feedback folder.
+ */
+const mediaOnlyFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const mime = String(file.mimetype || '');
+
+  const looksLikeMedia =
+    mime.startsWith('image/') ||
+    mime.startsWith('video/') ||
+    ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.mp4', '.mov', '.webm', '.3gp', '.mkv'].includes(ext);
+
+  if (looksLikeMedia) return cb(null, true);
+
+  cb(new ValidationError('Attach a screenshot or a short clip. Other files are not accepted here.'));
+};
+
+const uploadMedia = multer({
+  storage: storage,
+  fileFilter: mediaOnlyFilter,
+  limits: { fileSize: 10 * 1024 * 1024 }
+});
+
+/** `upload.singleSafeMedia('attachment')` — a picture or a clip, 10MB. */
+upload.singleSafeMedia = (field) => withUploadErrors(uploadMedia.single(field));
+
+/** Exposed so the accepted-type lists can be asserted directly in tests. */
+upload.fileFilter = fileFilter;
+upload.mediaOnlyFilter = mediaOnlyFilter;
 
 module.exports = upload;

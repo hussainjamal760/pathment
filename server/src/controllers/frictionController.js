@@ -3,33 +3,34 @@ const { successResponse } = require('../utils/responses');
 const frictionService = require('../services/frictionService');
 
 /**
- * A mentee defaults to acting on their own records; mentors/admins pass an
- * explicit menteeId. (Finer-grained ownership checks come with the per-clan
- * permission work.)
+ * A mentee logging their own friction doesn't send a menteeId — the client has
+ * no reason to know it — so default it to them. This grants nothing: the service
+ * still runs the ownership check, and `canViewMentee` is true for self anyway.
+ * Mentors/admins name the mentee explicitly.
  */
-function resolveMenteeId(req) {
-  if (req.query.menteeId) return req.query.menteeId;
-  if (req.body && req.body.menteeId) return req.body.menteeId;
-  return req.user.role === 'mentee' ? req.user.id : undefined;
+function targetMenteeId(req) {
+  return req.body?.menteeId || (req.user.role === 'mentee' ? req.user.id : undefined);
 }
 
 // ── Blockers ──────────────────────────────────────────────────────────────
 const listBlockers = catchAsync(async (req, res) => {
   const blockers = await frictionService.listBlockers({
-    menteeId: resolveMenteeId(req),
-    status: req.query.status
+    menteeId: req.query.menteeId,
+    status: req.query.status,
+    user: req.user
   });
   res.status(200).json(successResponse('Blockers retrieved', { blockers }));
 });
 
 const createBlocker = catchAsync(async (req, res) => {
-  const menteeId = req.body.menteeId || (req.user.role === 'mentee' ? req.user.id : undefined);
-  const blocker = await frictionService.createBlocker({ ...req.body, menteeId }, req.user.id);
+  const blocker = await frictionService.createBlocker(
+    { ...req.body, menteeId: targetMenteeId(req) }, req.user.id, req.user
+  );
   res.status(201).json(successResponse('Blocker logged', { blocker }, 201));
 });
 
 const resolveBlocker = catchAsync(async (req, res) => {
-  const blocker = await frictionService.resolveBlocker(req.params.id);
+  const blocker = await frictionService.resolveBlocker(req.params.id, req.user);
   res.status(200).json(successResponse('Blocker resolved', { blocker }));
 });
 
@@ -40,23 +41,27 @@ const deleteBlocker = catchAsync(async (req, res) => {
 
 // ── Delays ──────────────────────────────────────────────────────────────
 const listDelays = catchAsync(async (req, res) => {
-  const delays = await frictionService.listDelays({ menteeId: resolveMenteeId(req) });
+  const delays = await frictionService.listDelays({
+    menteeId: req.query.menteeId,
+    user: req.user
+  });
   res.status(200).json(successResponse('Delays retrieved', { delays }));
 });
 
 const createDelay = catchAsync(async (req, res) => {
-  const menteeId = req.body.menteeId || (req.user.role === 'mentee' ? req.user.id : undefined);
-  const delay = await frictionService.createDelay({ ...req.body, menteeId }, req.user.id);
+  const delay = await frictionService.createDelay(
+    { ...req.body, menteeId: targetMenteeId(req) }, req.user.id, req.user
+  );
   res.status(201).json(successResponse('Delay logged', { delay }, 201));
 });
 
 const acceptDelay = catchAsync(async (req, res) => {
-  const delay = await frictionService.acceptDelay(req.params.id, req.body);
+  const delay = await frictionService.acceptDelay(req.params.id, req.body, req.user);
   res.status(200).json(successResponse('Delay updated', { delay }));
 });
 
 const rejectDelay = catchAsync(async (req, res) => {
-  const result = await frictionService.rejectDelay(req.params.id);
+  const result = await frictionService.rejectDelay(req.params.id, req.user);
   res.status(200).json(successResponse('Delay rejected', result));
 });
 

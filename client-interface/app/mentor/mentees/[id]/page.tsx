@@ -24,6 +24,7 @@ import { OneOnOneDrawer, type OneOnOneData } from '@/components/mentor/OneOnOneD
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { TaskDrawerById } from '@/components/mentor/TaskDrawerById';
 import { NudgeButton } from '@/components/mentor/NudgeButton';
+import { MoveMenteeButton } from '@/components/mentor/MoveMenteeButton';
 import { CollaboratorsCard } from '@/components/mentor/CollaboratorsCard';
 import { TracksPanel } from '@/components/mentor/TracksPanel';
 import { Drawer } from '@/components/shared/Drawer';
@@ -141,14 +142,14 @@ export default function MenteeDetail() {
       setFrictionBusy(id);
       await frictionApi.resolveBlocker(id);
       await refetchProfile();
-      toast.success('Blocker resolved');
-    } catch { toast.error('Could not resolve the blocker'); }
+      toast.success('Roadblock resolved');
+    } catch { toast.error('Could not resolve the roadblock'); }
     finally { setFrictionBusy(null); }
   };
 
   const [loggingOneOnOne, setLoggingOneOnOne] = useState(false);
   const [assigningTask, setAssigningTask] = useState(false);
-  // A clicked work-history task opens in the shared task drawer (like Cohort Review).
+  // A clicked work-history task opens in the shared task drawer (like Clan Review).
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
 
   // Full cohort-review attendance record for this mentee (every meeting they
@@ -309,6 +310,11 @@ export default function MenteeDetail() {
               <Plus className="w-4 h-4" />Assign task
             </button>
             <NudgeButton menteeId={menteeId} menteeName={insights?.name} className="!rounded-xl !px-4" />
+            <MoveMenteeButton
+              menteeId={menteeId}
+              menteeName={insights?.name || `${mentee?.firstName ?? ''} ${mentee?.lastName ?? ''}`.trim()}
+              className="!rounded-xl !px-4 !py-2"
+            />
             <button
               onClick={openAttendance}
               className="px-4 py-2 bg-card hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-colors flex items-center gap-2"
@@ -368,7 +374,7 @@ export default function MenteeDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <MetricChip label="On-time" value={insights ? `${insights.onTimeRate}%` : '-'} />
         <MetricChip label="Awaiting review" value={insights?.pendingApprovals ?? 0} />
-        <MetricChip label="Open blockers" value={insights?.openBlockers ?? 0} />
+        <MetricChip label="Open roadblocks" value={insights?.openBlockers ?? 0} />
         <MetricChip label="Avg rating" value={insights && insights.avgRating > 0 ? insights.avgRating.toFixed(1) : '-'} />
       </div>
 
@@ -460,11 +466,13 @@ export default function MenteeDetail() {
           <div className="bg-card rounded-2xl border border-slate-200">
             <div className="px-6 py-5 border-b border-slate-200 flex items-center gap-2">
               <Flag className="w-4 h-4 text-red-500" />
-              <h2 className="text-slate-900">Blockers</h2>
+              <h2 className="text-slate-900">Roadblocks</h2>
             </div>
             <div className="p-6">
-              {insights.blockers.filter((b) => b.status === 'open').length === 0 ? (
-                <p className="text-sm text-slate-500">No open blockers.</p>
+              {insights.sectionErrors?.blockers ? (
+                <p className="text-sm text-slate-500">Roadblocks failed to load.</p>
+              ) : insights.blockers.filter((b) => b.status === 'open').length === 0 ? (
+                <p className="text-sm text-slate-500">No open roadblocks.</p>
               ) : (
                 <div className="space-y-2">
                   {insights.blockers.filter((b) => b.status === 'open').map((b) => (
@@ -496,7 +504,9 @@ export default function MenteeDetail() {
               <h2 className="text-slate-900">Logged delays</h2>
             </div>
             <div className="p-6">
-              {insights.delays.length === 0 ? (
+              {insights.sectionErrors?.delays ? (
+                <p className="text-sm text-slate-500">Delays failed to load.</p>
+              ) : insights.delays.length === 0 ? (
                 <p className="text-sm text-slate-500">No delays logged.</p>
               ) : (
                 <div className="space-y-2">
@@ -646,7 +656,7 @@ export default function MenteeDetail() {
         />
       )}
 
-      {/* ── Attendance record — every cohort review this mentee was marked on,
+      {/* ── Attendance record — every clan review this mentee was marked on,
           newest first (same data as the cohort-review attendance drawer). ──── */}
       <Drawer open={attOpen} onClose={() => setAttOpen(false)} width="md"
         title="Attendance record"

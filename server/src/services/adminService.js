@@ -7,6 +7,7 @@ const { generateRandomToken, hashToken } = require('../utils/jwt');
 const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const { createAuditLog } = require('../utils/auditContext');
+const { inviteLink } = require('../utils/links');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -63,7 +64,7 @@ class AdminService {
   /**
    * Create one-time registration invite
    */
-  async createRegistrationInvite(inviteData, createdBy) {
+  async createRegistrationInvite(inviteData, createdBy, options = {}) {
     const { email, role, expiresInHours = 72 } = inviteData;
     const normalizedEmail = email.trim().toLowerCase();
     const defaultInviteTtl = 72;
@@ -143,8 +144,7 @@ class AdminService {
       }
     });
 
-    const clientBaseUrl = process.env.CLIENT_URL || 'http://localhost:3003';
-    const inviteUrl = `${clientBaseUrl.replace(/\/$/, '')}/register?invite=${encodeURIComponent(rawToken)}`;
+    const inviteUrl = inviteLink(rawToken);
 
     // A mentee placed in a clan gets that clan's WhatsApp group link in the email
     // so they can join it (WhatsApp can't be auto-joined via API).
@@ -167,7 +167,9 @@ class AdminService {
 
     // Give the clan's mentors a heads-up that a new mentee is being onboarded into
     // their clan (they get a second "joined" notification once the mentee registers).
-    if (role === 'mentee' && placement.clanId) {
+    // (Skipped on a resend - the clan's mentors were already told about this
+    // person when the original invite went out; telling them again is noise.)
+    if (role === 'mentee' && placement.clanId && options.notifyClanMentors !== false) {
       this._notifyClanMentorsOfInvitedMentee({
         clanId: placement.clanId,
         clanName: placement.clanName,
@@ -313,6 +315,103 @@ class AdminService {
     });
 
     return invite;
+  }
+
+  /**
+   * Re-issue an invite from an existing one, reusing its email, role, placement
+   * and original TTL - so an expired or revoked invite can be sent again without
+   * re-entering anything.
+   *
+   * Tokens are stored hashed, so the original link can never be recovered: a
+   * resend always mints a NEW token and the previous link stops working. For an
+   * expired/revoked invite that link was already dead; for a still-active one we
+   * revoke it here, and the caller is expected to have confirmed that.
+   */
+  async resendRegistrationInvite(inviteId, resentBy, { expiresInHours } = {}) {
+    const invite = await models.RegistrationInvite.findByPk(inviteId);
+    if (!invite) {
+      throw new NotFoundError('Registration invite not found');
+    }
+
+    if (invite.usedAt) {
+      throw new ValidationError(
+        'This invite has already been used to create an account, so it cannot be resent'
+      );
+    }
+
+    // Placement is stored as ids; a program or clan may have been deleted since.
+    // Say so plainly rather than failing with a bare "not found".
+    if (invite.programId) {
+      const program = await models.Program.findByPk(invite.programId);
+      if (!program) {
+        throw new ValidationError(
+          "This invite's program no longer exists. Create a new invite with a current program."
+        );
+      }
+    }
+    if (invite.clanId) {
+      const clan = await models.Clan.findByPk(invite.clanId);
+      if (!clan) {
+        throw new ValidationError(
+          "This invite's clan no longer exists. Create a new invite with a current clan."
+        );
+      }
+    }
+
+    // Repeat the window the original was issued with, unless overridden.
+    const originalTtlHours = Math.round(
+      (new Date(invite.expiresAt).getTime() - new Date(invite.createdAt).getTime()) / 3_600_000
+    );
+    const ttlHours = Number(expiresInHours) || (originalTtlHours > 0 ? originalTtlHours : 72);
+
+    // Retire the old one first. createRegistrationInvite refuses to issue while an
+    // active invite exists for the same (email, role), and leaving a live link
+    // around after resending would mean two working invites for one person.
+    const weRevokedIt = !invite.revokedAt;
+    if (weRevokedIt) {
+      invite.revokedAt = new Date();
+      await invite.save();
+    }
+
+    let created;
+    try {
+      created = await this.createRegistrationInvite(
+        {
+          email: invite.email,
+          role: invite.role,
+          expiresInHours: ttlHours,
+          programId: invite.programId,
+          clanId: invite.clanId,
+          cohortId: invite.cohortId
+        },
+        resentBy,
+        { notifyClanMentors: false }
+      );
+    } catch (e) {
+      // Reissue failed (e.g. a newer active invite exists, or they registered in
+      // the meantime) - put the old row back exactly as we found it. Only undo the
+      // revoke if it was ours; an already-revoked invite stays revoked.
+      if (weRevokedIt) {
+        invite.revokedAt = null;
+        await invite.save().catch(() => {});
+      }
+      throw e;
+    }
+
+    await createAuditLog({
+      userId: resentBy,
+      action: 'REGISTRATION_INVITE_RESENT',
+      entityType: 'RegistrationInvite',
+      entityId: created.id,
+      newValues: {
+        replacedInviteId: invite.id,
+        email: created.email,
+        role: created.role,
+        expiresAt: created.expiresAt
+      }
+    });
+
+    return { ...created, replacedInviteId: invite.id };
   }
 
   /**
@@ -656,6 +755,10 @@ class AdminService {
     const user = await models.User.findByPk(targetUserId);
     if (!user) throw new NotFoundError('User not found');
 
+    if (user.role === 'admin') {
+      throw new ValidationError('Admin accounts cannot be modified through the general user management endpoint.');
+    }
+
     const before = { firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role };
 
     if (updates.firstName !== undefined) user.firstName = String(updates.firstName).trim().slice(0, 100);
@@ -676,9 +779,6 @@ class AdminService {
       if (!['mentee', 'mentor'].includes(updates.role)) {
         throw new ValidationError('Base role must be mentee or mentor');
       }
-      if (user.role === 'admin') {
-        throw new ValidationError('Admin accounts cannot be re-roled here — manage them in Roles & Access');
-      }
       user.role = updates.role; // beforeSave hook adds it to capabilities
     }
 
@@ -687,7 +787,7 @@ class AdminService {
     await createAuditLog({
       userId: adminUserId, action: 'USER_UPDATED_BY_ADMIN', entityType: 'User', entityId: user.id,
       oldValues: before, newValues: { firstName: user.firstName, lastName: user.lastName, email: user.email, role: user.role },
-    }).catch(() => {});
+    }).catch(() => { });
 
     return {
       id: user.id, firstName: user.firstName, lastName: user.lastName,
@@ -713,7 +813,7 @@ class AdminService {
 
     await createAuditLog({
       userId: adminUserId, action: 'USER_PASSWORD_SET_BY_ADMIN', entityType: 'User', entityId: user.id,
-    }).catch(() => {});
+    }).catch(() => { });
 
     return { message: `Password updated for ${user.firstName} ${user.lastName}. They've been signed out.` };
   }
@@ -741,7 +841,7 @@ class AdminService {
     await securityService.disable2FA(targetUserId);
     await createAuditLog({
       userId: adminUserId, action: 'USER_2FA_DISABLED_BY_ADMIN', entityType: 'User', entityId: targetUserId,
-    }).catch(() => {});
+    }).catch(() => { });
     return { message: `Two-factor disabled for ${user.firstName} ${user.lastName}. They can log in without a code and re-enable it in Settings.` };
   }
 
@@ -812,7 +912,6 @@ class AdminService {
     const BATCH_SIZE = 500;
     const defaultTtlHours = Number(process.env.REGISTRATION_INVITE_EXPIRY_HOURS) || 72;
     const expiresAt = new Date(Date.now() + defaultTtlHours * 60 * 60 * 1000);
-    const clientBaseUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
 
     const normalized = inviteRows.map(row => ({
       email: row.email.trim().toLowerCase(),
@@ -941,7 +1040,7 @@ class AdminService {
     // The email worker delivers + retries; no Redis involved.
     if (createdRecords.length > 0) {
       Promise.allSettled(createdRecords.map((r) => {
-        const inviteUrl = `${clientBaseUrl}/register?invite=${encodeURIComponent(r.rawToken)}`;
+        const inviteUrl = inviteLink(r.rawToken);
         return notificationOrchestrator.sendRegistrationInviteEmail({ email: r.email, role: r.role, inviteUrl });
       })).catch((err) => console.error('[bulk-invite:enqueue-error]', err.message));
     }

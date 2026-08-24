@@ -3,7 +3,8 @@ const { successResponse } = require('../utils/responses');
 const clanService = require('../services/clanService');
 const clanHealthService = require('../services/clanHealthService');
 const authzService = require('../services/authzService');
-const { ValidationError } = require('../utils/errors/errorTypes');
+const { PERMISSIONS } = require('../config/permissions');
+const { ValidationError, NotFoundError } = require('../utils/errors/errorTypes');
 
 /**
  * GET /api/clans/health  (admin)
@@ -143,11 +144,20 @@ const setMemberPermissions = catchAsync(async (req, res) => {
 
 /**
  * GET /api/clans/:id/available  (admin / lead mentor of the clan)
- * Mentees not in any active clan, that the lead can pull into theirs.
+ * People who can be placed in THIS clan as a mentee. Anyone already placed
+ * elsewhere comes back annotated with that clan (so the picker offers to move
+ * them) rather than being silently omitted — see listAvailableMembers.
  */
 const availableMembers = catchAsync(async (req, res) => {
-  const people = await clanService.listAvailableMembers({ q: req.query.q });
-  res.status(200).json(successResponse('Available members', { people }));
+  // Only a caller who can reassign gets the placed-elsewhere rows (and the
+  // "move them here" affordance). A lead mentor still sees just the people they
+  // can add outright — pulling someone out of another clan is a request the
+  // receiving side accepts, not something to offer in a picker.
+  const canReassign = await authzService.canAtMinScope(req.user, PERMISSIONS.CLAN_MANAGE_MEMBERS, 'program');
+  const people = await clanService.listAvailableMembers({
+    q: req.query.q, clanId: req.params.id, includePlaced: canReassign,
+  });
+  res.status(200).json(successResponse('Available members', { people, canReassign }));
 });
 
 /**
@@ -219,7 +229,72 @@ const inviteToClan = catchAsync(async (req, res) => {
   res.status(201).json(successResponse('Invite sent', { invite }, 201));
 });
 
+/**
+ * GET /api/clans/:id/invites  (admin / lead mentor of the clan)
+ *
+ * Every invite into THIS clan, whoever sent it. A lead mentor could create one
+ * through POST /clans/:id/invite and then had no way to see it: listing invites
+ * lived behind invite.create, which a mentor does not hold. So an invite went
+ * out and whether it landed, lapsed or was already used was unanswerable
+ * without an admin.
+ *
+ * Scoped by clan rather than by who sent it, because the clan is what a lead
+ * mentor is responsible for. An invite an admin placed into their clan is still
+ * theirs to chase.
+ */
+const listClanInvites = catchAsync(async (req, res) => {
+  const adminService = require('../services/adminService');
+  const result = await adminService.listRegistrationInvites({
+    clanId: req.params.id,
+    status: req.query.status || 'all',
+    limit: req.query.limit,
+    offset: req.query.offset
+  });
+
+  res.status(200).json(successResponse('Clan invites retrieved', result));
+});
+
+/**
+ * The invite named in the path, once it is confirmed to belong to this clan.
+ *
+ * Without the check an id is all it takes to act on another clan's invite, and
+ * the guard on these routes only proves the caller runs the clan in the path.
+ */
+async function inviteInClan(inviteId, clanId) {
+  const { models } = require('../db');
+  const invite = await models.RegistrationInvite.findByPk(inviteId);
+
+  if (!invite || invite.clanId !== clanId) {
+    throw new NotFoundError('Invite not found for this clan');
+  }
+
+  return invite;
+}
+
+/** POST /api/clans/:id/invites/:inviteId/resend  (admin / lead mentor of the clan) */
+const resendClanInvite = catchAsync(async (req, res) => {
+  await inviteInClan(req.params.inviteId, req.params.id);
+
+  const adminService = require('../services/adminService');
+  const invite = await adminService.resendRegistrationInvite(req.params.inviteId, req.user.id, {});
+
+  res.status(200).json(successResponse('Invite sent again', { invite }));
+});
+
+/** POST /api/clans/:id/invites/:inviteId/revoke  (admin / lead mentor of the clan) */
+const revokeClanInvite = catchAsync(async (req, res) => {
+  await inviteInClan(req.params.inviteId, req.params.id);
+
+  const adminService = require('../services/adminService');
+  const invite = await adminService.revokeRegistrationInvite(req.params.inviteId, req.user.id);
+
+  res.status(200).json(successResponse('Invite pulled', { invite }));
+});
+
 module.exports = {
+  listClanInvites,
+  resendClanInvite,
+  revokeClanInvite,
   listClans,
   clanHealth,
   clanInsights,

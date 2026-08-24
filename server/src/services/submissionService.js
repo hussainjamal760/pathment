@@ -8,6 +8,7 @@ const { endOfDayInZone } = require('../utils/timezone');
 const authzService = require('./authzService');
 const { PERMISSIONS } = require('../config/permissions');
 const { pointsForDifficulty } = require('../config/points');
+const { toStringList, toBoolean } = require('../utils/multipartFields');
 
 /** Standard points for a submission's task, derived solely from difficulty. */
 function taskStandardPoints(task) {
@@ -96,16 +97,17 @@ class SubmissionService {
     const newVersion = currentMaxVersion + 1;
 
     // Create submission
+    const wantsExtension = toBoolean(submissionData.extensionRequested);
     const submission = await models.TaskSubmission.create({
       assignedTaskId: taskId,
       version: newVersion,
       submissionText: submissionData.submissionText || '',
-      submissionUrls: submissionData.submissionUrls || [],
+      submissionUrls: toStringList(submissionData.submissionUrls),
       status: 'pending',
-      extensionRequested: submissionData.extensionRequested || false,
+      extensionRequested: wantsExtension,
       extensionReason: submissionData.extensionReason || null,
       extensionDays: submissionData.extensionDays || null,
-      extensionStatus: submissionData.extensionRequested ? 'pending' : null
+      extensionStatus: wantsExtension ? 'pending' : null
     });
 
     // Save file attachments
@@ -980,6 +982,12 @@ class SubmissionService {
           { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase', 'difficulty'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
         ]
+      },
+      {
+        model: models.TaskSubmissionFile,
+        as: 'files',
+        required: false,
+        attributes: ['id', 'fileName', 'fileUrl', 'fileType', 'fileSizeBytes']
       }],
       order: [['submittedAt', 'ASC']]
     });
@@ -1032,6 +1040,13 @@ class SubmissionService {
         version: s.version,
         submissionText: s.submissionText,
         submissionUrls: s.submissionUrls || [],
+        files: (s.files || []).map((f) => ({
+          id: f.id,
+          fileName: f.fileName,
+          fileUrl: f.fileUrl,
+          fileType: f.fileType,
+          fileSizeBytes: f.fileSizeBytes,
+        })),
         submittedAt: s.submittedAt,
         isLate: t.isLate,
         // Extension-request fields — lets the client split the queue into a
@@ -1055,7 +1070,8 @@ class SubmissionService {
         mentee: m ? {
           id: m.id,
           name: `${m.firstName} ${m.lastName}`.trim(),
-          avatar: `${(m.firstName || '').charAt(0)}${(m.lastName || '').charAt(0)}`.toUpperCase()
+          avatar: `${(m.firstName || '').charAt(0)}${(m.lastName || '').charAt(0)}`.toUpperCase(),
+          profilePictureUrl: m.profilePictureUrl || null
         } : null
       };
     });
@@ -1117,6 +1133,7 @@ class SubmissionService {
           id: m.id,
           name: `${m.firstName} ${m.lastName}`.trim(),
           avatar: `${(m.firstName || '').charAt(0)}${(m.lastName || '').charAt(0)}`.toUpperCase(),
+          profilePictureUrl: m.profilePictureUrl || null,
         } : null,
       };
     });

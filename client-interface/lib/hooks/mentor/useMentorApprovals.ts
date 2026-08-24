@@ -3,6 +3,7 @@ import { useClan, ALL_CLANS } from '@/lib/context/ClanContext';
 import { mentorApi } from '@/lib/services/mentor-api';
 import { notifyApprovalsChanged } from '@/lib/utils/approvals-badge';
 import { submissionService } from '@/lib/services/submissionService';
+import type { SubmissionFile } from '@/lib/types/submission';
 
 export interface BulkReviewPayload {
   decision: 'approved' | 'approved_notes' | 'changes' | 'rejected';
@@ -26,6 +27,7 @@ export interface ApprovalItem {
   version: number;
   submissionText: string;
   submissionUrls: string[];
+  files: SubmissionFile[];
   submittedAt: string;
   isLate: boolean;
   title: string;
@@ -34,7 +36,7 @@ export interface ApprovalItem {
   deliverable: string | null;
   criteria: string[];
   maxPoints: number;
-  mentee: { id: string; name: string; avatar: string } | null;
+  mentee: { id: string; name: string; avatar: string; profilePictureUrl: string | null } | null;
   isExtensionRequest: boolean;
   extensionReason: string | null;
   extensionDays: number | null;
@@ -57,7 +59,7 @@ export interface ChangesRequestedItem {
   requestedAt: string;
   dueDate: string | null;
   isLate: boolean;
-  mentee: { id: string; name: string; avatar: string } | null;
+  mentee: { id: string; name: string; avatar: string; profilePictureUrl: string | null } | null;
 }
 
 /** A task the mentor has already approved — the "Reviewed" history. */

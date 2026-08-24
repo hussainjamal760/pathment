@@ -35,7 +35,25 @@ function fmtInZone(date, tz) {
   catch { return new Intl.DateTimeFormat('en-US', { ...opts, timeZone: 'UTC' }).format(date); }
 }
 
-const VALID_TZ = (tz) => { try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; } };
+/**
+ * A real IANA zone, and one that was actually given.
+ *
+ * The undefined check is the point. `new Intl.DateTimeFormat('en-US', {
+ * timeZone: undefined })` does not throw, it quietly uses the server's own
+ * zone, so a request with no timezone passed this and then died in the column
+ * as a bare "Validation failed". That is what a mentor saw as "Could not set
+ * that rhythm. Try again." for every attempt: a message that named neither the
+ * field nor the fix.
+ */
+const VALID_TZ = (tz) => {
+  if (typeof tz !== 'string' || !tz.trim()) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 class ReviewScheduleService {
   async _assertMentorsClan(mentorId, clanId) {
@@ -49,7 +67,11 @@ class ReviewScheduleService {
     await this._assertMentorsClan(mentorId, clanId);
     if (!(dayOfWeek >= 0 && dayOfWeek <= 6)) throw new ValidationError('dayOfWeek must be 0–6');
     if (!/^\d{2}:\d{2}$/.test(String(timeLocal || ''))) throw new ValidationError('timeLocal must be HH:mm');
-    if (!VALID_TZ(timezone)) throw new ValidationError('Invalid timezone');
+    if (!VALID_TZ(timezone)) {
+      throw new ValidationError(
+        'A timezone is required, and must be one like Asia/Karachi. The time you set is a wall clock, so it means nothing without the clock it was read from.'
+      );
+    }
     if (![1, 2].includes(Number(intervalWeeks))) throw new ValidationError('intervalWeeks must be 1 or 2');
     if (!startsOn) throw new ValidationError('startsOn is required');
 

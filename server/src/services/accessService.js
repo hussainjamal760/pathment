@@ -5,6 +5,7 @@ const { ROLES } = require('../config/roles');
 const { ALL_PERMISSIONS } = require('../config/permissions');
 const { NotFoundError, ValidationError, ConflictError } = require('../utils/errors/errorTypes');
 const { generateRandomToken, hashToken } = require('../utils/jwt');
+const { inviteLink } = require('../utils/links');
 const authzService = require('./authzService');
 const notificationOrchestrator = require('./notificationOrchestrator');
 
@@ -225,7 +226,10 @@ class AccessService {
           ? { id: l.user.id, name: `${l.user.firstName} ${l.user.lastName}`.trim(), email: l.user.email, role: l.user.role }
           : null,
         status: l.newValues?.status ?? null,
-        details: l.newValues || null,
+        // Falls back to oldValues so a REVOKE says what was taken away. A
+        // revoke records only the snapshot it removed, so mapping newValues
+        // alone left every removal in the feed with no detail at all.
+        details: l.newValues || l.oldValues || null,
         ipAddress: l.ipAddress,
         createdAt: l.createdAt
       }))
@@ -369,8 +373,7 @@ class AccessService {
       newValues: { email: normalizedEmail, baseRole, role, scopeType, scopeId }
     }).catch(() => {});
 
-    const base = (process.env.CLIENT_URL || 'http://localhost:3000').split(',')[0].replace(/\/$/, '');
-    const inviteUrl = `${base}/register?invite=${encodeURIComponent(rawToken)}`;
+    const inviteUrl = inviteLink(rawToken);
     const emailDelivery = await notificationOrchestrator
       .sendRegistrationInviteEmail({ email: normalizedEmail, role: baseRole, inviteUrl })
       .catch(() => ({ sent: false }));

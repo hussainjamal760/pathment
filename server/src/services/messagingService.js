@@ -6,6 +6,7 @@ const {
   ValidationError
 } = require('../utils/errors/errorTypes');
 const schedulingService = require('./schedulingService');
+const logger = require('../utils/logger');
 
 class MessagingService {
   /**
@@ -98,6 +99,38 @@ class MessagingService {
       const existingConversations = await this.findDirectConversationsByKey(directKey, transaction);
       const existingConversation = this.selectCanonicalDirectConversation(existingConversations);
       if (existingConversation) {
+        // Rejoining is not the same as never having left. Whoever deleted this
+        // conversation gets a fresh joinedAt, which is the floor every read
+        // below is filtered by, so the history they removed stays removed. The
+        // person who never left keeps theirs: updating both rows in one call
+        // was silently wiping the other side's conversation the moment somebody
+        // re-opened one they had deleted.
+        await models.ConversationParticipant.update({
+          leftAt: null,
+          isArchived: false,
+          joinedAt: new Date(),
+          lastReadAt: new Date(),
+          lastReadMessageId: null
+        }, {
+          where: {
+            conversationId: existingConversation.id,
+            userId: { [Op.in]: [userId, participantId] },
+            leftAt: { [Op.ne]: null }
+          },
+          transaction
+        });
+
+        await models.ConversationParticipant.update({
+          isArchived: false
+        }, {
+          where: {
+            conversationId: existingConversation.id,
+            userId: { [Op.in]: [userId, participantId] },
+            leftAt: null
+          },
+          transaction
+        });
+
         return existingConversation;
       }
 
@@ -128,16 +161,35 @@ class MessagingService {
     return this.getConversationByIdForUser(conversation.id, userId);
   }
 
+  async archiveConversation(userId, conversationId) {
+    const participant = await this.assertUserInConversation(userId, conversationId);
+    await participant.update({ isArchived: true });
+    return { archived: true };
+  }
+
+  async unarchiveConversation(userId, conversationId) {
+    const participant = await this.assertUserInConversation(userId, conversationId);
+    await participant.update({ isArchived: false });
+    return { archived: false };
+  }
+
+  async deleteConversation(userId, conversationId) {
+    const participant = await this.assertUserInConversation(userId, conversationId);
+    await participant.update({ leftAt: new Date() });
+    return { deleted: true };
+  }
+
   async listConversations(userId, options = {}) {
     const limit = Math.min(Math.max(Number(options.limit || 25), 1), 100);
+    const isArchived = options.archived === 'true' || options.archived === true;
 
     // Step 1: fetch conversation IDs in stable order using a lightweight join.
     const membershipRows = await models.ConversationParticipant.findAll({
-      attributes: ['conversationId'],
+      attributes: ['conversationId', 'joinedAt'],
       where: {
         userId,
         leftAt: null,
-        isArchived: false
+        isArchived
       },
       include: [
         {
@@ -148,8 +200,16 @@ class MessagingService {
           required: true
         }
       ],
+      // NULLS LAST is not the default. Postgres sorts NULLs first on DESC, so a
+      // conversation nobody has written in yet outranked every live thread and
+      // the inbox opened on empty rows. A conversation with no messages is the
+      // least recent thing there is, not the most.
       order: [
-        [{ model: models.Conversation, as: 'conversation' }, 'lastMessageAt', 'DESC'],
+        [
+          sequelize.literal(
+            '"conversation"."last_message_at" DESC NULLS LAST'
+          )
+        ],
         ['createdAt', 'DESC']
       ],
       limit,
@@ -159,6 +219,14 @@ class MessagingService {
     const orderedConversationIds = [...new Set(
       membershipRows.map((row) => row.conversationId).filter(Boolean)
     )];
+
+    // When this person joined each conversation. Everything they are shown
+    // about it - the preview line and the unread badge - is floored by this,
+    // so a conversation they deleted and re-opened does not come back carrying
+    // its old last message and a badge for messages they chose to remove.
+    const joinedAtByConversation = new Map(
+      membershipRows.map((row) => [row.conversationId, row.joinedAt ? new Date(row.joinedAt) : null])
+    );
 
     if (orderedConversationIds.length === 0) {
       return [];
@@ -175,8 +243,7 @@ class MessagingService {
           model: models.ConversationParticipant,
           as: 'participants',
           where: {
-            leftAt: null,
-            isArchived: false
+            leftAt: null
           },
           required: false,
           include: [
@@ -209,7 +276,15 @@ class MessagingService {
         [fn('COUNT', col('id')), 'count']
       ],
       where: {
-        threadId: { [Op.in]: orderedConversationIds },
+        // One branch per conversation rather than a single IN, because each
+        // carries its own floor. The list is capped at a hundred and every
+        // branch is keyed on the indexed threadId.
+        [Op.or]: orderedConversationIds.map((conversationId) => {
+          const floor = joinedAtByConversation.get(conversationId);
+          return floor
+            ? { threadId: conversationId, createdAt: { [Op.gte]: floor } }
+            : { threadId: conversationId };
+        }),
         recipientId: userId,
         isRead: false
       },
@@ -266,6 +341,15 @@ class MessagingService {
         seenDirectKeys.add(directKey);
       }
 
+      // The preview follows the same floor as the thread itself. Without this
+      // a re-opened conversation shows a line the person deleted, which is the
+      // one place the inbox would contradict what opening it displays.
+      const floor = joinedAtByConversation.get(json.id);
+      const lastMessage = json.lastMessage
+        && (!floor || new Date(json.lastMessage.createdAt) >= floor)
+        ? json.lastMessage
+        : null;
+
       return [{
         id: json.id,
         type: json.type,
@@ -282,19 +366,29 @@ class MessagingService {
           role: p.user?.role
         })),
         clanIds: [...new Set(otherParticipants.flatMap((p) => [...(clanIdsByUser.get(p.userId) || [])]))],
-        lastMessage: json.lastMessage
+        lastMessage
       }];
     });
   }
 
   async listMessages(userId, conversationId, options = {}) {
-    await this.assertUserInConversation(userId, conversationId);
+    const participant = await this.assertUserInConversation(userId, conversationId);
 
     const limit = Math.min(Math.max(Number(options.limit || 50), 1), 100);
     const where = { threadId: conversationId };
 
-    if (options.before) {
+    // Nothing from before this person joined. For almost everybody joinedAt is
+    // the day the conversation started and this changes nothing; it matters for
+    // the one who deleted the conversation and later opened it again, who would
+    // otherwise be handed back every message they had removed.
+    const floor = participant.joinedAt ? new Date(participant.joinedAt) : null;
+
+    if (options.before && floor) {
+      where.createdAt = { [Op.lt]: new Date(options.before), [Op.gte]: floor };
+    } else if (options.before) {
       where.createdAt = { [Op.lt]: new Date(options.before) };
+    } else if (floor) {
+      where.createdAt = { [Op.gte]: floor };
     }
 
     const messages = await models.Message.findAll({
@@ -336,10 +430,10 @@ class MessagingService {
         throw new NotFoundError('Conversation not found');
       }
 
-      // Fetch participants separately within the same transaction
+      // Fetch all participants (even those who have left) to restore them
       const participantRows = await models.ConversationParticipant.findAll({
-        where: { conversationId, leftAt: null },
-        attributes: ['userId'],
+        where: { conversationId },
+        attributes: ['id', 'userId', 'leftAt'],
         transaction
       });
 
@@ -348,7 +442,38 @@ class MessagingService {
         throw new ForbiddenError('You are not a participant in this conversation');
       }
 
-      const recipientIds = participantIds.filter((id) => id !== senderId);
+      // If direct conversation, restore any participant who left. They have to
+      // come back or the message would be sent into a conversation they are not
+      // in and they would never see it. What they must not get back is the
+      // history they deleted, so they return on a fresh joinedAt, which is the
+      // floor every read of a conversation is filtered by. Without this, one
+      // reply undid somebody's delete and handed them the whole thread again.
+      if (conversation.type === 'direct') {
+        const leftParticipants = participantRows.filter((p) => p.leftAt !== null);
+        if (leftParticipants.length > 0) {
+          const now = new Date();
+          await models.ConversationParticipant.update({
+            leftAt: null,
+            isArchived: false,
+            joinedAt: now,
+            lastReadAt: now,
+            lastReadMessageId: null
+          }, {
+            where: { id: leftParticipants.map((p) => p.id) },
+            transaction
+          });
+        }
+      }
+
+      // Fetch active participants after restoration
+      const activeParticipantRows = await models.ConversationParticipant.findAll({
+        where: { conversationId, leftAt: null },
+        attributes: ['userId'],
+        transaction
+      });
+
+      const activeParticipantIds = activeParticipantRows.map((p) => p.userId);
+      const recipientIds = activeParticipantIds.filter((id) => id !== senderId);
       if (recipientIds.length === 0) {
         throw new ValidationError('Conversation has no recipient');
       }
@@ -432,6 +557,16 @@ class MessagingService {
         ],
         transaction
       });
+
+      // [RAG Core] Fire Orchestrator asynchronously if sender is a mentee
+      // (Mentors don't auto-reply to themselves)
+      if (recipientRoleById[recipientIds[0]] === 'mentor') {
+        const { RagFacade } = require('../features/rag');
+        // Fire and forget (do not await)
+        RagFacade.handleNewMessage(hydratedMessage).catch(err => {
+          logger.error('[RAG] Background orchestrator failed', { error: err.message, stack: err.stack });
+        });
+      }
 
       return {
         message: hydratedMessage,
@@ -654,11 +789,13 @@ class MessagingService {
   async getConversationByIdForUser(conversationId, userId) {
     await this.assertUserInConversation(userId, conversationId);
 
-    return models.Conversation.findByPk(conversationId, {
+    const conversation = await models.Conversation.findByPk(conversationId, {
       include: [
         {
           model: models.ConversationParticipant,
           as: 'participants',
+          where: { leftAt: null },
+          required: false,
           include: [
             {
               model: models.User,
@@ -674,6 +811,28 @@ class MessagingService {
         }
       ]
     });
+
+    if (!conversation) return null;
+    const json = conversation.toJSON();
+    const otherParticipants = (json.participants || []).filter((p) => p.userId !== userId);
+
+    return {
+      id: json.id,
+      type: json.type,
+      relatedTaskId: json.relatedTaskId,
+      relatedEnrollmentId: json.relatedEnrollmentId,
+      lastMessageAt: json.lastMessageAt,
+      unreadCount: 0,
+      participants: otherParticipants.map((p) => ({
+        id: p.user?.id || p.userId,
+        firstName: p.user?.firstName || '',
+        lastName: p.user?.lastName || '',
+        email: p.user?.email || '',
+        profilePictureUrl: p.user?.profilePictureUrl,
+        role: p.user?.role || 'mentee'
+      })),
+      lastMessage: json.lastMessage
+    };
   }
 
   async searchUsers(currentUserId, query = '', options = {}) {

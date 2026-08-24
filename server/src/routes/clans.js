@@ -53,6 +53,15 @@ router.post('/reassign', authenticate, requirePermissionMinScope(PERMISSIONS.CLA
 router.get('/:id/available', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.availableMembers);
 router.post('/:id/invite', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.inviteToClan);
 
+// The invites into this clan, and the two things left to do to one. Guarded on
+// the same pair as sending one: whoever may invite into a clan may see what
+// they invited. Listing invites otherwise lives behind invite.create, which a
+// lead mentor does not hold, so an invite went out and nothing could be learned
+// about it afterwards.
+router.get('/:id/invites', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.listClanInvites);
+router.post('/:id/invites/:inviteId/resend', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.resendClanInvite);
+router.post('/:id/invites/:inviteId/revoke', authenticate, requireAnyPermission([PERMISSIONS.CLAN_MANAGE_MEMBERS, PERMISSIONS.MENTEE_ADD], scope.clan('id')), clanController.revokeClanInvite);
+
 // Candidates for co-mentor / core-team (anyone active, not already in the clan).
 router.get('/:id/candidates', authenticate, requirePermission(PERMISSIONS.CLAN_MANAGE_MEMBERS, scope.clan('id')), clanController.candidates);
 

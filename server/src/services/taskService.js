@@ -7,8 +7,18 @@ const { endOfDayInZone } = require('../utils/timezone');
 const authzService = require('./authzService');
 const { PERMISSIONS } = require('../config/permissions');
 const { pointsForDifficulty } = require('../config/points');
+const { difficultyWeight } = require('../config/scoring');
 const interviewKitService = require('./interviewKitService');
 const quizKitService = require('./quizKitService');
+const { toStringList } = require('../utils/multipartFields');
+
+/**
+ * The statuses a mentee may set on their own task.
+ *
+ * Exactly one: picking it up. Submitting is done by sending work, and every
+ * state after that belongs to whoever reviews it.
+ */
+const MENTEE_SETTABLE_STATUSES = ['in_progress'];
 
 /** Guess a resource's kind from its URL (mirrors the roadmap step normalizer). */
 function inferResourceType(url) {
@@ -94,6 +104,8 @@ class TaskService {
       menteeId,
       roadmapTaskId, // NEW: If provided, assign existing roadmap task
       trackId, // Optional: personal lane this task belongs to
+      scheduleSlotId, // Optional: schedule slot origin for recurring tasks
+      occurrenceDate, // Optional: specific occurrence date (YYYY-MM-DD)
       title,
       description,
       type,
@@ -171,7 +183,7 @@ class TaskService {
       // Create custom roadmap task (not part of any roadmap - a one-off).
       roadmapTask = await models.RoadmapTask.create({
         title,
-        description: description || title || 'No description provided',
+        description: description || 'No description provided',
         type: type || 'custom',
         difficulty: difficulty || 'medium',
         taskOrder: 0,
@@ -210,7 +222,9 @@ class TaskService {
       status: 'assigned',
       dueDate: resolvedDueDate,
       isCustomTask: roadmapTaskId ? false : true, // Roadmap tasks are not custom
-      trackId: trackId || null
+      trackId: trackId || null,
+      scheduleSlotId: scheduleSlotId || null,
+      occurrenceDate: occurrenceDate || null
     });
 
     // Link the interview kit + snapshot the per-assignment options.
@@ -328,11 +342,26 @@ class TaskService {
   }
 
   /**
+   * Lightweight task read for the mentor's mentee-profile view — just the
+   * columns the profile renders (no submissions/feedback/track enrichment).
+   * Kept separate from getMenteeTasks so that heavy consumer isn't penalised
+   * by this view, and vice-versa.
+   */
+  async listMenteeProfileTasks(menteeId) {
+    return models.AssignedTask.findAll({
+      where: { menteeId },
+      attributes: ['id', 'status', 'dueDate', 'submittedAt', 'completedAt', 'isLate', 'finalRating', 'enrollmentId'],
+      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type'] }],
+      order: [['dueDate', 'ASC']]
+    });
+  }
+
+  /**
    * Get tasks for a mentee
    */
   async getMenteeTasks(menteeId, filters = {}) {
     const where = { menteeId };
-    
+
     if (filters.status) {
       where.status = filters.status;
     }
@@ -550,7 +579,7 @@ class TaskService {
       assignedTaskId: taskId,
       version,
       submissionText: submissionData.submissionText,
-      submissionUrls: submissionData.submissionUrls || []
+      submissionUrls: toStringList(submissionData.submissionUrls)
     });
 
     // Update task status
@@ -660,13 +689,28 @@ class TaskService {
     // or the assigning mentor). Keyed off capability, so a mentee-based co-mentor
     // is allowed and a co-mentor with the permission revoked is not.
     const isOwnerMentee = task.menteeId === userId;
-    if (!isOwnerMentee && !(await authzService.canActOnTask(userId, task, [PERMISSIONS.TASK_REVIEW, PERMISSIONS.TASK_ASSIGN]))) {
+    const canManage = await authzService.canActOnTask(userId, task, [PERMISSIONS.TASK_REVIEW, PERMISSIONS.TASK_ASSIGN]);
+
+    if (!isOwnerMentee && !canManage) {
       throw new ForbiddenError('Not authorized');
     }
 
     const validStatuses = ['not_started', 'assigned', 'in_progress', 'submitted', 'revision_needed', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       throw new ValidationError('Invalid status');
+    }
+
+    // A mentee drives their own task forward. They do not grade it.
+    //
+    // Being the owner was the whole check, so a mentee could PATCH their own
+    // task straight to 'completed' and mark their own work approved: no
+    // submission, no review, no mentor. It counted towards their progress and
+    // towards the roadmap completion that makes an enrollment ready for
+    // sign-off. Starting is the one transition that is genuinely theirs, and
+    // everything after it is either decided by somebody else or reached by
+    // sending work.
+    if (!canManage && !MENTEE_SETTABLE_STATUSES.includes(status)) {
+      throw new ForbiddenError('Only your mentor can move a task to that state');
     }
 
     const updateData = { status };
@@ -731,7 +775,15 @@ class TaskService {
     // custom heuristic undercounted tasks assigned from non-base/local roadmaps,
     // which falsely hit 100% and prematurely triggered completion).
     const assignedTasks = await models.AssignedTask.findAll({
-      where: { enrollmentId }
+      where: { enrollmentId },
+      // Difficulty is needed to weight the bar. Without it, progress counts
+      // rows, and a five minute task moves it as far as a week of work.
+      include: [{
+        model: models.RoadmapTask,
+        as: 'roadmapTask',
+        attributes: ['difficulty'],
+        required: false
+      }]
     });
     const liveTasks = assignedTasks.filter(t => t.status !== 'cancelled');
 
@@ -750,9 +802,23 @@ class TaskService {
       ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
       : null;
 
-    // Percentage against the full program - grows steadily as work is done
-    const overallProgressPercentage = tasksTotal > 0
-      ? Math.round((tasksCompleted / tasksTotal) * 100)
+    // Progress is WEIGHTED BY DIFFICULTY, not a count of rows.
+    //
+    // Counting rows made every task worth the same, so somebody who cleared six
+    // easy steps read as further along than somebody who finished the three
+    // hardest ones. The bar is meant to say how much of the programme is behind
+    // them, and those two are not the same amount of programme.
+    //
+    // Weights come from the same table the points do, so the bar and the score
+    // can never disagree about what a hard task is worth.
+    const weightOf = (t) => difficultyWeight(t.roadmapTask?.difficulty);
+    const totalWeight = liveTasks.reduce((sum, t) => sum + weightOf(t), 0);
+    const completedWeight = liveTasks
+      .filter(t => t.status === 'completed')
+      .reduce((sum, t) => sum + weightOf(t), 0);
+
+    const overallProgressPercentage = totalWeight > 0
+      ? Math.round((completedWeight / totalWeight) * 100)
       : 0;
 
     // Completion is the MENTOR's call, and it's gated on finishing the program
@@ -1212,11 +1278,13 @@ class TaskService {
 
     // Annotate each task with this mentee's assignment status, if asked.
     if (menteeId) {
+      const assignedTasks = await models.AssignedTask.findAll({
+        where: { menteeId, roadmapTaskId: { [Op.in]: tasks.map(t => t.id) } },
+        attributes: ['id', 'status', 'submittedAt', 'completedAt', 'roadmapTaskId']
+      });
+      const assignedByTaskId = new Map(assignedTasks.map(at => [at.roadmapTaskId, at]));
       for (const task of tasks) {
-        const assignedTask = await models.AssignedTask.findOne({
-          where: { menteeId, roadmapTaskId: task.id },
-          attributes: ['id', 'status', 'submittedAt', 'completedAt']
-        });
+        const assignedTask = assignedByTaskId.get(task.id);
         task.dataValues.assignmentStatus = assignedTask ? {
           isAssigned: true,
           taskId: assignedTask.id,

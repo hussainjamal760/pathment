@@ -1,10 +1,12 @@
 const { Op } = require('sequelize');
 const { models } = require('../db');
 const emailService = require('./emailService');
+const pushService = require('./pushService');
 const { shouldCreateNotification } = require('../utils/notificationPreferences');
 const { NOTIFICATION_EVENTS, NOTIFICATION_MATRIX, resolveAudience } = require('../config/notificationMatrix');
 const { renderEmail, plainText } = require('../utils/emailTemplate');
 const { unsubscribeUrl } = require('../utils/emailUnsubscribe');
+const { resetLink, verifyLink, signInLink, pageLink } = require('../utils/links');
 
 const escHtml = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -31,7 +33,14 @@ class NotificationOrchestrator {
     );
   }
 
-  async dispatch({ eventKey, recipients, payload, dedupe = null, channelOverrides = null }) {
+  /**
+   * @param {boolean} [emailOnlyIfOffline] Send the email ONLY to recipients who
+   *   have no live socket right now. Someone sitting in the app already got the
+   *   bell (and a toast) the instant this fired — mailing them too is noise. Used
+   *   for time-sensitive asks that need a nudge if the person isn't looking.
+   *   Still subject to the user's email preferences and the global switches.
+   */
+  async dispatch({ eventKey, recipients, payload, dedupe = null, channelOverrides = null, emailOnlyIfOffline = false }) {
     const matrix = NOTIFICATION_MATRIX[eventKey];
     if (!matrix || !Array.isArray(recipients) || recipients.length === 0) {
       return { delivered: 0, skipped: recipients?.length || 0 };
@@ -123,7 +132,15 @@ class NotificationOrchestrator {
           respectQuietHours: false
         }).should_create;
 
-        if (notificationEmailEnabled && !isEventEmailDisabled && !shouldSkipByDedupe && allowedByPrefs && user.email) {
+        // "Only if they're not here": a live socket means they're in the app and
+        // already saw the bell. Presence is best-effort — if we can't tell, we
+        // send (missing a time-sensitive email is worse than one extra email).
+        let onlineNow = false;
+        if (emailOnlyIfOffline) {
+          try { onlineNow = require('../socket').isUserOnline(recipient.userId); } catch { onlineNow = false; }
+        }
+
+        if (notificationEmailEnabled && !isEventEmailDisabled && !shouldSkipByDedupe && allowedByPrefs && user.email && !onlineNow) {
           // ENQUEUE, don't send inline. The DB worker owns delivery + retries,
           // so a slow/failing Resend call never blocks the request or aborts the
           // recipient loop. Wrapped defensively for the same reason.
@@ -137,7 +154,12 @@ class NotificationOrchestrator {
             const unsub = unsubscribeUrl(recipient.userId);
             const heading = payload.title || 'Pathment';
             const bodyText = payload.emailText || payload.message || '';
-            const cta = { label: 'Open Pathment', url: payload.actionUrl || `${clientUrl()}/dashboard` };
+            // actionUrl is a relative path, because the bell and the mobile app
+            // both want it that way. An email does not: `href="/mentor/clan-team"`
+            // has no base to resolve against, which is why the button in every
+            // task, deadline and approval email did nothing. Only the email copy
+            // is made absolute; what is stored and what is pushed stay relative.
+            const cta = { label: 'Open Pathment', url: pageLink(payload.actionUrl) };
             const html = payload.emailHtml || renderEmail({
               heading,
               bodyHtml: `<p style="margin:0 0 14px;">${escHtml(bodyText)}</p>`,
@@ -165,6 +187,38 @@ class NotificationOrchestrator {
           } catch (e) {
             console.error('[notify] enqueue failed for', user.email, e?.message);
           }
+        }
+      }
+
+      // Push channel. The matrix carries no push flag, so push follows inApp:
+      // anything worth a bell in the app is worth a buzz on the phone, and the
+      // alternative is forty near-identical edits that would drift apart.
+      //
+      // Quiet hours ARE respected here and deliberately not for email, because a
+      // buzz at 3am wakes someone and an email does not.
+      if (channels.push ?? channels.inApp) {
+        const pushAllowed = shouldCreateNotification(settings, preferenceKey, {
+          checkEmail: false,
+          checkPush: true,
+          respectQuietHours: true
+        }).should_create;
+
+        if (!shouldSkipByDedupe && pushAllowed) {
+          // Deliberately not awaited. A phone that could not be reached must
+          // never fail, slow, or abort the thing that triggered the
+          // notification: the submission is submitted either way.
+          pushService
+            .send([recipient.userId], {
+              title: payload.title,
+              body: payload.message,
+              data: {
+                actionUrl: payload.actionUrl || null,
+                type: matrix.type,
+                relatedEntityType: payload.relatedEntityType || null,
+                relatedEntityId: payload.relatedEntityId || null
+              }
+            })
+            .catch((e) => console.error('[Push] dispatch failed:', e.message));
         }
       }
     }
@@ -215,8 +269,7 @@ class NotificationOrchestrator {
   }
 
   async sendPasswordResetEmail(user, resetToken) {
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const resetUrl = `${baseUrl}/reset-password?token=${encodeURIComponent(resetToken)}`;
+    const resetUrl = resetLink(resetToken);
 
     // Transactional security email: always send, no unsubscribe (a security email
     // must reach the user).
@@ -236,9 +289,39 @@ class NotificationOrchestrator {
     });
   }
 
+  /**
+   * The link that signs somebody in.
+   *
+   * Transactional and never suppressed: somebody is waiting on this with the
+   * app open. The wording is deliberately blunt about what the link does,
+   * because a link that hands over a session is worth being able to recognise
+   * when it arrives and nobody asked for it.
+   */
+  async sendSignInLinkEmail(user, linkToken) {
+    const url = signInLink(linkToken);
+    const heading = 'Your sign-in link';
+
+    return emailService.sendEmail({
+      to: user.email,
+      emailType: 'sign_in_link',
+      subject: 'Your Pathment sign-in link',
+      text: plainText({
+        heading,
+        bodyText: `Hi ${user.firstName || 'there'}, this link signs you in to Pathment. It works once and expires in 15 minutes. If you did not ask for it, ignore this email and nothing happens.`,
+        cta: { label: 'Sign in', url }
+      }),
+      html: renderEmail({
+        heading,
+        bodyHtml: `<p style="margin:0 0 14px;">Hi ${escHtml(user.firstName || 'there')}, tap below and you are in. No password needed.</p>`,
+        cta: { label: 'Sign in', url },
+        preheader: 'Your Pathment sign-in link',
+        footerNote: "This link works once and expires in 15 minutes. Didn't ask for it? Ignore this email — nobody can sign in without opening the link."
+      })
+    });
+  }
+
   async sendEmailVerificationEmail(user, verificationToken) {
-    const baseUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const verifyUrl = `${baseUrl}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+    const verifyUrl = verifyLink(verificationToken);
 
     // Transactional auth email: always send, no unsubscribe.
     const heading = 'Verify your email';

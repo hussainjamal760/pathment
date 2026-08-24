@@ -2,21 +2,28 @@ const { Op } = require('sequelize');
 const { models } = require('../db');
 const authzService = require('./authzService');
 const notificationOrchestrator = require('./notificationOrchestrator');
+const taskService = require('./taskService');
+const frictionService = require('./frictionService');
+const insightService = require('./insightService');
+const dailyLogService = require('./dailyLogService');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes');
+const logger = require('../utils/logger');
 
 /**
  * cohortService - assembles a mentor's cohort for the Cockpit on real data,
  * and computes the fairness signals (relativeProgress / momentum / risk) that
  * the new design leans on.
  *
- * FAIRNESS v1 (intentionally simple + documented so it can be tuned later):
- *  - relativeProgress = absoluteProgress + credit for ACCEPTED EXTERNAL delays,
- *    capped, never below absolute. Someone fighting real, logged constraints
- *    reads higher than their raw output; a coasting mentee reads ~= absolute.
+ * FAIRNESS v2:
+ *  - absoluteProgress is weighted by difficulty, so the bar says how much of the
+ *    programme is behind somebody rather than how many rows they ticked.
+ *  - relativeProgress = absoluteProgress + credit for days a mentor actually
+ *    granted. Evidence only: the credit inferred from the occupation text, and
+ *    the one for having open blockers, are both gone.
  *  - momentum from activity recency + recent completion trend (up/flat/down).
- *  - risk from how far behind the plan they are, how much of that the logged
- *    friction explains, inactivity, and open blockers.
+ *  - risk needs somebody to be BEHIND before silence escalates it. Being quiet
+ *    while ahead is a note, not an alarm.
  */
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
@@ -50,29 +57,7 @@ class CohortService {
   }
 
   async resolveMenteeIds(mentorId) {
-    const ids = new Set();
-
-    const [matches, { clanIds }] = await Promise.all([
-      // (a) Legacy / existing path: active 1:1 matches.
-      models.MentorMenteeMatch.findAll({
-        where: { mentorId, status: 'active' },
-        attributes: ['menteeId']
-      }),
-      // (b) Clans where this user is a mentor (membership / grant / cover).
-      this.mentorClanMap(mentorId)
-    ]);
-
-    matches.forEach((m) => ids.add(m.menteeId));
-
-    if (clanIds.length) {
-      const menteeMemberships = await models.ClanMembership.findAll({
-        where: { clanId: { [Op.in]: clanIds }, status: 'active', role: 'mentee' },
-        attributes: ['userId']
-      });
-      menteeMemberships.forEach((m) => ids.add(m.userId));
-    }
-
-    return [...ids];
+    return authzService.resolveMenteeIds(mentorId);
   }
 
   /** Active mentee userIds in ONE clan (cohort-review is now clan-scoped). */
@@ -183,35 +168,35 @@ class CohortService {
   }
 
   /**
-   * Relative ("adjusted for constraints") progress = absolute output + a capped
-   * fairness credit for real-life constraints OUTSIDE the mentee's control, so a
-   * learner juggling e.g. a full-time job isn't graded as if they had 40 free
-   * hours/week. Credit sources (each capped, total capped at 30):
-   *   - Accepted EXTERNAL delays  (a mentor/admin agreed it wasn't their fault)
-   *   - Job / study load          (employed or studying → limited weekly hours)
-   *   - Actively-flagged blockers (they surfaced impediments early vs stalling)
-   * Never drops below absolute, never exceeds 100.
+   * Credited progress: raw progress, plus time a mentor actually agreed to.
+   *
+   * Only accepted external delays count, and only for the days that were
+   * granted. Two things used to be added here and are deliberately gone:
+   *
+   *   - A credit inferred from the free text occupation field by regular
+   *     expression. It read "freelance" and "between jobs" and anything not in
+   *     English as employment, gave nearly everybody the same nine points, and
+   *     was ultimately a guess about somebody's life dressed up as a
+   *     measurement. If availability should count, it has to be declared and
+   *     confirmed, not inferred.
+   *   - A credit for having open blockers. Raising a blocker is healthy, but it
+   *     is not progress, and it is already read as a risk signal. Counting it
+   *     twice, once as a worry and once as credit, meant the two numbers moved
+   *     in opposite directions for the same fact.
+   *
+   * With those gone the credit is evidence only, which is why the ceiling is
+   * lower: it no longer needs headroom for guesses. Most people now read at or
+   * near their raw progress, and the gap means something when it appears.
    */
-  computeRelativeProgress(absolute, { delays = [], occupation = null, openBlockers = 0 } = {}) {
-    const frictionDays = delays
+  computeRelativeProgress(absolute, { delays = [] } = {}) {
+    const grantedDays = delays
       .filter((d) => d.accepted && d.category === 'external')
       .reduce((sum, d) => sum + (d.days || 0), 0);
-    const delayCredit = Math.min(15, frictionDays * 1.5);
 
-    // Job/study load: someone with a day job (or full-time study) has far fewer
-    // weekly hours, so steady output deserves more credit than raw % implies.
-    const occ = (occupation || '').toLowerCase().trim();
-    const studying = /\b(student|university|college|school|studying|bs|ms|phd|degree)\b/i.test(occ);
-    const noJob = !occ || /^(none|n\/?a|unemployed|looking|job ?seeker)$/i.test(occ);
-    let loadCredit = 0;
-    if (studying) loadCredit = 5;           // full-time study (checked first)
-    else if (!noJob) loadCredit = 9;        // employed / has an occupation
-    loadCredit = Math.min(10, loadCredit);
+    // A granted day is worth roughly a day and a half of the plan, because a
+    // delay costs momentum as well as time.
+    const credit = Math.min(20, grantedDays * 1.5);
 
-    // Surfacing blockers early is healthy behaviour and represents real friction.
-    const blockerCredit = Math.min(6, Math.max(0, openBlockers) * 2);
-
-    const credit = Math.min(30, delayCredit + loadCredit + blockerCredit);
     return clamp(Math.round(absolute + credit), Math.round(absolute), 100);
   }
 
@@ -242,24 +227,48 @@ class CohortService {
     const behind = expected != null ? Math.max(0, expected - absolute) : 0;
     const gap = relative - absolute; // how much logged friction explains
 
+    // Silence is a question, not a verdict.
+    //
+    // This used to read `lastActiveDays > 10` as high risk, as the FIRST branch,
+    // so it settled the answer before progress was looked at. On a real cohort
+    // most people are quiet for more than ten days at some point, which put two
+    // thirds of the organisation at risk and left every clan red. A signal that
+    // fires for the majority carries nothing.
+    //
+    // Being quiet now only escalates alongside actually being behind. Someone at
+    // 93% who has not opened the app for a fortnight has finished their work and
+    // taken a breather; they are not the same as someone who stopped at 20%.
+    const QUIET_DAYS = 14;
+    const GONE_DAYS = 28;
+    const NEARLY_DONE = 90;
+
+    const quiet = lastActiveDays > QUIET_DAYS;
+    const gone = lastActiveDays > GONE_DAYS;
+    const unexplained = gap < 10; // logged friction does not account for it
+
     let level = 'low';
     const reasons = [];
 
-    if (lastActiveDays > 10) {
+    if (behind >= 25 && unexplained && (quiet || highSeverityBlockers >= 1)) {
       level = 'high';
-      reasons.push(Number.isFinite(lastActiveDays) ? `no activity in ${lastActiveDays} days` : 'assigned work but never started');
-    } else if (behind >= 30 && gap < 10) {
+      reasons.push('well behind the plan');
+      if (highSeverityBlockers >= 1) reasons.push('a high-severity blocker is holding them back');
+      else reasons.push(`quiet for ${lastActiveDays} days`);
+    } else if (gone && absolute < NEARLY_DONE) {
+      // A month of silence with work outstanding is worth chasing whatever the
+      // percentage says.
       level = 'high';
-      reasons.push('well behind plan with no logged reason');
-    } else if (highSeverityBlockers >= 1 && behind >= 20) {
-      level = 'high';
-      reasons.push('a high-severity blocker is holding them back');
-    } else if (behind >= 15 || openBlockers > 0 || momentum === 'down' || lastActiveDays > 5) {
+      reasons.push(
+        Number.isFinite(lastActiveDays)
+          ? `no activity in ${lastActiveDays} days`
+          : 'assigned work but never started'
+      );
+    } else if (behind >= 15 || openBlockers > 0 || momentum === 'down' || quiet) {
       level = 'watch';
-      if (behind >= 15 && gap < 10) reasons.push('slipping behind the plan');
+      if (behind >= 15 && unexplained) reasons.push('slipping behind the plan');
       if (openBlockers > 0) reasons.push(`${openBlockers} open blocker${openBlockers > 1 ? 's' : ''}`);
       if (momentum === 'down') reasons.push('momentum is dropping');
-      if (lastActiveDays > 5 && lastActiveDays <= 10) reasons.push(`quiet for ${lastActiveDays} days`);
+      if (quiet) reasons.push(`quiet for ${lastActiveDays} days`);
     }
 
     // If they're behind but friction explains it, soften the message.
@@ -306,7 +315,8 @@ class CohortService {
       if (enrollment) taskWhere.enrollmentId = enrollment.id;
       tasks = await models.AssignedTask.findAll({
         where: taskWhere,
-        attributes: ['id', 'status', 'isLate', 'completedAt', 'dueDate', 'enrollmentId']
+        attributes: ['id', 'status', 'isLate', 'completedAt', 'dueDate', 'enrollmentId', 'pointsAwarded'],
+        include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['difficulty', 'type'], required: false }]
       });
 
       delays = await models.DelayEvent.findAll({
@@ -334,11 +344,7 @@ class CohortService {
     const totalWeeks = enrollment?.program?.totalDurationWeeks || 0;
     const expected = totalWeeks ? clamp(Math.round((week / totalWeeks) * 100), 0, 100) : null;
 
-    const relativeProgress = this.computeRelativeProgress(absolute, {
-      delays,
-      occupation: mentee.menteeProfile?.currentOccupation || null,
-      openBlockers
-    });
+    const relativeProgress = this.computeRelativeProgress(absolute, { delays });
     const hasWork = tasks.length > 0;
     const momentum = this.computeMomentum(tasks, lastActiveDays, hasWork);
     const { risk, riskReason } = this.computeRisk({
@@ -379,6 +385,12 @@ class CohortService {
       lastAttendance, // { status, date } | null — most recent review attendance
       taskCount: tasks.length, // total assigned tasks — 0 = never been given work
       tasksCompleted: tasks.filter((t) => t.status === 'completed').length, // real output, for effort-weighted leaderboard
+      completedTasks: tasks.filter((t) => t.status === 'completed'),
+      pointsEarned: tasks.filter((t) => t.status === 'completed').reduce((s, t) => s + (t.pointsAwarded || 0), 0),
+      // Per-difficulty counts on completed tasks — drives the leaderboard breakdown and AI report brief.
+      tasksEasy:   tasks.filter((t) => t.status === 'completed' && (t.roadmapTask?.difficulty || '').toLowerCase() === 'easy').length,
+      tasksMedium: tasks.filter((t) => t.status === 'completed' && (t.roadmapTask?.difficulty || '').toLowerCase() === 'medium').length,
+      tasksHard:   tasks.filter((t) => t.status === 'completed' && ['hard', 'expert'].includes((t.roadmapTask?.difficulty || '').toLowerCase())).length,
       sentiment: 'neutral'
     };
   }
@@ -407,52 +419,77 @@ class CohortService {
    * summary feature is wired in.
    */
   async getMenteeDetail(menteeId) {
-    const row = await this.buildMenteeRow(menteeId);
-    if (!row) return null;
-
-    const [blockers, delays, tasks, insights, menteeProfile] = await Promise.all([
-      models.Blocker.findAll({
-        where: { menteeId },
-        order: [['status', 'ASC'], ['openedAt', 'DESC']],
-        include: [{ model: models.AssignedTask, as: 'task', attributes: ['id'], include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title'] }] }]
+    // Critical path: the mentee record itself. If this fails (or doesn't exist)
+    // the profile can't render — fail loudly so the controller returns a 404.
+    const [mentee, optional] = await Promise.all([
+      models.User.findByPk(menteeId, {
+        attributes: ['id', 'firstName', 'lastName', 'email', 'profilePictureUrl'],
+        include: [
+          { model: models.MenteeProfile, as: 'menteeProfile', attributes: ['lastActivityDate', 'currentOccupation', 'personality'] },
+          { model: models.Enrollment, as: 'enrollments', required: false, include: [{ model: models.Program, as: 'program', attributes: ['id', 'name', 'totalDurationWeeks'] }] }
+        ]
       }),
-      models.DelayEvent.findAll({ where: { menteeId }, order: [['occurredAt', 'DESC']] }),
-      models.AssignedTask.findAll({
-        where: { menteeId },
-        attributes: ['id', 'status', 'dueDate', 'submittedAt', 'completedAt', 'isLate', 'finalRating'],
-        include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type'] }],
-        order: [['dueDate', 'ASC']]
-      }),
-      models.Insight.findAll({
-        where: { menteeId },
-        order: [['created_at', 'DESC']],
-        include: [{ model: models.User, as: 'author', attributes: ['firstName', 'lastName'] }]
-      }),
-      models.MenteeProfile.findOne({ where: { userId: menteeId }, attributes: ['personality'] })
+      // Enrichment sections are optional — a hiccup in one must not 500 the whole
+      // profile, so they run under Promise.allSettled and each falls back below.
+      // Reads are delegated to the owning domain services (SRP/DIP): cohortService
+      // assembles the profile, it doesn't know other domains' schemas.
+      Promise.allSettled([
+        taskService.listMenteeProfileTasks(menteeId),
+        frictionService.listDelaysFor(menteeId),
+        frictionService.listBlockersWithTask(menteeId),
+        insightService.getInsightsByMentee(menteeId),
+        models.MeetingNote.findAll({
+          where: { menteeId },
+          order: [['date', 'DESC']],
+          include: [{ model: models.User, as: 'author', attributes: ['firstName', 'lastName'] }]
+        }),
+        models.Collaborator.findAll({ where: { menteeId }, order: [['created_at', 'DESC']] }),
+        dailyLogService.list(menteeId, 7),
+        this._lastAttendance(menteeId)
+      ])
     ]);
 
-    const meetingNotes = await models.MeetingNote.findAll({
-      where: { menteeId },
-      order: [['date', 'DESC']],
-      include: [{ model: models.User, as: 'author', attributes: ['firstName', 'lastName'] }]
+    if (!mentee) return null;
+
+    // Order must mirror the Promise.allSettled array above — one entry per section.
+    const SECTIONS = ['tasks', 'delays', 'blockers', 'insights', 'notes', 'collaborators', 'dailyLogs', 'attendance'];
+
+    // Per-section fallback: fulfilled → value, rejected → sane default (the
+    // failure is ALSO recorded in sectionErrors + logged, never silently hidden).
+    const settled = (i, fallback) => (optional[i].status === 'fulfilled' ? optional[i].value : fallback);
+    const sectionErrors = {};
+    optional.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        const section = SECTIONS[i];
+        sectionErrors[section] = r.reason?.message || 'Failed to load';
+        logger.warn(`getMenteeDetail: ${section} failed to load`, { menteeId, error: r.reason?.message });
+      }
     });
+    const allTasks = settled(0, []);
+    const allDelays = settled(1, []);
+    const allBlockers = settled(2, []);
+    const insights = settled(3, []);
+    const meetingNotes = settled(4, []);
+    const collaborators = settled(5, []);
+    const dailyLogs = settled(6, []);
+    const lastAttendance = settled(7, null);
 
-    const collaborators = await models.Collaborator.findAll({
-      where: { menteeId },
-      order: [['created_at', 'DESC']]
-    });
+    const openBlockers = allBlockers.filter((b) => b.status === 'open');
+    const preloads = {
+      users: { [menteeId]: mentee },
+      tasks: { [menteeId]: allTasks },
+      delays: { [menteeId]: allDelays },
+      blockers: { [menteeId]: openBlockers },
+      attendance: { [menteeId]: lastAttendance }
+    };
 
-    const dailyLogs = await models.DailyLogEntry.findAll({
-      where: { menteeId },
-      order: [['dateKey', 'DESC']],
-      limit: 7
-    });
+    const row = await this.buildMenteeRow(menteeId, preloads);
+    if (!row) return null;
 
-    const completed = tasks.filter((t) => t.status === 'completed').length;
+    const completed = allTasks.filter((t) => t.status === 'completed').length;
 
-    // Group tasks by status for the profile's work history.
     const tasksByStatus = {};
-    tasks.forEach((t) => {
+    allTasks.forEach((t) => {
       const key = t.status || 'assigned';
       (tasksByStatus[key] = tasksByStatus[key] || []).push({
         id: t.id,
@@ -466,13 +503,13 @@ class CohortService {
     });
 
     const aiSummary = buildSummary(row);
-    const aiSignals = buildSignals(row, { completed }, delays);
+    const aiSignals = buildSignals(row, { completed }, allDelays);
 
     return {
       ...row,
       aiSummary,
       aiSignals,
-      blockers: blockers.map((b) => ({
+      blockers: allBlockers.map((b) => ({
         id: b.id,
         title: b.title,
         category: b.category,
@@ -481,7 +518,7 @@ class CohortService {
         daysOpen: Math.max(0, daysSince(b.openedAt)),
         taskTitle: b.task?.roadmapTask?.title || null
       })),
-      delays: delays.map((d) => ({
+      delays: allDelays.map((d) => ({
         id: d.id,
         reason: d.reason,
         kind: d.kind,
@@ -491,7 +528,7 @@ class CohortService {
         aiRationale: d.aiRationale,
         occurredAt: d.occurredAt
       })),
-      personality: menteeProfile?.personality || null,
+      personality: mentee.menteeProfile?.personality || null,
       insights: insights.map((i) => ({
         id: i.id,
         kind: i.kind,
@@ -523,7 +560,8 @@ class CohortService {
         note: l.note,
         loggedAt: l.loggedAt
       })),
-      tasksByStatus
+      tasksByStatus,
+      sectionErrors: Object.keys(sectionErrors).length ? sectionErrors : undefined
     };
   }
 
@@ -749,7 +787,8 @@ class CohortService {
       }),
       models.AssignedTask.findAll({
         where: { menteeId: inIds },
-        attributes: ['id', 'status', 'isLate', 'completedAt', 'dueDate', 'menteeId', 'enrollmentId']
+        attributes: ['id', 'status', 'isLate', 'completedAt', 'dueDate', 'menteeId', 'enrollmentId', 'pointsAwarded'],
+        include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['difficulty', 'type'], required: false }]
       }),
       models.DelayEvent.findAll({
         where: { menteeId: inIds },
@@ -927,6 +966,11 @@ class CohortService {
     const top = [...cohort].sort((a, b) => (b.absoluteProgress + b.onTimeRate) - (a.absoluteProgress + a.onTimeRate)).slice(0, 3);
     const activity = await this.getPeriodActivity(mentorId, period);
 
+    // Cohort-wide difficulty breakdown — sum per band across all mentees.
+    const totalEasy   = cohort.reduce((n, m) => n + (m.tasksEasy   || 0), 0);
+    const totalMedium = cohort.reduce((n, m) => n + (m.tasksMedium || 0), 0);
+    const totalHard   = cohort.reduce((n, m) => n + (m.tasksHard   || 0), 0);
+
     const brief = [
       `Period: the last ${activity.days} days (this ${period})`,
       `Cohort size: ${size} mentees`,
@@ -938,9 +982,10 @@ class CohortService {
       `Average progress through programs: ${avgProgress}%`,
       `Overall on-time delivery: ${avgOnTime}%`,
       avgRating ? `Average work quality: ${avgRating}/5` : 'Average work quality: no ratings yet',
+      `Task difficulty breakdown (all-time completed): ${totalEasy} easy, ${totalMedium} medium, ${totalHard} hard/expert`,
       `On track: ${onTrack.length}; to watch: ${watch.length}; at risk: ${high.length}`,
       `Pending reviews: ${pending}; open blockers: ${openBlockers}`,
-      `Top performers: ${top.map((m) => `${m.name} (${round(m.absoluteProgress)}% done, ${round(m.onTimeRate)}% on time)`).join('; ') || 'none'}`,
+      `Top performers: ${top.map((m) => `${m.name} (${round(m.absoluteProgress)}% done, ${round(m.onTimeRate)}% on time, ${(m.tasksEasy||0)}e/${(m.tasksMedium||0)}m/${(m.tasksHard||0)}h tasks)`).join('; ') || 'none'}`,
       `Needs attention: ${[...high, ...watch].map((m) => `${m.name} - ${m.riskReason || m.risk}`).join('; ') || 'none'}`,
     ].join('\n');
 

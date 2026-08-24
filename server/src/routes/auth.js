@@ -3,14 +3,15 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const { validateBody } = require('../middlewares/validate');
 const { authSchemas } = require('../validations/authValidation');
-const { authenticate } = require('../middlewares/auth');
+const { authenticate, authenticateTemporary } = require('../middlewares/auth');
 const {
   loginLimiter,
   passwordResetLimiter,
   registerLimiter,
   verifyEmailLimiter,
   resendVerificationLimiter,
-  refreshTokenLimiter
+  refreshTokenLimiter,
+  signInLinkLimiter
 } = require('../middlewares/rateLimiter');
 
 /**
@@ -37,6 +38,22 @@ router.post(
   loginLimiter,
   validateBody(authSchemas.login),
   authController.login
+);
+
+// Ask for a sign-in link. Answers the same whatever the address was.
+router.post(
+  '/sign-in-link',
+  signInLinkLimiter,
+  validateBody(authSchemas.signInLinkRequest),
+  authController.requestSignInLink
+);
+
+// Spend a sign-in link. Same shape as login, two factor included.
+router.post(
+  '/sign-in-link/verify',
+  loginLimiter,
+  validateBody(authSchemas.signInLinkVerify),
+  authController.verifySignInLink
 );
 
 // Refresh access token
@@ -98,12 +115,23 @@ router.post(
   authController.changePassword
 );
 
-// Logout
+// Logout.
+// Deliberately NOT behind authenticate: people sign out after the app has been
+// closed for a while, which is exactly when the 15-minute access token is dead.
+// Requiring one meant the request 401'd and the refresh token was never revoked.
+// Possession of the refresh token is itself the authorisation to revoke it.
 router.post(
   '/logout',
-  authenticate,
   validateBody(authSchemas.refreshToken),
   authController.logout
+);
+
+// Sign out on every device. This one DOES need a live session — it acts on the
+// whole account, not just the token in your hand.
+router.post(
+  '/logout-all',
+  authenticate,
+  authController.logoutAll
 );
 
 /**
@@ -167,10 +195,12 @@ router.get(
   authController.get2FAStatus
 );
 
-// Verify 2FA during login (uses temporary token from login response)
+// Verify 2FA during login (uses the temporary token from the login response,
+// which authenticateTemporary accepts and authenticate deliberately does not)
 router.post(
   '/verify-2fa-login',
-  authenticate,
+  loginLimiter,
+  authenticateTemporary,
   validateBody(authSchemas.verify2FALogin),
   authController.verify2FALogin
 );

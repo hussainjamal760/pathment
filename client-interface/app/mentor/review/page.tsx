@@ -7,6 +7,7 @@ import {
   ChevronLeft, ChevronRight, SkipForward, Check, Loader2,
   TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo, CalendarClock,
   Trash2, X, History, RotateCcw, CalendarDays, AlertTriangle, StickyNote, Search, Lock, Unlock, PauseCircle, Sparkles,
+  ChevronDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
@@ -21,6 +22,7 @@ import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { DualProgress } from '@/components/mentor/DualProgress';
 import { AISummaryPanel } from '@/components/mentor/AISummaryPanel';
 import { NudgeButton } from '@/components/mentor/NudgeButton';
+import { MoveMenteeButton } from '@/components/mentor/MoveMenteeButton';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
 import { AssignTaskDrawer } from '@/components/mentor/AssignTaskDrawer';
 import { MenteeTaskDrawer } from '@/components/mentor/MenteeTaskDrawer';
@@ -34,6 +36,7 @@ import { ReviewMeetingPanel } from '@/components/mentor/ReviewMeetingPanel';
 import { ReviewScheduleDrawer } from '@/components/mentor/ReviewScheduleDrawer';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { getViewerTimeZone } from '@/lib/utils/datetime';
+import { MobileReviewActionBar } from '@/components/mentor/MobileReviewActionBar';
 
 type Attendance = 'present' | 'absent' | 'excused';
 type EntryStatus = 'pending' | 'reviewed' | 'deferred';
@@ -76,7 +79,7 @@ export default function CohortReview() {
   const { queue, refetch: refetchQueue } = useMentorApprovals();
   const confirm = useConfirm();
 
-  // Cohort review is CLAN-scoped: a session belongs to a clan, shared by its
+  // Clan review is CLAN-scoped: a session belongs to a clan, shared by its
   // lead + co-mentors. "All clans" can't map to one dated session, so for a
   // multi-clan mentor we pin to a concrete clan (keeps the cohort list and the
   // session on the same clan). Single-clan mentors never see the picker and the
@@ -339,7 +342,7 @@ export default function CohortReview() {
 
       toast.success(`Attendance updated for ${changes.length} mentee${changes.length === 1 ? '' : 's'}`);
     } catch {
-      toast.error('Failed to save some attendance records');
+      toast.error('Some attendance marks didn\'t save. Try again.');
     } finally {
       setIsSavingAttendance(false);
     }
@@ -350,6 +353,7 @@ export default function CohortReview() {
   useEffect(() => {
     if (!mentee) return;
     setFocus(0); setNote(''); setNoteSent(false); setBlockers([]); setTasks([]); setProfile(null); setAttHistory([]);
+    setOpenTaskGroups({}); // finished work re-collapses for each mentee you land on
     frictionApi.listBlockers(mentee.id, 'open').then((r: any) => setBlockers(r?.data?.blockers ?? [])).catch(() => {}); // eslint-disable-line @typescript-eslint/no-explicit-any
     mentorApi.getMenteeProfile(mentee.id).then((r: any) => setProfile(r?.data?.profile ?? r?.data ?? null)).catch(() => setProfile(null)); // eslint-disable-line @typescript-eslint/no-explicit-any
     mentorApi.getMenteeAttendanceHistory(mentee.id).then((r) => setAttHistory((r?.data?.history ?? []) as typeof attHistory)).catch(() => setAttHistory([]));
@@ -401,6 +405,12 @@ export default function CohortReview() {
     dayTasks.forEach((t) => { const k = t.status || 'assigned'; (by[k] = by[k] || []).push(t); });
     return TASK_STATUS_ORDER.filter((s) => by[s]?.length).map((s) => ({ status: s, items: by[s] }));
   }, [dayTasks]);
+
+  // Finished work collapses by default. A mentee a few months in has far more
+  // completed tasks than live ones, and leaving them all expanded pushed the
+  // "To review" queue — the reason you're on this screen — below the fold.
+  // The count stays on the header, so nothing looks missing when it's shut.
+
 
   // Latest mentor note + rating for a task, surfaced on reviewed/changes rows.
   const reviewOf = (t: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -653,7 +663,7 @@ export default function CohortReview() {
     const first = next.name.split(' ')[0];
     setPinged((p) => new Set(p).add(next.id)); // optimistic
     try {
-      await mentorApi.nudge(next.id, `Heads up ${first} — you're up next in today's cohort review. Please be ready 🙌`);
+      await mentorApi.nudge(next.id, `Heads up ${first} — you're up next in today's clan review. Please be ready 🙌`);
       toast.success(`${first} was told they're up next`);
     } catch {
       setPinged((p) => { const n = new Set(p); n.delete(next.id); return n; });
@@ -684,12 +694,12 @@ export default function CohortReview() {
   const addBlocker = async () => {
     if (!bTitle.trim() || !mentee) return;
     try {
-      setBusy('add-blocker');
+      setBusy('add-roadblock');
       const r: any = await frictionApi.createBlocker({ menteeId: mentee.id, title: bTitle.trim(), category: bCat, severity: bSev }); // eslint-disable-line @typescript-eslint/no-explicit-any
       if (r?.data?.blocker) setBlockers((b) => [r.data.blocker, ...b]);
       setBTitle(''); setBCat('technical'); setBSev('medium'); setShowAddBlocker(false);
-      toast.success('Blocker logged');
-    } catch { toast.error('Could not add blocker'); } finally { setBusy(null); }
+      toast.success('Roadblock logged');
+    } catch { toast.error('Could not add roadblock'); } finally { setBusy(null); }
   };
 
   // Keyboard shortcuts.
@@ -745,29 +755,31 @@ export default function CohortReview() {
     : '';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 lg:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-slate-900">Cohort review</h1>
+            <h1 className="text-slate-900 text-xl sm:text-2xl font-bold">Clan review</h1>
             {sessionDateLabel && (
-              <span className="inline-flex items-center gap-1 text-xs text-slate-500 bg-slate-100 rounded-full px-2 py-0.5"><CalendarDays className="w-3 h-3" />{sessionDateLabel}</span>
+              <span className="inline-flex items-center gap-1 text-xs text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5"><CalendarDays className="w-3 h-3" />{sessionDateLabel}</span>
             )}
             {session?.status === 'finished' && (
-              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5"><CheckCircle2 className="w-3 h-3" />Finished</span>
+              <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5"><CheckCircle2 className="w-3 h-3" />Finished</span>
             )}
           </div>
-          <p className="text-slate-600 text-sm">{idx + 1} of {cohort.length} · {session?.title || 'review each mentee, then finish'}</p>
+          <p className="text-slate-600 text-xs sm:text-sm mt-0.5">{idx + 1} of {cohort.length} · {session?.title || 'review each mentee, then finish'}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setScheduleOpen(true)} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Recurring reviews"><CalendarClock className="w-4 h-4" />Schedule</button>
-          <button onClick={openHistory} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Past reviews"><History className="w-4 h-4" />History</button>
-          <button onClick={() => setAssigning(true)} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Assign a task (t)"><Plus className="w-4 h-4" />Assign task</button>
-          <button onClick={() => setShowHelp(true)} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100" title="Shortcuts"><Keyboard className="w-4 h-4" /></button>
-          <button onClick={() => go(-1)} disabled={idx === 0} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-40 inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" />Prev</button>
-          <button onClick={skip} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1"><SkipForward className="w-4 h-4" />Skip</button>
-          <button onClick={() => go(1)} disabled={idx === cohort.length - 1} className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-40 inline-flex items-center gap-1">Next<ChevronRight className="w-4 h-4" /></button>
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+          <button onClick={() => setScheduleOpen(true)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-slate-200 text-slate-700 text-xs sm:text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Recurring reviews"><CalendarClock className="w-3.5 h-3.5 sm:w-4 sm:h-4" /><span className="hidden sm:inline">Schedule</span></button>
+          <button onClick={openHistory} className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-slate-200 text-slate-700 text-xs sm:text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Past reviews"><History className="w-3.5 h-3.5 sm:w-4 sm:h-4" /><span className="hidden sm:inline">History</span></button>
+          <button onClick={() => setAssigning(true)} className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-lg border border-slate-200 text-slate-700 text-xs sm:text-sm hover:bg-slate-50 inline-flex items-center gap-1" title="Assign a task (t)"><Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />Assign task</button>
+          <button onClick={() => setShowHelp(true)} className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:bg-slate-100 hidden sm:inline-flex" title="Shortcuts"><Keyboard className="w-4 h-4" /></button>
+          <div className="hidden sm:flex items-center gap-1.5 ml-1">
+            <button onClick={() => go(-1)} disabled={idx === 0} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 disabled:opacity-40 inline-flex items-center gap-1"><ChevronLeft className="w-4 h-4" />Prev</button>
+            <button onClick={skip} className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 text-sm hover:bg-slate-50 inline-flex items-center gap-1"><SkipForward className="w-4 h-4" />Skip</button>
+            <button onClick={() => go(1)} disabled={idx === cohort.length - 1} className="px-3 py-2 rounded-lg bg-brand-600 text-white text-sm hover:bg-brand-700 disabled:opacity-40 inline-flex items-center gap-1">Next<ChevronRight className="w-4 h-4" /></button>
+          </div>
         </div>
       </div>
 
@@ -879,28 +891,35 @@ export default function CohortReview() {
         {/* Main */}
         <div className="lg:col-span-2 space-y-5">
           {/* Mentee card */}
-          <div className="bg-card rounded-2xl border border-slate-200 p-5">
-            <div className="flex items-start gap-3">
-              <Avatar name={mentee!.name} src={mentee!.profilePictureUrl} initials={mentee!.avatar} size="lg" href={`/mentor/mentees/${mentee!.id}`} />
+          <div className="bg-card rounded-2xl border border-slate-200 p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0 w-full sm:w-auto">
+                <Avatar name={mentee!.name} src={mentee!.profilePictureUrl} initials={mentee!.avatar} size="lg" href={`/mentor/mentees/${mentee!.id}`} />
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-semibold text-slate-900 truncate">{mentee!.name}</h2>
-                  {mentee!.isNew && (
-                    <span
-                      title={mentee!.daysSinceJoined != null ? `Joined ${mentee!.daysSinceJoined === 0 ? 'today' : `${mentee!.daysSinceJoined} day${mentee!.daysSinceJoined === 1 ? '' : 's'} ago`}` : 'New to the platform'}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    >
-                      <Sparkles className="w-3 h-3" /> New mentee
-                    </span>
-                  )}
-                  <MomentumIcon m={mentee!.momentum} />
-                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />{risk.label}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-semibold text-slate-900 text-base sm:text-lg truncate">{mentee!.name}</h2>
+                    {mentee!.isNew && (
+                      <span
+                        title={mentee!.daysSinceJoined != null ? `Joined ${mentee!.daysSinceJoined === 0 ? 'today' : `${mentee!.daysSinceJoined} day${mentee!.daysSinceJoined === 1 ? '' : 's'} ago`}` : 'New to the platform'}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      >
+                        <Sparkles className="w-3 h-3" /> New mentee
+                      </span>
+                    )}
+                    <MomentumIcon m={mentee!.momentum} />
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-xs font-medium ${risk.cls}`}><span className={`w-1.5 h-1.5 rounded-full ${risk.dot}`} />{risk.label}</span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '-'} · {mentee!.onTimeRate}% on-time</div>
                 </div>
-                <div className="mt-0.5 text-xs text-slate-500">{mentee!.level} · Wk {mentee!.week}/{mentee!.totalWeeks || '-'} · {mentee!.onTimeRate}% on-time</div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto border-t sm:border-t-0 border-slate-100 pt-2 sm:pt-0 w-full sm:w-auto justify-end">
                 <NudgeButton menteeId={mentee!.id} menteeName={mentee!.name} variant="icon" />
+                {/* Reviewing someone is exactly when you realise they'd do better
+                    with another mentor — so the move lives here too, not only on
+                    the profile. */}
+                <MoveMenteeButton menteeId={mentee!.id} menteeName={mentee!.name} variant="icon" />
                 <button
                   onClick={pauseCurrent}
                   disabled={pausing}
@@ -909,7 +928,7 @@ export default function CohortReview() {
                 >
                   <PauseCircle className="w-4 h-4" />
                 </button>
-                <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
+                <Link href={`/mentor/mentees/${mentee!.id}`} className="text-xs text-brand-600 hover:text-brand-700 inline-flex items-center gap-0.5 px-2 py-1 rounded-md hover:bg-brand-50">Profile <ArrowUpRight className="w-3.5 h-3.5" /></Link>
               </div>
             </div>
             <div className="mt-4"><DualProgress absolute={mentee!.absoluteProgress} relative={mentee!.relativeProgress} compact /></div>
@@ -1098,7 +1117,7 @@ export default function CohortReview() {
             </div>
             <div className="p-4">
               {pending.length === 0 ? (
-                <p className="text-sm text-slate-500 flex items-center gap-2 px-1 py-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" />Nothing waiting - all clear.</p>
+                <p className="text-sm text-slate-500 flex items-center gap-2 px-1 py-2"><CheckCircle2 className="w-4 h-4 text-emerald-400" />Nothing waiting. All clear.</p>
               ) : (
                 <div className="space-y-2">
                   {pending.map((item, i) => (
@@ -1171,8 +1190,8 @@ export default function CohortReview() {
           {/* Blockers */}
           <div className="bg-card rounded-2xl border border-slate-200 p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" />Open blockers</h3>
-              <button onClick={() => setShowAddBlocker(true)} title="Log a blocker" className="p-1 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-slate-100"><Plus className="w-4 h-4" /></button>
+              <h3 className="font-semibold text-slate-900 flex items-center gap-2"><Flag className="w-4 h-4 text-red-500" />Open roadblocks</h3>
+              <button onClick={() => setShowAddBlocker(true)} title="Log a roadblock" className="p-1 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-slate-100"><Plus className="w-4 h-4" /></button>
             </div>
             {blockers.length === 0 ? (
               <p className="text-sm text-slate-500">None open.</p>
@@ -1194,27 +1213,28 @@ export default function CohortReview() {
           </div>
 
           {/* Progress / finish */}
-          <div className="bg-[#0f172a] rounded-2xl p-5 text-white">
-            <div className="text-sm space-y-1">
-              <div className="flex justify-between"><span className="text-slate-300">Reviewed</span><span>{seen.size}/{cohort.length}</span></div>
-              <div className="flex justify-between"><span className="text-slate-300">Present</span><span>{Object.values(attendance).filter((v) => v === 'present').length}</span></div>
-              <div className="flex justify-between"><span className="text-slate-300">Absent</span><span>{Object.values(attendance).filter((v) => v === 'absent').length}</span></div>
-              <div className="flex justify-between"><span className="text-slate-300">Excused</span><span>{Object.values(attendance).filter((v) => v === 'excused').length}</span></div>
-              <div className="flex justify-between"><span className="text-amber-300">Deferred</span><span className="text-amber-300">{deferred.size}</span></div>
+          <div className="bg-card rounded-2xl border border-slate-200 p-5">
+            <h3 className="font-semibold text-slate-900 mb-3">Session progress</h3>
+            <div className="text-sm space-y-1.5">
+              <div className="flex justify-between"><span className="text-slate-500">Reviewed</span><span className="font-medium text-slate-900">{seen.size}/{cohort.length}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Present</span><span className="font-medium text-slate-900">{Object.values(attendance).filter((v) => v === 'present').length}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Absent</span><span className="font-medium text-slate-900">{Object.values(attendance).filter((v) => v === 'absent').length}</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Excused</span><span className="font-medium text-slate-900">{Object.values(attendance).filter((v) => v === 'excused').length}</span></div>
+              <div className="flex justify-between"><span className="text-amber-600">Deferred</span><span className="font-medium text-amber-600">{deferred.size}</span></div>
             </div>
             {deferred.size > 0 && editable && (
-              <div className="mt-3 rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-2 text-xs text-amber-200">
+              <div className="mt-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
                 {deferred.size} deferred — jump to them from the dots above before finishing.
               </div>
             )}
             <button onClick={finishOrReopen}
-              className={`mt-4 w-full px-3 py-2 rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 ${session?.status === 'finished' ? 'bg-card/10 text-white hover:bg-card/20' : allSeen ? 'bg-card text-slate-900 hover:bg-slate-100' : 'bg-card/10 text-white/80 hover:bg-card/20'}`}>
+              className={`mt-4 w-full px-3 py-2 rounded-xl text-sm font-medium inline-flex items-center justify-center gap-1.5 ${session?.status === 'finished' || !allSeen ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' : 'bg-brand-600 text-white hover:bg-brand-700'}`}>
               {session?.status === 'finished'
                 ? (<><RotateCcw className="w-4 h-4" />Reopen to edit</>)
                 : allSeen ? 'Finish review' : `Finish (${pendingCount} not reviewed)`}
             </button>
             {session?.status === 'finished' && session?.finishedAt && (
-              <p className="mt-2 text-[11px] text-slate-400 text-center">Finished {new Date(session.finishedAt).toLocaleString()}</p>
+              <p className="mt-2 text-[11px] text-slate-500 text-center">Finished {new Date(session.finishedAt).toLocaleString()}</p>
             )}
           </div>
         </div>
@@ -1224,13 +1244,13 @@ export default function CohortReview() {
       <Drawer
         open={showAddBlocker}
         onClose={() => setShowAddBlocker(false)}
-        title="Log a blocker"
+        title="Log a roadblock"
         subtitle={mentee ? `Capture what's slowing ${mentee.name.split(' ')[0]} down.` : undefined}
         footer={
           <>
             <button onClick={() => setShowAddBlocker(false)} className="px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-sm hover:bg-slate-50">Cancel</button>
-            <button onClick={addBlocker} disabled={busy === 'add-blocker' || !bTitle.trim()} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
-              {busy === 'add-blocker' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log blocker
+            <button onClick={addBlocker} disabled={busy === 'add-roadblock' || !bTitle.trim()} className="px-4 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium inline-flex items-center gap-2 disabled:opacity-50">
+              {busy === 'add-roadblock' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Log roadblock
             </button>
           </>
         }
@@ -1340,7 +1360,7 @@ export default function CohortReview() {
       />
 
       {/* Cohort-review history: browse & open past dated sessions to view or edit. */}
-      <Drawer open={historyOpen} onClose={() => setHistoryOpen(false)} width="md" title="Cohort review history" subtitle="Open a past session to view or edit it">
+      <Drawer open={historyOpen} onClose={() => setHistoryOpen(false)} width="md" title="Clan review history" subtitle="Open a past session to view or edit it">
         {/* Deletion lock: org-enforced for audit integrity. Mentor can request access. */}
         {deletionBlocked && (
           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/30 px-4 py-3">
@@ -1430,7 +1450,7 @@ export default function CohortReview() {
         </div>
       </Drawer>
 
-      {/* Per-mentee attendance history — every cohort review they were marked on,
+      {/* Per-mentee attendance history — every clan review they were marked on,
           newest first. A late-joiner simply has no entries before they joined. */}
       <Drawer open={attOpen} onClose={() => setAttOpen(false)} width="md"
         title="Attendance history"
@@ -1484,6 +1504,17 @@ export default function CohortReview() {
           </div>
         </div>
       )}
+
+      {/* Mobile sticky action bar for clan review */}
+      <MobileReviewActionBar
+        currentIndex={idx}
+        totalCount={cohort.length}
+        onPrev={() => go(-1)}
+        onSkip={skip}
+        onNext={() => go(1)}
+        canPrev={idx > 0}
+        canNext={idx < cohort.length - 1}
+      />
     </div>
   );
 }
