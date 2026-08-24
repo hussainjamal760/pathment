@@ -393,9 +393,32 @@ class ProgramService {
         type: program.type
       }
     });
+    if (program.status === 'published') {
+      const enrollments = await models.Enrollment.findAll({
+        where: {
+          programId: program.id,
+          status: 'active'
+        },
+        attributes: ['menteeId'],
+        limit: 5000
+      });
 
-
-
+      if (enrollments.length > 0) {
+        await notificationOrchestrator.dispatch({
+          eventKey: NOTIFICATION_EVENTS.PROGRAM_UPDATED,
+          recipients: enrollments.map((e) => ({ userId: e.menteeId })),
+          payload: {
+            title: 'Program updated',
+            message: `"${program.name}" has been updated.`,
+            actionUrl: `/mentee/dashboard`,
+            actionLabel: 'View Program',
+            relatedEntityType: 'program',
+            relatedEntityId: program.id,
+            emailSubject: 'Pathment: Program update'
+          }
+        });
+      }
+    }
     return program;
   }
 
