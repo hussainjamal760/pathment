@@ -67,6 +67,7 @@ export function RoadmapLinearStepCard({
   const isOverdue =
     step.assignedTask?.dueDate &&
     !isDone &&
+    !isSubmitted &&
     new Date(step.assignedTask.dueDate).getTime() < Date.now();
 
   const getStatusBadge = () => {

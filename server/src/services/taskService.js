@@ -1004,7 +1004,7 @@ class TaskService {
     const overdue = allTasks.filter(t => 
       t.dueDate && 
       new Date(t.dueDate) < now && 
-      !['completed', 'cancelled'].includes(t.status)
+      !['completed', 'submitted', 'cancelled'].includes(t.status)
     ).length;
 
     return {

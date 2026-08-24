@@ -167,7 +167,7 @@ export default function TaskSubmission({ params }: PageProps) {
   const daysUntilDue = Math.ceil(
     (new Date(task.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
   );
-  const isOverdue = daysUntilDue < 0;
+  const isOverdue = daysUntilDue < 0 && !['completed', 'submitted'].includes(task.status);
 
   // Get task details from roadmapTask or custom task fields
   const taskTitle = task.roadmapTask?.title || task.title;
