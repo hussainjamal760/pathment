@@ -261,6 +261,9 @@ export const mentorApi = {
     cancel: (id: string) => apiClient.post(`/mentor/transfers/${id}/cancel`, {}),
   },
 
+  // A mentee's day-by-day progress on one task, read only.
+  getTaskProgress: (taskId: string) => apiClient.get('/mentor/tasks/' + taskId + '/progress'),
+
   deleteUser: (id: string) => {
     return apiClient.delete(`/admin/users/${id}`);
   },

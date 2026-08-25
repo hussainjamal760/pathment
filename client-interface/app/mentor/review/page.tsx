@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import {
   ChevronLeft, ChevronRight, SkipForward, Check, Loader2,
   TrendingUp, TrendingDown, Minus, Flag, Clock, ClipboardCheck, Keyboard, CheckCircle2, ArrowUpRight, Send, Plus, ListTodo, CalendarClock,
-  Trash2, X, History, RotateCcw, CalendarDays, AlertTriangle, StickyNote, Search, Lock, Unlock, PauseCircle, Sparkles,
+  Trash2, X, History, RotateCcw, CalendarDays, AlertTriangle, StickyNote, Search, Lock, Unlock, PauseCircle, Sparkles, PenLine,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useMentorCohort, useMentorApprovals, type CohortMentee, type CohortMomentum, type CohortRisk, type ApprovalItem } from '@/lib/hooks/mentor';
@@ -932,6 +932,32 @@ export default function CohortReview() {
             <div className="mt-4"><DualProgress absolute={mentee!.absoluteProgress} relative={mentee!.relativeProgress} compact /></div>
             {mentee!.riskReason && <p className="mt-3 text-xs text-slate-500 border-t border-slate-100 pt-3">{mentee!.riskReason}</p>}
           </div>
+
+          {/* What they have actually been doing, day by day, on the work that is
+              open right now. The mentor is already here going person by person,
+              so this turns a status into something to ask about. */}
+          {Array.isArray(profile?.taskProgress) && profile.taskProgress.length > 0 && (
+            <div className="bg-card rounded-2xl border border-slate-200 p-4">
+              <h3 className="text-sm font-medium text-slate-900 mb-2.5 flex items-center gap-1.5">
+                <PenLine className="w-4 h-4 text-brand-600" /> Progress on open work
+              </h3>
+              <div className="space-y-2">
+                {profile.taskProgress.map((tp: { taskId: string; title: string; label: string; loggedDays: number; lastNote: string | null }) => (
+                  <div key={tp.taskId} className="rounded-xl border border-slate-200 px-3 py-2">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm text-slate-800 truncate">{tp.title}</p>
+                      <span className={`shrink-0 text-xs tabular-nums ${tp.loggedDays === 0 ? 'text-amber-600 font-medium' : 'text-slate-500'}`}>
+                        {tp.label}
+                      </span>
+                    </div>
+                    {tp.lastNote && (
+                      <p className="mt-1 text-xs text-slate-500 line-clamp-2">&ldquo;{tp.lastNote}&rdquo;</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* State of this mentee - same read as the profile (AI summary + signals). */}
           {profile?.aiSummary && (

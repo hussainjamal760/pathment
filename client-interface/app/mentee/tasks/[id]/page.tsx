@@ -27,6 +27,7 @@ import { useTaskDetail } from '@/lib/hooks/mentee';
 import { PageHeader, StatusBadge } from '@/components/admin/ui';
 import { useActivityTracker } from '@/lib/hooks/shared/useActivityTracker';
 import { FrictionPanel } from '@/components/mentee/FrictionPanel';
+import { TaskProgressTimeline } from '@/components/shared/TaskProgressTimeline';
 import { SubmitTaskDrawer } from '@/components/mentee/SubmitTaskDrawer';
 import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
 import { isMissingDescription } from '@/lib/utils/html';
@@ -410,6 +411,13 @@ export default function TaskDetailsPage({ params }: PageProps) {
             );
           })}
         </div>
+      )}
+
+      {/* Day by day progress. Sits above the friction panel because "here's what
+          I did" is the everyday act and "here's what stopped me" is the exception.
+          Interview and quiz tasks are one sitting, so there is no day three. */}
+      {!['completed', 'cancelled'].includes(task.status) && !isInterview && !isQuiz && (
+        <TaskProgressTimeline taskId={task.id} mode="mentee" />
       )}
 
       {/* What's getting in the way - log roadblock / delay / request extension */}

@@ -474,6 +474,16 @@ class CohortService {
     const dailyLogs = settled(6, []);
     const lastAttendance = settled(7, null);
 
+    // Day-by-day progress per in-flight task, for the review screen's one liner.
+    // Deliberately outside the Promise.allSettled block above: it is additive,
+    // and a profile that loses this section is still a perfectly good profile.
+    let taskProgress = [];
+    try {
+      taskProgress = await require('./taskProgressService').summaryForMentee(menteeId);
+    } catch (error) {
+      logger.warn('getMenteeDetail: taskProgress failed to load', { menteeId, error: error.message });
+    }
+
     const openBlockers = allBlockers.filter((b) => b.status === 'open');
     const preloads = {
       users: { [menteeId]: mentee },
@@ -554,6 +564,10 @@ class CohortService {
         email: c.email,
         status: c.status
       })),
+      // Per-task progress, one line each, for the cohort review screen. Attached
+      // to the profile the review page already loads rather than a second
+      // request, so walking 20 mentees does not become 20 extra round trips.
+      taskProgress,
       dailyLogs: dailyLogs.map((l) => ({
         dateKey: l.dateKey,
         tasksDone: (l.tasksDone || []).length,
