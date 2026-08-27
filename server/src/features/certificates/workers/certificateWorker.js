@@ -20,7 +20,11 @@ async function processJob(job) {
   const instance = await models.CertificateInstance.findOne({
     where: { id: job.instanceId },
     include: [
-      { model: models.CertificateTemplate, as: 'template' },
+      {
+        model: models.CertificateTemplate,
+        as: 'template',
+        include: [{ model: models.Program, as: 'program', required: false }]
+      },
       { model: models.User, as: 'mentee' },
       { model: models.User, as: 'mentor', required: false },
       { model: models.User, as: 'issuer' }
@@ -47,13 +51,15 @@ async function processJob(job) {
     where: { menteeId: instance.menteeId },
     include: [{ model: models.Program, as: 'program', required: false }]
   });
-  const fellowshipName = enrollment?.program?.name || 'Pathment Fellowship';
+  const programName = instance.template?.program?.name || enrollment?.program?.name || 'Pathment Program';
+  const fellowshipName = programName;
 
   const renderData = {
     menteeName,
     mentorName,
     dateIssued,
     fellowshipName,
+    programName,
     issuerName: mentorName,
     issuerTitle: instance.mentor ? 'Mentor' : 'Pathment Admin'
   };

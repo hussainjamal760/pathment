@@ -44,6 +44,10 @@ async function up() {
         participation_badge_url: { type: Sequelize.TEXT, allowNull: true },
         criteria: { type: Sequelize.JSONB, allowNull: true },
         config: { type: Sequelize.JSONB, allowNull: false },
+        program_id: {
+          type: Sequelize.UUID, allowNull: false,
+          references: { model: 'programs', key: 'id' }, onDelete: 'CASCADE', onUpdate: 'CASCADE',
+        },
         created_by: {
           type: Sequelize.UUID, allowNull: false,
           references: { model: 'users', key: 'id' }, onDelete: 'CASCADE', onUpdate: 'CASCADE',

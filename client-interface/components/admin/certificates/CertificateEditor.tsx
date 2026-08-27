@@ -45,7 +45,7 @@ const FONTS = [
 
 const DYNAMIC_SHORTCUTS = [
   { key: 'mentee_name', label: 'Member Name', tag: '{{name}}' },
-  { key: 'fellowship_name', label: 'Fellowship Name', tag: '{{fellowship_name}}' },
+  { key: 'program_name', label: 'Program Name', tag: '{{program_name}}' },
   { key: 'date_issued', label: 'Date', tag: '{{date}}' },
   { key: 'issuer_name', label: 'Issuer Name', tag: '{{issuer_name}}' },
   { key: 'issuer_title', label: 'Issuer Title', tag: '{{issuer_title}}' }
@@ -260,6 +260,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   // Roadmap tasks & Programs
   const [availableTasks, setAvailableTasks] = useState<Array<{ id: string; title: string }>>([]);
+  const [allRoadmaps, setAllRoadmaps] = useState<any[]>([]);
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
 
@@ -278,6 +279,17 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [adminTiers, setAdminTiers] = useState<Record<string, string>>({});
   const [isRulesDrawerOpen, setIsRulesDrawerOpen] = useState(false);
   const [criteriaTasks, setCriteriaTasks] = useState<Array<{ id: string; title: string }>>([]);
+
+  const handleProgramChange = (val: string) => {
+    if (criteria.some(c => c.taskIds.length > 0)) {
+      if (window.confirm("Changing the program will clear the selected task criteria. Do you want to proceed?")) {
+        setSelectedProgramId(val);
+        setCriteria(prev => prev.map(c => ({ ...c, taskIds: [] })));
+      }
+    } else {
+      setSelectedProgramId(val);
+    }
+  };
 
   const getTierName = (tierId: string) => {
     const match = criteria.find(c => c.id === tierId);
@@ -315,25 +327,13 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
         // Load tasks list
         if (roadmapRes.data && Array.isArray(roadmapRes.data.roadmaps)) {
-          const flat: Array<{ id: string; title: string }> = [];
-          roadmapRes.data.roadmaps.forEach((rm: any) => {
-            if (Array.isArray(rm.steps)) {
-              rm.steps.forEach((step: any) => {
-                if (step.id && step.title) {
-                  if (!flat.some(f => f.id === step.id)) {
-                    flat.push({ id: step.id, title: step.title });
-                  }
-                }
-              });
-            }
-          });
-          setAvailableTasks(flat);
+          setAllRoadmaps(roadmapRes.data.roadmaps);
         }
 
         // Load cohorts
         if (programsRes.success && programsRes.data) {
           setPrograms(programsRes.data);
-          if (programsRes.data.length > 0) {
+          if (programsRes.data.length > 0 && !templateId) {
             setSelectedProgramId(programsRes.data[0].id);
           }
         }
@@ -342,7 +342,30 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       }
     };
     loadData();
-  }, []);
+  }, [templateId]);
+
+  // Dynamically compute available tasks based on selected Program ID
+  useEffect(() => {
+    if (!selectedProgramId || allRoadmaps.length === 0) {
+      setAvailableTasks([]);
+      return;
+    }
+
+    const flat: Array<{ id: string; title: string }> = [];
+    const programRoadmaps = allRoadmaps.filter((r: any) => r.programId === selectedProgramId);
+    programRoadmaps.forEach((rm: any) => {
+      if (Array.isArray(rm.steps)) {
+        rm.steps.forEach((step: any) => {
+          if (step.id && step.title) {
+            if (!flat.some(f => f.id === step.id)) {
+              flat.push({ id: step.id, title: step.title });
+            }
+          }
+        });
+      }
+    });
+    setAvailableTasks(flat);
+  }, [selectedProgramId, allRoadmaps]);
 
   // Fetch initial template if editing
   useEffect(() => {
@@ -355,6 +378,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         if (res.success && res.data) {
           const t = res.data;
           setName(t.name);
+          if (t.programId) {
+            setSelectedProgramId(t.programId);
+          }
           const bg = t.bgImageUrl || '';
           setBgImageUrl(bg);
           const matchPreset = BACKGROUND_PRESETS.find(p => {
@@ -686,6 +712,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       toast.error('Please enter a template name');
       return;
     }
+    if (!selectedProgramId) {
+      toast.error('Please select a program');
+      return;
+    }
     
     try {
       setLoading(true);
@@ -695,7 +725,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         logoUrl: undefined,
         logoConfig: undefined,
         criteria,
-        config: elements
+        config: elements,
+        programId: selectedProgramId
       };
 
       let res;
@@ -997,7 +1028,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             <span>&gt;</span>
             <span className="text-brand-500">Create Certificate Cycle</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-3 mt-1 flex-wrap">
             <input
               type="text"
               value={name}
@@ -1005,6 +1036,21 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               placeholder="Enter Template / Cycle Name..."
               className="text-xl font-extrabold text-foreground bg-transparent border-b border-dashed border-border/80 hover:border-brand-500 focus:border-brand-500 focus:outline-none transition-all pb-1 min-w-[320px] max-w-[500px]"
             />
+
+            <div className="flex items-center gap-1.5 pl-3 border-l border-border">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Program:</span>
+              <select
+                value={selectedProgramId}
+                onChange={(e) => handleProgramChange(e.target.value)}
+                disabled={!!templateId}
+                className="px-2 py-0.5 text-xs font-semibold bg-card border border-border rounded-lg text-foreground focus:outline-none cursor-pointer max-w-[200px]"
+              >
+                <option value="" disabled>Select Program</option>
+                {programs.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground mt-1">Create, customize and issue certificates for this fellowship cycle.</p>
         </div>
@@ -1574,8 +1620,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 <label className="text-[10px] font-bold text-muted-foreground uppercase">Cohort / Program</label>
                 <select
                   value={selectedProgramId}
-                  onChange={e => setSelectedProgramId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-background border border-border rounded-xl text-foreground focus:outline-none cursor-pointer"
+                  disabled={true}
+                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-muted border border-border rounded-xl text-muted-foreground focus:outline-none cursor-not-allowed opacity-80"
                 >
                   {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>

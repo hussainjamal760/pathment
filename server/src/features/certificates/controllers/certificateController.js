@@ -6,10 +6,13 @@ const { NotFoundError, ValidationError, ForbiddenError } = require('../../../uti
  */
 exports.createTemplate = async (req, res, next) => {
   try {
-    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria } = req.body;
+    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId } = req.body;
 
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ValidationError('Template name is required');
+    }
+    if (!programId) {
+      throw new ValidationError('Program ID is required');
     }
     if (!config || !Array.isArray(config)) {
       throw new ValidationError('Template config must be an array of elements');
@@ -22,6 +25,7 @@ exports.createTemplate = async (req, res, next) => {
       logoConfig: logoConfig || null,
       config,
       criteria: criteria || [],
+      programId,
       createdBy: req.user.id,
       status: 'active'
     });
@@ -41,9 +45,24 @@ exports.createTemplate = async (req, res, next) => {
  */
 exports.listTemplates = async (req, res, next) => {
   try {
+    const { Op } = require('sequelize');
     let whereClause = { status: 'active' };
 
+    if (req.query.programId) {
+      whereClause.programId = req.query.programId;
+    }
+
     if (req.user.role === 'mentor') {
+      const memberships = await models.ClanMembership.findAll({
+        where: {
+          userId: req.user.id,
+          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
+          status: 'active'
+        },
+        include: [{ model: models.Clan, as: 'clan', attributes: ['programId'] }]
+      });
+      const programIds = [...new Set(memberships.map(m => m.clan?.programId).filter(Boolean))];
+
       const shares = await models.Notification.findAll({
         where: {
           userId: req.user.id,
@@ -52,8 +71,11 @@ exports.listTemplates = async (req, res, next) => {
         attributes: ['relatedEntityId']
       });
       const sharedIds = [...new Set(shares.map(s => s.relatedEntityId).filter(Boolean))];
-      const { Op } = require('sequelize');
-      whereClause.id = { [Op.in]: sharedIds };
+
+      whereClause[Op.or] = [
+        { programId: { [Op.in]: programIds } },
+        { id: { [Op.in]: sharedIds } }
+      ];
     }
 
     const templates = await models.CertificateTemplate.findAll({
@@ -64,6 +86,11 @@ exports.listTemplates = async (req, res, next) => {
           model: models.User,
           as: 'creator',
           attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: models.Program,
+          as: 'program',
+          attributes: ['id', 'name']
         }
       ]
     });
@@ -114,7 +141,7 @@ exports.getTemplate = async (req, res, next) => {
 exports.updateTemplate = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria } = req.body;
+    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId } = req.body;
 
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' }
@@ -129,6 +156,13 @@ exports.updateTemplate = async (req, res, next) => {
         throw new ValidationError('Template name cannot be empty');
       }
       template.name = name.trim();
+    }
+
+    if (programId !== undefined) {
+      if (!programId) {
+        throw new ValidationError('Program ID cannot be empty');
+      }
+      template.programId = programId;
     }
 
     if (bgImageUrl !== undefined) template.bgImageUrl = bgImageUrl || null;
@@ -391,20 +425,21 @@ exports.uploadAsset = async (req, res, next) => {
 exports.getQualification = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { programId, mentorId } = req.query;
+    const { mentorId: queryMentorId } = req.query;
     const { Op } = require('sequelize');
-
-    if (!mentorId && !programId) throw new ValidationError('Either mentorId or programId is required');
 
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
+
+    const programId = template.programId;
+    const mentorId = req.user.role === 'mentor' ? req.user.id : queryMentorId;
 
     // --- 1. Resolve mentee pool ---
     const activeMentees = [];
     const pausedMentees  = [];
 
     if (mentorId) {
-      // Find clans where this mentor is active lead_mentor or co_mentor
+      // Find clans where this mentor is active lead_mentor or co_mentor and clan belongs to template's program
       const mentorClans = await models.ClanMembership.findAll({
         where: {
           userId: mentorId,
@@ -412,13 +447,24 @@ exports.getQualification = async (req, res, next) => {
           status: 'active'
         },
         attributes: ['clanId'],
+        include: [{
+          model: models.Clan,
+          as: 'clan',
+          where: { programId },
+          attributes: []
+        }],
         raw: true
       });
-      let clanIds = mentorClans.map(c => c.clanId);
+      let clanIds = mentorClans.map(c => c.clanId || c['clan.id']);
 
-      // Admin fallback for testing: if no clans matched and caller is admin, load first 5 active clans
+      // Admin fallback for testing: if no clans matched and caller is admin, load first 5 active clans of this program
       if (clanIds.length === 0 && req.user.role === 'admin') {
-        const allClans = await models.Clan.findAll({ limit: 5, attributes: ['id'], raw: true });
+        const allClans = await models.Clan.findAll({
+          where: { programId },
+          limit: 5,
+          attributes: ['id'],
+          raw: true
+        });
         clanIds = allClans.map(c => c.id);
       }
 
@@ -625,12 +671,11 @@ exports.getQualification = async (req, res, next) => {
 exports.sendToMentors = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { programId } = req.body;
-    if (!programId) throw new ValidationError('Program ID is required');
 
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
+    const programId = template.programId;
     const { Op } = require('sequelize');
 
     // Find all active mentors in clans belonging to this program

@@ -6,19 +6,24 @@ import { Plus, Trash2, Edit2, Loader2, Award, Calendar, User } from 'lucide-reac
 import { toast } from 'sonner';
 import { certificatesApi, CertificateTemplate } from '@/lib/services/certificates-api';
 import { ConfirmModal } from '@/components/shared';
+import { programsApi } from '@/lib/services/program-api';
 
 export default function AdminCertificatesPage() {
   const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>('all');
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
   
   // Delete confirm states
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (progId?: string) => {
     try {
       setLoading(true);
-      const res = await certificatesApi.listTemplates();
+      const filterId = progId !== undefined ? progId : selectedProgramFilter;
+      const res = await certificatesApi.listTemplates(filterId !== 'all' ? filterId : undefined);
       if (res.success && res.data) {
         setTemplates(res.data);
       }
@@ -31,8 +36,25 @@ export default function AdminCertificatesPage() {
   };
 
   useEffect(() => {
-    fetchTemplates();
+    const loadInitialData = async () => {
+      try {
+        setLoadingPrograms(true);
+        const res = await programsApi.getAll({ limit: 100 });
+        if (res.success && res.data) {
+          setPrograms(res.data);
+        }
+      } catch (err) {
+        console.error('Failed to load programs:', err);
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+    loadInitialData();
   }, []);
+
+  useEffect(() => {
+    fetchTemplates();
+  }, [selectedProgramFilter]);
 
   const requestDelete = (id: string) => {
     setTemplateToDelete(id);
@@ -58,18 +80,33 @@ export default function AdminCertificatesPage() {
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="flex items-center justify-between border-b border-border pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">Certificates</h1>
           <p className="text-xs text-muted-foreground">Manage templates and issue certificates to mentees</p>
         </div>
-        <Link
-          href="/admin/certificates/new"
-          className="flex items-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Create Template
-        </Link>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap">Program:</span>
+            <select
+              value={selectedProgramFilter}
+              onChange={e => setSelectedProgramFilter(e.target.value)}
+              className="px-3 py-1.5 text-xs font-semibold bg-card border border-border rounded-xl text-foreground focus:outline-none cursor-pointer min-w-[150px]"
+            >
+              <option value="all">All Programs</option>
+              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+
+          <Link
+            href="/admin/certificates/new"
+            className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Create Template
+          </Link>
+        </div>
       </div>
 
       {/* Templates List */}
@@ -130,8 +167,13 @@ export default function AdminCertificatesPage() {
 
                 {/* Details Footer */}
                 <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-bold text-foreground line-clamp-1">{template.name}</h3>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{template.name}</h3>
+                      <span className="text-[9px] bg-brand-500/10 text-brand-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider whitespace-nowrap">
+                        {template.program?.name || 'No Program'}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-semibold">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-brand-500" />

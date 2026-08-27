@@ -49,7 +49,7 @@ function compileHtml(template, data) {
     let text = el.text || '';
     if (el.type === 'dynamic') {
       if (el.dynamicKey === 'mentee_name') text = data.menteeName || '';
-      else if (el.dynamicKey === 'fellowship_name') text = data.fellowshipName || '';
+      else if (el.dynamicKey === 'fellowship_name' || el.dynamicKey === 'program_name') text = data.programName || data.fellowshipName || '';
       else if (el.dynamicKey === 'date_issued') text = data.dateIssued || '';
       else if (el.dynamicKey === 'issuer_name') text = data.issuerName || '';
       else if (el.dynamicKey === 'issuer_title') text = data.issuerTitle || '';

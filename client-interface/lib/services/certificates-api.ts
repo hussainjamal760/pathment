@@ -4,7 +4,7 @@ export interface CertificateElement {
   id: string;
   text: string;
   type: 'static' | 'dynamic' | 'badge' | 'image';
-  dynamicKey?: 'mentee_name' | 'mentor_name' | 'date_issued' | 'fellowship_name' | 'issuer_name' | 'issuer_title';
+  dynamicKey?: 'mentee_name' | 'mentor_name' | 'date_issued' | 'program_name' | 'fellowship_name' | 'issuer_name' | 'issuer_title';
   xPercent: number;
   yPercent: number;
   fontSizePercent: number;
@@ -41,6 +41,11 @@ export interface CertificateTemplate {
   status: string;
   createdAt: string;
   updatedAt: string;
+  programId: string;
+  program?: {
+    id: string;
+    name: string;
+  };
   creator?: {
     id: string;
     firstName: string;
@@ -69,8 +74,11 @@ export interface CertificateInstance {
 
 export const certificatesApi = {
   // Templates CRUD
-  listTemplates: () => 
-    apiClient.get<{ success: boolean; data: CertificateTemplate[] }>('/certificates/templates'),
+  listTemplates: (programId?: string) => {
+    const qs = new URLSearchParams();
+    if (programId) qs.set('programId', programId);
+    return apiClient.get<{ success: boolean; data: CertificateTemplate[] }>(`/certificates/templates?${qs.toString()}`);
+  },
     
   getTemplate: (id: string) => 
     apiClient.get<{ success: boolean; data: CertificateTemplate }>(`/certificates/templates/${id}`),

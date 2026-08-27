@@ -17,11 +17,13 @@ module.exports = (sequelize) => {
     participationBadgeUrl: { type: DataTypes.TEXT, field: 'participation_badge_url' },
     criteria: { type: DataTypes.JSONB },
     createdBy: { type: DataTypes.UUID, allowNull: false, field: 'created_by' },
+    programId: { type: DataTypes.UUID, allowNull: false, field: 'program_id' },
     status: { type: DataTypes.STRING(20), defaultValue: 'active' }
   }, { tableName: 'certificate_templates', underscored: true });
 
   CertificateTemplate.associate = function(models) {
     CertificateTemplate.belongsTo(models.User, { foreignKey: 'createdBy', as: 'creator' });
+    CertificateTemplate.belongsTo(models.Program, { foreignKey: 'programId', as: 'program' });
   };
 
   const CertificateInstance = sequelize.define('CertificateInstance', {
