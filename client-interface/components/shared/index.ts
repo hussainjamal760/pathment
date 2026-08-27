@@ -32,3 +32,5 @@ export { default as OnboardingGuard } from './OnboardingGuard';
 export { RoleGuard } from './RoleGuard';
 export { default as RichTextEditor } from './RichTextEditor';
 export { FileDragDrop } from './FileDragDrop';
+export { default as ConfirmModal } from './ConfirmModal';
+export { default as DuplicateWarnModal } from './DuplicateWarnModal';

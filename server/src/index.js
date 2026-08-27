@@ -157,6 +157,10 @@ async function start() {
     // Initialize RAG subsystem (Workers & Event Listeners)
     const { initializeRag } = require('./features/rag');
     initializeRag();
+
+    // Initialize Certificates subsystem (Workers)
+    const { initializeCertificates } = require('./features/certificates');
+    initializeCertificates();
     if (process.env.NOTIFICATION_SCHEDULER_DISABLED !== 'true') {
       notificationScheduler.start();
     }

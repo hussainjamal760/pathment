@@ -33,6 +33,7 @@ import {
   Mic,
   ListChecks,
   Video,
+  Award,
   type LucideIcon
 } from 'lucide-react';
 import { UserRole } from '@/lib/types';
@@ -95,6 +96,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
         { path: '/admin/programs/list', icon: BookOpen, label: 'Programs', permission: 'program.manage' },
         { path: '/admin/roadmaps', icon: Route, label: 'Roadmaps', permission: 'roadmap.author' },
         { path: '/admin/schedules', icon: CalendarClock, label: 'Schedules', permission: 'program.manage' },
+        { path: '/admin/certificates', icon: Award, label: 'Certificates', permission: 'program.manage' },
       ],
     },
     {
@@ -146,6 +148,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
         { path: '/mentor/schedules', icon: CalendarClock, label: 'Schedules' },
         { path: '/mentor/reports', icon: FileText, label: 'Reports' },
         { path: '/mentor/scores', icon: Gauge, label: 'Progress Scores' },
+        { path: '/mentor/certificates', icon: Award, label: 'Certificates' },
       ],
     },
     {
@@ -174,6 +177,7 @@ export const navigationConfig: Record<string, NavLink[]> = {
         { path: '/mentee/blockers', icon: Flag, label: 'Blockers' },
         { path: '/mentee/progress', icon: BarChart2, label: 'My Progress' },
         { path: '/mentee/gamification', icon: Trophy, label: 'Points & Badges' },
+        { path: '/mentee/certificates', icon: Award, label: 'My Certificates' },
       ],
     },
     {
