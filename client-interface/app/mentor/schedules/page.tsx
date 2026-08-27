@@ -379,6 +379,7 @@ function RoadmapSlotEditor({ slot, menteeId, roadmaps, onPatch, refreshTick }: {
 function FillTab() {
   const { cohort } = useMentorCohort();
   const { local } = useMentorRoadmaps();
+  const confirm = useConfirm();
   const [scope, setScope] = useState<'all' | 'selected' | 'single'>('all');
   const [selectedMenteeIds, setSelectedMenteeIds] = useState<Set<string>>(new Set());
   const [menteeId, setMenteeId] = useState('');
@@ -420,6 +421,12 @@ function FillTab() {
   // Save/Apply slot config across target mentees
   const saveSlotConfig = async (slot: ScheduleSlot, slotId: string) => {
     if (!slotId) return;
+    if (slot.kind === 'recurring' && slot.recurring?.startsOn && slot.recurring?.endsOn) {
+      if (new Date(slot.recurring.endsOn) < new Date(slot.recurring.startsOn)) {
+        toast.error("Ends On date must be after Starts On date");
+        return;
+      }
+    }
     try {
       setBusy(slotId);
       if (scope === 'single') {
@@ -598,7 +605,7 @@ function FillTab() {
                       </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="grid gap-3 sm:grid-cols-4">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Frequency</label>
                         <select
@@ -640,11 +647,44 @@ function FillTab() {
                           className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 shadow-2xs"
                         />
                       </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Ends On</label>
+                        <input
+                          type="date"
+                          value={s.recurring?.endsOn || ''}
+                          onChange={(e) => patchSlot(s.id, {
+                            recurring: { ...(s.recurring || { title: '', type: 'discussion' }), endsOn: e.target.value || undefined }
+                          })}
+                          className="w-full rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 shadow-2xs"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
                 <div className="flex items-center justify-end gap-2.5 mt-4 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                  {s.kind !== 'empty' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!(await confirm({
+                          title: 'Clear this slot?',
+                          description: `This will change the slot "${s.label}" to Empty, stopping any active schedules.`,
+                          variant: 'danger',
+                          confirmLabel: 'Clear Slot'
+                        }))) return;
+
+                        const clearedSlot: ScheduleSlot = { ...s, kind: 'empty', roadmapChain: [], startStep: 0, recurring: null };
+                        patchSlot(slotId, clearedSlot);
+                        await saveSlotConfig(clearedSlot, slotId);
+                      }}
+                      disabled={busy === slotId}
+                      className="mr-auto text-xs font-semibold text-red-600 hover:text-red-700 hover:underline transition-colors disabled:opacity-50"
+                    >
+                      Clear Slot
+                    </button>
+                  )}
                   {s.kind === 'recurring' && (
                     <button
                       type="button"

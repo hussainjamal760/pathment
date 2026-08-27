@@ -108,6 +108,7 @@ export function AssignTaskDrawer({
   const [recIntervalWeeks, setRecIntervalWeeks] = useState<number>(1);
   const [recDueOffsetDays, setRecDueOffsetDays] = useState<number>(7);
   const [recStartsOn, setRecStartsOn] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [recEndsOn, setRecEndsOn] = useState<string>('');
 
   // Load the mentor's interview kits the first time they pick the Interview type.
   // Guard on a ref (not `kitsLoading`) so toggling loading state doesn't re-run
@@ -343,6 +344,11 @@ export function AssignTaskDrawer({
       }
 
       // ── Assign a custom task ─────────────────────────────────────────────
+      if (type === 'recurring' && recEndsOn && new Date(recEndsOn) < new Date(recStartsOn)) {
+        toast.error("Ends On date must be after Starts On date");
+        return;
+      }
+
       const cleanResources = resources
         .map((r) => ({ title: r.title.trim(), url: r.url.trim() }))
         .filter((r) => r.url)
@@ -375,6 +381,7 @@ export function AssignTaskDrawer({
                 intervalWeeks: recIntervalWeeks,
                 dueOffsetDays: recDueOffsetDays,
                 startsOn: recStartsOn,
+                endsOn: recEndsOn || undefined,
               },
             }
           : {}),
@@ -660,16 +667,29 @@ export function AssignTaskDrawer({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Starts On <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={recStartsOn}
-                      onChange={(e) => setRecStartsOn(e.target.value)}
-                      className={field}
-                    />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Starts On <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={recStartsOn}
+                        onChange={(e) => setRecStartsOn(e.target.value)}
+                        className={field}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Ends On <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={recEndsOn}
+                        onChange={(e) => setRecEndsOn(e.target.value)}
+                        className={field}
+                      />
+                    </div>
                   </div>
                 </div>
               )}
