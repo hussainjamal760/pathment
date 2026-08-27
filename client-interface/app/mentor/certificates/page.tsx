@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Loader2, Award, Calendar, ArrowLeft, Search,
   Users, Send, Eye, CheckCircle2, XCircle, AlertCircle,
-  TrendingUp, ShieldOff, Download, ExternalLink, Linkedin, ShieldCheck, X, ShieldAlert, Info
+  TrendingUp, ShieldOff, Download, ExternalLink, Linkedin, ShieldCheck, X, ShieldAlert, Info,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/context/AuthContext';
@@ -801,30 +802,52 @@ export default function MentorCertificatesPage() {
               <CertificateHistoryLog templateId={activeTemplateId!} userRole="mentor" />
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-2xl p-5 shadow-2xs flex flex-col min-h-[560px]">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Mentees list</p>
-                <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-600">
+            <div className="bg-card border border-border/80 rounded-2xl p-6 shadow-2xs flex flex-col min-h-[580px] bg-white/70 dark:bg-slate-900/70 backdrop-blur-md">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Mentees Eligibility</h3>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Select mentees and configure their certificate tiers</p>
+                </div>
+                <span className="flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400">
                   <TrendingUp className="w-3 h-3" />
                   Active Mentees
                   <span className="ml-1 font-extrabold">{activeMentees.length}</span>
                 </span>
               </div>
 
-              {/* Search and Bulk Actions */}
-              <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              {/* Search Field */}
+              <div className="mb-5">
+                <div className="relative w-full">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search mentees by name or email..."
-                    className="w-full pl-9 pr-4 py-2.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/40"
+                    className="w-full pl-10 pr-10 py-2.5 text-xs bg-muted/40 hover:bg-muted/60 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/50 transition-all shadow-3xs"
                   />
+                  {search && (
+                    <button
+                      onClick={() => setSearch('')}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded-full transition-colors"
+                      type="button"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
                 </div>
-                {filtered.length > 0 && (
-                  <div className="flex items-center gap-1.5 flex-wrap bg-muted/20 border border-border rounded-2xl p-3 text-xs">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Set All to:</span>
+              </div>
+
+              {/* Bulk Actions Banner - slides/fades in when mentees selected */}
+              {selectedIds.size > 0 && filtered.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 dark:border-brand-500/30 rounded-xl p-3.5 text-xs mb-5 animate-in fade-in slide-in-from-top-2 duration-200 gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-brand-500 animate-pulse" />
+                    <span className="font-semibold text-foreground">
+                      <strong className="font-extrabold">{selectedIds.size}</strong> {selectedIds.size === 1 ? 'mentee' : 'mentees'} selected
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Set Selected to:</span>
                     {criteria.map((c: any) => {
                       const badgeColor = getTierButtonColor(c.id);
                       return (
@@ -832,40 +855,40 @@ export default function MentorCertificatesPage() {
                           key={c.id}
                           type="button"
                           onClick={() => bulkSetBadge(c.id)}
-                          className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all border animate-fade-in ${badgeColor}`}
+                          className={`px-2.5 py-1 rounded-lg text-[9px] font-extrabold transition-all border shadow-3xs uppercase tracking-wider ${badgeColor}`}
                         >
-                          {c.name}
+                          {getTierName(c.id).replace(/\s*certificate\s*/i, '')}
                         </button>
                       );
                     })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Mentee table */}
               <div className="flex-1 flex flex-col min-h-0">
                 {loadingQualifications ? (
-                  <div className="flex-1 flex items-center justify-center gap-2 py-20">
-                    <Loader2 className="animate-spin w-5 h-5 text-brand-500" />
-                    <span className="text-xs text-muted-foreground">Loading mentees...</span>
+                  <div className="flex-1 flex flex-col items-center justify-center gap-3 py-20">
+                    <Loader2 className="animate-spin w-6 h-6 text-brand-500" />
+                    <span className="text-xs text-muted-foreground font-semibold">Loading qualification roster...</span>
                   </div>
                 ) : filtered.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center py-20 gap-2 text-center">
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 gap-2.5 text-center">
                     <Users className="w-8 h-8 text-muted-foreground/30" />
-                    <p className="text-xs font-semibold text-muted-foreground">
+                    <p className="text-xs font-bold text-muted-foreground">
                       {search ? 'No mentees match your search.' : 'No active mentees found.'}
                     </p>
                   </div>
                 ) : (
-                  <div className="border border-border rounded-2xl overflow-hidden flex flex-col">
+                  <div className="border border-border/60 rounded-xl overflow-hidden flex flex-col bg-background/40">
                     {/* Table header */}
-                    <div className="grid grid-cols-12 gap-2 px-4 py-2.5 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
+                    <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/30 text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider items-center border-b border-border/40 select-none">
                       <div className="col-span-1 flex items-center justify-center">
                         <input
                           type="checkbox"
                           checked={allSelected}
                           onChange={toggleAll}
-                          className="w-3.5 h-3.5 accent-brand-600 cursor-pointer"
+                          className="w-3.5 h-3.5 rounded border-border text-brand-600 focus:ring-brand-500 accent-brand-600 cursor-pointer shadow-3xs"
                         />
                       </div>
                       <div className="col-span-3">Mentee</div>
@@ -875,47 +898,59 @@ export default function MentorCertificatesPage() {
                     </div>
 
                     {/* Table rows */}
-                    <div className="max-h-[340px] overflow-y-auto divide-y divide-border">
+                    <div className="max-h-[350px] overflow-y-auto divide-y divide-border/30">
                       {filtered.map(m => {
                         const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
                         const selectedTier = mentorTiers[m.id] ?? defaultTier;
                         const matchPercent = m.tierMatches?.[selectedTier] ?? 0;
                         const issuedTiersList = m.issuedTiers ?? [];
+                        const initials = `${m.firstName?.charAt(0) || ''}${m.lastName?.charAt(0) || ''}`.toUpperCase();
 
                         return (
-                          <div key={m.id} className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center text-xs hover:bg-muted/10 transition-colors">
+                          <div key={m.id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-xs hover:bg-muted/20 dark:hover:bg-muted/5 transition-all duration-150">
                             <div className="col-span-1 flex items-center justify-center">
                               <input
                                 type="checkbox"
                                 checked={selectedIds.has(m.id)}
                                 onChange={() => toggleOne(m.id)}
-                                className="w-3.5 h-3.5 accent-brand-600 cursor-pointer"
+                                className="w-3.5 h-3.5 rounded border-border text-brand-600 focus:ring-brand-500 accent-brand-600 cursor-pointer shadow-3xs"
                               />
                             </div>
-                            <div className="col-span-3 min-w-0">
-                              <p className="font-bold text-foreground truncate">{m.firstName} {m.lastName}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">{m.email}</p>
+                            <div className="col-span-3 flex items-center gap-2.5 min-w-0">
+                              <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-brand-500/10 to-indigo-500/10 dark:from-brand-500/20 dark:to-indigo-500/20 text-brand-700 dark:text-brand-300 flex items-center justify-center text-[9px] font-extrabold border border-brand-500/20 shrink-0">
+                                {initials}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-foreground truncate">{m.firstName} {m.lastName}</p>
+                                <p className="text-[9px] text-muted-foreground/80 truncate">{m.email}</p>
+                              </div>
                             </div>
                             <div className="col-span-3 flex justify-center">
-                              <select
-                                value={selectedTier}
-                                onChange={e => handleTierChange(m.id, e.target.value)}
-                                className="px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none cursor-pointer font-semibold"
-                              >
-                                {criteria.map((c: any) => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                              </select>
+                              <div className="relative inline-flex items-center w-full max-w-[170px] shadow-3xs rounded-lg border border-border/40 bg-background/50 hover:bg-background transition-colors">
+                                <select
+                                  value={selectedTier}
+                                  onChange={e => handleTierChange(m.id, e.target.value)}
+                                  className="w-full appearance-none pr-8 pl-3 py-1.5 bg-transparent text-[11px] font-semibold text-foreground cursor-pointer focus:outline-none"
+                                >
+                                  {criteria.map((c: any) => (
+                                    <option key={c.id} value={c.id} className="text-foreground bg-card font-medium">
+                                      {c.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="absolute right-2.5 w-3 h-3 pointer-events-none text-muted-foreground/60" />
+                              </div>
                             </div>
                             <div className="col-span-3 flex flex-wrap justify-center gap-1">
                               {issuedTiersList.length === 0 ? (
-                                <span className="text-[10px] text-muted-foreground/60 font-semibold">—</span>
+                                <span className="text-[10px] text-muted-foreground/40 font-semibold select-none">—</span>
                               ) : (
                                 issuedTiersList.map((tier: string) => {
                                   const badgeColor = getTierBadgeColor(tier);
+                                  const shortTierName = getTierName(tier).replace(/\s*certificate\s*/i, '');
                                   return (
-                                    <span key={tier} className={`px-1.5 py-0.5 rounded border text-[9px] font-extrabold uppercase tracking-wide ${badgeColor}`}>
-                                      {getTierName(tier)}
+                                    <span key={tier} className={`px-2 py-0.5 rounded-md border text-[9px] font-extrabold uppercase tracking-wider shadow-3xs ${badgeColor}`}>
+                                      {shortTierName}
                                     </span>
                                   );
                                 })
@@ -933,15 +968,17 @@ export default function MentorCertificatesPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
+              <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-4">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
                   <Users className="w-4 h-4 text-brand-500" />
-                  <span><span className="text-foreground font-extrabold">{selectedIds.size}</span> selected</span>
+                  <span>
+                    <span className="text-foreground font-extrabold">{selectedIds.size}</span> / {filtered.length} selected
+                  </span>
                 </div>
                 <button
                   onClick={handleIssue}
                   disabled={issuing || selectedIds.size === 0}
-                  className="flex items-center gap-1.5 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:bg-muted disabled:text-muted-foreground disabled:dark:bg-slate-800 disabled:cursor-not-allowed rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
                   {issuing ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
                   Issue Certificates
