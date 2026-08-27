@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   ArrowRightLeft,
   ChevronDown,
-  ChevronUp,
+  Briefcase,
+  Calendar,
 } from 'lucide-react';
 import { TablePagination } from '@/components/shared/TablePagination';
 import {
@@ -250,107 +251,165 @@ export default function AdminMenteesListPage() {
             return (
               <div
                 key={row.id}
-                className="bg-card border border-border rounded-xl overflow-hidden shadow-sm hover:border-slate-300 transition-colors"
+                className={`
+                  bg-card border rounded-xl overflow-hidden transition-all duration-200 select-none relative
+                  ${isExpanded ? 'border-brand-500/20 shadow-md bg-slate-50/20' : 'border-border shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:border-slate-300 hover:shadow-md'}
+                `}
               >
                 {/* Header / Summary */}
                 <div
                   onClick={() => toggleExpand(row.id)}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 cursor-pointer gap-4"
+                  className={`
+                    p-4 cursor-pointer transition-colors duration-200
+                    ${isExpanded ? 'bg-slate-50/70' : 'hover:bg-slate-50/30'}
+                  `}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <AvatarWithInitials
-                      firstName={row.firstName}
-                      lastName={row.lastName}
-                      email={row.email}
-                      src={row.profilePictureUrl}
-                      href={`/admin/mentees/${row.id}`}
-                      colorClass="bg-brand-100 text-brand-700"
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 text-sm truncate">{name}</span>
-                        {isSuspended && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[10px] font-medium dark:bg-amber-500/10 dark:text-amber-300">Suspended</span>
-                        )}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center">
+                    {/* Column 1: Profile info */}
+                    <div className="sm:col-span-5 flex items-center gap-3 min-w-0">
+                      <AvatarWithInitials
+                        firstName={row.firstName}
+                        lastName={row.lastName}
+                        email={row.email}
+                        src={row.profilePictureUrl}
+                        href={`/admin/mentees/${row.id}`}
+                        colorClass="bg-brand-100 text-brand-700 w-10 h-10 shadow-inner shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-semibold text-slate-800 text-sm truncate">{name}</span>
+                          {isSuspended && (
+                            <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[10px] font-medium border border-rose-100 uppercase tracking-wider scale-95 origin-left">Suspended</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-400 truncate block mt-0.5">{row.email}</span>
                       </div>
-                      <span className="text-xs text-slate-500 truncate block">{row.email}</span>
                     </div>
-                  </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-6 shrink-0 text-slate-600">
-                    {row.currentClan ? (
-                      <span className="inline-flex items-center gap-1.5 text-xs text-slate-700">
-                        <Users2 className="w-3.5 h-3.5 text-slate-400" />
-                        {row.currentClan.name}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-xs">Unassigned</span>
-                    )}
+                    {/* Column 2: Clan info */}
+                    <div className="sm:col-span-3 flex items-center">
+                      {row.currentClan ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                          <Users2 className="w-3.5 h-3.5 text-slate-400" />
+                          {row.currentClan.name}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-50 text-slate-400 border border-slate-100 border-dashed">
+                          Unassigned
+                        </span>
+                      )}
+                    </div>
 
-                    {primaryBg && (
-                      <span className="text-xs text-slate-500 hidden md:inline max-w-[150px] truncate">
-                        {primaryBg}
-                      </span>
-                    )}
+                    {/* Column 3: Background occupation */}
+                    <div className="sm:col-span-3 flex items-center">
+                      {primaryBg ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-full">
+                          <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{primaryBg}</span>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300">-</span>
+                      )}
+                    </div>
 
-                    <div className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
-                      {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                    {/* Column 4: Toggle Action */}
+                    <div className="sm:col-span-1 flex justify-end">
+                      <div className={`p-1.5 rounded-full hover:bg-slate-200/60 transition-all duration-200 ${isExpanded ? 'rotate-180 bg-slate-100' : ''}`}>
+                        <ChevronDown className="w-4 h-4 text-slate-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Collapsible Content */}
                 {isExpanded && (
-                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Programs</span>
-                        <div className="mt-1 text-slate-700">
-                          <span className="font-medium text-slate-900">{mp?.totalProgramsEnrolled ?? 0}</span> enrolled
-                          <span className="text-slate-300 mx-1.5">·</span>
-                          <span className="font-medium text-green-600">{mp?.totalProgramsCompleted ?? 0}</span> completed
+                  <div className="relative border-t border-slate-100 bg-slate-50/30 p-5 space-y-5 before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-brand-600">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Sub-card 1: Programs */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs">
+                        <div className="flex items-center gap-2 mb-3">
+                          <BookOpen className="w-4 h-4 text-slate-400" />
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Programs Overview</span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Enrolled Programs</span>
+                            <span className="font-semibold text-slate-900">{mp?.totalProgramsEnrolled ?? 0}</span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span className="text-slate-500">Completed Programs</span>
+                            <span className="font-semibold text-green-600">{mp?.totalProgramsCompleted ?? 0}</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Progress</span>
-                        <div className="mt-1 text-slate-700">
-                          <span className="font-medium text-slate-900">{mp?.totalTasksCompleted ?? 0}</span> tasks done
-                          <span className="text-slate-300 mx-1.5">·</span>
-                          <span className="text-brand-600 font-medium">Lvl {mp?.currentLevel ?? 1}</span> ({mp?.totalPoints?.toLocaleString() ?? 0} pts)
+                      {/* Sub-card 2: Progress */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Trophy className="w-4 h-4 text-slate-400" />
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Milestones & Points</span>
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Tasks Completed</span>
+                            <span className="font-semibold text-slate-900">{mp?.totalTasksCompleted ?? 0}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Current Level</span>
+                            <span className="font-bold text-brand-600">Lvl {mp?.currentLevel ?? 1}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Total Points</span>
+                            <span className="font-semibold text-slate-900">{(mp?.totalPoints ?? 0).toLocaleString()} pts</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Streak & Activity</span>
-                        <div className="mt-1 flex items-center gap-3">
-                          {(mp?.currentStreakDays ?? 0) > 0 ? (
-                            <span className="inline-flex items-center gap-1 text-orange-600 font-medium">
-                              <Flame className="w-3.5 h-3.5" />
-                              {mp?.currentStreakDays}d streak
-                            </span>
-                          ) : (
-                            <span className="text-slate-400">-</span>
-                          )}
-                          <span className="text-slate-300">·</span>
-                          <span className="text-slate-600">Active {relativeTime(mp?.lastActivityDate)}</span>
+                      {/* Sub-card 3: Streak & Timeline */}
+                      <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Flame className="w-4 h-4 text-slate-400" />
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Activity Status</span>
+                        </div>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Current Streak</span>
+                            {(mp?.currentStreakDays ?? 0) > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-orange-600 font-bold">
+                                <Flame className="w-3.5 h-3.5 fill-orange-50" />
+                                {mp?.currentStreakDays}d streak
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-500">Last Active</span>
+                            <span className="font-medium text-slate-800">{relativeTime(mp?.lastActivityDate)}</span>
+                          </div>
                         </div>
                       </div>
+                    </div>
 
-                      <div>
-                        <span className="block text-xs font-medium text-slate-400 uppercase tracking-wider">Details</span>
-                        <div className="mt-1 text-slate-600 space-y-0.5">
-                          {secondaryBg && <p className="truncate">Edu: {secondaryBg}</p>}
-                          <p>Joined: {row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</p>
-                        </div>
+                    {/* Metadata & Secondary Details */}
+                    <div className="bg-slate-100/50 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600 border border-slate-200/50">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>Joined: <span className="font-medium text-slate-800">{row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '-'}</span></span>
                       </div>
+                      {secondaryBg && (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <School className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">Education: <span className="font-medium text-slate-800 truncate">{secondaryBg}</span></span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions Panel */}
                     <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-100">
                       <Link
                         href={`/admin/mentees/${row.id}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-50 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-brand-600 bg-white border border-brand-200 hover:bg-brand-50 rounded-lg shadow-2xs transition-colors"
                         title={`View profile for ${name}`}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
@@ -359,7 +418,7 @@ export default function AdminMenteesListPage() {
                       <button
                         onClick={() => setMovingMentee(row)}
                         title="Move to another clan"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
                       >
                         <ArrowRightLeft className="w-3.5 h-3.5" />
                         Move clan
@@ -368,10 +427,10 @@ export default function AdminMenteesListPage() {
                         onClick={() => handleOpenSuspendModal(row)}
                         disabled={suspendLoading === row.id}
                         title={isSuspended ? 'Unsuspend' : 'Suspend'}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white border rounded-lg shadow-2xs transition-colors disabled:opacity-50 ${
                           isSuspended
-                            ? 'text-green-700 hover:bg-green-50'
-                            : 'text-amber-700 hover:bg-amber-50'
+                            ? 'text-green-700 border-green-200 hover:bg-green-50'
+                            : 'text-amber-700 border-amber-200 hover:bg-amber-50'
                         }`}
                       >
                         {suspendLoading === row.id
@@ -384,7 +443,7 @@ export default function AdminMenteesListPage() {
                       <button
                         onClick={() => setEditUser(row)}
                         title="Edit user"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg shadow-2xs transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                         Edit
@@ -393,7 +452,7 @@ export default function AdminMenteesListPage() {
                         onClick={() => handleDelete(row.id, name)}
                         disabled={deleteLoading === row.id}
                         title="Delete permanently"
-                        className="inline-flex items-center justify-center w-7 h-7 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="inline-flex items-center justify-center w-8 h-8 text-slate-400 bg-white border border-slate-200 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 rounded-lg shadow-2xs transition-colors disabled:opacity-50"
                       >
                         {deleteLoading === row.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                       </button>
