@@ -978,7 +978,7 @@ export default function MentorCertificatesPage() {
                 <button
                   onClick={handleIssue}
                   disabled={issuing || selectedIds.size === 0}
-                  className="flex items-center gap-1.5 px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 disabled:bg-muted disabled:text-muted-foreground disabled:dark:bg-slate-800 disabled:cursor-not-allowed rounded-xl text-xs font-bold transition-all shadow-sm"
+                  className="flex items-center gap-1.5 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-xl text-xs font-bold transition-all shadow-sm"
                 >
                   {issuing ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
                   Issue Certificates

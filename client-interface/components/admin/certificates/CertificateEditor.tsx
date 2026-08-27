@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { 
+import {
   ArrowLeft, Save, Plus, Trash2, Move, Type, Edit,
   Image as ImageIcon, AlignLeft, AlignCenter, AlignRight,
   Bold, Loader2, ZoomIn, ZoomOut, Award,
-  CheckCircle, Users, Trash, Search, Send, Info
+  CheckCircle, Users, Trash, Search, Send, Info,
+  ChevronDown, X
 } from 'lucide-react';
 import Link from 'next/link';
 import { certificatesApi, CertificateElement, CertificateTemplate } from '@/lib/services/certificates-api';
@@ -225,10 +226,10 @@ const BACKGROUND_PRESETS = [
 export default function CertificateEditor({ templateId }: CertificateEditorProps) {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
-  
+
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
-  
+
   // Upload states
   const [uploadingBg, setUploadingBg] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -236,7 +237,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   // Zoom state
   const [zoom, setZoom] = useState(1.0);
-  
+
   // Template states
   const [name, setName] = useState('');
   const [bgImageUrl, setBgImageUrl] = useState('https://res.cloudinary.com/djctfho31/image/upload/v1724683050/pathment/templates/default-cert-bg.jpg');
@@ -244,7 +245,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [isPresetsDrawerOpen, setIsPresetsDrawerOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState('');
   const [logoConfig, setLogoConfig] = useState({ xPercent: 50, yPercent: 20, widthPercent: 12 });
-  
+
   // Elements & Dragging
   const [elements, setElements] = useState<CertificateElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -370,7 +371,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   // Fetch initial template if editing
   useEffect(() => {
     if (!templateId) return;
-    
+
     const fetchTemplate = async () => {
       try {
         setFetching(true);
@@ -405,7 +406,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         setFetching(false);
       }
     };
-    
+
     fetchTemplate();
   }, [templateId]);
 
@@ -502,21 +503,21 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   // Handle Drag Move
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!activeDragId || !canvasRef.current) return;
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
+
     let xPercent = Math.round((x / rect.width) * 100);
     let yPercent = Math.round((y / rect.height) * 100);
-    
+
     xPercent = Math.max(0, Math.min(100, xPercent));
     yPercent = Math.max(0, Math.min(100, yPercent));
-    
+
     if (activeDragId === 'logo') {
       setLogoConfig(prev => ({ ...prev, xPercent, yPercent }));
     } else {
-      setElements(prev => prev.map(el => 
+      setElements(prev => prev.map(el =>
         el.id === activeDragId ? { ...el, xPercent, yPercent } : el
       ));
     }
@@ -596,7 +597,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       alignment: 'center',
       fontStyle: 'Montserrat, sans-serif'
     };
-    
+
     setElements(prev => [...prev, newEl]);
     setSelectedId(id);
     toast.success(`Added ${label} variable to template canvas!`);
@@ -701,7 +702,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   const updateSelectedElement = (key: keyof CertificateElement, val: any) => {
     if (!selectedId) return;
-    setElements(prev => prev.map(el => 
+    setElements(prev => prev.map(el =>
       el.id === selectedId ? { ...el, [key]: val } : el
     ));
   };
@@ -716,7 +717,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       toast.error('Please select a program');
       return;
     }
-    
+
     try {
       setLoading(true);
       const payload: Partial<CertificateTemplate> = {
@@ -873,7 +874,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     setCriteria(prev => {
       if (editingTier) {
         // Edit mode
-        return prev.map(t => t.id === editingTier.id 
+        return prev.map(t => t.id === editingTier.id
           ? { ...t, name: tierModalName.trim(), badgeUrl: tierModalBadgeUrl, taskIds: tierModalTaskIds }
           : t
         );
@@ -899,7 +900,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   };
 
   const toggleTierTask = (taskId: string) => {
-    setTierModalTaskIds(prev => 
+    setTierModalTaskIds(prev =>
       prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
     );
   };
@@ -1016,57 +1017,64 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   return (
     <div className="space-y-8 select-none" onMouseUp={handleMouseUp}>
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;700&family=Great+Vibes&family=Montserrat:wght@400;600;700&family=Oswald:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Sacramento&family=Lustria&family=Merriweather&display=swap');
       ` }} />
 
       {/* Breadcrumb & Title Header */}
-      <div className="flex items-center justify-between pb-2">
-        <div className="space-y-1">
-          <div className="flex items-center gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-border/60 pb-5">
+        {/* Left side: Breadcrumb & Title */}
+        <div className="space-y-2 flex-1 max-w-2xl">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
             <span>Certificates</span>
-            <span>&gt;</span>
-            <span className="text-brand-500">Create Certificate Cycle</span>
+            <span className="text-muted-foreground/45">&gt;</span>
+            <span className="text-brand-600">{templateId ? 'Edit Certificate Cycle' : 'Create Certificate Cycle'}</span>
           </div>
-          <div className="flex items-center gap-3 mt-1 flex-wrap">
+          <div className="relative">
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Enter Template / Cycle Name..."
-              className="text-xl font-extrabold text-foreground bg-transparent border-b border-dashed border-border/80 hover:border-brand-500 focus:border-brand-500 focus:outline-none transition-all pb-1 min-w-[320px] max-w-[500px]"
+              className="w-full text-2xl font-extrabold text-foreground bg-transparent border-0 focus:ring-0 focus:outline-none placeholder:text-muted-foreground/30 transition-all p-0 focus:border-b focus:border-brand-500 pb-1"
             />
-
-            <div className="flex items-center gap-1.5 pl-3 border-l border-border">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase">Program:</span>
-              <select
-                value={selectedProgramId}
-                onChange={(e) => handleProgramChange(e.target.value)}
-                disabled={!!templateId}
-                className="px-2 py-0.5 text-xs font-semibold bg-card border border-border rounded-lg text-foreground focus:outline-none cursor-pointer max-w-[200px]"
-              >
-                <option value="" disabled>Select Program</option>
-                {programs.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Create, customize and issue certificates for this fellowship cycle.</p>
+          <p className="text-xs text-muted-foreground font-medium">Create, customize and issue certificates for this fellowship cycle.</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Right side: Meta (Program Select) & Actions (Back, Save) */}
+        <div className="flex items-center gap-3 flex-wrap md:justify-end shrink-0">
+          {/* Program Select */}
+          <div className="relative inline-flex items-center shadow-3xs rounded-xl border border-border/80 bg-background hover:bg-muted/30 transition-colors">
+            <span className="pl-3.5 pr-1.5 text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider select-none border-r border-border/60 py-2">
+              Program
+            </span>
+            <select
+              value={selectedProgramId}
+              onChange={(e) => handleProgramChange(e.target.value)}
+              disabled={!!templateId}
+              className="appearance-none pr-8 pl-3 py-2 text-xs font-bold text-foreground bg-transparent cursor-pointer focus:outline-none min-w-[140px] max-w-[200px] disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              <option value="" disabled className="text-foreground bg-card">Select Program</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id} className="text-foreground bg-card">{p.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 w-3 h-3 pointer-events-none text-muted-foreground/60" />
+          </div>
+
           <Link
             href="/admin/certificates"
-            className="flex items-center gap-1.5 px-4 py-2 border border-border rounded-xl text-xs font-bold text-foreground hover:bg-muted transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 border border-border/80 hover:bg-muted text-foreground rounded-xl text-xs font-bold transition-all shadow-3xs"
           >
-            <ArrowLeft className="w-4 h-4" /> Back
+            <ArrowLeft className="w-3.5 h-3.5" /> Back
           </Link>
 
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center gap-2 px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow-sm transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow-sm transition-all disabled:opacity-50"
           >
             {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
             Save Template
@@ -1144,11 +1152,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           transform: 'translate(-50%, -50%)',
                           boxSizing: 'border-box'
                         }}
-                        className={`group cursor-move p-1 border transition-all rounded ${
-                          isSelected 
-                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md' 
+                        className={`group cursor-move p-1 border transition-all rounded ${isSelected
+                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
                             : 'border-transparent hover:border-brand-500/30'
-                        }`}
+                          }`}
                       >
                         <img src={badgePreview} className="w-full h-auto pointer-events-none" alt="Badge Preview" />
                         <div className="hidden group-hover:flex absolute -top-5 left-1/2 -translate-x-1/2 bg-brand-600 text-[8px] text-white px-1 py-0.5 rounded shadow-sm gap-1 items-center font-bold whitespace-nowrap">
@@ -1175,11 +1182,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           transform: 'translate(-50%, -50%)',
                           boxSizing: 'border-box'
                         }}
-                        className={`group cursor-move p-1 border transition-all rounded ${
-                          isSelected 
-                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md' 
+                        className={`group cursor-move p-1 border transition-all rounded ${isSelected
+                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
                             : 'border-transparent hover:border-brand-500/30'
-                        }`}
+                          }`}
                       >
                         <img src={el.imageUrl} className="w-full h-auto pointer-events-none" alt={el.text} />
                         <div className="hidden group-hover:flex absolute -top-5 left-1/2 -translate-x-1/2 bg-brand-600 text-[8px] text-white px-1 py-0.5 rounded shadow-sm gap-1 items-center font-bold whitespace-nowrap">
@@ -1214,11 +1220,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                         lineHeight: 1.4,
                         boxSizing: 'border-box'
                       }}
-                      className={`cursor-move p-2 border transition-all rounded ${
-                        isSelected 
-                          ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500' 
+                      className={`cursor-move p-2 border transition-all rounded ${isSelected
+                          ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500'
                           : 'border-transparent hover:border-brand-500/30 hover:bg-brand-500/2'
-                      }`}
+                        }`}
                     >
                       {el.type === 'dynamic' ? `{{${el.dynamicKey}}}` : el.text}
                     </div>
@@ -1233,20 +1238,19 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Background template paper</label>
                 <span className="text-[9px] font-bold text-brand-600 bg-brand-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider select-none">Design Setup</span>
               </div>
-              
+
               {/* Presets Trigger Button */}
               <div className="w-full">
                 <button
                   type="button"
                   onClick={() => setIsPresetsDrawerOpen(true)}
-                  className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                    activePresetId 
-                      ? 'border-brand-500 bg-brand-500/5 text-brand-700' 
+                  className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activePresetId
+                      ? 'border-brand-500 bg-brand-500/5 text-brand-700'
                       : 'border-border bg-background hover:bg-muted/40 text-foreground'
-                  }`}
+                    }`}
                 >
                   <Award className="w-3.5 h-3.5 text-brand-500" />
-                  {activePresetId 
+                  {activePresetId
                     ? BACKGROUND_PRESETS.find(p => p.id === activePresetId)?.name || 'Preset Selected'
                     : 'Browse Presets & Custom Backgrounds'
                   }
@@ -1272,11 +1276,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                       key={shortcut.key}
                       type="button"
                       onClick={() => addVariableElement(shortcut.key, shortcut.label)}
-                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-[11px] font-bold transition-all text-left ${
-                        alreadyAdded 
-                          ? 'border-brand-500 bg-brand-500/5 text-brand-600' 
+                      className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-[11px] font-bold transition-all text-left ${alreadyAdded
+                          ? 'border-brand-500 bg-brand-500/5 text-brand-600'
                           : 'border-border bg-background hover:bg-muted/50 text-foreground'
-                      }`}
+                        }`}
                     >
                       <span>{shortcut.label}</span>
                       <span className="font-mono text-[9px] bg-muted px-1.5 py-0.5 rounded border border-border/40">{shortcut.tag}</span>
@@ -1402,11 +1405,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                         <button
                           type="button"
                           onClick={() => updateSelectedElement('fontWeight', selectedElement.fontWeight === 'bold' ? 'normal' : 'bold')}
-                          className={`w-full py-1.5 border border-border rounded-xl text-xs transition-colors flex items-center justify-center ${
-                            selectedElement.fontWeight === 'bold'
+                          className={`w-full py-1.5 border border-border rounded-xl text-xs transition-colors flex items-center justify-center ${selectedElement.fontWeight === 'bold'
                               ? 'bg-brand-500/10 border-brand-500 text-brand-600 font-bold'
                               : 'bg-muted hover:bg-muted/70 text-foreground'
-                          }`}
+                            }`}
                         >
                           <Bold className="w-4 h-4 mr-1" /> Bold
                         </button>
@@ -1424,11 +1426,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                                 key={align}
                                 type="button"
                                 onClick={() => updateSelectedElement('alignment', align)}
-                                className={`flex-1 py-1 flex items-center justify-center rounded-lg transition-colors ${
-                                  selectedElement.alignment === align
+                                className={`flex-1 py-1 flex items-center justify-center rounded-lg transition-colors ${selectedElement.alignment === align
                                     ? 'bg-card text-foreground shadow-2xs font-semibold'
                                     : 'text-muted-foreground hover:text-foreground'
-                                }`}
+                                  }`}
                               >
                                 <Icon className="w-3.5 h-3.5" />
                               </button>
@@ -1589,17 +1590,16 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     key={type}
                     type="button"
                     onClick={() => { setRecipientType(type); setSelectedMenteeIds(new Set()); setRecipientSearch(''); }}
-                    className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${
-                      recipientType === type
+                    className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${recipientType === type
                         ? 'border-brand-600 text-brand-600'
                         : 'border-transparent text-muted-foreground hover:text-foreground'
-                    }`}
+                      }`}
                   >
                     {type === 'all'
                       ? `All (${recipientMenteesList.length + recipientMentorsList.length})`
                       : type === 'mentees'
-                      ? `Mentees (${recipientMenteesList.length})`
-                      : `Mentors (${recipientMentorsList.length})`}
+                        ? `Mentees (${recipientMenteesList.length})`
+                        : `Mentors (${recipientMentorsList.length})`}
                   </button>
                 ))}
               </div>
@@ -1615,29 +1615,25 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             </div>
 
             {/* Filters row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Cohort / Program</label>
-                <select
-                  value={selectedProgramId}
-                  disabled={true}
-                  className="w-full px-3.5 py-2.5 text-xs font-semibold bg-muted border border-border rounded-xl text-muted-foreground focus:outline-none cursor-not-allowed opacity-80"
-                >
-                  {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  <input
-                    type="text"
-                    value={recipientSearch}
-                    onChange={e => setRecipientSearch(e.target.value)}
-                    placeholder="Search by name or email..."
-                    className="w-full pl-8 pr-3.5 py-2.5 text-xs font-semibold bg-background border border-border rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/60"
-                  />
-                </div>
+            <div className="mb-5">
+              <div className="relative w-full">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+                <input
+                  type="text"
+                  value={recipientSearch}
+                  onChange={e => setRecipientSearch(e.target.value)}
+                  placeholder="Search roster by name or email..."
+                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-muted/30 hover:bg-muted/50 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/50 transition-all shadow-3xs"
+                />
+                {recipientSearch && (
+                  <button
+                    onClick={() => setRecipientSearch('')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded-full transition-colors"
+                    type="button"
+                  >
+                    <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1691,8 +1687,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     const matchColor = match === 100
                       ? 'text-emerald-600 bg-emerald-500/10'
                       : match >= 50
-                      ? 'text-amber-600 bg-amber-500/10'
-                      : 'text-red-500 bg-red-500/10';
+                        ? 'text-amber-600 bg-amber-500/10'
+                        : 'text-red-500 bg-red-500/10';
                     const issuedTiersList: string[] = m.issuedTiers ?? [];
 
                     return (
@@ -1709,11 +1705,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           <div className="font-bold text-foreground flex items-center gap-1.5 flex-wrap">
                             <span className="truncate">{m.firstName} {m.lastName}</span>
                             {recipientType === 'all' && (
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${
-                                m.role === 'mentor'
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${m.role === 'mentor'
                                   ? 'bg-indigo-500/10 text-indigo-600'
                                   : 'bg-brand-500/10 text-brand-600'
-                              }`}>
+                                }`}>
                                 {m.role}
                               </span>
                             )}
@@ -1779,8 +1774,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   {recipientType === 'all'
                     ? `recipient${selectedMenteeIds.size !== 1 ? 's' : ''}`
                     : recipientType === 'mentees'
-                    ? `mentee${selectedMenteeIds.size !== 1 ? 's' : ''}`
-                    : `mentor${selectedMenteeIds.size !== 1 ? 's' : ''}`}{' '}
+                      ? `mentee${selectedMenteeIds.size !== 1 ? 's' : ''}`
+                      : `mentor${selectedMenteeIds.size !== 1 ? 's' : ''}`}{' '}
                   selected
                 </span>
               </div>
@@ -1796,7 +1791,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             </div>
           </div>
         )}
-      
+
       </div>
 
       {/* SECTION 4: Issuance History */}
@@ -2018,7 +2013,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           await executeIssuance(cleanRecipients);
         }}
       />
-      
+
       <Drawer
         open={isPresetsDrawerOpen}
         onClose={() => setIsPresetsDrawerOpen(false)}
@@ -2031,15 +2026,14 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           {(() => {
             const hasCustomImage = bgImageUrl && !bgImageUrl.startsWith('data:image/svg+xml;base64,');
             const isCustomActive = !activePresetId && hasCustomImage;
-            
+
             if (hasCustomImage) {
               return (
                 <div
-                  className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${
-                    isCustomActive 
-                      ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]' 
+                  className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${isCustomActive
+                      ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
                       : 'border-border hover:border-brand-500/30'
-                  }`}
+                    }`}
                 >
                   <button
                     type="button"
@@ -2051,10 +2045,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   >
                     {/* Image Preview */}
                     <div className="w-full aspect-[1.414] rounded-xl overflow-hidden border border-border bg-muted/30 relative flex items-center justify-center">
-                      <img 
-                        src={bgImageUrl} 
-                        className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-[1.03]" 
-                        alt="Custom background" 
+                      <img
+                        src={bgImageUrl}
+                        className="w-full h-full object-cover pointer-events-none transition-transform duration-300 group-hover:scale-[1.03]"
+                        alt="Custom background"
                       />
                       {isCustomActive && (
                         <div className="absolute top-2 right-2 w-5.5 h-5.5 rounded-full bg-emerald-500 flex items-center justify-center text-white shadow-sm border border-white">
@@ -2062,7 +2056,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="mt-3 px-1 flex-1 flex flex-col justify-between w-full">
                       <div>
                         <span className="text-[11px] font-bold text-foreground group-hover:text-brand-600 transition-colors">
@@ -2149,15 +2143,14 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 onClick={() => {
                   applyPresetBackground(preset.id, preset.svg);
                 }}
-                className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${
-                  isActive 
-                    ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]' 
+                className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${isActive
+                    ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
                     : 'border-border hover:border-brand-500/30'
-                }`}
+                  }`}
               >
                 {/* Scaled Mini SVG Preview */}
                 <div className="w-full aspect-[1.414] rounded-xl overflow-hidden border border-border bg-muted/30 relative flex items-center justify-center">
-                  <div 
+                  <div
                     className="w-full h-full pointer-events-none transition-transform duration-300 group-hover:scale-[1.03]"
                     dangerouslySetInnerHTML={{ __html: preset.svg }}
                   />
@@ -2167,7 +2160,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     </div>
                   )}
                 </div>
-                
+
                 <div className="mt-3 px-1 flex-1 flex flex-col justify-between">
                   <div>
                     <span className="text-[11px] font-bold text-foreground group-hover:text-brand-600 transition-colors">
@@ -2177,7 +2170,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                       {preset.description}
                     </p>
                   </div>
-                  
+
                   {/* Status Button at the bottom */}
                   <div className="mt-3">
                     {isActive ? (

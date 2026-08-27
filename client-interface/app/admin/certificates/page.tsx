@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Trash2, Edit2, Loader2, Award, Calendar, User } from 'lucide-react';
+import { Plus, Trash2, Loader2, Award, Calendar, User, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { certificatesApi, CertificateTemplate } from '@/lib/services/certificates-api';
 import { ConfirmModal } from '@/components/shared';
@@ -80,28 +80,36 @@ export default function AdminCertificatesPage() {
   return (
     <div className="space-y-6">
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border/60 pb-5 gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">Certificates</h1>
-          <p className="text-xs text-muted-foreground">Manage templates and issue certificates to mentees</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage templates and issue certificates to mentees</p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap">Program:</span>
+        <div className="flex items-center gap-3.5 flex-wrap">
+          {/* Custom styled select box */}
+          <div className="relative inline-flex items-center shadow-3xs rounded-xl border border-border/80 bg-background hover:bg-muted/30 transition-colors">
+            <span className="pl-3.5 pr-1.5 text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider select-none border-r border-border/60 py-2">
+              Program
+            </span>
             <select
               value={selectedProgramFilter}
               onChange={e => setSelectedProgramFilter(e.target.value)}
-              className="px-3 py-1.5 text-xs font-semibold bg-card border border-border rounded-xl text-foreground focus:outline-none cursor-pointer min-w-[150px]"
+              className="appearance-none pr-9 pl-3 py-2 text-xs font-bold text-foreground bg-transparent cursor-pointer focus:outline-none min-w-[150px] max-w-[240px]"
             >
-              <option value="all">All Programs</option>
-              {programs.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="all" className="bg-card text-foreground">All Programs</option>
+              {programs.map(p => (
+                <option key={p.id} value={p.id} className="bg-card text-foreground">
+                  {p.name}
+                </option>
+              ))}
             </select>
+            <ChevronDown className="absolute right-3 w-3 h-3 pointer-events-none text-muted-foreground/60" />
           </div>
 
           <Link
             href="/admin/certificates/new"
-            className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs transition-all shadow-sm"
           >
             <Plus className="w-4 h-4" />
             Create Template
@@ -141,7 +149,7 @@ export default function AdminCertificatesPage() {
             return (
               <div 
                 key={template.id} 
-                className="group bg-card border border-border hover:border-brand-500/30 rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col"
+                className="group bg-card border border-border hover:border-brand-500/20 hover:shadow-md rounded-2xl overflow-hidden shadow-3xs transition-all duration-300 flex flex-col hover:-translate-y-0.5"
               >
                 {/* Image Preview Container */}
                 <div className="relative aspect-[1.414] bg-muted overflow-hidden border-b border-border">
@@ -166,46 +174,43 @@ export default function AdminCertificatesPage() {
                 </div>
 
                 {/* Details Footer */}
-                <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-bold text-foreground line-clamp-1">{template.name}</h3>
-                      <span className="text-[9px] bg-brand-500/10 text-brand-600 px-2 py-0.5 rounded-md font-bold uppercase tracking-wider whitespace-nowrap">
-                        {template.program?.name || 'No Program'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground font-semibold">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-brand-500" />
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <span className="inline-block text-[9px] bg-brand-500/10 text-brand-600 dark:text-brand-400 px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider">
+                      {template.program?.name || 'No Program'}
+                    </span>
+                    
+                    <h3 className="text-sm font-extrabold text-foreground line-clamp-2 leading-snug">
+                      {template.name}
+                    </h3>
+                    
+                    <div className="flex items-center gap-3.5 text-[10px] text-muted-foreground/80 font-semibold border-t border-border/40 pt-2.5 mt-1">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-brand-500/80" />
                         {dateStr}
                       </span>
-                      <span className="flex items-center gap-1">
-                        <User className="w-3 h-3 text-brand-500" />
+                      <span className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-brand-500/80" />
                         {template.creator ? `${template.creator.firstName} ${template.creator.lastName.slice(0, 1)}.` : 'Admin'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2.5">
                     <Link
                       href={`/admin/certificates/${template.id}/edit`}
-                      className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                     >
-                      <Award className="w-3.5 h-3.5" />
-                      Issue
-                    </Link>
-                    <Link
-                      href={`/admin/certificates/${template.id}/edit`}
-                      className="p-2 bg-muted hover:bg-muted/70 text-foreground border border-border rounded-xl text-xs font-semibold transition-colors"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
+                      <Award className="w-4 h-4" />
+                      Issue & Manage
                     </Link>
                     <button
                       type="button"
                       onClick={() => requestDelete(template.id)}
-                      className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl transition-colors border border-transparent"
+                      className="p-2 bg-red-500/5 hover:bg-red-500/10 text-red-600 dark:text-red-400 rounded-xl transition-all border border-red-500/10 hover:border-red-500/20"
+                      title="Delete template"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
