@@ -283,16 +283,22 @@ async function evaluateSingleMentee(template, menteePayload, preCheckResult, adm
   const userPrompt = JSON.stringify(menteePayload, null, 2);
 
   let response = null;
-  const candidates = [ai.model];
+  const initialCandidates = [ai.model];
   if (ai.provider === 'groq' || /groq/i.test(ai.baseURL || '')) {
-    candidates.push('llama-3.3-70b-versatile', 'llama3-70b-8192', 'llama-3.1-8b-instant');
+    initialCandidates.push('llama-3.3-70b-versatile', 'llama-3.1-8b-instant');
   } else if (ai.provider === 'openai' || /openai/i.test(ai.baseURL || '')) {
-    candidates.push('gpt-4o-mini', 'gpt-4o');
+    initialCandidates.push('gpt-4o-mini', 'gpt-4o');
   }
-  const uniqueModels = [...new Set(candidates.filter(Boolean))];
 
+  const modelQueue = [...new Set(initialCandidates.filter(Boolean))];
+  const triedModels = new Set();
   let lastError = null;
-  for (const m of uniqueModels) {
+
+  for (let idx = 0; idx < modelQueue.length; idx++) {
+    const m = modelQueue[idx];
+    if (triedModels.has(m)) continue;
+    triedModels.add(m);
+
     try {
       response = await Promise.race([
         ai.client.chat.completions.create({
@@ -310,8 +316,29 @@ async function evaluateSingleMentee(template, menteePayload, preCheckResult, adm
     } catch (err) {
       lastError = err;
       console.warn(`[aiEvaluationService] Model ${m} failed:`, err.message);
-      if (!/404|model_not_found|does not exist/i.test(err?.message || '')) {
+
+      // Only break early on authentication, billing, or rate limit issues.
+      if (/401|unauthorized|auth|api_key|invalid_key|429|rate_limit|quota|billing/i.test(err?.message || '')) {
         break;
+      }
+
+      // If we run out of initial candidates, dynamically fetch all available chat models from the endpoint
+      if (idx === modelQueue.length - 1) {
+        try {
+          console.log('[aiEvaluationService] Fetching available models list dynamically from endpoint...');
+          const listRes = await ai.client.models.list();
+          const available = (listRes.data || [])
+            .map(x => x.id)
+            .filter(id => !/whisper|guard|embed|moderation/i.test(id)); // exclude non-chat models
+
+          for (const modelId of available) {
+            if (!triedModels.has(modelId)) {
+              modelQueue.push(modelId);
+            }
+          }
+        } catch (listErr) {
+          console.warn('[aiEvaluationService] Failed to dynamically list models:', listErr.message);
+        }
       }
     }
   }
