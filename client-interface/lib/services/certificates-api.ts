@@ -35,8 +35,21 @@ export interface CertificateTemplate {
     id: string;
     name: string;
     badgeUrl?: string;
-    taskIds: string[];
+    // Legacy (task-ID-based)
+    taskIds?: string[];
+    maxBlockers?: number;    // legacy
+    // Current AI-based
+    keywords?: string[];
+    minScorePercent?: number;   // 0-100 HARD threshold
+    maxOpenBlockers?: number;   // -1 = unlimited; >=0 = max allowed
+    minCompletionRate?: number; // 0 = off; % tasks completed
+    minOnTimeRate?: number;     // 0 = off; % submitted on time
+    minAvgRating?: number;      // 0 = off; 0.5-5 scale
+    customRule?: string;        // free-text AI rule
   }>;
+  aiEvaluation?: { results: AIEvaluationResult[]; ranAt: string } | null;
+  aiEvaluationRanAt?: string | null;
+
   createdBy: string;
   status: string;
   createdAt: string;
@@ -72,7 +85,37 @@ export interface CertificateInstance {
   updatedAt: string;
 }
 
+export interface AIBlockersAnalysis {
+  total: number;
+  resolved: number;
+  impact: 'Low' | 'Medium' | 'High';
+  summary: string;
+}
+
+export interface AIEvaluationResult {
+  mentee_id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  is_eligible: boolean;
+  certificate_tier: string;
+  match_score: number;        // 0-100 holistic quality score WITHIN eligible tier
+  overall_percentage: number; // normalized points % (ground truth)
+  matched_keywords: string[];
+  missing_keywords: string[];
+  hard_constraints_check: {
+    score_ok:           boolean;
+    blockers_ok:        boolean;
+    completion_rate_ok: boolean;
+    on_time_rate_ok:    boolean;
+    rating_ok:          boolean;
+  };
+  blockers_analysis: AIBlockersAnalysis;
+  reasoning: string;
+}
+
 export const certificatesApi = {
+
   // Templates CRUD
   listTemplates: (programId?: string) => {
     const qs = new URLSearchParams();
@@ -163,5 +206,23 @@ export const certificatesApi = {
     apiClient.delete<{ success: boolean; message: string }>(`/certificates/templates/${id}/instances`),
 
   resendAllTemplateCertificates: (id: string, failedOnly: boolean) =>
-    apiClient.post<{ success: boolean; message: string; updated: number }>(`/certificates/templates/${id}/resend`, { failedOnly })
+    apiClient.post<{ success: boolean; message: string; updated: number }>(`/certificates/templates/${id}/resend`, { failedOnly }),
+
+  runAIEvaluation: (id: string, mentorId?: string) => {
+    const qs = mentorId ? `?mentorId=${encodeURIComponent(mentorId)}` : '';
+    return apiClient.post<{ success: boolean; runId: string; total: number; message: string }>(`/certificates/templates/${id}/ai-evaluate${qs}`, {});
+  },
+
+  getAIEvaluationStatus: (id: string, runId: string) =>
+    apiClient.get<{
+      success: boolean;
+      isDone: boolean;
+      total: number;
+      completed: number;
+      failed: number;
+      pending: number;
+      data: AIEvaluationResult[];
+      ranAt: string | null;
+    }>(`/certificates/templates/${id}/ai-evaluate/status?runId=${encodeURIComponent(runId)}`)
 };
+

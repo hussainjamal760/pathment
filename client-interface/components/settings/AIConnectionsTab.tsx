@@ -29,7 +29,9 @@ const FEATURE_META: { key: AIFeature; label: string; hint: string }[] = [
   { key: 'rag_generation', label: 'RAG Reply Drafts', hint: 'Generate drafted mentor replies' },
   { key: 'rag_grounding', label: 'RAG Fact-Checking', hint: 'Verify drafted replies' },
   { key: 'rag_embedding', label: 'RAG Vectors (Gemini Only)', hint: 'Generate embeddings for documents' },
+  { key: 'certificates', label: 'Certificate AI Evaluation', hint: 'Evaluate mentee criteria & assign certificate tiers' },
 ];
+
 
 const STATUS_META: Record<AIKeyStatus, { label: string; cls: string; Icon: typeof CheckCircle2 }> = {
   connected: { label: 'Connected', cls: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400', Icon: CheckCircle2 },

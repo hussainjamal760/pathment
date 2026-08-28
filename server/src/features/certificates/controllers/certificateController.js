@@ -1,5 +1,7 @@
 const { models, sequelize } = require('../../../db');
+const { Op } = require('sequelize');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../../../utils/errors/errorTypes');
+const aiEvaluationService = require('../services/aiEvaluationService');
 
 /**
  * Create a new certificate template (Admin only)
@@ -421,6 +423,9 @@ exports.uploadAsset = async (req, res, next) => {
  * Scope is determined by query params:
  *  - ?mentorId=<id>   → mentees in clans where mentor is lead_mentor/co_mentor
  *  - ?programId=<id>  → all enrollments in that program (admin view)
+ *
+ * Hard constraints from criteria are enforced server-side:
+ *  minScorePercent, maxOpenBlockers, minCompletionRate, minOnTimeRate, minAvgRating
  */
 exports.getQualification = async (req, res, next) => {
   try {
@@ -439,7 +444,6 @@ exports.getQualification = async (req, res, next) => {
     const pausedMentees  = [];
 
     if (mentorId) {
-      // Find clans where this mentor is active lead_mentor or co_mentor and clan belongs to template's program
       const mentorClans = await models.ClanMembership.findAll({
         where: {
           userId: mentorId,
@@ -457,32 +461,18 @@ exports.getQualification = async (req, res, next) => {
       });
       let clanIds = mentorClans.map(c => c.clanId || c['clan.id']);
 
-      // Admin fallback for testing: if no clans matched and caller is admin, load first 5 active clans of this program
       if (clanIds.length === 0 && req.user.role === 'admin') {
         const allClans = await models.Clan.findAll({
-          where: { programId },
-          limit: 5,
-          attributes: ['id'],
-          raw: true
+          where: { programId }, limit: 5, attributes: ['id'], raw: true
         });
         clanIds = allClans.map(c => c.id);
       }
 
       if (clanIds.length > 0) {
-        // All mentee-role clan members in those clans
         const menteeMembers = await models.ClanMembership.findAll({
-          where: {
-            clanId: { [Op.in]: clanIds },
-            role: 'mentee',
-            status: 'active'
-          },
-          include: [{
-            model: models.User,
-            as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email', 'status']
-          }]
+          where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
+          include: [{ model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
         });
-
         for (const mem of menteeMembers) {
           if (!mem.user) continue;
           const u = mem.user;
@@ -502,42 +492,68 @@ exports.getQualification = async (req, res, next) => {
       }
     }
 
-    // --- 1.5. Fetch existing issued instances for this template to map to recipients ---
+    // --- 1.5. Fetch existing issued instances ---
     const existingInstances = await models.CertificateInstance.findAll({
       where: { templateId: id },
       attributes: ['menteeId', 'mentorId', 'tier']
     });
-
     const issuedMap = {};
     for (const inst of existingInstances) {
       const key = inst.menteeId || inst.mentorId;
-      if (key) {
-        issuedMap[key] ??= [];
-        issuedMap[key].push(inst.tier);
-      }
+      if (key) { issuedMap[key] ??= []; issuedMap[key].push(inst.tier); }
     }
 
     const activeIds = activeMentees.map(m => m.id);
 
-    // --- 2. All assigned tasks for active mentees ---
+    // --- 2. Fetch tasks with points, rating, and lateness ---
     const allAssigned = activeIds.length ? await models.AssignedTask.findAll({
       where: { menteeId: { [Op.in]: activeIds }, status: { [Op.ne]: 'cancelled' } },
-      attributes: ['menteeId', 'status'],
-      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title'] }]
+      attributes: ['menteeId', 'status', 'pointsAwarded', 'pointsBase', 'finalRating', 'isLate'],
+      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'pointsBase'] }]
     }) : [];
 
-    const menteeStats = {};
+    // --- 3. Fetch blockers for open-blocker count ---
+    const allBlockers = activeIds.length ? await models.Blocker.findAll({
+      where: { menteeId: { [Op.in]: activeIds } },
+      attributes: ['menteeId', 'status'],
+      raw: true
+    }) : [];
+
+    // --- 4. Compute per-mentee metrics (all server-side, ground-truth numbers) ---
+    const menteeMetrics = {};
+    for (const mid of activeIds) {
+      menteeMetrics[mid] = {
+        completedTitles: new Set(),
+        completedCount: 0, totalTasks: 0,
+        totalBase: 0, totalAwarded: 0,
+        onTimeTasks: 0,
+        ratedSum: 0, ratedCount: 0,
+        openBlockers: 0
+      };
+    }
     for (const row of allAssigned) {
-      const s = menteeStats[row.menteeId] ??= { completedTitles: new Set(), completedCount: 0, totalTasks: 0 };
-      s.totalTasks++;
+      const m = menteeMetrics[row.menteeId];
+      if (!m) continue;
+      m.totalTasks++;
+      const base    = row.pointsBase ?? row.roadmapTask?.pointsBase ?? 10;
+      const awarded = row.pointsAwarded ?? 0;
+      m.totalBase += base;
       if (row.status === 'completed') {
-        s.completedCount++;
+        m.completedCount++;
+        m.totalAwarded += awarded;
+        if (!row.isLate) m.onTimeTasks++;
+        const rating = row.finalRating != null ? parseFloat(row.finalRating) : null;
+        if (rating != null) { m.ratedSum += rating; m.ratedCount++; }
         const title = row.roadmapTask?.title?.trim()?.toLowerCase();
-        if (title) s.completedTitles.add(title);
+        if (title) m.completedTitles.add(title);
       }
     }
+    for (const row of allBlockers) {
+      const m = menteeMetrics[row.menteeId];
+      if (m && row.status !== 'resolved') m.openBlockers++;
+    }
 
-    // --- 3. Resolve criteria task IDs → titles ---
+    // --- 5. Resolve criteria task IDs → titles (legacy support) ---
     const criteria = Array.isArray(template.criteria) ? template.criteria : [];
     const allStepIds = [...new Set(criteria.flatMap(t => t.taskIds || []))];
     const stepRows = allStepIds.length ? await models.RoadmapTask.findAll({
@@ -545,56 +561,84 @@ exports.getQualification = async (req, res, next) => {
     }) : [];
     const titleById = Object.fromEntries(stepRows.map(s => [s.id, s.title.trim().toLowerCase()]));
 
-    // --- 4. Enrichment helper ---
-    const enrich = (m, requiredTitles, isParticipation = false) => {
-      const stats = menteeStats[m.id] || { completedTitles: new Set(), completedCount: 0, totalTasks: 0 };
+    // --- 6. Enrichment helper ---
+    const enrich = (m, requiredTitles, isParticipation = false, tier = null) => {
+      const mx = menteeMetrics[m.id] || {
+        completedTitles: new Set(), completedCount: 0, totalTasks: 0,
+        totalBase: 0, totalAwarded: 0, onTimeTasks: 0,
+        ratedSum: 0, ratedCount: 0, openBlockers: 0
+      };
+
+      const normalizedScore = mx.totalBase > 0
+        ? Math.round((mx.totalAwarded / mx.totalBase) * 100) : 0;
+      const completionRate  = mx.totalTasks > 0
+        ? Math.round((mx.completedCount / mx.totalTasks) * 100) : 0;
+      const onTimeRate      = mx.completedCount > 0
+        ? Math.round((mx.onTimeTasks / mx.completedCount) * 100) : 0;
+      const avgRating       = mx.ratedCount > 0
+        ? parseFloat((mx.ratedSum / mx.ratedCount).toFixed(2)) : null;
+
       const matched = requiredTitles.length > 0
-        ? requiredTitles.filter(t => stats.completedTitles.has(t)).length
-        : 0;
+        ? requiredTitles.filter(t => mx.completedTitles.has(t)).length : 0;
+      let taskCriteriaMatch = requiredTitles.length > 0
+        ? Math.round((matched / requiredTitles.length) * 100)
+        : (isParticipation ? 100 : 0);
+
+      // Apply hard constraints: any failure → criteriaMatch = 0
+      if (tier) {
+        const minScore      = tier.minScorePercent    ?? 0;
+        const maxBlockers   = tier.maxOpenBlockers ?? tier.maxBlockers ?? -1;
+        const minCompletion = tier.minCompletionRate  ?? 0;
+        const minOnTime     = tier.minOnTimeRate      ?? 0;
+        const minRating     = tier.minAvgRating       ?? 0;
+        const hardPass = (
+          (minScore      <= 0 || normalizedScore  >= minScore) &&
+          (maxBlockers   < 0  || mx.openBlockers  <= maxBlockers) &&
+          (minCompletion <= 0 || completionRate   >= minCompletion) &&
+          (minOnTime     <= 0 || onTimeRate       >= minOnTime) &&
+          (minRating     <= 0 || (avgRating != null && avgRating >= minRating))
+        );
+        if (!hardPass) taskCriteriaMatch = 0;
+      }
+
       return {
         ...m,
-        completedCount: stats.completedCount,
-        totalTasks: stats.totalTasks,
-        criteriaMatch: requiredTitles.length > 0 
-          ? Math.round((matched / requiredTitles.length) * 100) 
-          : (isParticipation ? 100 : 0),
-        issuedTiers: issuedMap[m.id] || []
+        completedCount: mx.completedCount,
+        totalTasks:     mx.totalTasks,
+        normalizedScore,
+        completionRate,
+        onTimeRate,
+        avgRating,
+        openBlockers:   mx.openBlockers,
+        criteriaMatch:  taskCriteriaMatch,
+        issuedTiers:    issuedMap[m.id] || []
       };
     };
 
-    // --- 5. Build per-tier result ---
+    // --- 7. Build per-tier result ---
     const result = {
       participation: activeMentees.map(m => enrich(m, [], true)),
-      paused: pausedMentees.map(m => ({ ...m, completedCount: 0, totalTasks: 0, criteriaMatch: 0, issuedTiers: issuedMap[m.id] || [] })),
+      paused: pausedMentees.map(m => ({
+        ...m, completedCount: 0, totalTasks: 0, normalizedScore: 0,
+        completionRate: 0, onTimeRate: 0, avgRating: null, openBlockers: 0,
+        criteriaMatch: 0, issuedTiers: issuedMap[m.id] || []
+      })),
       mentors: []
     };
     for (const tier of criteria) {
       const requiredTitles = (tier.taskIds || []).map(id => titleById[id]).filter(Boolean);
-      result[tier.id] = activeMentees.map(m => enrich(m, requiredTitles, tier.id === 'participation'));
+      result[tier.id] = activeMentees.map(m => enrich(m, requiredTitles, tier.id === 'participation', tier));
     }
 
-    // Populate mentors list if queried by program (Admin)
+    // --- 8. Populate mentors list (Admin program-wide view) ---
     if (programId) {
       const mentorMemberships = await models.ClanMembership.findAll({
-        where: {
-          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
-          status: 'active'
-        },
+        where: { role: { [Op.in]: ['lead_mentor', 'co_mentor'] }, status: 'active' },
         include: [
-          {
-            model: models.Clan,
-            as: 'clan',
-            where: { programId },
-            attributes: []
-          },
-          {
-            model: models.User,
-            as: 'user',
-            attributes: ['id', 'firstName', 'lastName', 'email', 'status']
-          }
+          { model: models.Clan, as: 'clan', where: { programId }, attributes: [] },
+          { model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }
         ]
       });
-
       const uniqueMentors = [];
       const seenMentorIds = new Set();
       for (const mem of mentorMemberships) {
@@ -605,11 +649,12 @@ exports.getQualification = async (req, res, next) => {
             firstName: mem.user.firstName,
             lastName: mem.user.lastName,
             email: mem.user.email,
-            completedCount: 0,
-            totalTasks: 0,
+            completedCount: 0, totalTasks: 0,
+            normalizedScore: 100, completionRate: 100, onTimeRate: 100,
+            avgRating: null, openBlockers: 0,
             criteriaMatch: 100,
             assignedTier: 'participation',
-            tierMatches: { gold: 100, silver: 100, bronze: 100, participation: 100 },
+            tierMatches: { participation: 100 },
             issuedTiers: issuedMap[mem.user.id] || []
           });
         }
@@ -617,10 +662,9 @@ exports.getQualification = async (req, res, next) => {
       result.mentors = uniqueMentors;
     }
 
-    // --- 6. Apply tier-exclusivity filtering based on 90%+ qualification threshold ---
+    // --- 9. Tier-exclusivity: assign each mentee to their highest qualifying tier ---
     const orderedTiers = [...criteria.map(c => c.id), 'participation'];
     const tierMatchesByMentee = {};
-
     for (const mentee of activeMentees) {
       const matches = { participation: 100 };
       for (const tier of criteria) {
@@ -634,8 +678,7 @@ exports.getQualification = async (req, res, next) => {
     for (const mentee of activeMentees) {
       let assignedTier = 'participation';
       for (const tierId of criteria.map(c => c.id)) {
-        const matches = tierMatchesByMentee[mentee.id] || {};
-        if (matches[tierId] >= 90) {
+        if ((tierMatchesByMentee[mentee.id]?.[tierId] ?? 0) >= 90) {
           assignedTier = tierId;
           break;
         }
@@ -643,13 +686,12 @@ exports.getQualification = async (req, res, next) => {
       assignedTierByMentee[mentee.id] = assignedTier;
     }
 
-    // Filter each list to only include mentees classified in that specific tier and attach metadata
     for (const tierId of orderedTiers) {
       result[tierId] = result[tierId]
         .map(m => ({
           ...m,
           assignedTier: assignedTierByMentee[m.id],
-          tierMatches: tierMatchesByMentee[m.id] || { participation: 100 }
+          tierMatches:  tierMatchesByMentee[m.id] || { participation: 100 }
         }))
         .filter(m => assignedTierByMentee[m.id] === tierId);
     }
@@ -1049,3 +1091,165 @@ exports.resendAllTemplateCertificates = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Run AI evaluation for a certificate template — ASYNC queue-based.
+ * Enqueues one job per mentee → worker processes them one by one.
+ * Results stream back to the client via socket.io as they complete.
+ * POST /api/certificates/templates/:id/ai-evaluate  (Admin / Mentor)
+ */
+exports.runAIEvaluation = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { Op } = require('sequelize');
+
+    const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
+    if (!template) throw new NotFoundError('Certificate template not found');
+
+    const programId = template.programId;
+    const criteria = Array.isArray(template.criteria) ? template.criteria : [];
+
+    // ── Resolve mentee pool ──────────────────────────────────────────────
+    const menteeRows = [];
+    const mentorId = req.user.role === 'mentor' ? req.user.id : req.query.mentorId;
+
+    if (mentorId) {
+      const mentorClans = await models.ClanMembership.findAll({
+        where: { userId: mentorId, role: { [Op.in]: ['lead_mentor', 'co_mentor'] }, status: 'active' },
+        attributes: ['clanId'],
+        include: [{ model: models.Clan, as: 'clan', where: { programId }, attributes: [] }],
+        raw: true
+      });
+      let clanIds = mentorClans.map(c => c.clanId || c['clan.id']);
+      if (clanIds.length === 0 && req.user.role === 'admin') {
+        const allClans = await models.Clan.findAll({ where: { programId }, limit: 5, attributes: ['id'], raw: true });
+        clanIds = allClans.map(c => c.id);
+      }
+
+      if (clanIds.length > 0) {
+        const menteeMembers = await models.ClanMembership.findAll({
+          where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
+          include: [{ model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
+        });
+        for (const m of menteeMembers) {
+          if (m.user && m.user.status !== 'suspended') {
+            menteeRows.push({ id: m.user.id, firstName: m.user.firstName, lastName: m.user.lastName, email: m.user.email });
+          }
+        }
+      }
+    } else {
+      // Admin: program-wide enrollments
+      const enrollments = await models.Enrollment.findAll({
+        where: { programId },
+        include: [{ model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
+      });
+      for (const e of enrollments) {
+        if (e.mentee && e.status !== 'paused' && e.mentee.status !== 'suspended') {
+          menteeRows.push({ id: e.mentee.id, firstName: e.mentee.firstName, lastName: e.mentee.lastName, email: e.mentee.email });
+        }
+      }
+    }
+
+    // Deduplicate
+    const seenIds = new Set();
+    const mentees = menteeRows.filter(m => {
+      if (seenIds.has(m.id)) return false;
+      seenIds.add(m.id);
+      return true;
+    });
+
+    if (mentees.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        ranAt: new Date().toISOString(),
+        message: 'No active mentees found in this program.'
+      });
+    }
+
+    const menteeIds = mentees.map(m => m.id);
+
+    // ── Enqueue per-mentee evaluation jobs ────────────────────────────────
+    const { runId, total } = await aiEvaluationService.enqueueEvaluation(
+      id,
+      menteeIds,
+      req.user.id,
+      criteria
+    );
+
+    res.status(202).json({
+      success: true,
+      runId,
+      total,
+      message: `Queued ${total} mentee evaluations. Results will arrive via real-time updates.`
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get AI evaluation run status — polling fallback if socket disconnects.
+ * GET /api/certificates/templates/:id/ai-evaluate/status?runId=xxx
+ */
+exports.getAIEvaluationStatus = async (req, res, next) => {
+  try {
+    const { runId } = req.query;
+    if (!runId) {
+      return res.status(400).json({ success: false, message: 'runId is required' });
+    }
+
+    const jobs = await models.AIEvaluationQueue.findAll({
+      where: { runId },
+      attributes: ['menteeId', 'status', 'result', 'error'],
+      raw: true
+    });
+
+    if (jobs.length === 0) {
+      return res.status(404).json({ success: false, message: 'Run not found' });
+    }
+
+    const total     = jobs.length;
+    const completed = jobs.filter(j => j.status === 'completed').length;
+    const failed    = jobs.filter(j => j.status === 'failed').length;
+    const pending   = jobs.filter(j => j.status === 'pending' || j.status === 'processing').length;
+    const isDone    = pending === 0;
+
+    // Collect completed results with mentee names
+    const completedResults = jobs
+      .filter(j => j.status === 'completed' && j.result)
+      .map(j => j.result);
+
+    let enrichedResults = completedResults;
+    if (completedResults.length > 0) {
+      const menteeIds = completedResults.map(r => r.mentee_id);
+      const mentees = await models.User.findAll({
+        where: { id: { [Op.in]: menteeIds } },
+        attributes: ['id', 'firstName', 'lastName', 'email'],
+        raw: true
+      });
+      const menteeMap = Object.fromEntries(mentees.map(m => [m.id, m]));
+      enrichedResults = completedResults.map(ev => ({
+        ...ev,
+        firstName: menteeMap[ev.mentee_id]?.firstName ?? '',
+        lastName:  menteeMap[ev.mentee_id]?.lastName  ?? '',
+        email:     menteeMap[ev.mentee_id]?.email     ?? ''
+      }));
+      enrichedResults.sort((a, b) => b.match_score - a.match_score);
+    }
+
+    res.status(200).json({
+      success: true,
+      isDone,
+      total,
+      completed,
+      failed,
+      pending,
+      data: enrichedResults,
+      ranAt: isDone ? new Date().toISOString() : null
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

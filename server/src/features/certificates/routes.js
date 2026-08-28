@@ -197,4 +197,29 @@ router.post(
   certificateController.resendAllTemplateCertificates
 );
 
+/**
+ * @route   POST /api/certificates/templates/:id/ai-evaluate
+ * @desc    Run AI evaluation pipeline for certificate eligibility
+ * @access  Admin
+ */
+router.post(
+  '/templates/:id/ai-evaluate',
+  authenticate,
+  authorize(['admin', 'mentor']),
+  certificateController.runAIEvaluation
+);
+
+/**
+ * @route   GET /api/certificates/templates/:id/ai-evaluate/status
+ * @desc    Get status of an ongoing AI evaluation run
+ * @access  Admin, Mentor
+ */
+router.get(
+  '/templates/:id/ai-evaluate/status',
+  authenticate,
+  authorize(['admin', 'mentor']),
+  certificateController.getAIEvaluationStatus
+);
+
+
 module.exports = router;

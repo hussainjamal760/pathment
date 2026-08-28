@@ -8,7 +8,7 @@ import {
   Image as ImageIcon, AlignLeft, AlignCenter, AlignRight,
   Bold, Loader2, ZoomIn, ZoomOut, Award,
   CheckCircle, Users, Trash, Search, Send, Info,
-  ChevronDown, X
+  ChevronDown, X, Sparkles, CheckCircle2, XCircle, Edit3
 } from 'lucide-react';
 import Link from 'next/link';
 import { certificatesApi, CertificateElement, CertificateTemplate } from '@/lib/services/certificates-api';
@@ -19,6 +19,9 @@ import { orgRoadmapApi } from '@/lib/services/roadmap-api';
 import { programsApi } from '@/lib/services/program-api';
 import CertificateHistoryLog from './CertificateHistoryLog';
 import { getTierBadgeColor, getTierButtonColor, getTierIconColor } from '@/lib/utils/certificates';
+import { AIDetailDrawer, AIEvaluationBanner, CriteriaTable } from '@/components/certificates/shared';
+import { getSocket } from '@/lib/services/socket-client';
+
 
 interface CertificateEditorProps {
   templateId?: string; // If provided, we are in Edit Mode
@@ -28,7 +31,16 @@ interface TierCriteria {
   id: string;
   name: string;
   badgeUrl?: string;
-  taskIds: string[];
+  keywords: string[];         // AI evaluation: tech stack / topics
+  minScorePercent: number;    // 0-100 — HARD threshold: AI may not bypass
+  maxOpenBlockers: number;    // -1 = unlimited; 0 = zero open blockers allowed
+  minCompletionRate: number;  // 0 = off; 1-100 = % of tasks that must be completed
+  minOnTimeRate: number;      // 0 = off; 1-100 = % of completed tasks submitted on time
+  minAvgRating: number;       // 0 = off; 0.5-5 = minimum mentor rating average
+  customRule: string;         // free-text rule for AI e.g. "must have 2+ project tasks"
+  // Legacy compat: old templates may still have taskIds / maxBlockers
+  taskIds?: string[];
+  maxBlockers?: number;
 }
 
 const FONTS = [
@@ -253,11 +265,132 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   // Dynamic Tiers state (Step 2)
   const [criteria, setCriteria] = useState<TierCriteria[]>([
-    { id: 'gold', name: 'Gold Certificate', badgeUrl: '', taskIds: [] },
-    { id: 'silver', name: 'Silver Certificate', badgeUrl: '', taskIds: [] },
-    { id: 'bronze', name: 'Bronze Certificate', badgeUrl: '', taskIds: [] },
-    { id: 'participation', name: 'Participation Certificate', badgeUrl: '', taskIds: [] }
+    { id: 'gold',          name: 'Gold Certificate',          badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0,  minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, customRule: '' },
+    { id: 'silver',        name: 'Silver Certificate',        badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2,  minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, customRule: '' },
+    { id: 'bronze',        name: 'Bronze Certificate',        badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5,  minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, customRule: '' },
+    { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0,  maxOpenBlockers: -1, minCompletionRate: 0,  minOnTimeRate: 0,  minAvgRating: 0,   customRule: '' },
   ]);
+
+  // AI evaluation state
+  const [aiResults, setAiResults] = useState<any[]>([]);
+  const [aiRanAt, setAiRanAt] = useState<string | null>(null);
+  const [runningAI, setRunningAI] = useState(false);
+  const [aiDetailMentee, setAiDetailMentee] = useState<any | null>(null);
+  const [expandedAIRows, setExpandedAIRows] = useState<Set<string>>(new Set());
+
+  // Real-time AI queue evaluation progress states
+  const [aiProgressCount, setAiProgressCount] = useState(0);
+  const [aiTotalCount, setAiTotalCount] = useState(0);
+  const [aiEvaluationRunId, setAiEvaluationRunId] = useState<string | null>(null);
+
+  // Listen to AI evaluation progress in real-time
+  useEffect(() => {
+    if (!aiEvaluationRunId || !templateId) return;
+
+    const socket = getSocket();
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const handleProgress = (data: { runId: string; menteeId: string; result: any; completed: number; total: number }) => {
+      if (data.runId !== aiEvaluationRunId) return;
+      setAiProgressCount(data.completed);
+      setAiTotalCount(data.total);
+
+      // Merge incremental result
+      setAiResults(prev => {
+        const index = prev.findIndex(r => r.mentee_id === data.result.mentee_id);
+        if (index > -1) {
+          const updated = [...prev];
+          updated[index] = data.result;
+          return updated;
+        } else {
+          return [...prev, data.result];
+        }
+      });
+
+      // Automatically check or pre-select tier
+      setAdminTiers(prev => ({
+        ...prev,
+        [data.result.mentee_id]: data.result.certificate_tier
+      }));
+      setSelectedMenteeIds(prev => {
+        const next = new Set(prev);
+        next.add(data.result.mentee_id);
+        return next;
+      });
+    };
+
+    const handleComplete = (data: { runId: string; results: any[]; ranAt: string }) => {
+      if (data.runId !== aiEvaluationRunId) return;
+      setAiResults(data.results || []);
+      setAiRanAt(data.ranAt);
+      
+      const newTiers: Record<string, string> = {};
+      const autoSelected = new Set<string>();
+      for (const r of (data.results || [])) {
+        newTiers[r.mentee_id] = r.certificate_tier;
+        autoSelected.add(r.mentee_id);
+      }
+      setAdminTiers(prev => ({ ...prev, ...newTiers }));
+      setSelectedMenteeIds(autoSelected);
+      setRunningAI(false);
+      setAiEvaluationRunId(null);
+      toast.success(`AI evaluation completed successfully for ${data.results.length} mentees!`);
+    };
+
+    if (socket) {
+      socket.on('ai-eval:progress', handleProgress);
+      socket.on('ai-eval:complete', handleComplete);
+    }
+
+    // Polling fallback (in case WebSocket fails or isn't active)
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await certificatesApi.getAIEvaluationStatus(templateId, aiEvaluationRunId);
+        if (res.success) {
+          setAiProgressCount(res.completed);
+          setAiTotalCount(res.total);
+          
+          if (res.data && res.data.length > 0) {
+            setAiResults(res.data);
+            
+            const newTiers: Record<string, string> = {};
+            const autoSelected = new Set<string>();
+            for (const r of res.data) {
+              newTiers[r.mentee_id] = r.certificate_tier;
+              autoSelected.add(r.mentee_id);
+            }
+            setAdminTiers(prev => ({ ...prev, ...newTiers }));
+            setSelectedMenteeIds(autoSelected);
+          }
+
+          if (res.isDone) {
+            setAiRanAt(res.ranAt || new Date().toISOString());
+            setRunningAI(false);
+            setAiEvaluationRunId(null);
+            if (pollInterval) clearInterval(pollInterval);
+            toast.success(`AI evaluation completed successfully!`);
+          }
+        }
+      } catch (err) {
+        console.error('AI status poll error:', err);
+      }
+    }, 4000);
+
+    return () => {
+      if (socket) {
+        socket.off('ai-eval:progress', handleProgress);
+        socket.off('ai-eval:complete', handleComplete);
+      }
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [aiEvaluationRunId, templateId]);
+
+  // Map AI evaluation results by mentee_id
+  const aiEvalMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    (aiResults || []).forEach(r => { map[r.mentee_id] = r; });
+    return map;
+  }, [aiResults]);
 
   // Roadmap tasks & Programs
   const [availableTasks, setAvailableTasks] = useState<Array<{ id: string; title: string }>>([]);
@@ -272,6 +405,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   // Recipient Select Tier
   const [issuing, setIssuing] = useState(false);
   const [recipientSearch, setRecipientSearch] = useState('');
+  const [badgeFilter, setBadgeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'none' | 'score_desc' | 'score_asc'>('none');
   const [selectedMenteeIds, setSelectedMenteeIds] = useState<Set<string>>(new Set());
   const [sendingToMentors, setSendingToMentors] = useState(false);
   const [recipientType, setRecipientType] = useState<'all' | 'mentees' | 'mentors'>('all');
@@ -282,10 +417,12 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [criteriaTasks, setCriteriaTasks] = useState<Array<{ id: string; title: string }>>([]);
 
   const handleProgramChange = (val: string) => {
-    if (criteria.some(c => c.taskIds.length > 0)) {
-      if (window.confirm("Changing the program will clear the selected task criteria. Do you want to proceed?")) {
+    if (criteria.some(c => (c.keywords?.length ?? 0) > 0)) {
+      if (window.confirm("Changing the program will clear the keyword criteria. Do you want to proceed?")) {
         setSelectedProgramId(val);
-        setCriteria(prev => prev.map(c => ({ ...c, taskIds: [] })));
+        setCriteria(prev => prev.map(c => ({ ...c, keywords: [] })));
+        setAiResults([]);
+        setAiRanAt(null);
       }
     } else {
       setSelectedProgramId(val);
@@ -293,6 +430,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   };
 
   const getTierName = (tierId: string) => {
+    if (!tierId || typeof tierId !== 'string') return '';
     const match = criteria.find(c => c.id === tierId);
     return match ? match.name : tierId.charAt(0).toUpperCase() + tierId.slice(1);
   };
@@ -316,6 +454,15 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [tierModalName, setTierModalName] = useState('');
   const [tierModalBadgeUrl, setTierModalBadgeUrl] = useState('');
   const [tierModalTaskIds, setTierModalTaskIds] = useState<string[]>([]);
+  const [tierModalKeywords, setTierModalKeywords] = useState<string[]>([]);
+  const [tierModalKeywordInput, setTierModalKeywordInput] = useState('');
+  const [tierModalMinScore, setTierModalMinScore] = useState(0);
+  // New tier fields
+  const [tierModalMaxBlockers, setTierModalMaxBlockers] = useState(-1);
+  const [tierModalMinCompletion, setTierModalMinCompletion] = useState(0);
+  const [tierModalMinOnTime, setTierModalMinOnTime] = useState(0);
+  const [tierModalMinRating, setTierModalMinRating] = useState(0);
+  const [tierModalCustomRule, setTierModalCustomRule] = useState('');
 
   // Fetch roadmap tasks & cohorts on mount
   useEffect(() => {
@@ -396,7 +543,27 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           if (t.logoConfig) setLogoConfig(t.logoConfig);
           setElements(t.config || []);
           if (Array.isArray(t.criteria)) {
-            setCriteria(t.criteria);
+            // Normalize: old criteria may have taskIds/maxBlockers but lack new fields — apply defaults
+            setCriteria(t.criteria.map((c: any) => ({
+              id: c.id,
+              name: c.name,
+              badgeUrl: c.badgeUrl ?? '',
+              keywords: Array.isArray(c.keywords) ? c.keywords : [],
+              minScorePercent:   c.minScorePercent   ?? 0,
+              maxOpenBlockers:   c.maxOpenBlockers   ?? c.maxBlockers ?? -1,
+              minCompletionRate: c.minCompletionRate ?? 0,
+              minOnTimeRate:     c.minOnTimeRate     ?? 0,
+              minAvgRating:      c.minAvgRating      ?? 0,
+              customRule:        c.customRule        ?? '',
+              // legacy
+              maxBlockers: c.maxBlockers,
+              taskIds: c.taskIds
+            })));
+          }
+          // Load cached AI evaluation if present
+          if (t.aiEvaluation?.results) {
+            setAiResults(t.aiEvaluation.results);
+            setAiRanAt(t.aiEvaluation.ranAt ?? null);
           }
         }
       } catch (err: any) {
@@ -839,13 +1006,28 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       setEditingTier(tier);
       setTierModalName(tier.name);
       setTierModalBadgeUrl(tier.badgeUrl || '');
+      setTierModalKeywords(tier.keywords || []);
+      setTierModalMinScore(tier.minScorePercent ?? 0);
       setTierModalTaskIds(tier.taskIds || []);
+      setTierModalMaxBlockers(tier.maxOpenBlockers ?? tier.maxBlockers ?? -1);
+      setTierModalMinCompletion(tier.minCompletionRate ?? 0);
+      setTierModalMinOnTime(tier.minOnTimeRate ?? 0);
+      setTierModalMinRating(tier.minAvgRating ?? 0);
+      setTierModalCustomRule(tier.customRule ?? '');
     } else {
       setEditingTier(null);
       setTierModalName('');
       setTierModalBadgeUrl('');
+      setTierModalKeywords([]);
+      setTierModalMinScore(0);
       setTierModalTaskIds([]);
+      setTierModalMaxBlockers(-1);
+      setTierModalMinCompletion(0);
+      setTierModalMinOnTime(0);
+      setTierModalMinRating(0);
+      setTierModalCustomRule('');
     }
+    setTierModalKeywordInput('');
     setIsTierModalOpen(true);
   };
 
@@ -871,27 +1053,59 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       return;
     }
 
+    // Flush any pending keyword input
+    const kws = [...tierModalKeywords];
+    const pending = tierModalKeywordInput.trim();
+    if (pending && !kws.includes(pending)) kws.push(pending);
+
+    const newFields = {
+      name:              tierModalName.trim(),
+      badgeUrl:          tierModalBadgeUrl,
+      keywords:          kws,
+      minScorePercent:   tierModalMinScore,
+      maxOpenBlockers:   tierModalMaxBlockers,
+      minCompletionRate: tierModalMinCompletion,
+      minOnTimeRate:     tierModalMinOnTime,
+      minAvgRating:      tierModalMinRating,
+      customRule:        tierModalCustomRule.trim(),
+    };
+
     setCriteria(prev => {
       if (editingTier) {
-        // Edit mode
         return prev.map(t => t.id === editingTier.id
-          ? { ...t, name: tierModalName.trim(), badgeUrl: tierModalBadgeUrl, taskIds: tierModalTaskIds }
+          ? { ...t, ...newFields, taskIds: t.taskIds } // preserve legacy taskIds
           : t
         );
       } else {
-        // Create mode
         const newTier: TierCriteria = {
           id: `tier-${Date.now()}`,
-          name: tierModalName.trim(),
-          badgeUrl: tierModalBadgeUrl,
-          taskIds: tierModalTaskIds
+          ...newFields,
         };
         return [...prev, newTier];
       }
     });
 
     setIsTierModalOpen(false);
-    toast.success('Certificate type saved! Remeber to click "Save Template" to persist your changes.');
+    toast.success('Certificate type saved! Click "Save Template" to persist changes.');
+  };
+
+  const handleRunAIEvaluation = async () => {
+    if (!templateId) return;
+    try {
+      setRunningAI(true);
+      setAiProgressCount(0);
+      setAiTotalCount(0);
+      setAiResults([]); // Clear previous results
+      const res = await certificatesApi.runAIEvaluation(templateId);
+      if (res.success) {
+        setAiEvaluationRunId(res.runId);
+        setAiTotalCount(res.total);
+        toast.info(`AI evaluation started for ${res.total} mentees...`);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'AI evaluation failed. Check AI connection in Settings.');
+      setRunningAI(false);
+    }
   };
 
   const deleteTier = (tierId: string) => {
@@ -940,13 +1154,36 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     return recipientMentorsList;
   }, [recipientType, recipientMenteesList, recipientMentorsList]);
 
-  /** Further filtered by the search field. */
+  /** Further filtered by the search field, badge filter, and sorted by score. */
   const filtered = useMemo(() => {
+    let result = [...activeList];
+
+    // 1. Filter by search query
     const q = recipientSearch.toLowerCase().trim();
-    return q
-      ? activeList.filter((m: any) => `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(q))
-      : activeList;
-  }, [activeList, recipientSearch]);
+    if (q) {
+      result = result.filter((m: any) =>
+        `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(q)
+      );
+    }
+
+    // 2. Filter by assigned badge (tier)
+    if (badgeFilter !== 'all') {
+      const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
+      result = result.filter((m: any) => {
+        const assignedTier = adminTiers[m.id] ?? defaultTier;
+        return assignedTier === badgeFilter;
+      });
+    }
+
+    // 3. Sort by score
+    if (sortBy === 'score_desc') {
+      result.sort((a: any, b: any) => (b.normalizedScore ?? 0) - (a.normalizedScore ?? 0));
+    } else if (sortBy === 'score_asc') {
+      result.sort((a: any, b: any) => (a.normalizedScore ?? 0) - (b.normalizedScore ?? 0));
+    }
+
+    return result;
+  }, [activeList, recipientSearch, badgeFilter, sortBy, adminTiers, criteria]);
 
   const allFilteredIds = filtered.map((m: any) => m.id);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedMenteeIds.has(id));
@@ -1003,6 +1240,31 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     setAdminTiers(updatedTiers);
     setSelectedMenteeIds(nextSelected);
     toast.info(`Set all filtered recipients to ${getTierName(badge)}`);
+  };
+
+  const resetToAIRecommendations = () => {
+    if (!aiResults || aiResults.length === 0) return;
+    const updatedTiers = { ...adminTiers };
+    const nextSelected = new Set(selectedMenteeIds);
+    const aiMap: Record<string, string> = {};
+    aiResults.forEach(r => {
+      if (r.mentee_id && r.certificate_tier) {
+        aiMap[r.mentee_id] = r.certificate_tier;
+      }
+    });
+
+    filtered.forEach((m: any) => {
+      const aiTier = aiMap[m.id];
+      if (aiTier) {
+        updatedTiers[m.id] = aiTier;
+        const match = m.tierMatches?.[aiTier] ?? 0;
+        if (match >= 90) nextSelected.add(m.id); else nextSelected.delete(m.id);
+      }
+    });
+
+    setAdminTiers(updatedTiers);
+    setSelectedMenteeIds(nextSelected);
+    toast.success('Reset all filtered recipients to AI recommendations.');
   };
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1464,94 +1726,12 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       </div>
 
       {/* SECTION 2: Certificate Criteria */}
-      <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
-        <div className="flex items-center justify-between border-b border-border pb-4">
-          <div className="flex items-start gap-3.5">
-            <div className="w-8 h-8 rounded-full bg-brand-500/10 flex items-center justify-center font-bold text-brand-500 text-sm">
-              2
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-foreground">Certificate Criteria</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Define rules and link task checklist requirements to qualify mentees for each certificate type.</p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => openTierModal()}
-            className="flex items-center gap-1 text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline bg-brand-500/5 hover:bg-brand-500/10 px-3.5 py-2 rounded-xl transition-all"
-          >
-            <Plus className="w-4 h-4" /> Add Certificate Type
-          </button>
-        </div>
-
-        {/* Criteria Table */}
-        <div className="border border-border rounded-2xl overflow-hidden bg-muted/10 divide-y divide-border">
-          {/* Table Header */}
-          <div className="grid grid-cols-12 gap-4 px-6 py-3.5 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-            <div className="col-span-4">Certificate Type</div>
-            <div className="col-span-6">Criteria Summary</div>
-            <div className="col-span-2 text-right">Actions</div>
-          </div>
-
-          {/* Table Body */}
-          {criteria.length === 0 ? (
-            <div className="p-12 text-center text-xs text-muted-foreground font-semibold">
-              No certificate criteria types configured. Click "+ Add Certificate Type" to begin.
-            </div>
-          ) : (
-            criteria.map(tier => {
-              // Build criteria summary text
-              let summaryText = 'Active mentees during the fellowship';
-              if (tier.taskIds && tier.taskIds.length > 0) {
-                const count = tier.taskIds.length;
-                const taskTitles = tier.taskIds
-                  .map(id => availableTasks.find(t => t.id === id)?.title)
-                  .filter(Boolean);
-                summaryText = `${count} required task${count > 1 ? 's' : ''} (${taskTitles.slice(0, 2).join(', ')}${taskTitles.length > 2 ? '...' : ''})`;
-              }
-
-              return (
-                <div key={tier.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center text-xs font-semibold text-foreground bg-card hover:bg-muted/10 transition-colors">
-                  <div className="col-span-4 flex items-center gap-2">
-                    {tier.badgeUrl ? (
-                      <img src={tier.badgeUrl} className="w-7 h-7 object-contain rounded-md" alt={tier.name} />
-                    ) : (
-                      <div className="w-7 h-7 rounded-md bg-brand-500/10 flex items-center justify-center font-bold text-brand-500 text-[10px]">
-                        {tier.name.slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                    <span className="font-bold text-foreground">{tier.name}</span>
-                  </div>
-
-                  <div className="col-span-6 text-muted-foreground text-[11px] font-medium leading-relaxed">
-                    {summaryText}
-                  </div>
-
-                  <div className="col-span-2 flex items-center justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => openTierModal(tier)}
-                      className="p-1 text-muted-foreground hover:text-brand-500 hover:bg-muted rounded transition-colors"
-                      title="Edit Criteria"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteTier(tier.id)}
-                      className="p-1 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
-                      title="Delete Tier"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+      <CriteriaTable
+        criteria={criteria}
+        onAdd={() => openTierModal()}
+        onEdit={(tier) => openTierModal(tier as any)}
+        onDelete={deleteTier}
+      />
 
       {/* SECTION 3: Select Recipients & Issue */}
       <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
@@ -1563,17 +1743,31 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               <p className="text-xs text-muted-foreground mt-0.5">Filter mentees who meet criteria and issue credentials.</p>
             </div>
           </div>
-          {templateId && selectedProgramId && (
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleSendToMentors}
-              disabled={sendingToMentors}
-              className="flex items-center gap-1.5 px-4 py-2 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+              onClick={handleRunAIEvaluation}
+              disabled={runningAI || !templateId}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-xs"
             >
-              {sendingToMentors ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
-              Send to Mentors
+              {runningAI ? (
+                <><Loader2 className="animate-spin w-3.5 h-3.5" /> Evaluating…</>
+              ) : (
+                <><Sparkles className="w-3.5 h-3.5" /> {aiRanAt ? 'Re-run AI Evaluation' : 'Run AI Evaluation'}</>
+              )}
             </button>
-          )}
+            {templateId && selectedProgramId && (
+              <button
+                type="button"
+                onClick={handleSendToMentors}
+                disabled={sendingToMentors}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+              >
+                {sendingToMentors ? <Loader2 className="animate-spin w-3.5 h-3.5" /> : <Send className="w-3.5 h-3.5" />}
+                Send to Mentors
+              </button>
+            )}
+          </div>
         </div>
 
         {!templateId ? (
@@ -1582,6 +1776,25 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           </div>
         ) : (
           <div className="space-y-4">
+            <AIEvaluationBanner
+              count={aiResults.length}
+              ranAt={aiRanAt}
+              runningAI={runningAI}
+              progressCount={aiProgressCount}
+              totalCount={aiTotalCount}
+            />
+
+            {/* ── AI Detail Drawer ─────────────────────────────────────────── */}
+            <AIDetailDrawer
+              mentee={aiDetailMentee}
+              onClose={() => setAiDetailMentee(null)}
+              criteria={criteria}
+              selectedTier={aiDetailMentee ? (adminTiers[aiDetailMentee.mentee_id] ?? aiDetailMentee.certificate_tier) : undefined}
+              onTierChange={handleTierChange}
+              overrideLabel="Override Tier (Admin)"
+            />
+
+            {/* ── Existing Roster (Tabs + Table) ─────────────────────────── */}
             {/* Recipient Type Tabs & Rules */}
             <div className="flex items-center justify-between border-b border-border -mx-6 px-6 pb-px mb-2">
               <div className="flex gap-4">
@@ -1614,9 +1827,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </button>
             </div>
 
-            {/* Filters row */}
-            <div className="mb-5">
-              <div className="relative w-full">
+            {/* Filters & Sorting row */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-5">
+              <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
                 <input
                   type="text"
@@ -1631,15 +1844,44 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 hover:bg-muted rounded-full transition-colors"
                     type="button"
                   >
-                    <X className="w-3 h-3 text-muted-foreground hover:text-foreground" />
+                    <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
                   </button>
                 )}
+              </div>
+
+              {/* Badge Filter select */}
+              <div className="relative min-w-[150px]">
+                <select
+                  value={badgeFilter}
+                  onChange={e => setBadgeFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 pr-8 text-xs bg-muted/30 hover:bg-muted/50 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
+                >
+                  <option value="all">All Badges</option>
+                  {criteria.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
+              </div>
+
+              {/* Sort by Score select */}
+              <div className="relative min-w-[150px]">
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 pr-8 text-xs bg-muted/30 hover:bg-muted/50 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
+                >
+                  <option value="none">Sort: Default</option>
+                  <option value="score_desc">High Score first</option>
+                  <option value="score_asc">Low Score first</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
               </div>
             </div>
 
             {/* Bulk Actions */}
             {filtered.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap bg-muted/20 border border-border rounded-2xl p-3 text-xs">
+              <div className="flex items-center gap-1.5 flex-wrap bg-muted/20 border border-border rounded-2xl p-3 text-xs w-full">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Set All to:</span>
                 {criteria.map(c => (
                   <button
@@ -1651,6 +1893,15 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     {c.name}
                   </button>
                 ))}
+                {aiResults && aiResults.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={resetToAIRecommendations}
+                    className="ml-auto flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-bold bg-violet-600 hover:bg-violet-700 text-white shadow-xs transition-colors border border-transparent"
+                  >
+                    <Sparkles className="w-3 h-3 text-white animate-pulse" /> Reset to AI Recommendations
+                  </button>
+                )}
               </div>
             )}
 
@@ -1666,16 +1917,17 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             ) : (
               <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border">
                 {/* Table header */}
-                <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
+                {/* Table header */}
+                <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center border-b border-border/40 select-none">
                   <div className="col-span-1 flex items-center justify-center">
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-3.5 h-3.5 accent-brand-600 cursor-pointer" />
                   </div>
                   <div className="col-span-3">
                     {recipientType === 'all' ? 'Recipient' : recipientType === 'mentees' ? 'Mentee' : 'Mentor'}
                   </div>
-                  <div className="col-span-3 text-center">Certificate Badge</div>
-                  <div className="col-span-3 text-center">Issued Badges</div>
-                  <div className="col-span-2 text-center">Eligibility</div>
+                  <div className="col-span-3 text-center">AI Recommendation</div>
+                  <div className="col-span-3 text-center">Final Assigned Badge</div>
+                  <div className="col-span-2 text-center">Issued Badges</div>
                 </div>
 
                 {/* Table rows */}
@@ -1715,35 +1967,68 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           </div>
                           <div className="text-[10px] text-muted-foreground truncate">{m.email}</div>
                         </div>
-                        <div className="col-span-3 flex justify-center">
+                        {/* Column 3: AI Recommendation */}
+                        <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
+                          {aiEvalMap[m.id] ? (
+                            <div className="flex items-center gap-1.5 bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-xl">
+                              <span className="text-[10px] font-extrabold text-violet-700 dark:text-violet-300 flex items-center gap-1">
+                                <Sparkles className="w-3 h-3 text-violet-500" /> {getTierName(aiEvalMap[m.id].certificate_tier)}
+                              </span>
+                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                                (aiEvalMap[m.id].match_score ?? 0) >= 75
+                                  ? 'text-emerald-600 bg-emerald-500/20'
+                                  : 'text-amber-600 bg-amber-500/20'
+                              }`}>
+                                {aiEvalMap[m.id].match_score}%
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setAiDetailMentee(aiEvalMap[m.id])}
+                                className="p-0.5 hover:bg-violet-500/20 rounded text-violet-600 dark:text-violet-400 transition-colors"
+                                title="View AI Analysis & Breakdown"
+                              >
+                                <Info className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${matchColor}`}>
+                              {match}% match
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Column 4: Final Assigned Badge Dropdown */}
+                        <div className="col-span-3 flex flex-col items-center justify-center">
                           <select
                             value={selectedTier}
                             onChange={e => handleTierChange(m.id, e.target.value)}
-                            className="px-2 py-0.5 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none cursor-pointer font-bold max-w-[160px]"
+                            className="px-2.5 py-1 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none cursor-pointer font-bold max-w-[160px]"
                           >
                             {criteria.map(c => (
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                           </select>
+                          {aiEvalMap[m.id] && aiEvalMap[m.id].certificate_tier !== selectedTier && (
+                            <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                              <Edit3 className="w-2.5 h-2.5" /> Overridden by Admin
+                            </span>
+                          )}
                         </div>
-                        <div className="col-span-3 flex flex-wrap justify-center gap-1">
+
+                        {/* Column 5: Issued Badges */}
+                        <div className="col-span-2 flex flex-wrap justify-center gap-1">
                           {issuedTiersList.length === 0 ? (
                             <span className="text-[10px] text-muted-foreground/60 font-semibold">—</span>
                           ) : (
-                            issuedTiersList.map(tier => (
+                            issuedTiersList.map((tier, idx) => (
                               <span
-                                key={tier}
+                                key={`${tier}-${idx}`}
                                 className={`px-1.5 py-0.5 rounded border text-[9px] font-extrabold uppercase tracking-wide ${getTierBadgeColor(tier)}`}
                               >
                                 {getTierName(tier)}
                               </span>
                             ))
                           )}
-                        </div>
-                        <div className="col-span-2 flex items-center justify-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${matchColor}`}>
-                            {match}%
-                          </span>
                         </div>
                       </div>
                     );
@@ -1861,50 +2146,145 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 </FileDragDrop>
               </div>
 
-              {/* Required Tasks list checklist */}
+              {/* ── Keywords / Tech Stack ─────────────────────────── */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <label className="font-semibold text-muted-foreground">Select Required Cohort Tasks</label>
-                  {availableTasks.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (tierModalTaskIds.length === availableTasks.length) {
-                          setTierModalTaskIds([]);
-                        } else {
-                          setTierModalTaskIds(availableTasks.map(t => t.id));
-                        }
-                      }}
-                      className="text-[10px] font-bold text-brand-600 dark:text-brand-400 hover:underline"
-                    >
-                      {tierModalTaskIds.length === availableTasks.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  )}
+                <label className="text-xs font-semibold text-muted-foreground block">Keywords / Tech Stack <span className="text-[9px] text-muted-foreground/60 font-normal">(AI matches loosely against task titles and descriptions)</span></label>
+                {/* Tag chips */}
+                <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+                  {tierModalKeywords.map(kw => (
+                    <span key={kw} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 text-[10px] font-bold border border-brand-500/20">
+                      {kw}
+                      <button type="button" onClick={() => setTierModalKeywords(prev => prev.filter(k => k !== kw))} className="hover:text-red-500 leading-none">×</button>
+                    </span>
+                  ))}
                 </div>
-                <div className="border border-border rounded-xl bg-muted/20 p-3 max-h-[160px] overflow-y-auto space-y-1.5">
-                  {availableTasks.length === 0 ? (
-                    <div className="text-center text-[10px] text-muted-foreground italic py-4">
-                      No roadmap tasks found in library.
-                    </div>
-                  ) : (
-                    availableTasks.map(task => {
-                      const checked = tierModalTaskIds.includes(task.id);
-                      return (
-                        <label key={task.id} className="flex items-center gap-2 text-[10px] cursor-pointer hover:bg-muted/40 p-1.5 rounded text-foreground font-semibold">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleTierTask(task.id)}
-                            className="rounded border-border text-brand-500 focus:ring-brand-500 w-3.5 h-3.5 cursor-pointer"
-                          />
-                          <span className="line-clamp-1">{task.title}</span>
-                        </label>
-                      );
-                    })
-                  )}
+                {/* Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tierModalKeywordInput}
+                    onChange={e => setTierModalKeywordInput(e.target.value)}
+                    onKeyDown={e => {
+                      if ((e.key === 'Enter' || e.key === ',') && tierModalKeywordInput.trim()) {
+                        e.preventDefault();
+                        const kw = tierModalKeywordInput.trim().replace(/,$/, '');
+                        if (kw && !tierModalKeywords.includes(kw)) {
+                          setTierModalKeywords(prev => [...prev, kw]);
+                        }
+                        setTierModalKeywordInput('');
+                      }
+                    }}
+                    placeholder="Type keyword and press Enter (e.g. React.js, Node.js)"
+                    className="flex-1 px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 placeholder:text-muted-foreground/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const kw = tierModalKeywordInput.trim();
+                      if (kw && !tierModalKeywords.includes(kw)) {
+                        setTierModalKeywords(prev => [...prev, kw]);
+                        setTierModalKeywordInput('');
+                      }
+                    }}
+                    className="px-3 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 rounded-xl text-xs font-bold transition-colors"
+                  >
+                    Add
+                  </button>
                 </div>
               </div>
+
+              {/* ── Hard Constraint Thresholds ─────────────────────── */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-t border-border/60 pt-2">Hard Constraints <span className="normal-case font-normal text-muted-foreground/60">(AI cannot bypass these)</span></p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Min Score */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                      Min Score %
+                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
+                    </label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={tierModalMinScore}
+                      onChange={e => setTierModalMinScore(Math.min(100, Math.max(0, Number(e.target.value))))}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                    />
+                  </div>
+
+                  {/* Max Open Blockers */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                      Max Open Blockers
+                      <span className="text-[9px] text-muted-foreground/50 font-normal">(-1 = unlimited)</span>
+                    </label>
+                    <input
+                      type="number" min={-1}
+                      value={tierModalMaxBlockers}
+                      onChange={e => setTierModalMaxBlockers(Math.max(-1, Number(e.target.value)))}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                    />
+                  </div>
+
+                  {/* Min Completion Rate */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                      Min Completion Rate %
+                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
+                    </label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={tierModalMinCompletion}
+                      onChange={e => setTierModalMinCompletion(Math.min(100, Math.max(0, Number(e.target.value))))}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                    />
+                  </div>
+
+                  {/* Min On-Time Rate */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                      Min On-Time Rate %
+                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
+                    </label>
+                    <input
+                      type="number" min={0} max={100}
+                      value={tierModalMinOnTime}
+                      onChange={e => setTierModalMinOnTime(Math.min(100, Math.max(0, Number(e.target.value))))}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                    />
+                  </div>
+
+                  {/* Min Avg Rating */}
+                  <div className="space-y-1 col-span-2">
+                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
+                      Min Avg Mentor Rating
+                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off; scale 1-5)</span>
+                    </label>
+                    <input
+                      type="number" min={0} max={5} step={0.5}
+                      value={tierModalMinRating}
+                      onChange={e => setTierModalMinRating(Math.min(5, Math.max(0, Number(e.target.value))))}
+                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Custom AI Rule ─────────────────────────────────── */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block border-t border-border/60 pt-2">
+                  Custom AI Rule <span className="normal-case font-normal text-muted-foreground/60">(qualitative — AI enforces this on top of hard constraints)</span>
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder={'e.g. "Must have completed at least 2 project-type tasks" or "Mentee should have shown initiative in resolving blockers independently"'}
+                  value={tierModalCustomRule}
+                  onChange={e => setTierModalCustomRule(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 resize-none placeholder:text-muted-foreground/40"
+                />
+              </div>
             </div>
+
 
             {/* Footer */}
             <div className="px-6 py-4 bg-muted/20 border-t border-border flex justify-end gap-3">
@@ -1935,17 +2315,20 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       >
         <div className="space-y-6">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            The rules below determine which badge tier a mentee qualifies for. If a mentee completes the required roadmap tasks, they will become eligible to receive the corresponding badge.
+            The rules below define the AI evaluation criteria for each tier. The AI uses these keywords and scoring thresholds to determine which certificate each mentee qualifies for.
           </p>
 
           <div className="space-y-4">
             {criteria.map((c: any) => {
               const iconColor = getTierIconColor(c.id);
               const isParticipation = c.id === 'participation';
-              const taskList = c.taskIds || [];
-              const resolvedTasks = taskList
-                .map((id: string) => criteriaTasks.find(t => t.id === id)?.title)
-                .filter(Boolean);
+              const kws: string[] = c.keywords || [];
+              const minScore      = c.minScorePercent    ?? 0;
+              const maxB          = (c.maxOpenBlockers ?? c.maxBlockers ?? -1) === -1 ? 'Unlimited' : (c.maxOpenBlockers ?? c.maxBlockers);
+              const minCompletion = c.minCompletionRate  ?? 0;
+              const minOnTime     = c.minOnTimeRate      ?? 0;
+              const minRating     = c.minAvgRating       ?? 0;
+              const customRule    = c.customRule?.trim() ?? '';
 
               return (
                 <div key={c.id} className="p-4 rounded-2xl border border-border bg-card shadow-2xs space-y-3">
@@ -1954,42 +2337,69 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     <span className="text-xs font-bold text-foreground">{c.name}</span>
                   </div>
 
-                  <div className="space-y-2">
-                    {isParticipation ? (
+                  <div className="space-y-3">
+                    {isParticipation && kws.length === 0 && minScore === 0 ? (
                       <p className="text-xs text-muted-foreground font-semibold italic">
-                        Participation Certificate - Requires no tasks (awarded to all active participants by default).
-                      </p>
-                    ) : taskList.length === 0 ? (
-                      <p className="text-xs text-red-500 font-semibold italic">
-                        No required tasks have been configured for this tier.
+                        Awarded to all active participants (no minimum requirements).
                       </p>
                     ) : (
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold text-foreground">
-                          Requires completing <span className="text-brand-600 font-extrabold">{taskList.length}</span> task{taskList.length !== 1 ? 's' : ''}:
-                        </p>
-                        <ul className="list-disc list-inside space-y-1 text-[11px] text-muted-foreground pl-1">
-                          {resolvedTasks.length > 0 ? (
-                            resolvedTasks.map((title: string, index: number) => (
-                              <li key={index} className="leading-relaxed">
-                                {title}
-                              </li>
-                            ))
+                      <>
+                        {/* Keywords */}
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Keywords / Tech Stack</p>
+                          {kws.length === 0 ? (
+                            <p className="text-[11px] text-amber-600 font-semibold italic">No keywords set — AI will use hard constraints only.</p>
                           ) : (
-                            taskList.map((id: string) => (
-                              <li key={id} className="leading-relaxed font-mono text-[9px] text-muted-foreground/60">
-                                Task ID: {id}
-                              </li>
-                            ))
+                            <div className="flex flex-wrap gap-1">
+                              {kws.map(kw => (
+                                <span key={kw} className="px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 text-[10px] font-bold border border-brand-500/20">{kw}</span>
+                              ))}
+                            </div>
                           )}
-                        </ul>
-                      </div>
+                        </div>
+
+                        {/* Hard Constraints Grid */}
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hard Constraints (AI cannot bypass)</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="p-2 rounded-xl bg-muted/30 text-center">
+                              <p className="text-[9px] text-muted-foreground font-semibold">Min Score</p>
+                              <p className="text-xs font-extrabold text-foreground">{minScore > 0 ? `${minScore}%` : '—'}</p>
+                            </div>
+                            <div className="p-2 rounded-xl bg-muted/30 text-center">
+                              <p className="text-[9px] text-muted-foreground font-semibold">Max Blockers</p>
+                              <p className="text-xs font-extrabold text-foreground">{maxB}</p>
+                            </div>
+                            <div className="p-2 rounded-xl bg-muted/30 text-center">
+                              <p className="text-[9px] text-muted-foreground font-semibold">Min Completion</p>
+                              <p className="text-xs font-extrabold text-foreground">{minCompletion > 0 ? `${minCompletion}%` : '—'}</p>
+                            </div>
+                            <div className="p-2 rounded-xl bg-muted/30 text-center">
+                              <p className="text-[9px] text-muted-foreground font-semibold">Min On-Time</p>
+                              <p className="text-xs font-extrabold text-foreground">{minOnTime > 0 ? `${minOnTime}%` : '—'}</p>
+                            </div>
+                            <div className="p-2 rounded-xl bg-muted/30 text-center col-span-2">
+                              <p className="text-[9px] text-muted-foreground font-semibold">Min Avg Rating</p>
+                              <p className="text-xs font-extrabold text-foreground">{minRating > 0 ? `${minRating} / 5` : '—'}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Custom Rule */}
+                        {customRule && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Custom AI Rule</p>
+                            <p className="text-[11px] text-foreground italic bg-muted/30 rounded-xl px-3 py-2 leading-relaxed">"{customRule}"</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
+
         </div>
       </Drawer>
 
