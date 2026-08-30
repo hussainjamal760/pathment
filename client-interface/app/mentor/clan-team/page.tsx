@@ -24,6 +24,7 @@ interface ClanDetail {
   name: string;
   program?: { id: string; name: string };
   memberships: Member[];
+  whatsappGroupLink?: string | null;
 }
 interface MyMembership {
   role: string;
@@ -96,6 +97,10 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
   const [canAddMentees, setCanAddMentees] = useState(myRole === 'lead_mentor');
   const confirm = useConfirm();
 
+  const [isEditingLink, setIsEditingLink] = useState(false);
+  const [tempLink, setTempLink] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
+
   const load = useCallback(() => {
     setLoading(true);
     Promise.all([
@@ -103,7 +108,9 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
       clanApi.myClanAccess(clanId).catch(() => null),
     ])
       .then(([clanRes, accessRes]: any[]) => {
-        setClan(clanRes.data?.clan || clanRes.data);
+        const clanData = clanRes.data?.clan || clanRes.data;
+        setClan(clanData);
+        setTempLink(clanData?.whatsappGroupLink || '');
         const access = accessRes?.data;
         if (access) {
           setCanManageTeam(Boolean(access.canManageTeam));
@@ -117,6 +124,24 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
       .finally(() => setLoading(false));
   }, [clanId, myRole]);
   useEffect(load, [load]);
+
+  const handleSaveLink = async () => {
+    if (tempLink && !tempLink.startsWith('http://') && !tempLink.startsWith('https://')) {
+      toast.error('Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+    setSavingLink(true);
+    try {
+      await clanApi.update(clanId, { whatsappGroupLink: tempLink.trim() || null });
+      toast.success('WhatsApp group link updated successfully');
+      setIsEditingLink(false);
+      load();
+    } catch (e) {
+      toast.error(extractApiErrorMessage(e, 'Could not update WhatsApp link'));
+    } finally {
+      setSavingLink(false);
+    }
+  };
 
   const members = clan?.memberships || [];
   // People holding a mentor role here AND still learning here as a mentee. They
@@ -228,6 +253,78 @@ function ClanTeamCard({ clanId, myRole }: { clanId: string; myRole: string }) {
           <span className="text-xs text-slate-400 shrink-0">View only (co-mentor)</span>
         )}
       </div>
+      
+      {/* WhatsApp Group Link Section */}
+      {isEditingLink ? (
+        <div className="mt-4 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-3">
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">WhatsApp Invite Link</label>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={tempLink}
+              onChange={(e) => setTempLink(e.target.value)}
+              placeholder="https://chat.whatsapp.com/..."
+              className="flex-1 px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm bg-card focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-950 dark:text-slate-50"
+              disabled={savingLink}
+            />
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleSaveLink}
+                disabled={savingLink}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 disabled:bg-brand-400 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5"
+              >
+                {savingLink && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditingLink(false);
+                  setTempLink(clan.whatsappGroupLink || '');
+                }}
+                disabled={savingLink}
+                className="px-4 py-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+              <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.458 5.704 1.459h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">WhatsApp Group Link</h4>
+              <p className="text-xs text-slate-500 truncate">
+                {clan.whatsappGroupLink ? (
+                  <a
+                    href={clan.whatsappGroupLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-600 dark:text-emerald-500 hover:underline break-all"
+                  >
+                    {clan.whatsappGroupLink}
+                  </a>
+                ) : (
+                  'No link set. Add one so your mentees can join your group.'
+                )}
+              </p>
+            </div>
+          </div>
+          {canManageTeam && (
+            <button
+              onClick={() => setIsEditingLink(true)}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 shrink-0"
+            >
+              {clan.whatsappGroupLink ? 'Change Link' : 'Add Link'}
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mt-5 space-y-5">
         <Section icon={<Crown className="w-3.5 h-3.5" />} title="Lead mentor" items={lead} removable={false} />
