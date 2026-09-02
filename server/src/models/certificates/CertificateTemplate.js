@@ -9,10 +9,6 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.JSONB, 
       allowNull: false 
     },
-    goldBadgeUrl: { type: DataTypes.TEXT, field: 'gold_badge_url' },
-    silverBadgeUrl: { type: DataTypes.TEXT, field: 'silver_badge_url' },
-    bronzeBadgeUrl: { type: DataTypes.TEXT, field: 'bronze_badge_url' },
-    participationBadgeUrl: { type: DataTypes.TEXT, field: 'participation_badge_url' },
     criteria: { type: DataTypes.JSONB },
     createdBy: { type: DataTypes.UUID, allowNull: false, field: 'created_by' },
     programId: { type: DataTypes.UUID, allowNull: false, field: 'program_id' },

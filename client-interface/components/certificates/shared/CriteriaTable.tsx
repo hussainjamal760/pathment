@@ -6,13 +6,13 @@ interface TierCriteria {
   id: string;
   name: string;
   badgeUrl?: string;
-  keywords?: string[];
-  minScorePercent?: number;
-  maxOpenBlockers?: number;
-  minCompletionRate?: number;
-  minOnTimeRate?: number;
-  minAvgRating?: number;
-  customRule?: string;
+  keywords?: string[] | null;
+  minScorePercent?: number | null;
+  maxOpenBlockers?: number | null;
+  minCompletionRate?: number | null;
+  minOnTimeRate?: number | null;
+  minAvgRating?: number | null;
+  customRule?: string | null;
 }
 
 interface CriteriaTableProps {
@@ -72,19 +72,13 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete }: CriteriaTab
         ) : (
           criteria.map((tier) => {
             const kws           = tier.keywords || [];
-            const minScore      = tier.minScorePercent    ?? 0;
-            const maxB          = tier.maxOpenBlockers    ?? -1;
-            const minCompletion = tier.minCompletionRate  ?? 0;
-            const minOnTime     = tier.minOnTimeRate      ?? 0;
-            const minRating     = tier.minAvgRating       ?? 0;
-
             const parts: string[] = [];
-            if (kws.length > 0)      parts.push(`Keywords: ${kws.slice(0, 3).join(', ')}${kws.length > 3 ? ` +${kws.length - 3}` : ''}`);
-            if (minScore > 0)        parts.push(`Score ≥${minScore}%`);
-            if (maxB >= 0)           parts.push(`Blockers ≤${maxB}`);
-            if (minCompletion > 0)   parts.push(`Completion ≥${minCompletion}%`);
-            if (minOnTime > 0)       parts.push(`On-Time ≥${minOnTime}%`);
-            if (minRating > 0)       parts.push(`Rating ≥${minRating}`);
+            if (kws.length > 0)                      parts.push(`Keywords: ${kws.slice(0, 3).join(', ')}${kws.length > 3 ? ` +${kws.length - 3}` : ''}`);
+            if (tier.minScorePercent != null)        parts.push(`Score ≥${tier.minScorePercent}%`);
+            if (tier.maxOpenBlockers != null)        parts.push(`Blockers ≤${tier.maxOpenBlockers}`);
+            if (tier.minCompletionRate != null)      parts.push(`Completion ≥${tier.minCompletionRate}%`);
+            if (tier.minOnTimeRate != null)          parts.push(`On-Time ≥${tier.minOnTimeRate}%`);
+            if (tier.minAvgRating != null)           parts.push(`Rating ≥${tier.minAvgRating}`);
 
             const summaryText = parts.length > 0
               ? parts.join(' · ')

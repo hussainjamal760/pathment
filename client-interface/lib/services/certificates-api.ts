@@ -16,6 +16,30 @@ export interface CertificateElement {
   imageUrl?: string;
 }
 
+export const BACKGROUND_PRESETS = [
+  {
+    id: 'preset-classic-navy',
+    name: 'Classic Navy & Gold',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+      <rect width="800" height="600" fill="#0f172a"/>
+      <rect x="20" y="20" width="760" height="560" fill="none" stroke="#e2e8f0" stroke-width="2" opacity="0.1"/>
+      <rect x="30" y="30" width="740" height="540" fill="none" stroke="#d97706" stroke-width="1.5" opacity="0.4"/>
+    </svg>`
+  },
+  {
+    id: 'preset-emerald-luxury',
+    name: 'Emerald Luxury',
+    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+      <rect width="800" height="600" fill="#064e3b"/>
+      <rect x="25" y="25" width="750" height="550" fill="none" stroke="#34d399" stroke-width="2" opacity="0.2"/>
+    </svg>`
+  }
+];
+
+export const BACKGROUND_PRESETS_MAP: Record<string, typeof BACKGROUND_PRESETS[0]> = Object.fromEntries(
+  BACKGROUND_PRESETS.map(p => [p.id, p])
+);
+
 export interface CertificateTemplate {
   id: string;
   name: string;
@@ -27,25 +51,17 @@ export interface CertificateTemplate {
     widthPercent: number;
   };
   config: CertificateElement[];
-  goldBadgeUrl?: string;
-  silverBadgeUrl?: string;
-  bronzeBadgeUrl?: string;
-  participationBadgeUrl?: string;
   criteria?: Array<{
     id: string;
     name: string;
     badgeUrl?: string;
-    // Legacy (task-ID-based)
-    taskIds?: string[];
-    maxBlockers?: number;    // legacy
-    // Current AI-based
-    keywords?: string[];
-    minScorePercent?: number;   // 0-100 HARD threshold
-    maxOpenBlockers?: number;   // -1 = unlimited; >=0 = max allowed
-    minCompletionRate?: number; // 0 = off; % tasks completed
-    minOnTimeRate?: number;     // 0 = off; % submitted on time
-    minAvgRating?: number;      // 0 = off; 0.5-5 scale
-    customRule?: string;        // free-text AI rule
+    keywords?: string[] | null;
+    minScorePercent?: number | null;
+    maxOpenBlockers?: number | null;
+    minCompletionRate?: number | null;
+    minOnTimeRate?: number | null;
+    minAvgRating?: number | null;
+    customRule?: string | null;
   }>;
   aiEvaluation?: { results: AIEvaluationResult[]; ranAt: string } | null;
   aiEvaluationRanAt?: string | null;
@@ -215,9 +231,11 @@ export const certificatesApi = {
     return apiClient.post<{ success: boolean; runId: string; total: number; message: string }>(`/certificates/templates/${id}/ai-evaluate${qs}`, {});
   },
 
-  getAIEvaluationStatus: (id: string, runId: string) =>
-    apiClient.get<{
+  getAIEvaluationStatus: (id: string, runId?: string) => {
+    const qs = runId ? `?runId=${encodeURIComponent(runId)}` : '';
+    return apiClient.get<{
       success: boolean;
+      runId: string | null;
       isDone: boolean;
       total: number;
       completed: number;
@@ -225,6 +243,7 @@ export const certificatesApi = {
       pending: number;
       data: AIEvaluationResult[];
       ranAt: string | null;
-    }>(`/certificates/templates/${id}/ai-evaluate/status?runId=${encodeURIComponent(runId)}`)
+    }>(`/certificates/templates/${id}/ai-evaluate/status${qs}`);
+  }
 };
 

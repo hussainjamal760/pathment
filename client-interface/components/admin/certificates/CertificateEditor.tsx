@@ -17,30 +17,21 @@ import { DuplicateWarnModal } from '@/components/shared';
 import { Drawer } from '@/components/shared/Drawer';
 import { orgRoadmapApi } from '@/lib/services/roadmap-api';
 import { programsApi } from '@/lib/services/program-api';
-import CertificateHistoryLog from './CertificateHistoryLog';
 import { getTierBadgeColor, getTierButtonColor, getTierIconColor } from '@/lib/utils/certificates';
-import { AIDetailDrawer, AIEvaluationBanner, CriteriaTable } from '@/components/certificates/shared';
 import { getSocket } from '@/lib/services/socket-client';
+import { AIDetailDrawer, AIEvaluationBanner, CriteriaTable } from '@/components/certificates/shared';
+import {
+  useAIEvaluationProgress,
+  useTierModal,
+  useCertificateQualifications,
+  useCertificateCanvas,
+  TierCriteria
+} from './hooks';
+import CertificateHistoryLog from './CertificateHistoryLog';
 
 
 interface CertificateEditorProps {
   templateId?: string; // If provided, we are in Edit Mode
-}
-
-interface TierCriteria {
-  id: string;
-  name: string;
-  badgeUrl?: string;
-  keywords: string[];         // AI evaluation: tech stack / topics
-  minScorePercent: number;    // 0-100 — HARD threshold: AI may not bypass
-  maxOpenBlockers: number;    // -1 = unlimited; 0 = zero open blockers allowed
-  minCompletionRate: number;  // 0 = off; 1-100 = % of tasks that must be completed
-  minOnTimeRate: number;      // 0 = off; 1-100 = % of completed tasks submitted on time
-  minAvgRating: number;       // 0 = off; 0.5-5 = minimum mentor rating average
-  customRule: string;         // free-text rule for AI e.g. "must have 2+ project tasks"
-  // Legacy compat: old templates may still have taskIds / maxBlockers
-  taskIds?: string[];
-  maxBlockers?: number;
 }
 
 const FONTS = [
@@ -265,10 +256,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   // Dynamic Tiers state (Step 2)
   const [criteria, setCriteria] = useState<TierCriteria[]>([
-    { id: 'gold',          name: 'Gold Certificate',          badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0,  minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, customRule: '' },
-    { id: 'silver',        name: 'Silver Certificate',        badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2,  minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, customRule: '' },
-    { id: 'bronze',        name: 'Bronze Certificate',        badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5,  minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, customRule: '' },
-    { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0,  maxOpenBlockers: -1, minCompletionRate: 0,  minOnTimeRate: 0,  minAvgRating: 0,   customRule: '' },
+    { id: 'gold', name: 'Gold Certificate', badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, customRule: '' },
+    { id: 'silver', name: 'Silver Certificate', badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2, minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, customRule: '' },
+    { id: 'bronze', name: 'Bronze Certificate', badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5, minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, customRule: '' },
+    { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0, maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, customRule: '' },
   ]);
 
   // AI evaluation state
@@ -323,7 +314,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       if (data.runId !== aiEvaluationRunId) return;
       setAiResults(data.results || []);
       setAiRanAt(data.ranAt);
-      
+
       const newTiers: Record<string, string> = {};
       const autoSelected = new Set<string>();
       for (const r of (data.results || [])) {
@@ -345,26 +336,34 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     // Polling fallback (in case WebSocket fails or isn't active)
     pollInterval = setInterval(async () => {
       try {
-        const res = await certificatesApi.getAIEvaluationStatus(templateId, aiEvaluationRunId);
+        const res: any = await certificatesApi.getAIEvaluationStatus(templateId, aiEvaluationRunId);
         if (res.success) {
-          setAiProgressCount(res.completed);
-          setAiTotalCount(res.total);
-          
-          if (res.data && res.data.length > 0) {
-            setAiResults(res.data);
-            
+          const payload = res.data?.data ? res.data : res;
+          const completed = payload.completed ?? res.completed ?? 0;
+          const total = payload.total ?? res.total ?? 0;
+          const isDone = payload.isDone ?? res.isDone ?? false;
+          const resultsList = payload.data ?? res.data ?? [];
+
+          setAiProgressCount(completed);
+          setAiTotalCount(total);
+
+          if (Array.isArray(resultsList) && resultsList.length > 0) {
+            setAiResults(resultsList);
+
             const newTiers: Record<string, string> = {};
             const autoSelected = new Set<string>();
-            for (const r of res.data) {
-              newTiers[r.mentee_id] = r.certificate_tier;
-              autoSelected.add(r.mentee_id);
+            for (const r of resultsList) {
+              if (r.mentee_id) {
+                newTiers[r.mentee_id] = r.certificate_tier;
+                autoSelected.add(r.mentee_id);
+              }
             }
             setAdminTiers(prev => ({ ...prev, ...newTiers }));
             setSelectedMenteeIds(autoSelected);
           }
 
-          if (res.isDone) {
-            setAiRanAt(res.ranAt || new Date().toISOString());
+          if (isDone) {
+            setAiRanAt(payload.ranAt || res.ranAt || new Date().toISOString());
             setRunningAI(false);
             setAiEvaluationRunId(null);
             if (pollInterval) clearInterval(pollInterval);
@@ -453,7 +452,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [editingTier, setEditingTier] = useState<TierCriteria | null>(null);
   const [tierModalName, setTierModalName] = useState('');
   const [tierModalBadgeUrl, setTierModalBadgeUrl] = useState('');
-  const [tierModalTaskIds, setTierModalTaskIds] = useState<string[]>([]);
   const [tierModalKeywords, setTierModalKeywords] = useState<string[]>([]);
   const [tierModalKeywordInput, setTierModalKeywordInput] = useState('');
   const [tierModalMinScore, setTierModalMinScore] = useState(0);
@@ -463,6 +461,15 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [tierModalMinOnTime, setTierModalMinOnTime] = useState(0);
   const [tierModalMinRating, setTierModalMinRating] = useState(0);
   const [tierModalCustomRule, setTierModalCustomRule] = useState('');
+
+  // Toggle states for enabling/disabling individual criteria checks
+  const [enableKeywords, setEnableKeywords] = useState(true);
+  const [enableMinScore, setEnableMinScore] = useState(true);
+  const [enableMaxBlockers, setEnableMaxBlockers] = useState(true);
+  const [enableMinCompletion, setEnableMinCompletion] = useState(true);
+  const [enableMinOnTime, setEnableMinOnTime] = useState(true);
+  const [enableMinRating, setEnableMinRating] = useState(true);
+  const [enableCustomRule, setEnableCustomRule] = useState(true);
 
   // Fetch roadmap tasks & cohorts on mount
   useEffect(() => {
@@ -543,27 +550,44 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           if (t.logoConfig) setLogoConfig(t.logoConfig);
           setElements(t.config || []);
           if (Array.isArray(t.criteria)) {
-            // Normalize: old criteria may have taskIds/maxBlockers but lack new fields — apply defaults
             setCriteria(t.criteria.map((c: any) => ({
               id: c.id,
               name: c.name,
               badgeUrl: c.badgeUrl ?? '',
               keywords: Array.isArray(c.keywords) ? c.keywords : [],
-              minScorePercent:   c.minScorePercent   ?? 0,
-              maxOpenBlockers:   c.maxOpenBlockers   ?? c.maxBlockers ?? -1,
+              minScorePercent: c.minScorePercent ?? 0,
+              maxOpenBlockers: c.maxOpenBlockers ?? -1,
               minCompletionRate: c.minCompletionRate ?? 0,
-              minOnTimeRate:     c.minOnTimeRate     ?? 0,
-              minAvgRating:      c.minAvgRating      ?? 0,
-              customRule:        c.customRule        ?? '',
-              // legacy
-              maxBlockers: c.maxBlockers,
-              taskIds: c.taskIds
+              minOnTimeRate: c.minOnTimeRate ?? 0,
+              minAvgRating: c.minAvgRating ?? 0,
+              customRule: c.customRule ?? ''
             })));
           }
           // Load cached AI evaluation if present
           if (t.aiEvaluation?.results) {
             setAiResults(t.aiEvaluation.results);
             setAiRanAt(t.aiEvaluation.ranAt ?? null);
+          }
+
+          // Auto-detect active background evaluation run on page reload
+          try {
+            const statusRes: any = await certificatesApi.getAIEvaluationStatus(templateId);
+            if (statusRes.success) {
+              const payload = statusRes.data?.data ? statusRes.data : statusRes;
+              const activeRunId = payload.runId || statusRes.runId;
+              const isDone = payload.isDone ?? statusRes.isDone ?? true;
+              const completed = payload.completed ?? statusRes.completed ?? 0;
+              const total = payload.total ?? statusRes.total ?? 0;
+
+              if (!isDone && activeRunId) {
+                setAiEvaluationRunId(activeRunId);
+                setRunningAI(true);
+                setAiProgressCount(completed);
+                setAiTotalCount(total);
+              }
+            }
+          } catch (e) {
+            // Silently ignore on mount
           }
         }
       } catch (err: any) {
@@ -625,24 +649,11 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           const autoSelected = new Set<string>();
 
           activeList.forEach(m => {
-            let defTier = m.assignedTier;
-            if (!defTier || !criteria.some(c => c.id === defTier)) {
-              let maxMatch = -1;
-              let bestTierId = criteria[criteria.length - 1]?.id || 'participation';
-              criteria.forEach(c => {
-                const match = m.tierMatches?.[c.id] ?? 0;
-                if (match > maxMatch) {
-                  maxMatch = match;
-                  bestTierId = c.id;
-                }
-              });
-              defTier = bestTierId;
-            }
+            const defTier = m.assignedTier || '';
             initialTiers[m.id] = defTier;
 
-            // Auto-select if criteriaMatch is high (>= 90%)
             const matchPercent = m.tierMatches?.[defTier] ?? 0;
-            if (matchPercent >= 90) {
+            if (defTier && matchPercent >= 75) {
               autoSelected.add(m.id);
             }
           });
@@ -1006,25 +1017,41 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       setEditingTier(tier);
       setTierModalName(tier.name);
       setTierModalBadgeUrl(tier.badgeUrl || '');
+
+      setEnableKeywords(Array.isArray(tier.keywords) && tier.keywords.length > 0);
+      setEnableMinScore(tier.minScorePercent != null);
+      setEnableMaxBlockers(tier.maxOpenBlockers != null);
+      setEnableMinCompletion(tier.minCompletionRate != null);
+      setEnableMinOnTime(tier.minOnTimeRate != null);
+      setEnableMinRating(tier.minAvgRating != null);
+      setEnableCustomRule(Boolean(tier.customRule && tier.customRule.trim()));
+
       setTierModalKeywords(tier.keywords || []);
-      setTierModalMinScore(tier.minScorePercent ?? 0);
-      setTierModalTaskIds(tier.taskIds || []);
-      setTierModalMaxBlockers(tier.maxOpenBlockers ?? tier.maxBlockers ?? -1);
-      setTierModalMinCompletion(tier.minCompletionRate ?? 0);
-      setTierModalMinOnTime(tier.minOnTimeRate ?? 0);
-      setTierModalMinRating(tier.minAvgRating ?? 0);
+      setTierModalMinScore(tier.minScorePercent ?? 75);
+      setTierModalMaxBlockers(tier.maxOpenBlockers ?? 0);
+      setTierModalMinCompletion(tier.minCompletionRate ?? 80);
+      setTierModalMinOnTime(tier.minOnTimeRate ?? 80);
+      setTierModalMinRating(tier.minAvgRating ?? 4.0);
       setTierModalCustomRule(tier.customRule ?? '');
     } else {
       setEditingTier(null);
       setTierModalName('');
       setTierModalBadgeUrl('');
+
+      setEnableKeywords(true);
+      setEnableMinScore(true);
+      setEnableMaxBlockers(true);
+      setEnableMinCompletion(true);
+      setEnableMinOnTime(true);
+      setEnableMinRating(true);
+      setEnableCustomRule(true);
+
       setTierModalKeywords([]);
-      setTierModalMinScore(0);
-      setTierModalTaskIds([]);
-      setTierModalMaxBlockers(-1);
-      setTierModalMinCompletion(0);
-      setTierModalMinOnTime(0);
-      setTierModalMinRating(0);
+      setTierModalMinScore(75);
+      setTierModalMaxBlockers(0);
+      setTierModalMinCompletion(80);
+      setTierModalMinOnTime(80);
+      setTierModalMinRating(4.0);
       setTierModalCustomRule('');
     }
     setTierModalKeywordInput('');
@@ -1059,21 +1086,21 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     if (pending && !kws.includes(pending)) kws.push(pending);
 
     const newFields = {
-      name:              tierModalName.trim(),
-      badgeUrl:          tierModalBadgeUrl,
-      keywords:          kws,
-      minScorePercent:   tierModalMinScore,
-      maxOpenBlockers:   tierModalMaxBlockers,
-      minCompletionRate: tierModalMinCompletion,
-      minOnTimeRate:     tierModalMinOnTime,
-      minAvgRating:      tierModalMinRating,
-      customRule:        tierModalCustomRule.trim(),
+      name: tierModalName.trim(),
+      badgeUrl: tierModalBadgeUrl,
+      keywords: enableKeywords ? kws : null,
+      minScorePercent: enableMinScore ? tierModalMinScore : null,
+      maxOpenBlockers: enableMaxBlockers ? tierModalMaxBlockers : null,
+      minCompletionRate: enableMinCompletion ? tierModalMinCompletion : null,
+      minOnTimeRate: enableMinOnTime ? tierModalMinOnTime : null,
+      minAvgRating: enableMinRating ? tierModalMinRating : null,
+      customRule: enableCustomRule ? tierModalCustomRule.trim() : null,
     };
 
     setCriteria(prev => {
       if (editingTier) {
         return prev.map(t => t.id === editingTier.id
-          ? { ...t, ...newFields, taskIds: t.taskIds } // preserve legacy taskIds
+          ? { ...t, ...newFields }
           : t
         );
       } else {
@@ -1096,11 +1123,13 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       setAiProgressCount(0);
       setAiTotalCount(0);
       setAiResults([]); // Clear previous results
-      const res = await certificatesApi.runAIEvaluation(templateId);
-      if (res.success) {
-        setAiEvaluationRunId(res.runId);
-        setAiTotalCount(res.total);
-        toast.info(`AI evaluation started for ${res.total} mentees...`);
+      const res: any = await certificatesApi.runAIEvaluation(templateId);
+      const runId = res.runId || res.data?.runId;
+      const total = res.total ?? res.data?.total ?? 0;
+      if (res.success && runId) {
+        setAiEvaluationRunId(runId);
+        setAiTotalCount(total);
+        toast.info(`AI evaluation started for ${total} mentees...`);
       }
     } catch (err: any) {
       toast.error(err.message || 'AI evaluation failed. Check AI connection in Settings.');
@@ -1111,12 +1140,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const deleteTier = (tierId: string) => {
     setCriteria(prev => prev.filter(t => t.id !== tierId));
     toast.success('Certificate type removed.');
-  };
-
-  const toggleTierTask = (taskId: string) => {
-    setTierModalTaskIds(prev =>
-      prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
-    );
   };
 
   const selectedElement = elements.find(el => el.id === selectedId) || null;
@@ -1415,8 +1438,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           boxSizing: 'border-box'
                         }}
                         className={`group cursor-move p-1 border transition-all rounded ${isSelected
-                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
-                            : 'border-transparent hover:border-brand-500/30'
+                          ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
+                          : 'border-transparent hover:border-brand-500/30'
                           }`}
                       >
                         <img src={badgePreview} className="w-full h-auto pointer-events-none" alt="Badge Preview" />
@@ -1445,8 +1468,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           boxSizing: 'border-box'
                         }}
                         className={`group cursor-move p-1 border transition-all rounded ${isSelected
-                            ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
-                            : 'border-transparent hover:border-brand-500/30'
+                          ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500 shadow-md'
+                          : 'border-transparent hover:border-brand-500/30'
                           }`}
                       >
                         <img src={el.imageUrl} className="w-full h-auto pointer-events-none" alt={el.text} />
@@ -1483,8 +1506,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                         boxSizing: 'border-box'
                       }}
                       className={`cursor-move p-2 border transition-all rounded ${isSelected
-                          ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500'
-                          : 'border-transparent hover:border-brand-500/30 hover:bg-brand-500/2'
+                        ? 'border-brand-500 bg-brand-500/5 ring-1 ring-brand-500'
+                        : 'border-transparent hover:border-brand-500/30 hover:bg-brand-500/2'
                         }`}
                     >
                       {el.type === 'dynamic' ? `{{${el.dynamicKey}}}` : el.text}
@@ -1507,8 +1530,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   type="button"
                   onClick={() => setIsPresetsDrawerOpen(true)}
                   className={`w-full px-3 py-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${activePresetId
-                      ? 'border-brand-500 bg-brand-500/5 text-brand-700'
-                      : 'border-border bg-background hover:bg-muted/40 text-foreground'
+                    ? 'border-brand-500 bg-brand-500/5 text-brand-700'
+                    : 'border-border bg-background hover:bg-muted/40 text-foreground'
                     }`}
                 >
                   <Award className="w-3.5 h-3.5 text-brand-500" />
@@ -1539,8 +1562,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                       type="button"
                       onClick={() => addVariableElement(shortcut.key, shortcut.label)}
                       className={`flex items-center justify-between px-3 py-2.5 rounded-xl border text-[11px] font-bold transition-all text-left ${alreadyAdded
-                          ? 'border-brand-500 bg-brand-500/5 text-brand-600'
-                          : 'border-border bg-background hover:bg-muted/50 text-foreground'
+                        ? 'border-brand-500 bg-brand-500/5 text-brand-600'
+                        : 'border-border bg-background hover:bg-muted/50 text-foreground'
                         }`}
                     >
                       <span>{shortcut.label}</span>
@@ -1668,8 +1691,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           type="button"
                           onClick={() => updateSelectedElement('fontWeight', selectedElement.fontWeight === 'bold' ? 'normal' : 'bold')}
                           className={`w-full py-1.5 border border-border rounded-xl text-xs transition-colors flex items-center justify-center ${selectedElement.fontWeight === 'bold'
-                              ? 'bg-brand-500/10 border-brand-500 text-brand-600 font-bold'
-                              : 'bg-muted hover:bg-muted/70 text-foreground'
+                            ? 'bg-brand-500/10 border-brand-500 text-brand-600 font-bold'
+                            : 'bg-muted hover:bg-muted/70 text-foreground'
                             }`}
                         >
                           <Bold className="w-4 h-4 mr-1" /> Bold
@@ -1689,8 +1712,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                                 type="button"
                                 onClick={() => updateSelectedElement('alignment', align)}
                                 className={`flex-1 py-1 flex items-center justify-center rounded-lg transition-colors ${selectedElement.alignment === align
-                                    ? 'bg-card text-foreground shadow-2xs font-semibold'
-                                    : 'text-muted-foreground hover:text-foreground'
+                                  ? 'bg-card text-foreground shadow-2xs font-semibold'
+                                  : 'text-muted-foreground hover:text-foreground'
                                   }`}
                               >
                                 <Icon className="w-3.5 h-3.5" />
@@ -1751,7 +1774,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               className="flex items-center gap-1.5 px-3.5 py-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-xs"
             >
               {runningAI ? (
-                <><Loader2 className="animate-spin w-3.5 h-3.5" /> Evaluating…</>
+                <><Loader2 className="animate-spin w-3.5 h-3.5" /> Evaluating {aiTotalCount > 0 ? `(${aiProgressCount}/${aiTotalCount})` : '…'}</>
               ) : (
                 <><Sparkles className="w-3.5 h-3.5" /> {aiRanAt ? 'Re-run AI Evaluation' : 'Run AI Evaluation'}</>
               )}
@@ -1804,8 +1827,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     type="button"
                     onClick={() => { setRecipientType(type); setSelectedMenteeIds(new Set()); setRecipientSearch(''); }}
                     className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${recipientType === type
-                        ? 'border-brand-600 text-brand-600'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                      ? 'border-brand-600 text-brand-600'
+                      : 'border-transparent text-muted-foreground hover:text-foreground'
                       }`}
                   >
                     {type === 'all'
@@ -1933,14 +1956,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 {/* Table rows */}
                 <div className="max-h-[340px] overflow-y-auto divide-y divide-border">
                   {filtered.map((m: any) => {
-                    const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
-                    const selectedTier = adminTiers[m.id] ?? defaultTier;
-                    const match = m.tierMatches?.[selectedTier] ?? 0;
-                    const matchColor = match === 100
-                      ? 'text-emerald-600 bg-emerald-500/10'
-                      : match >= 50
-                        ? 'text-amber-600 bg-amber-500/10'
-                        : 'text-red-500 bg-red-500/10';
+                    const selectedTier = adminTiers[m.id] ?? (aiEvalMap[m.id]?.certificate_tier || m.assignedTier || '');
                     const issuedTiersList: string[] = m.issuedTiers ?? [];
 
                     return (
@@ -1958,8 +1974,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                             <span className="truncate">{m.firstName} {m.lastName}</span>
                             {recipientType === 'all' && (
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider ${m.role === 'mentor'
-                                  ? 'bg-indigo-500/10 text-indigo-600'
-                                  : 'bg-brand-500/10 text-brand-600'
+                                ? 'bg-indigo-500/10 text-indigo-600'
+                                : 'bg-brand-500/10 text-brand-600'
                                 }`}>
                                 {m.role}
                               </span>
@@ -1974,11 +1990,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                               <span className="text-[10px] font-extrabold text-violet-700 dark:text-violet-300 flex items-center gap-1">
                                 <Sparkles className="w-3 h-3 text-violet-500" /> {getTierName(aiEvalMap[m.id].certificate_tier)}
                               </span>
-                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                                (aiEvalMap[m.id].match_score ?? 0) >= 75
+                              <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${(aiEvalMap[m.id].match_score ?? 0) >= 75
                                   ? 'text-emerald-600 bg-emerald-500/20'
                                   : 'text-amber-600 bg-amber-500/20'
-                              }`}>
+                                }`}>
                                 {aiEvalMap[m.id].match_score}%
                               </span>
                               <button
@@ -1991,9 +2006,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                               </button>
                             </div>
                           ) : (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${matchColor}`}>
-                              {match}% match
-                            </span>
+                            <span className="text-xs text-muted-foreground font-semibold">—</span>
                           )}
                         </div>
 
@@ -2004,6 +2017,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                             onChange={e => handleTierChange(m.id, e.target.value)}
                             className="px-2.5 py-1 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none cursor-pointer font-bold max-w-[160px]"
                           >
+                            <option value="">Select Certificate</option>
                             {criteria.map(c => (
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
@@ -2147,140 +2161,217 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
 
               {/* ── Keywords / Tech Stack ─────────────────────────── */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-muted-foreground block">Keywords / Tech Stack <span className="text-[9px] text-muted-foreground/60 font-normal">(AI matches loosely against task titles and descriptions)</span></label>
-                {/* Tag chips */}
-                <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                  {tierModalKeywords.map(kw => (
-                    <span key={kw} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 text-[10px] font-bold border border-brand-500/20">
-                      {kw}
-                      <button type="button" onClick={() => setTierModalKeywords(prev => prev.filter(k => k !== kw))} className="hover:text-red-500 leading-none">×</button>
-                    </span>
-                  ))}
+              <div className="space-y-2 border-t border-border/60 pt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 cursor-pointer">
+                    Keywords / Tech Stack <span className="text-[9px] text-muted-foreground/60 font-normal">(AI matches loosely)</span>
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableKeywords}
+                      onChange={e => setEnableKeywords(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-7 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-600"></div>
+                  </label>
                 </div>
-                {/* Input */}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tierModalKeywordInput}
-                    onChange={e => setTierModalKeywordInput(e.target.value)}
-                    onKeyDown={e => {
-                      if ((e.key === 'Enter' || e.key === ',') && tierModalKeywordInput.trim()) {
-                        e.preventDefault();
-                        const kw = tierModalKeywordInput.trim().replace(/,$/, '');
+
+                <div className={`space-y-2 transition-opacity ${enableKeywords ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                  {/* Tag chips */}
+                  <div className="flex flex-wrap gap-1.5 min-h-[28px]">
+                    {tierModalKeywords.map(kw => (
+                      <span key={kw} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 text-[10px] font-bold border border-brand-500/20">
+                        {kw}
+                        <button type="button" onClick={() => setTierModalKeywords(prev => prev.filter(k => k !== kw))} className="hover:text-red-500 leading-none">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  {/* Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      disabled={!enableKeywords}
+                      value={tierModalKeywordInput}
+                      onChange={e => setTierModalKeywordInput(e.target.value)}
+                      onKeyDown={e => {
+                        if ((e.key === 'Enter' || e.key === ',') && tierModalKeywordInput.trim()) {
+                          e.preventDefault();
+                          const kw = tierModalKeywordInput.trim().replace(/,$/, '');
+                          if (kw && !tierModalKeywords.includes(kw)) {
+                            setTierModalKeywords(prev => [...prev, kw]);
+                          }
+                          setTierModalKeywordInput('');
+                        }
+                      }}
+                      placeholder="Type keyword and press Enter (e.g. React.js, Node.js)"
+                      className="flex-1 px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 placeholder:text-muted-foreground/50 disabled:bg-muted/30"
+                    />
+                    <button
+                      type="button"
+                      disabled={!enableKeywords}
+                      onClick={() => {
+                        const kw = tierModalKeywordInput.trim();
                         if (kw && !tierModalKeywords.includes(kw)) {
                           setTierModalKeywords(prev => [...prev, kw]);
+                          setTierModalKeywordInput('');
                         }
-                        setTierModalKeywordInput('');
-                      }
-                    }}
-                    placeholder="Type keyword and press Enter (e.g. React.js, Node.js)"
-                    className="flex-1 px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 placeholder:text-muted-foreground/50"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const kw = tierModalKeywordInput.trim();
-                      if (kw && !tierModalKeywords.includes(kw)) {
-                        setTierModalKeywords(prev => [...prev, kw]);
-                        setTierModalKeywordInput('');
-                      }
-                    }}
-                    className="px-3 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 rounded-xl text-xs font-bold transition-colors"
-                  >
-                    Add
-                  </button>
+                      }}
+                      className="px-3 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-600 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* ── Hard Constraint Thresholds ─────────────────────── */}
-              <div className="space-y-3">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider border-t border-border/60 pt-2">Hard Constraints <span className="normal-case font-normal text-muted-foreground/60">(AI cannot bypass these)</span></p>
+              <div className="space-y-3 border-t border-border/60 pt-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Hard Constraints <span className="normal-case font-normal text-muted-foreground/60">(AI cannot bypass these)</span>
+                </p>
 
                 <div className="grid grid-cols-2 gap-3">
                   {/* Min Score */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                      Min Score %
-                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
-                    </label>
+                  <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Min Score %</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableMinScore}
+                          onChange={e => setEnableMinScore(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                      </label>
+                    </div>
                     <input
                       type="number" min={0} max={100}
+                      disabled={!enableMinScore}
                       value={tierModalMinScore}
                       onChange={e => setTierModalMinScore(Math.min(100, Math.max(0, Number(e.target.value))))}
-                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                      className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                     />
                   </div>
 
                   {/* Max Open Blockers */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                      Max Open Blockers
-                      <span className="text-[9px] text-muted-foreground/50 font-normal">(-1 = unlimited)</span>
-                    </label>
+                  <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Max Open Blockers</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableMaxBlockers}
+                          onChange={e => setEnableMaxBlockers(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                      </label>
+                    </div>
                     <input
-                      type="number" min={-1}
+                      type="number" min={0}
+                      disabled={!enableMaxBlockers}
                       value={tierModalMaxBlockers}
-                      onChange={e => setTierModalMaxBlockers(Math.max(-1, Number(e.target.value)))}
-                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                      onChange={e => setTierModalMaxBlockers(Math.max(0, Number(e.target.value)))}
+                      className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                     />
                   </div>
 
                   {/* Min Completion Rate */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                      Min Completion Rate %
-                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
-                    </label>
+                  <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Min Completion %</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableMinCompletion}
+                          onChange={e => setEnableMinCompletion(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                      </label>
+                    </div>
                     <input
                       type="number" min={0} max={100}
+                      disabled={!enableMinCompletion}
                       value={tierModalMinCompletion}
                       onChange={e => setTierModalMinCompletion(Math.min(100, Math.max(0, Number(e.target.value))))}
-                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                      className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                     />
                   </div>
 
                   {/* Min On-Time Rate */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                      Min On-Time Rate %
-                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off)</span>
-                    </label>
+                  <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Min On-Time %</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableMinOnTime}
+                          onChange={e => setEnableMinOnTime(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                      </label>
+                    </div>
                     <input
                       type="number" min={0} max={100}
+                      disabled={!enableMinOnTime}
                       value={tierModalMinOnTime}
                       onChange={e => setTierModalMinOnTime(Math.min(100, Math.max(0, Number(e.target.value))))}
-                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                      className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                     />
                   </div>
 
                   {/* Min Avg Rating */}
-                  <div className="space-y-1 col-span-2">
-                    <label className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1">
-                      Min Avg Mentor Rating
-                      <span className="text-[9px] text-muted-foreground/50 font-normal">(0 = off; scale 1-5)</span>
-                    </label>
+                  <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50 col-span-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-muted-foreground">Min Avg Mentor Rating (1-5)</label>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableMinRating}
+                          onChange={e => setEnableMinRating(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                      </label>
+                    </div>
                     <input
                       type="number" min={0} max={5} step={0.5}
+                      disabled={!enableMinRating}
                       value={tierModalMinRating}
                       onChange={e => setTierModalMinRating(Math.min(5, Math.max(0, Number(e.target.value))))}
-                      className="w-full px-3 py-1.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40"
+                      className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                     />
                   </div>
                 </div>
               </div>
 
               {/* ── Custom AI Rule ─────────────────────────────────── */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block border-t border-border/60 pt-2">
-                  Custom AI Rule <span className="normal-case font-normal text-muted-foreground/60">(qualitative — AI enforces this on top of hard constraints)</span>
-                </label>
+              <div className="space-y-2 border-t border-border/60 pt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                    Custom AI Rule <span className="normal-case font-normal text-muted-foreground/60">(qualitative)</span>
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableCustomRule}
+                      onChange={e => setEnableCustomRule(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-7 h-4 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand-600"></div>
+                  </label>
+                </div>
                 <textarea
-                  rows={3}
-                  placeholder={'e.g. "Must have completed at least 2 project-type tasks" or "Mentee should have shown initiative in resolving blockers independently"'}
+                  rows={2}
+                  disabled={!enableCustomRule}
+                  placeholder={'e.g. "Must have completed at least 2 project-type tasks"'}
                   value={tierModalCustomRule}
                   onChange={e => setTierModalCustomRule(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 resize-none placeholder:text-muted-foreground/40"
+                  className="w-full px-3 py-2 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:border-brand-500/40 resize-none placeholder:text-muted-foreground/40 disabled:opacity-40 disabled:bg-muted/30"
                 />
               </div>
             </div>
@@ -2323,12 +2414,12 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               const iconColor = getTierIconColor(c.id);
               const isParticipation = c.id === 'participation';
               const kws: string[] = c.keywords || [];
-              const minScore      = c.minScorePercent    ?? 0;
-              const maxB          = (c.maxOpenBlockers ?? c.maxBlockers ?? -1) === -1 ? 'Unlimited' : (c.maxOpenBlockers ?? c.maxBlockers);
-              const minCompletion = c.minCompletionRate  ?? 0;
-              const minOnTime     = c.minOnTimeRate      ?? 0;
-              const minRating     = c.minAvgRating       ?? 0;
-              const customRule    = c.customRule?.trim() ?? '';
+              const minScore = c.minScorePercent ?? 0;
+              const maxB = (c.maxOpenBlockers ?? -1) === -1 ? 'Unlimited' : c.maxOpenBlockers;
+              const minCompletion = c.minCompletionRate ?? 0;
+              const minOnTime = c.minOnTimeRate ?? 0;
+              const minRating = c.minAvgRating ?? 0;
+              const customRule = c.customRule?.trim() ?? '';
 
               return (
                 <div key={c.id} className="p-4 rounded-2xl border border-border bg-card shadow-2xs space-y-3">
@@ -2441,8 +2532,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               return (
                 <div
                   className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${isCustomActive
-                      ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
-                      : 'border-border hover:border-brand-500/30'
+                    ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
+                    : 'border-border hover:border-brand-500/30'
                     }`}
                 >
                   <button
@@ -2554,8 +2645,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   applyPresetBackground(preset.id, preset.svg);
                 }}
                 className={`group relative flex flex-col p-2.5 rounded-2xl border transition-all text-left w-full bg-card hover:shadow-md ${isActive
-                    ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
-                    : 'border-border hover:border-brand-500/30'
+                  ? 'border-brand-500 ring-2 ring-brand-500/15 scale-[1.01]'
+                  : 'border-border hover:border-brand-500/30'
                   }`}
               >
                 {/* Scaled Mini SVG Preview */}

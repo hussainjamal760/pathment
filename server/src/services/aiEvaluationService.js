@@ -15,6 +15,7 @@ const { Op } = require('sequelize');
 const groqService = require('./groqService');
 const { ValidationError } = require('../utils/errors/errorTypes');
 const logger = require('../utils/logger');
+const { preCheckHardConstraints } = require('./certificatePreCheckEngine');
 
 /**
  * Build a rich data snapshot for each mentee in `menteeIds`.
@@ -124,98 +125,6 @@ async function aggregateMenteeData(menteeIds) {
 }
 
 /**
- * Determine the highest eligible tier for a mentee using server-side constraints.
- */
-function preCheckHardConstraints(menteePayload, criteria) {
-  if (!criteria || !criteria.length) {
-    return {
-      maxEligibleTier: 'participation',
-      hardChecks: {},
-      customRuleChecks: {}
-    };
-  }
-
-  const completedTitlesLower = (menteePayload.tasks || [])
-    .filter(t => t.status === 'completed')
-    .map(t => (t.title || '').toLowerCase());
-
-  const hardChecks = {};
-  const customRuleChecks = {};
-  let maxEligibleTier = null;
-
-  for (const tier of criteria) {
-    const tierId = tier.id;
-    const checks = {
-      score_ok: true,
-      blockers_ok: true,
-      completion_rate_ok: true,
-      on_time_rate_ok: true,
-      rating_ok: true
-    };
-
-    const minScore = tier.minScorePercent ?? 0;
-    if (minScore > 0 && menteePayload.normalized_score < minScore) {
-      checks.score_ok = false;
-    }
-
-    const maxBlockers = tier.maxOpenBlockers ?? tier.maxBlockers ?? -1;
-    if (maxBlockers >= 0 && menteePayload.blockers.open > maxBlockers) {
-      checks.blockers_ok = false;
-    }
-
-    const minCompletion = tier.minCompletionRate ?? 0;
-    if (minCompletion > 0 && menteePayload.completion_rate < minCompletion) {
-      checks.completion_rate_ok = false;
-    }
-
-    const minOnTime = tier.minOnTimeRate ?? 0;
-    if (minOnTime > 0 && menteePayload.on_time_rate < minOnTime) {
-      checks.on_time_rate_ok = false;
-    }
-
-    const minRating = tier.minAvgRating ?? 0;
-    if (minRating > 0 && (menteePayload.avg_rating == null || menteePayload.avg_rating < minRating)) {
-      checks.rating_ok = false;
-    }
-
-    let customRuleSatisfied = true;
-    if (tier.customRule && tier.customRule.trim()) {
-      const rule = tier.customRule.trim();
-      const stopWords = new Set([
-        'must', 'have', 'has', 'had', 'completed', 'complete', 'finish',
-        'finished', 'the', 'and', 'for', 'with', 'that', 'this', 'from',
-        'been', 'not', 'all', 'are', 'was', 'were', 'will', 'should',
-        'would', 'could', 'their', 'they', 'them', 'your', 'our',
-        'project', 'task', 'tasks', 'projects', 'any', 'least', 'one',
-        'mentee', 'student'
-      ]);
-
-      const ruleWords = rule.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w.toLowerCase()));
-      if (ruleWords.length > 0) {
-        customRuleSatisfied = ruleWords.every(keyword => {
-          const kw = keyword.toLowerCase().replace(/[^a-z0-9]/gi, '');
-          return completedTitlesLower.some(title => title.includes(kw));
-        });
-      }
-    }
-
-    customRuleChecks[tierId] = customRuleSatisfied;
-    hardChecks[tierId] = checks;
-
-    const allHardPass = Object.values(checks).every(Boolean);
-    if (allHardPass && customRuleSatisfied && !maxEligibleTier) {
-      maxEligibleTier = tierId;
-    }
-  }
-
-  return {
-    maxEligibleTier: maxEligibleTier || 'participation',
-    hardChecks,
-    customRuleChecks
-  };
-}
-
-/**
  * Evaluate ONE mentee against the template criteria using AI.
  */
 async function evaluateSingleMentee(template, menteePayload, preCheckResult, adminUserId) {
@@ -303,11 +212,12 @@ async function evaluateSingleMentee(template, menteePayload, preCheckResult, adm
 function buildSingleMenteePrompt(criteria, preCheckResult) {
   const tierDescriptions = criteria.map(c => {
     const lines = [`### ${c.id.toUpperCase()} ("${c.name}")`];
-    if (c.minScorePercent > 0) lines.push(`  - Min score: ${c.minScorePercent}%`);
-    if ((c.maxOpenBlockers ?? c.maxBlockers) >= 0) lines.push(`  - Max open blockers: ${c.maxOpenBlockers ?? c.maxBlockers}`);
-    if (c.minCompletionRate > 0) lines.push(`  - Min completion rate: ${c.minCompletionRate}%`);
-    if (c.minOnTimeRate > 0) lines.push(`  - Min on-time rate: ${c.minOnTimeRate}%`);
-    if (c.minAvgRating > 0) lines.push(`  - Min avg rating: ${c.minAvgRating}`);
+    if (c.minScorePercent != null) lines.push(`  - Min score: ${c.minScorePercent}%`);
+    if (c.maxOpenBlockers != null) lines.push(`  - Max open blockers: ${c.maxOpenBlockers}`);
+    if (c.minCompletionRate != null) lines.push(`  - Min completion rate: ${c.minCompletionRate}%`);
+    if (c.minOnTimeRate != null) lines.push(`  - Min on-time rate: ${c.minOnTimeRate}%`);
+    if (c.minAvgRating != null) lines.push(`  - Min avg rating: ${c.minAvgRating}`);
+    if (Array.isArray(c.keywords) && c.keywords.length > 0) lines.push(`  - Target Keywords/Tech Stack: ${c.keywords.join(', ')}`);
     if (c.customRule?.trim()) lines.push(`  - Custom rule: "${c.customRule.trim()}"`);
     return lines.join('\n');
   }).join('\n\n');
@@ -315,10 +225,9 @@ function buildSingleMenteePrompt(criteria, preCheckResult) {
   const preCheckLines = [
     `SERVER PRE-CHECK VERDICT: maxEligibleTier = "${preCheckResult.maxEligibleTier}"`
   ];
-  for (const [tierId, checks] of Object.entries(preCheckResult.hardChecks)) {
+  for (const [tierId, checks] of Object.entries(preCheckResult.hardChecks || {})) {
     const passAll = Object.values(checks).every(Boolean);
-    const customOk = preCheckResult.customRuleChecks[tierId] !== false;
-    preCheckLines.push(`  ${tierId}: hardConstraints=${passAll ? 'PASS' : 'FAIL'}, customRule=${customOk ? 'PASS' : 'FAIL'}`);
+    preCheckLines.push(`  ${tierId}: hardConstraints=${passAll ? 'PASS' : 'FAIL'}`);
   }
 
   return `You are evaluating ONE mentee for certificate eligibility on a mentorship platform.
@@ -454,25 +363,10 @@ async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria) {
   return { runId, total: queueRows.length };
 }
 
-/** @deprecated — legacy synchronous evaluator */
-async function evaluateWithAI(template, menteePayloads, adminUserId) {
-  const criteria = Array.isArray(template.criteria) ? template.criteria : [];
-  const results = [];
-
-  for (const payload of menteePayloads) {
-    const preCheck = preCheckHardConstraints(payload, criteria);
-    const result = await evaluateSingleMentee(template, payload, preCheck, adminUserId);
-    results.push(result);
-  }
-
-  return results;
-}
-
 module.exports = {
   aggregateMenteeData,
   preCheckHardConstraints,
   evaluateSingleMentee,
   enqueueEvaluation,
-  evaluateWithAI,
   buildFallbackResult
 };

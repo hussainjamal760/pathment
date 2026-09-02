@@ -428,119 +428,39 @@ class CertificateService {
       if (key) { issuedMap[key] ??= []; issuedMap[key].push(inst.tier); }
     }
 
-    const activeIds = activeMentees.map(m => m.id);
-
-    const allAssigned = activeIds.length ? await models.AssignedTask.findAll({
-      where: { menteeId: { [Op.in]: activeIds }, status: { [Op.ne]: 'cancelled' } },
-      attributes: ['menteeId', 'status', 'pointsAwarded', 'pointsBase', 'finalRating', 'isLate'],
-      include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'pointsBase'] }]
-    }) : [];
-
-    const allBlockers = activeIds.length ? await models.Blocker.findAll({
-      where: { menteeId: { [Op.in]: activeIds } },
-      attributes: ['menteeId', 'status'],
-      raw: true
-    }) : [];
-
-    const menteeMetrics = {};
-    for (const mid of activeIds) {
-      menteeMetrics[mid] = {
-        completedTitles: new Set(),
-        completedCount: 0, totalTasks: 0,
-        totalBase: 0, totalAwarded: 0,
-        onTimeTasks: 0,
-        ratedSum: 0, ratedCount: 0,
-        openBlockers: 0
-      };
-    }
-    for (const row of allAssigned) {
-      const m = menteeMetrics[row.menteeId];
-      if (!m) continue;
-      m.totalTasks++;
-      const base = row.pointsBase ?? row.roadmapTask?.pointsBase ?? 10;
-      const awarded = row.pointsAwarded ?? 0;
-      m.totalBase += base;
-      if (row.status === 'completed') {
-        m.completedCount++;
-        m.totalAwarded += awarded;
-        if (!row.isLate) m.onTimeTasks++;
-        const rating = row.finalRating != null ? parseFloat(row.finalRating) : null;
-        if (rating != null) { m.ratedSum += rating; m.ratedCount++; }
-        const title = row.roadmapTask?.title?.trim()?.toLowerCase();
-        if (title) m.completedTitles.add(title);
-      }
-    }
-    for (const row of allBlockers) {
-      const m = menteeMetrics[row.menteeId];
-      if (m && row.status !== 'resolved') m.openBlockers++;
-    }
-
     const criteria = Array.isArray(template.criteria) ? template.criteria : [];
-    const allStepIds = [...new Set(criteria.flatMap(t => t.taskIds || []))];
-    const stepRows = allStepIds.length ? await models.RoadmapTask.findAll({
-      where: { id: { [Op.in]: allStepIds } }, attributes: ['id', 'title']
-    }) : [];
-    const titleById = Object.fromEntries(stepRows.map(s => [s.id, s.title.trim().toLowerCase()]));
+    const aiResults = Array.isArray(template.aiEvaluation?.results) ? template.aiEvaluation.results : [];
+    const aiResultMap = Object.fromEntries(aiResults.map(r => [r.mentee_id, r]));
+    const hasAiRun = aiResults.length > 0;
 
-    const enrich = (m, requiredTitles, isParticipation = false, tier = null) => {
-      const mx = menteeMetrics[m.id] || {
-        completedTitles: new Set(), completedCount: 0, totalTasks: 0,
-        totalBase: 0, totalAwarded: 0, onTimeTasks: 0,
-        ratedSum: 0, ratedCount: 0, openBlockers: 0
-      };
-
-      const normalizedScore = mx.totalBase > 0 ? Math.round((mx.totalAwarded / mx.totalBase) * 100) : 0;
-      const completionRate = mx.totalTasks > 0 ? Math.round((mx.completedCount / mx.totalTasks) * 100) : 0;
-      const onTimeRate = mx.completedCount > 0 ? Math.round((mx.onTimeTasks / mx.completedCount) * 100) : 0;
-      const avgRating = mx.ratedCount > 0 ? parseFloat((mx.ratedSum / mx.ratedCount).toFixed(2)) : null;
-
-      const matched = requiredTitles.length > 0 ? requiredTitles.filter(t => mx.completedTitles.has(t)).length : 0;
-      let taskCriteriaMatch = requiredTitles.length > 0
-        ? Math.round((matched / requiredTitles.length) * 100)
-        : (isParticipation ? 100 : 0);
-
-      if (tier) {
-        const minScore = tier.minScorePercent ?? 0;
-        const maxBlockers = tier.maxOpenBlockers ?? tier.maxBlockers ?? -1;
-        const minCompletion = tier.minCompletionRate ?? 0;
-        const minOnTime = tier.minOnTimeRate ?? 0;
-        const minRating = tier.minAvgRating ?? 0;
-        const hardPass = (
-          (minScore <= 0 || normalizedScore >= minScore) &&
-          (maxBlockers < 0 || mx.openBlockers <= maxBlockers) &&
-          (minCompletion <= 0 || completionRate >= minCompletion) &&
-          (minOnTime <= 0 || onTimeRate >= minOnTime) &&
-          (minRating <= 0 || (avgRating != null && avgRating >= minRating))
-        );
-        if (!hardPass) taskCriteriaMatch = 0;
+    const buildMenteeRow = (m) => {
+      const aiEval = aiResultMap[m.id];
+      if (hasAiRun && aiEval) {
+        return {
+          ...m,
+          assignedTier: aiEval.certificate_tier || null,
+          tierMatches: { [aiEval.certificate_tier || 'participation']: Number(aiEval.match_score) || 0 },
+          criteriaMatch: Number(aiEval.match_score) || 0,
+          issuedTiers: issuedMap[m.id] || []
+        };
       }
-
       return {
         ...m,
-        completedCount: mx.completedCount,
-        totalTasks: mx.totalTasks,
-        normalizedScore,
-        completionRate,
-        onTimeRate,
-        avgRating,
-        openBlockers: mx.openBlockers,
-        criteriaMatch: taskCriteriaMatch,
+        assignedTier: null,
+        tierMatches: {},
+        criteriaMatch: null,
         issuedTiers: issuedMap[m.id] || []
       };
     };
 
     const result = {
-      participation: activeMentees.map(m => enrich(m, [], true)),
-      paused: pausedMentees.map(m => ({
-        ...m, completedCount: 0, totalTasks: 0, normalizedScore: 0,
-        completionRate: 0, onTimeRate: 0, avgRating: null, openBlockers: 0,
-        criteriaMatch: 0, issuedTiers: issuedMap[m.id] || []
-      })),
+      participation: activeMentees.map(buildMenteeRow),
+      paused: pausedMentees.map(m => ({ ...m, assignedTier: null, tierMatches: {}, criteriaMatch: null, issuedTiers: issuedMap[m.id] || [] })),
       mentors: []
     };
+
     for (const tier of criteria) {
-      const requiredTitles = (tier.taskIds || []).map(id => titleById[id]).filter(Boolean);
-      result[tier.id] = activeMentees.map(m => enrich(m, requiredTitles, tier.id === 'participation', tier));
+      result[tier.id] = activeMentees.map(buildMenteeRow);
     }
 
     if (programId) {
@@ -561,12 +481,9 @@ class CertificateService {
             firstName: mem.user.firstName,
             lastName: mem.user.lastName,
             email: mem.user.email,
-            completedCount: 0, totalTasks: 0,
-            normalizedScore: 100, completionRate: 100, onTimeRate: 100,
-            avgRating: null, openBlockers: 0,
-            criteriaMatch: 100,
-            assignedTier: 'participation',
-            tierMatches: { participation: 100 },
+            assignedTier: null,
+            tierMatches: {},
+            criteriaMatch: null,
             issuedTiers: issuedMap[mem.user.id] || []
           });
         }
@@ -574,42 +491,9 @@ class CertificateService {
       result.mentors = uniqueMentors;
     }
 
-    const orderedTiers = [...criteria.map(c => c.id), 'participation'];
-    const tierMatchesByMentee = {};
-    for (const mentee of activeMentees) {
-      const matches = { participation: 100 };
-      for (const tier of criteria) {
-        const menteeInTier = result[tier.id].find(m => m.id === mentee.id);
-        matches[tier.id] = menteeInTier ? menteeInTier.criteriaMatch : 0;
-      }
-      tierMatchesByMentee[mentee.id] = matches;
-    }
-
-    const assignedTierByMentee = {};
-    for (const mentee of activeMentees) {
-      let assignedTier = 'participation';
-      for (const tierId of criteria.map(c => c.id)) {
-        if ((tierMatchesByMentee[mentee.id]?.[tierId] ?? 0) >= 90) {
-          assignedTier = tierId;
-          break;
-        }
-      }
-      assignedTierByMentee[mentee.id] = assignedTier;
-    }
-
-    for (const tierId of orderedTiers) {
-      result[tierId] = result[tierId]
-        .map(m => ({
-          ...m,
-          assignedTier: assignedTierByMentee[m.id],
-          tierMatches: tierMatchesByMentee[m.id] || { participation: 100 }
-        }))
-        .filter(m => assignedTierByMentee[m.id] === tierId);
-    }
-
     return {
       ...result,
-      criteriaTasks: stepRows.map(s => ({ id: s.id, title: s.title }))
+      criteriaTasks: []
     };
   }
 
@@ -928,19 +812,41 @@ class CertificateService {
   /**
    * Get AI evaluation status
    */
-  async getAIEvaluationStatus(runId) {
-    if (!runId) {
-      throw new BadRequestError('runId is required');
+  async getAIEvaluationStatus(runId, templateId) {
+    let targetRunId = runId;
+
+    if (!targetRunId && templateId) {
+      const activeJob = await models.AIEvaluationQueue.findOne({
+        where: { templateId, status: { [Op.in]: ['pending', 'processing'] } },
+        order: [['createdAt', 'DESC']],
+        attributes: ['runId'],
+        raw: true
+      });
+      if (activeJob) {
+        targetRunId = activeJob.runId;
+      } else {
+        const latestJob = await models.AIEvaluationQueue.findOne({
+          where: { templateId },
+          order: [['createdAt', 'DESC']],
+          attributes: ['runId'],
+          raw: true
+        });
+        if (latestJob) targetRunId = latestJob.runId;
+      }
+    }
+
+    if (!targetRunId) {
+      return { isDone: true, runId: null, total: 0, completed: 0, failed: 0, pending: 0, data: [] };
     }
 
     const jobs = await models.AIEvaluationQueue.findAll({
-      where: { runId },
+      where: { runId: targetRunId },
       attributes: ['menteeId', 'status', 'result', 'error'],
       raw: true
     });
 
     if (jobs.length === 0) {
-      throw new NotFoundError('Run not found');
+      return { isDone: true, runId: targetRunId, total: 0, completed: 0, failed: 0, pending: 0, data: [] };
     }
 
     const total = jobs.length;
@@ -972,6 +878,7 @@ class CertificateService {
     }
 
     return {
+      runId: targetRunId,
       isDone,
       total,
       completed,

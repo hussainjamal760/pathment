@@ -47,10 +47,6 @@ async function up() {
         bg_image_url: { type: Sequelize.TEXT, allowNull: true },
         logo_url: { type: Sequelize.TEXT, allowNull: true },
         logo_config: { type: Sequelize.JSONB, allowNull: true },
-        gold_badge_url: { type: Sequelize.TEXT, allowNull: true },
-        silver_badge_url: { type: Sequelize.TEXT, allowNull: true },
-        bronze_badge_url: { type: Sequelize.TEXT, allowNull: true },
-        participation_badge_url: { type: Sequelize.TEXT, allowNull: true },
         criteria: { type: Sequelize.JSONB, allowNull: true },
         config: { type: Sequelize.JSONB, allowNull: false },
         program_id: {

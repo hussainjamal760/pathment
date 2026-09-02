@@ -155,7 +155,7 @@ const runAIEvaluation = catchAsync(async (req, res) => {
  * Get AI evaluation run status — polling fallback if socket disconnects
  */
 const getAIEvaluationStatus = catchAsync(async (req, res) => {
-  const status = await certificateService.getAIEvaluationStatus(req.query.runId);
+  const status = await certificateService.getAIEvaluationStatus(req.query.runId, req.params.id);
   res.status(200).json(successResponse('AI evaluation status', status));
 });
 

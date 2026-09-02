@@ -1341,7 +1341,7 @@ export default function MentorCertificatesPage() {
               const isParticipation = c.id === 'participation';
               const kws: string[] = c.keywords || [];
               const minScore      = c.minScorePercent    ?? 0;
-              const maxB          = (c.maxOpenBlockers ?? c.maxBlockers ?? -1) === -1 ? 'Unlimited' : (c.maxOpenBlockers ?? c.maxBlockers);
+              const maxB          = (c.maxOpenBlockers ?? -1) === -1 ? 'Unlimited' : c.maxOpenBlockers;
               const minCompletion = c.minCompletionRate  ?? 0;
               const minOnTime     = c.minOnTimeRate      ?? 0;
               const minRating     = c.minAvgRating       ?? 0;
