@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const certificateController = require('./controllers/certificateController');
-const { authenticate, authorize } = require('../../middlewares/auth');
-const upload = require('../../middlewares/upload');
+const certificateController = require('../controllers/certificateController');
+const { authenticate, authorize } = require('../middlewares/auth');
+const upload = require('../middlewares/upload');
 
 /**
  * @route   POST /api/certificates/templates
@@ -200,7 +200,7 @@ router.post(
 /**
  * @route   POST /api/certificates/templates/:id/ai-evaluate
  * @desc    Run AI evaluation pipeline for certificate eligibility
- * @access  Admin
+ * @access  Admin, Mentor
  */
 router.post(
   '/templates/:id/ai-evaluate',
@@ -220,6 +220,5 @@ router.get(
   authorize(['admin', 'mentor']),
   certificateController.getAIEvaluationStatus
 );
-
 
 module.exports = router;

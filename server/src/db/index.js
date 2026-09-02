@@ -62,8 +62,7 @@ loadModelsFromDirectory(modelsPath);
 
 // Feature-Driven Models 
 const ragModels = require('../features/rag/models')(sequelize);
-const certificateModels = require('../features/certificates/models')(sequelize);
-Object.assign(models, ragModels, certificateModels);
+Object.assign(models, ragModels);
 
 // Set up associations
 Object.keys(models).forEach(modelName => {

@@ -1,15 +1,68 @@
-const { models, sequelize } = require('../../../db');
+const crypto = require('crypto');
 const { Op } = require('sequelize');
-const { NotFoundError, ValidationError, ForbiddenError } = require('../../../utils/errors/errorTypes');
-const aiEvaluationService = require('../services/aiEvaluationService');
+const { models, sequelize } = require('../db');
+const { NotFoundError, ValidationError, ForbiddenError, BadRequestError } = require('../utils/errors/errorTypes');
+const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+const aiEvaluationService = require('./aiEvaluationService');
 
-/**
- * Create a new certificate template (Admin only)
- */
-exports.createTemplate = async (req, res, next) => {
-  try {
-    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId } = req.body;
+class CertificateService {
+  /**
+   * Helper: Resolve mentee IDs scoped to a mentor's active clans within a program.
+   * Returns null if the user is an admin (meaning no mentor clan restriction).
+   */
+  async getMentorScopedMenteeIds(mentorId, programId, userRole) {
+    if (userRole !== 'mentor') return null;
 
+    const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, userRole);
+    if (!clanIds || clanIds.length === 0) return [];
+
+    const menteeMembers = await models.ClanMembership.findAll({
+      where: {
+        clanId: { [Op.in]: clanIds },
+        role: 'mentee',
+        status: 'active'
+      },
+      attributes: ['userId'],
+      raw: true
+    });
+
+    return menteeMembers.map(m => m.userId);
+  }
+
+  /**
+   * Helper for mentor clan ID lookup in qualification logic.
+   */
+  async getMentorScopedMenteeClans(mentorId, programId, userRole) {
+    const mentorClans = await models.ClanMembership.findAll({
+      where: {
+        userId: mentorId,
+        role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
+        status: 'active'
+      },
+      attributes: ['clanId'],
+      include: [{
+        model: models.Clan,
+        as: 'clan',
+        where: { programId },
+        attributes: []
+      }],
+      raw: true
+    });
+    let clanIds = mentorClans.map(c => c.clanId || c['clan.id']).filter(Boolean);
+
+    if (clanIds.length === 0 && userRole === 'admin') {
+      const allClans = await models.Clan.findAll({
+        where: { programId }, limit: 5, attributes: ['id'], raw: true
+      });
+      clanIds = allClans.map(c => c.id);
+    }
+    return clanIds;
+  }
+
+  /**
+   * Create a new certificate template
+   */
+  async createTemplate({ name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId }, userId) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ValidationError('Template name is required');
     }
@@ -20,7 +73,7 @@ exports.createTemplate = async (req, res, next) => {
       throw new ValidationError('Template config must be an array of elements');
     }
 
-    const template = await models.CertificateTemplate.create({
+    return models.CertificateTemplate.create({
       name: name.trim(),
       bgImageUrl: bgImageUrl || null,
       logoUrl: logoUrl || null,
@@ -28,36 +81,25 @@ exports.createTemplate = async (req, res, next) => {
       config,
       criteria: criteria || [],
       programId,
-      createdBy: req.user.id,
+      createdBy: userId,
       status: 'active'
     });
-
-    res.status(201).json({
-      success: true,
-      message: 'Certificate template created successfully',
-      data: template
-    });
-  } catch (err) {
-    next(err);
   }
-};
 
-/**
- * List all certificate templates (Admin & Mentor)
- */
-exports.listTemplates = async (req, res, next) => {
-  try {
-    const { Op } = require('sequelize');
-    let whereClause = { status: 'active' };
+  /**
+   * List all certificate templates
+   */
+  async listTemplates(queryProgramId, user) {
+    const whereClause = { status: 'active' };
 
-    if (req.query.programId) {
-      whereClause.programId = req.query.programId;
+    if (queryProgramId) {
+      whereClause.programId = queryProgramId;
     }
 
-    if (req.user.role === 'mentor') {
+    if (user.role === 'mentor') {
       const memberships = await models.ClanMembership.findAll({
         where: {
-          userId: req.user.id,
+          userId: user.id,
           role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
           status: 'active'
         },
@@ -67,7 +109,7 @@ exports.listTemplates = async (req, res, next) => {
 
       const shares = await models.Notification.findAll({
         where: {
-          userId: req.user.id,
+          userId: user.id,
           relatedEntityType: 'CertificateTemplate'
         },
         attributes: ['relatedEntityId']
@@ -80,7 +122,7 @@ exports.listTemplates = async (req, res, next) => {
       ];
     }
 
-    const templates = await models.CertificateTemplate.findAll({
+    return models.CertificateTemplate.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']],
       include: [
@@ -96,23 +138,12 @@ exports.listTemplates = async (req, res, next) => {
         }
       ]
     });
-
-    res.status(200).json({
-      success: true,
-      data: templates
-    });
-  } catch (err) {
-    next(err);
   }
-};
 
-/**
- * Get a single template details
- */
-exports.getTemplate = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
+  /**
+   * Get single template details
+   */
+  async getTemplate(id) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' },
       include: [
@@ -128,23 +159,13 @@ exports.getTemplate = async (req, res, next) => {
       throw new NotFoundError('Certificate template not found');
     }
 
-    res.status(200).json({
-      success: true,
-      data: template
-    });
-  } catch (err) {
-    next(err);
+    return template;
   }
-};
 
-/**
- * Update an existing template (Admin only)
- */
-exports.updateTemplate = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId } = req.body;
-
+  /**
+   * Update an existing template
+   */
+  async updateTemplate(id, { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId }) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' }
     });
@@ -184,24 +205,13 @@ exports.updateTemplate = async (req, res, next) => {
     }
 
     await template.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Certificate template updated successfully',
-      data: template
-    });
-  } catch (err) {
-    next(err);
+    return template;
   }
-};
 
-/**
- * Delete/Archive a template (Admin only)
- */
-exports.deleteTemplate = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
+  /**
+   * Archive/Delete a template
+   */
+  async deleteTemplate(id) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' }
     });
@@ -210,113 +220,92 @@ exports.deleteTemplate = async (req, res, next) => {
       throw new NotFoundError('Certificate template not found');
     }
 
-    // Instead of deleting, archive the template to keep integrity of issued certificates
     template.status = 'archived';
     await template.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Certificate template deleted successfully'
-    });
-  } catch (err) {
-    next(err);
+    return true;
   }
-};
 
-/**
- * Issue certificates to one or more mentees (Admin or Mentor)
- */
-exports.issueCertificates = async (req, res, next) => {
-  const t = await sequelize.transaction();
-  try {
-    const { templateId, menteeIds, mentorId, tier, recipients } = req.body;
-
+  /**
+   * Issue certificates to one or more mentees inside a transaction
+   */
+  async issueCertificates({ templateId, menteeIds, mentorId, tier, recipients }, userId) {
     if (!templateId) {
       throw new ValidationError('Template ID is required');
     }
 
-    const template = await models.CertificateTemplate.findOne({
-      where: { id: templateId, status: 'active' },
-      transaction: t
-    });
+    const t = await sequelize.transaction();
+    try {
+      const template = await models.CertificateTemplate.findOne({
+        where: { id: templateId, status: 'active' },
+        transaction: t
+      });
 
-    if (!template) {
-      throw new NotFoundError('Certificate template not found');
-    }
-
-    const crypto = require('crypto');
-
-    // 1. Prepare bulk data with pre-generated UUIDs
-    let instancesData = [];
-    if (Array.isArray(recipients) && recipients.length > 0) {
-      instancesData = recipients.map(r => ({
-        id: crypto.randomUUID(),
-        templateId,
-        menteeId: r.menteeId,
-        mentorId: mentorId || null,
-        issuedBy: req.user.id,
-        pdfUrl: null,
-        imageUrl: null,
-        tier: r.tier || 'participation',
-        metadata: {}
-      }));
-    } else {
-      if (!Array.isArray(menteeIds) || menteeIds.length === 0) {
-        throw new ValidationError('At least one mentee ID or recipients list is required');
+      if (!template) {
+        throw new NotFoundError('Certificate template not found');
       }
-      instancesData = menteeIds.map(menteeId => ({
+
+      let instancesData = [];
+      if (Array.isArray(recipients) && recipients.length > 0) {
+        instancesData = recipients.map(r => ({
+          id: crypto.randomUUID(),
+          templateId,
+          menteeId: r.menteeId,
+          mentorId: mentorId || null,
+          issuedBy: userId,
+          pdfUrl: null,
+          imageUrl: null,
+          tier: r.tier || 'participation',
+          metadata: {}
+        }));
+      } else {
+        if (!Array.isArray(menteeIds) || menteeIds.length === 0) {
+          throw new ValidationError('At least one mentee ID or recipients list is required');
+        }
+        instancesData = menteeIds.map(menteeId => ({
+          id: crypto.randomUUID(),
+          templateId,
+          menteeId,
+          mentorId: mentorId || null,
+          issuedBy: userId,
+          pdfUrl: null,
+          imageUrl: null,
+          tier: tier || 'participation',
+          metadata: {}
+        }));
+      }
+
+      const queueJobsData = instancesData.map(inst => ({
         id: crypto.randomUUID(),
-        templateId,
-        menteeId,
-        mentorId: mentorId || null,
-        issuedBy: req.user.id,
-        pdfUrl: null,
-        imageUrl: null,
-        tier: tier || 'participation',
-        metadata: {}
+        instanceId: inst.id,
+        status: 'pending',
+        attempts: 0
       }));
-    }
 
-    const queueJobsData = instancesData.map(inst => ({
-      id: crypto.randomUUID(),
-      instanceId: inst.id,
-      status: 'pending',
-      attempts: 0
-    }));
+      const instances = await models.CertificateInstance.bulkCreate(instancesData, { transaction: t });
+      const queueJobs = await models.CertificateQueue.bulkCreate(queueJobsData, { transaction: t });
 
-    // 2. Perform bulk insertion inside transaction
-    const instances = await models.CertificateInstance.bulkCreate(instancesData, { transaction: t });
-    const queueJobs = await models.CertificateQueue.bulkCreate(queueJobsData, { transaction: t });
+      await t.commit();
 
-    await t.commit();
-
-    res.status(201).json({
-      success: true,
-      message: `Enqueued ${instances.length} certificate(s) for generation`,
-      data: {
+      return {
         instances: instances.map(i => ({ id: i.id, menteeId: i.menteeId })),
-        jobs: queueJobs.map(j => ({ id: j.id, instanceId: j.instanceId }))
-      }
-    });
-  } catch (err) {
-    await t.rollback();
-    next(err);
+        jobs: queueJobs.map(j => ({ id: j.id, instanceId: j.instanceId })),
+        count: instances.length
+      };
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
   }
-};
 
-/**
- * List all certificates awarded to a specific mentee (Admin, Mentor, or Mentee themselves)
- */
-exports.listMenteeCertificates = async (req, res, next) => {
-  try {
-    const { menteeId } = req.params;
-
-    // Check authorization: admins/mentors can see anyone's, mentees only their own
-    if (req.user.role === 'mentee' && req.user.id !== menteeId) {
+  /**
+   * List all certificates for a mentee
+   */
+  async listMenteeCertificates(menteeId, user) {
+    if (user.role === 'mentee' && user.id !== menteeId) {
       throw new ForbiddenError('You can only view your own certificates');
     }
 
-    const certificates = await models.CertificateInstance.findAll({
+    return models.CertificateInstance.findAll({
       where: { menteeId },
       include: [
         {
@@ -337,23 +326,12 @@ exports.listMenteeCertificates = async (req, res, next) => {
       ],
       order: [['createdAt', 'DESC']]
     });
-
-    res.status(200).json({
-      success: true,
-      data: certificates
-    });
-  } catch (err) {
-    next(err);
   }
-};
 
-/**
- * Get details of a single certificate instance (Admin, Mentor, or awarded Mentee)
- */
-exports.getCertificateInstance = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
+  /**
+   * Get single certificate instance
+   */
+  async getCertificateInstance(id, user) {
     const instance = await models.CertificateInstance.findOne({
       where: { id },
       include: [
@@ -383,91 +361,39 @@ exports.getCertificateInstance = async (req, res, next) => {
       throw new NotFoundError('Certificate not found');
     }
 
-    // Verify authorization
-    if (req.user.role === 'mentee' && req.user.id !== instance.menteeId) {
+    if (user.role === 'mentee' && user.id !== instance.menteeId) {
       throw new ForbiddenError('You can only view your own certificates');
     }
 
-    res.status(200).json({
-      success: true,
-      data: instance
-    });
-  } catch (err) {
-    next(err);
+    return instance;
   }
-};
 
-/**
- * Upload an asset (Background image or logo) to Cloudinary (Admin only)
- */
-exports.uploadAsset = async (req, res, next) => {
-  try {
-    if (!req.file) {
+  /**
+   * Upload asset to Cloudinary
+   */
+  async uploadAsset(fileBuffer) {
+    if (!fileBuffer) {
       throw new ValidationError('No file uploaded');
     }
-
-    const { uploadToCloudinary } = require('../../../utils/cloudinaryUpload');
-    const result = await uploadToCloudinary(req.file.buffer, 'pathment/certificates', 'auto');
-
-    res.status(200).json({
-      success: true,
-      url: result.secure_url
-    });
-  } catch (err) {
-    next(err);
+    const result = await uploadToCloudinary(fileBuffer, 'pathment/certificates', 'auto');
+    return result.secure_url;
   }
-};
 
-/**
- * Evaluate qualification per tier with enriched mentee data.
- * Scope is determined by query params:
- *  - ?mentorId=<id>   → mentees in clans where mentor is lead_mentor/co_mentor
- *  - ?programId=<id>  → all enrollments in that program (admin view)
- *
- * Hard constraints from criteria are enforced server-side:
- *  minScorePercent, maxOpenBlockers, minCompletionRate, minOnTimeRate, minAvgRating
- */
-exports.getQualification = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { mentorId: queryMentorId } = req.query;
-    const { Op } = require('sequelize');
-
+  /**
+   * Evaluate qualification
+   */
+  async getQualification(id, queryMentorId, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
     const programId = template.programId;
-    const mentorId = req.user.role === 'mentor' ? req.user.id : queryMentorId;
+    const mentorId = user.role === 'mentor' ? user.id : queryMentorId;
 
-    // --- 1. Resolve mentee pool ---
     const activeMentees = [];
-    const pausedMentees  = [];
+    const pausedMentees = [];
 
     if (mentorId) {
-      const mentorClans = await models.ClanMembership.findAll({
-        where: {
-          userId: mentorId,
-          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
-          status: 'active'
-        },
-        attributes: ['clanId'],
-        include: [{
-          model: models.Clan,
-          as: 'clan',
-          where: { programId },
-          attributes: []
-        }],
-        raw: true
-      });
-      let clanIds = mentorClans.map(c => c.clanId || c['clan.id']);
-
-      if (clanIds.length === 0 && req.user.role === 'admin') {
-        const allClans = await models.Clan.findAll({
-          where: { programId }, limit: 5, attributes: ['id'], raw: true
-        });
-        clanIds = allClans.map(c => c.id);
-      }
-
+      const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
       if (clanIds.length > 0) {
         const menteeMembers = await models.ClanMembership.findAll({
           where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
@@ -492,7 +418,6 @@ exports.getQualification = async (req, res, next) => {
       }
     }
 
-    // --- 1.5. Fetch existing issued instances ---
     const existingInstances = await models.CertificateInstance.findAll({
       where: { templateId: id },
       attributes: ['menteeId', 'mentorId', 'tier']
@@ -505,21 +430,18 @@ exports.getQualification = async (req, res, next) => {
 
     const activeIds = activeMentees.map(m => m.id);
 
-    // --- 2. Fetch tasks with points, rating, and lateness ---
     const allAssigned = activeIds.length ? await models.AssignedTask.findAll({
       where: { menteeId: { [Op.in]: activeIds }, status: { [Op.ne]: 'cancelled' } },
       attributes: ['menteeId', 'status', 'pointsAwarded', 'pointsBase', 'finalRating', 'isLate'],
       include: [{ model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'pointsBase'] }]
     }) : [];
 
-    // --- 3. Fetch blockers for open-blocker count ---
     const allBlockers = activeIds.length ? await models.Blocker.findAll({
       where: { menteeId: { [Op.in]: activeIds } },
       attributes: ['menteeId', 'status'],
       raw: true
     }) : [];
 
-    // --- 4. Compute per-mentee metrics (all server-side, ground-truth numbers) ---
     const menteeMetrics = {};
     for (const mid of activeIds) {
       menteeMetrics[mid] = {
@@ -535,7 +457,7 @@ exports.getQualification = async (req, res, next) => {
       const m = menteeMetrics[row.menteeId];
       if (!m) continue;
       m.totalTasks++;
-      const base    = row.pointsBase ?? row.roadmapTask?.pointsBase ?? 10;
+      const base = row.pointsBase ?? row.roadmapTask?.pointsBase ?? 10;
       const awarded = row.pointsAwarded ?? 0;
       m.totalBase += base;
       if (row.status === 'completed') {
@@ -553,7 +475,6 @@ exports.getQualification = async (req, res, next) => {
       if (m && row.status !== 'resolved') m.openBlockers++;
     }
 
-    // --- 5. Resolve criteria task IDs → titles (legacy support) ---
     const criteria = Array.isArray(template.criteria) ? template.criteria : [];
     const allStepIds = [...new Set(criteria.flatMap(t => t.taskIds || []))];
     const stepRows = allStepIds.length ? await models.RoadmapTask.findAll({
@@ -561,7 +482,6 @@ exports.getQualification = async (req, res, next) => {
     }) : [];
     const titleById = Object.fromEntries(stepRows.map(s => [s.id, s.title.trim().toLowerCase()]));
 
-    // --- 6. Enrichment helper ---
     const enrich = (m, requiredTitles, isParticipation = false, tier = null) => {
       const mx = menteeMetrics[m.id] || {
         completedTitles: new Set(), completedCount: 0, totalTasks: 0,
@@ -569,34 +489,28 @@ exports.getQualification = async (req, res, next) => {
         ratedSum: 0, ratedCount: 0, openBlockers: 0
       };
 
-      const normalizedScore = mx.totalBase > 0
-        ? Math.round((mx.totalAwarded / mx.totalBase) * 100) : 0;
-      const completionRate  = mx.totalTasks > 0
-        ? Math.round((mx.completedCount / mx.totalTasks) * 100) : 0;
-      const onTimeRate      = mx.completedCount > 0
-        ? Math.round((mx.onTimeTasks / mx.completedCount) * 100) : 0;
-      const avgRating       = mx.ratedCount > 0
-        ? parseFloat((mx.ratedSum / mx.ratedCount).toFixed(2)) : null;
+      const normalizedScore = mx.totalBase > 0 ? Math.round((mx.totalAwarded / mx.totalBase) * 100) : 0;
+      const completionRate = mx.totalTasks > 0 ? Math.round((mx.completedCount / mx.totalTasks) * 100) : 0;
+      const onTimeRate = mx.completedCount > 0 ? Math.round((mx.onTimeTasks / mx.completedCount) * 100) : 0;
+      const avgRating = mx.ratedCount > 0 ? parseFloat((mx.ratedSum / mx.ratedCount).toFixed(2)) : null;
 
-      const matched = requiredTitles.length > 0
-        ? requiredTitles.filter(t => mx.completedTitles.has(t)).length : 0;
+      const matched = requiredTitles.length > 0 ? requiredTitles.filter(t => mx.completedTitles.has(t)).length : 0;
       let taskCriteriaMatch = requiredTitles.length > 0
         ? Math.round((matched / requiredTitles.length) * 100)
         : (isParticipation ? 100 : 0);
 
-      // Apply hard constraints: any failure → criteriaMatch = 0
       if (tier) {
-        const minScore      = tier.minScorePercent    ?? 0;
-        const maxBlockers   = tier.maxOpenBlockers ?? tier.maxBlockers ?? -1;
-        const minCompletion = tier.minCompletionRate  ?? 0;
-        const minOnTime     = tier.minOnTimeRate      ?? 0;
-        const minRating     = tier.minAvgRating       ?? 0;
+        const minScore = tier.minScorePercent ?? 0;
+        const maxBlockers = tier.maxOpenBlockers ?? tier.maxBlockers ?? -1;
+        const minCompletion = tier.minCompletionRate ?? 0;
+        const minOnTime = tier.minOnTimeRate ?? 0;
+        const minRating = tier.minAvgRating ?? 0;
         const hardPass = (
-          (minScore      <= 0 || normalizedScore  >= minScore) &&
-          (maxBlockers   < 0  || mx.openBlockers  <= maxBlockers) &&
-          (minCompletion <= 0 || completionRate   >= minCompletion) &&
-          (minOnTime     <= 0 || onTimeRate       >= minOnTime) &&
-          (minRating     <= 0 || (avgRating != null && avgRating >= minRating))
+          (minScore <= 0 || normalizedScore >= minScore) &&
+          (maxBlockers < 0 || mx.openBlockers <= maxBlockers) &&
+          (minCompletion <= 0 || completionRate >= minCompletion) &&
+          (minOnTime <= 0 || onTimeRate >= minOnTime) &&
+          (minRating <= 0 || (avgRating != null && avgRating >= minRating))
         );
         if (!hardPass) taskCriteriaMatch = 0;
       }
@@ -604,18 +518,17 @@ exports.getQualification = async (req, res, next) => {
       return {
         ...m,
         completedCount: mx.completedCount,
-        totalTasks:     mx.totalTasks,
+        totalTasks: mx.totalTasks,
         normalizedScore,
         completionRate,
         onTimeRate,
         avgRating,
-        openBlockers:   mx.openBlockers,
-        criteriaMatch:  taskCriteriaMatch,
-        issuedTiers:    issuedMap[m.id] || []
+        openBlockers: mx.openBlockers,
+        criteriaMatch: taskCriteriaMatch,
+        issuedTiers: issuedMap[m.id] || []
       };
     };
 
-    // --- 7. Build per-tier result ---
     const result = {
       participation: activeMentees.map(m => enrich(m, [], true)),
       paused: pausedMentees.map(m => ({
@@ -630,7 +543,6 @@ exports.getQualification = async (req, res, next) => {
       result[tier.id] = activeMentees.map(m => enrich(m, requiredTitles, tier.id === 'participation', tier));
     }
 
-    // --- 8. Populate mentors list (Admin program-wide view) ---
     if (programId) {
       const mentorMemberships = await models.ClanMembership.findAll({
         where: { role: { [Op.in]: ['lead_mentor', 'co_mentor'] }, status: 'active' },
@@ -662,7 +574,6 @@ exports.getQualification = async (req, res, next) => {
       result.mentors = uniqueMentors;
     }
 
-    // --- 9. Tier-exclusivity: assign each mentee to their highest qualifying tier ---
     const orderedTiers = [...criteria.map(c => c.id), 'participation'];
     const tierMatchesByMentee = {};
     for (const mentee of activeMentees) {
@@ -691,36 +602,26 @@ exports.getQualification = async (req, res, next) => {
         .map(m => ({
           ...m,
           assignedTier: assignedTierByMentee[m.id],
-          tierMatches:  tierMatchesByMentee[m.id] || { participation: 100 }
+          tierMatches: tierMatchesByMentee[m.id] || { participation: 100 }
         }))
         .filter(m => assignedTierByMentee[m.id] === tierId);
     }
 
-    res.status(200).json({
-      success: true,
-      data: result,
+    return {
+      ...result,
       criteriaTasks: stepRows.map(s => ({ id: s.id, title: s.title }))
-    });
-  } catch (err) {
-    next(err);
+    };
   }
-};
 
-
-/**
- * Send template notification to all mentors in a program.
- */
-exports.sendToMentors = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
+  /**
+   * Send template notifications to mentors
+   */
+  async sendToMentors(id) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
     const programId = template.programId;
-    const { Op } = require('sequelize');
 
-    // Find all active mentors in clans belonging to this program
     const mentorMemberships = await models.ClanMembership.findAll({
       where: {
         role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
@@ -739,10 +640,9 @@ exports.sendToMentors = async (req, res, next) => {
     const mentorIds = [...new Set(mentorMemberships.map(m => m.userId).filter(Boolean))];
 
     if (mentorIds.length === 0) {
-      return res.status(200).json({ success: true, message: 'No active mentors found in this program.', sent: 0 });
+      return { sent: 0 };
     }
 
-    // Create notifications
     const notifications = mentorIds.map(mentorId => ({
       userId: mentorId,
       type: 'system',
@@ -758,60 +658,28 @@ exports.sendToMentors = async (req, res, next) => {
 
     await models.Notification.bulkCreate(notifications);
 
-    // Push live via socket
     try {
-      const { emitToUser } = require('../../socket');
+      const { emitToUser } = require('../socket');
       for (const n of notifications) {
         emitToUser(n.userId, 'notification:new', { title: n.title, message: n.message, type: n.type });
       }
     } catch (_) { /* socket optional */ }
 
-    res.status(200).json({ success: true, message: `Sent to ${mentorIds.length} mentor(s).`, sent: mentorIds.length });
-  } catch (err) {
-    next(err);
+    return { sent: mentorIds.length };
   }
-};
 
-/**
- * Get history of certificates issued for a template.
- */
-exports.getTemplateHistory = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { Op } = require('sequelize');
-
+  /**
+   * Get template issuance history
+   */
+  async getTemplateHistory(id, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
-    let whereClause = { templateId: id };
+    const whereClause = { templateId: id };
 
-    if (req.user.role === 'mentor') {
-      const mentorClans = await models.ClanMembership.findAll({
-        where: {
-          userId: req.user.id,
-          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
-          status: 'active'
-        },
-        attributes: ['clanId'],
-        raw: true
-      });
-      const clanIds = mentorClans.map(c => c.clanId);
-
-      if (clanIds.length > 0) {
-        const menteeMembers = await models.ClanMembership.findAll({
-          where: {
-            clanId: { [Op.in]: clanIds },
-            role: 'mentee',
-            status: 'active'
-          },
-          attributes: ['userId'],
-          raw: true
-        });
-        const menteeIds = menteeMembers.map(m => m.userId);
-        whereClause.menteeId = { [Op.in]: menteeIds };
-      } else {
-        whereClause.menteeId = { [Op.in]: [] };
-      }
+    const menteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+    if (menteeIds !== null) {
+      whereClause.menteeId = { [Op.in]: menteeIds };
     }
 
     const instances = await models.CertificateInstance.findAll({
@@ -838,13 +706,13 @@ exports.getTemplateHistory = async (req, res, next) => {
 
     const queueMap = Object.fromEntries(queueEntries.map(q => [q.instanceId, q]));
 
-    const history = instances.map(inst => {
+    return instances.map(inst => {
       const q = queueMap[inst.id];
       let status = 'completed';
       if (inst.pdfUrl && inst.imageUrl) {
         status = 'completed';
       } else if (q) {
-        status = q.status; // 'pending', 'processing', 'completed', 'failed'
+        status = q.status;
       } else {
         status = 'pending';
       }
@@ -866,53 +734,27 @@ exports.getTemplateHistory = async (req, res, next) => {
         error: q ? q.error : null
       };
     });
-
-    res.status(200).json({ success: true, data: history });
-  } catch (err) {
-    next(err);
   }
-};
 
-/**
- * Delete / Revoke a certificate instance.
- */
-exports.deleteCertificateInstance = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
+  /**
+   * Delete / revoke single instance
+   */
+  async deleteCertificateInstance(id) {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
 
     await models.CertificateQueue.destroy({ where: { instanceId: id } });
     await instance.destroy();
-
-    res.status(200).json({ success: true, message: 'Certificate instance deleted/revoked successfully' });
-  } catch (err) {
-    next(err);
+    return true;
   }
-};
 
-/**
- * Queue a certificate instance for regeneration/resend.
- */
-exports.resendCertificateInstance = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const instance = await models.CertificateInstance.findOne({ where: { id } });
-    if (!instance) throw new NotFoundError('Certificate instance not found');
-
-    instance.pdfUrl = null;
-    instance.imageUrl = null;
-    await instance.save();
-
+  /**
+   * Helper: Reset or create a pending CertificateQueue entry for an instance.
+   */
+  async resetQueueEntry(instanceId) {
     const [queueEntry, created] = await models.CertificateQueue.findOrCreate({
-      where: { instanceId: id },
-      defaults: {
-        status: 'pending',
-        attempts: 0,
-        error: null
-      }
+      where: { instanceId },
+      defaults: { status: 'pending', attempts: 0, error: null }
     });
 
     if (!created) {
@@ -922,53 +764,36 @@ exports.resendCertificateInstance = async (req, res, next) => {
       queueEntry.lockedAt = null;
       await queueEntry.save();
     }
-
-    res.status(200).json({ success: true, message: 'Certificate queued for regeneration successfully' });
-  } catch (err) {
-    next(err);
+    return queueEntry;
   }
-};
 
-/**
- * Revoke/delete all certificate instances for a template.
- */
-exports.revokeAllTemplateCertificates = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { Op } = require('sequelize');
+  /**
+   * Resend single certificate instance
+   */
+  async resendCertificateInstance(id) {
+    const instance = await models.CertificateInstance.findOne({ where: { id } });
+    if (!instance) throw new NotFoundError('Certificate instance not found');
 
+    instance.pdfUrl = null;
+    instance.imageUrl = null;
+    await instance.save();
+
+    await this.resetQueueEntry(id);
+    return true;
+  }
+
+  /**
+   * Revoke all certificates for a template
+   */
+  async revokeAllTemplateCertificates(id, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
-    let whereClause = { templateId: id };
+    const whereClause = { templateId: id };
 
-    if (req.user.role === 'mentor') {
-      const mentorClans = await models.ClanMembership.findAll({
-        where: {
-          userId: req.user.id,
-          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
-          status: 'active'
-        },
-        attributes: ['clanId'],
-        raw: true
-      });
-      const clanIds = mentorClans.map(c => c.clanId);
-
-      if (clanIds.length > 0) {
-        const menteeMembers = await models.ClanMembership.findAll({
-          where: {
-            clanId: { [Op.in]: clanIds },
-            role: 'mentee',
-            status: 'active'
-          },
-          attributes: ['userId'],
-          raw: true
-        });
-        const menteeIds = menteeMembers.map(m => m.userId);
-        whereClause.menteeId = { [Op.in]: menteeIds };
-      } else {
-        whereClause.menteeId = { [Op.in]: [] };
-      }
+    const menteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+    if (menteeIds !== null) {
+      whereClause.menteeId = { [Op.in]: menteeIds };
     }
 
     const instances = await models.CertificateInstance.findAll({
@@ -979,59 +804,24 @@ exports.revokeAllTemplateCertificates = async (req, res, next) => {
 
     if (instanceIds.length > 0) {
       await models.CertificateQueue.destroy({ where: { instanceId: { [Op.in]: instanceIds } } });
-      await models.CertificateInstance.destroy({ where: { templateId: id } });
+      await models.CertificateInstance.destroy({ where: { id: { [Op.in]: instanceIds } } });
     }
 
-    res.status(200).json({
-      success: true,
-      message: `Successfully revoked all ${instances.length} certificates for this template`
-    });
-  } catch (err) {
-    next(err);
+    return { count: instances.length };
   }
-};
 
-/**
- * Resend/regenerate all or failed-only certificates for a template.
- */
-exports.resendAllTemplateCertificates = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { failedOnly } = req.body;
-    const { Op } = require('sequelize');
-
+  /**
+   * Resend all or failed certificates for a template
+   */
+  async resendAllTemplateCertificates(id, failedOnly, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
-    let whereClause = { templateId: id };
+    const whereClause = { templateId: id };
 
-    if (req.user.role === 'mentor') {
-      const mentorClans = await models.ClanMembership.findAll({
-        where: {
-          userId: req.user.id,
-          role: { [Op.in]: ['lead_mentor', 'co_mentor'] },
-          status: 'active'
-        },
-        attributes: ['clanId'],
-        raw: true
-      });
-      const clanIds = mentorClans.map(c => c.clanId);
-
-      if (clanIds.length > 0) {
-        const menteeMembers = await models.ClanMembership.findAll({
-          where: {
-            clanId: { [Op.in]: clanIds },
-            role: 'mentee',
-            status: 'active'
-          },
-          attributes: ['userId'],
-          raw: true
-        });
-        const menteeIds = menteeMembers.map(m => m.userId);
-        whereClause.menteeId = { [Op.in]: menteeIds };
-      } else {
-        whereClause.menteeId = { [Op.in]: [] };
-      }
+    const menteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+    if (menteeIds !== null) {
+      whereClause.menteeId = { [Op.in]: menteeIds };
     }
 
     const instances = await models.CertificateInstance.findAll({
@@ -1040,7 +830,7 @@ exports.resendAllTemplateCertificates = async (req, res, next) => {
     const instanceIds = instances.map(i => i.id);
 
     if (instanceIds.length === 0) {
-      return res.status(200).json({ success: true, message: 'No certificate instances found to resend.', updated: 0 });
+      return { updated: 0 };
     }
 
     const queueEntries = await models.CertificateQueue.findAll({
@@ -1059,7 +849,7 @@ exports.resendAllTemplateCertificates = async (req, res, next) => {
     }
 
     if (targetInstanceIds.length === 0) {
-      return res.status(200).json({ success: true, message: 'No matching certificates found to resend.', updated: 0 });
+      return { updated: 0 };
     }
 
     await models.CertificateInstance.update(
@@ -1068,64 +858,27 @@ exports.resendAllTemplateCertificates = async (req, res, next) => {
     );
 
     for (const instId of targetInstanceIds) {
-      const [queueEntry, created] = await models.CertificateQueue.findOrCreate({
-        where: { instanceId: instId },
-        defaults: { status: 'pending', attempts: 0, error: null }
-      });
-
-      if (!created) {
-        queueEntry.status = 'pending';
-        queueEntry.attempts = 0;
-        queueEntry.error = null;
-        queueEntry.lockedAt = null;
-        await queueEntry.save();
-      }
+      await this.resetQueueEntry(instId);
     }
 
-    res.status(200).json({
-      success: true,
-      message: `Successfully queued ${targetInstanceIds.length} certificate(s) for regeneration`,
-      updated: targetInstanceIds.length
-    });
-  } catch (err) {
-    next(err);
+    return { updated: targetInstanceIds.length };
   }
-};
 
-/**
- * Run AI evaluation for a certificate template — ASYNC queue-based.
- * Enqueues one job per mentee → worker processes them one by one.
- * Results stream back to the client via socket.io as they complete.
- * POST /api/certificates/templates/:id/ai-evaluate  (Admin / Mentor)
- */
-exports.runAIEvaluation = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { Op } = require('sequelize');
-
+  /**
+   * Run AI evaluation
+   */
+  async runAIEvaluation(id, queryMentorId, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
     const programId = template.programId;
     const criteria = Array.isArray(template.criteria) ? template.criteria : [];
 
-    // ── Resolve mentee pool ──────────────────────────────────────────────
     const menteeRows = [];
-    const mentorId = req.user.role === 'mentor' ? req.user.id : req.query.mentorId;
+    const mentorId = user.role === 'mentor' ? user.id : queryMentorId;
 
     if (mentorId) {
-      const mentorClans = await models.ClanMembership.findAll({
-        where: { userId: mentorId, role: { [Op.in]: ['lead_mentor', 'co_mentor'] }, status: 'active' },
-        attributes: ['clanId'],
-        include: [{ model: models.Clan, as: 'clan', where: { programId }, attributes: [] }],
-        raw: true
-      });
-      let clanIds = mentorClans.map(c => c.clanId || c['clan.id']);
-      if (clanIds.length === 0 && req.user.role === 'admin') {
-        const allClans = await models.Clan.findAll({ where: { programId }, limit: 5, attributes: ['id'], raw: true });
-        clanIds = allClans.map(c => c.id);
-      }
-
+      const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
       if (clanIds.length > 0) {
         const menteeMembers = await models.ClanMembership.findAll({
           where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
@@ -1138,7 +891,6 @@ exports.runAIEvaluation = async (req, res, next) => {
         }
       }
     } else {
-      // Admin: program-wide enrollments
       const enrollments = await models.Enrollment.findAll({
         where: { programId },
         include: [{ model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
@@ -1150,7 +902,6 @@ exports.runAIEvaluation = async (req, res, next) => {
       }
     }
 
-    // Deduplicate
     const seenIds = new Set();
     const mentees = menteeRows.filter(m => {
       if (seenIds.has(m.id)) return false;
@@ -1159,44 +910,27 @@ exports.runAIEvaluation = async (req, res, next) => {
     });
 
     if (mentees.length === 0) {
-      return res.status(200).json({
-        success: true,
-        data: [],
-        ranAt: new Date().toISOString(),
-        message: 'No active mentees found in this program.'
-      });
+      return { total: 0, runId: null, data: [] };
     }
 
     const menteeIds = mentees.map(m => m.id);
 
-    // ── Enqueue per-mentee evaluation jobs ────────────────────────────────
     const { runId, total } = await aiEvaluationService.enqueueEvaluation(
       id,
       menteeIds,
-      req.user.id,
+      user.id,
       criteria
     );
 
-    res.status(202).json({
-      success: true,
-      runId,
-      total,
-      message: `Queued ${total} mentee evaluations. Results will arrive via real-time updates.`
-    });
-  } catch (err) {
-    next(err);
+    return { runId, total };
   }
-};
 
-/**
- * Get AI evaluation run status — polling fallback if socket disconnects.
- * GET /api/certificates/templates/:id/ai-evaluate/status?runId=xxx
- */
-exports.getAIEvaluationStatus = async (req, res, next) => {
-  try {
-    const { runId } = req.query;
+  /**
+   * Get AI evaluation status
+   */
+  async getAIEvaluationStatus(runId) {
     if (!runId) {
-      return res.status(400).json({ success: false, message: 'runId is required' });
+      throw new BadRequestError('runId is required');
     }
 
     const jobs = await models.AIEvaluationQueue.findAll({
@@ -1206,16 +940,15 @@ exports.getAIEvaluationStatus = async (req, res, next) => {
     });
 
     if (jobs.length === 0) {
-      return res.status(404).json({ success: false, message: 'Run not found' });
+      throw new NotFoundError('Run not found');
     }
 
-    const total     = jobs.length;
+    const total = jobs.length;
     const completed = jobs.filter(j => j.status === 'completed').length;
-    const failed    = jobs.filter(j => j.status === 'failed').length;
-    const pending   = jobs.filter(j => j.status === 'pending' || j.status === 'processing').length;
-    const isDone    = pending === 0;
+    const failed = jobs.filter(j => j.status === 'failed').length;
+    const pending = jobs.filter(j => j.status === 'pending' || j.status === 'processing').length;
+    const isDone = pending === 0;
 
-    // Collect completed results with mentee names
     const completedResults = jobs
       .filter(j => j.status === 'completed' && j.result)
       .map(j => j.result);
@@ -1232,14 +965,13 @@ exports.getAIEvaluationStatus = async (req, res, next) => {
       enrichedResults = completedResults.map(ev => ({
         ...ev,
         firstName: menteeMap[ev.mentee_id]?.firstName ?? '',
-        lastName:  menteeMap[ev.mentee_id]?.lastName  ?? '',
-        email:     menteeMap[ev.mentee_id]?.email     ?? ''
+        lastName: menteeMap[ev.mentee_id]?.lastName ?? '',
+        email: menteeMap[ev.mentee_id]?.email ?? ''
       }));
       enrichedResults.sort((a, b) => b.match_score - a.match_score);
     }
 
-    res.status(200).json({
-      success: true,
+    return {
       isDone,
       total,
       completed,
@@ -1247,9 +979,8 @@ exports.getAIEvaluationStatus = async (req, res, next) => {
       pending,
       data: enrichedResults,
       ranAt: isDone ? new Date().toISOString() : null
-    });
-  } catch (err) {
-    next(err);
+    };
   }
-};
+}
 
+module.exports = new CertificateService();

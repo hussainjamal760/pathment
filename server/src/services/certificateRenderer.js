@@ -57,12 +57,10 @@ function compileHtml(template, data) {
 
     const left = el.xPercent != null ? el.xPercent : 50;
     const top = el.yPercent != null ? el.yPercent : 50;
-    const fontSize = el.fontSizePercent ? el.fontSizePercent * 8.48 : 24; // 8.48px is 1% of A4 container height (848px)
+    const fontSize = el.fontSizePercent ? el.fontSizePercent * 8.48 : 24;
     const color = el.color || '#1e293b';
     const fontWeight = el.fontWeight || 'normal';
     const alignment = el.alignment || 'center';
-    
-    // Use the stored font-family string directly
     const fontFamily = el.fontStyle || 'Montserrat, sans-serif';
 
     return `
@@ -157,9 +155,6 @@ exports.renderCertificate = async (template, data) => {
 
   try {
     const page = await browser.newPage();
-    
-    // Width and height matches landscape ratio 16:9
-    // deviceScaleFactor: 2 renders high-DPI double-resolution screenshot for crisp PNGs
     await page.setViewport({
       width: 1200,
       height: 848,
@@ -168,13 +163,11 @@ exports.renderCertificate = async (template, data) => {
 
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    // Capture high-quality PNG
     const pngBuffer = await page.screenshot({
       type: 'png',
       omitBackground: false
     });
 
-    // Capture A4 landscape PDF
     const pdfBuffer = await page.pdf({
       width: '11.69in',
       height: '8.27in',

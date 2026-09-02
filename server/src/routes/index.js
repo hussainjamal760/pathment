@@ -169,6 +169,6 @@ router.use('/admin/emails', require('./emailAdmin'));
 router.use('/feedback', require('./feedback'));
 
 // Custom Certificate Management System
-router.use('/certificates', require('../features/certificates/routes'));
+router.use('/certificates', require('./certificates'));
 
 module.exports = router;

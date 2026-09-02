@@ -135,10 +135,12 @@ export const certificatesApi = {
   deleteTemplate: (id: string) => 
     apiClient.delete<{ success: boolean }>(`/certificates/templates/${id}`),
 
-  uploadAsset: (file: File) => {
+  uploadAsset: async (file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiClient.post<{ success: boolean; url: string }>('/certificates/upload', formData);
+    const res = await apiClient.post<{ success: boolean; url?: string; data?: { url: string } }>('/certificates/upload', formData);
+    const url = res.url || res.data?.url || '';
+    return { ...res, url };
   },
 
   getQualification: (id: string, params: { mentorId?: string; programId?: string }) => {

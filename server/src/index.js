@@ -158,9 +158,13 @@ async function start() {
     const { initializeRag } = require('./features/rag');
     initializeRag();
 
-    // Initialize Certificates subsystem (Workers)
-    const { initializeCertificates } = require('./features/certificates');
-    initializeCertificates();
+    // Initialize Certificate Queue Workers
+    if (process.env.CERTIFICATE_WORKER_DISABLED !== 'true') {
+      require('./workers/certificateWorker').start();
+    }
+    if (process.env.AI_EVAL_WORKER_DISABLED !== 'true') {
+      require('./workers/aiEvaluationWorker').start();
+    }
     if (process.env.NOTIFICATION_SCHEDULER_DISABLED !== 'true') {
       notificationScheduler.start();
     }
