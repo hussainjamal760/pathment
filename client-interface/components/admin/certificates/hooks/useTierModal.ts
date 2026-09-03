@@ -3,19 +3,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { certificatesApi } from '@/lib/services/certificates-api';
+import { TierCriteria } from '../certificate-constants';
 
-export interface TierCriteria {
-  id: string;
-  name: string;
-  badgeUrl?: string;
-  keywords?: string[] | null;
-  minScorePercent?: number | null;
-  maxOpenBlockers?: number | null;
-  minCompletionRate?: number | null;
-  minOnTimeRate?: number | null;
-  minAvgRating?: number | null;
-  customRule?: string | null;
-}
 
 interface UseTierModalOptions {
   criteria: TierCriteria[];

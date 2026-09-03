@@ -12,6 +12,7 @@ const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
 const { emitToUser } = require('../socket');
 const aiEvaluationService = require('../services/aiEvaluationService');
+const { enrichEvaluationResults } = require('../utils/aiEvalHelpers');
 const logger = require('../utils/logger');
 
 const POLL_MS = Number(process.env.AI_EVAL_WORKER_POLL_MS) || 3000;
@@ -74,24 +75,7 @@ async function checkRunCompletion(runId, triggeredBy) {
       .map(j => j.result)
       .filter(Boolean);
 
-    const menteeIds = finishedJobs.map(j => j.menteeId);
-    const mentees = menteeIds.length > 0
-      ? await models.User.findAll({
-          where: { id: { [Op.in]: menteeIds } },
-          attributes: ['id', 'firstName', 'lastName', 'email'],
-          raw: true
-        })
-      : [];
-    const menteeMap = Object.fromEntries(mentees.map(m => [m.id, m]));
-
-    const enrichedResults = results.map(ev => ({
-      ...ev,
-      firstName: menteeMap[ev.mentee_id]?.firstName ?? '',
-      lastName: menteeMap[ev.mentee_id]?.lastName ?? '',
-      email: menteeMap[ev.mentee_id]?.email ?? ''
-    }));
-
-    enrichedResults.sort((a, b) => b.match_score - a.match_score);
+    const enrichedResults = await enrichEvaluationResults(results);
 
     const templateId = finishedJobs[0]
       ? (await models.AIEvaluationQueue.findOne({ where: { runId }, attributes: ['templateId'], raw: true }))?.templateId
@@ -168,12 +152,10 @@ async function tick() {
       job.error = null;
       await job.save();
 
-      const completedCount = await models.AIEvaluationQueue.count({
-        where: { runId: job.runId, status: { [Op.in]: ['completed', 'failed'] } }
-      });
-      const totalCount = await models.AIEvaluationQueue.count({
-        where: { runId: job.runId }
-      });
+      const [{ completedCount, totalCount }] = await sequelize.query(
+        `SELECT COUNT(*) FILTER (WHERE status IN ('completed', 'failed')) AS "completedCount", COUNT(*) AS "totalCount" FROM ai_evaluation_queue WHERE run_id = :runId`,
+        { replacements: { runId: job.runId }, type: sequelize.QueryTypes.SELECT }
+      );
 
       const mentee = await models.User.findByPk(job.menteeId, {
         attributes: ['id', 'firstName', 'lastName', 'email'],
@@ -206,12 +188,10 @@ async function tick() {
       await job.save();
 
       if (job.status === 'failed') {
-        const completedCount = await models.AIEvaluationQueue.count({
-          where: { runId: job.runId, status: { [Op.in]: ['completed', 'failed'] } }
-        });
-        const totalCount = await models.AIEvaluationQueue.count({
-          where: { runId: job.runId }
-        });
+        const [{ completedCount, totalCount }] = await sequelize.query(
+          `SELECT COUNT(*) FILTER (WHERE status IN ('completed', 'failed')) AS "completedCount", COUNT(*) AS "totalCount" FROM ai_evaluation_queue WHERE run_id = :runId`,
+          { replacements: { runId: job.runId }, type: sequelize.QueryTypes.SELECT }
+        );
 
         const fallbackResult = aiEvaluationService.buildFallbackResult(
           job.menteePayload,

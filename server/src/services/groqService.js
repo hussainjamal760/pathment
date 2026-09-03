@@ -28,24 +28,13 @@ class GroqService {
    */
   async _resolve(feature = null, userId = null) {
     let cfg = null;
-    let isMentorCaller = false;
     try {
       const aiConnectionService = require('./aiConnectionService');
-      if (userId) {
-        const { models } = require('../db');
-        const user = await models.User.findByPk(userId, { attributes: ['id', 'role', 'capabilities'] });
-        if (user) {
-          const caps = Array.isArray(user.capabilities) && user.capabilities.length ? user.capabilities : [user.role];
-          if (!caps.includes('admin') && user.role === 'mentor') {
-            isMentorCaller = true;
-          }
-        }
-      }
       cfg = await aiConnectionService.resolveActiveConfig(feature, userId);
     } catch (e) {
       console.error('[AI] connection resolve failed:', e.message);
     }
-    if (!cfg && config.ai.apiKey && !isMentorCaller) {
+    if (!cfg && config.ai.apiKey) {
       cfg = { apiKey: config.ai.apiKey, baseURL: config.ai.baseURL, model: config.ai.model, provider: config.ai.provider };
     }
     if (!cfg) return { enabled: false };

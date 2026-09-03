@@ -105,7 +105,7 @@ const getTemplateHistory = catchAsync(async (req, res) => {
  * Delete / Revoke a certificate instance
  */
 const deleteCertificateInstance = catchAsync(async (req, res) => {
-  await certificateService.deleteCertificateInstance(req.params.id);
+  await certificateService.deleteCertificateInstance(req.params.id, req.user);
   res.status(200).json(successResponse('Certificate instance deleted/revoked successfully'));
 });
 

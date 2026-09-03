@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
+const { enrichEvaluationResults } = require('../utils/aiEvalHelpers');
 const { NotFoundError, ValidationError, ForbiddenError, BadRequestError } = require('../utils/errors/errorTypes');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const aiEvaluationService = require('./aiEvaluationService');
@@ -33,6 +34,15 @@ class CertificateService {
    * Helper for mentor clan ID lookup in qualification logic.
    */
   async getMentorScopedMenteeClans(mentorId, programId, userRole) {
+    const clanInclude = {
+      model: models.Clan,
+      as: 'clan',
+      attributes: []
+    };
+    if (programId) {
+      clanInclude.where = { programId };
+    }
+
     const mentorClans = await models.ClanMembership.findAll({
       where: {
         userId: mentorId,
@@ -40,22 +50,10 @@ class CertificateService {
         status: 'active'
       },
       attributes: ['clanId'],
-      include: [{
-        model: models.Clan,
-        as: 'clan',
-        where: { programId },
-        attributes: []
-      }],
+      include: [clanInclude],
       raw: true
     });
     let clanIds = mentorClans.map(c => c.clanId || c['clan.id']).filter(Boolean);
-
-    if (clanIds.length === 0 && userRole === 'admin') {
-      const allClans = await models.Clan.findAll({
-        where: { programId }, limit: 5, attributes: ['id'], raw: true
-      });
-      clanIds = allClans.map(c => c.id);
-    }
     return clanIds;
   }
 
@@ -305,6 +303,13 @@ class CertificateService {
       throw new ForbiddenError('You can only view your own certificates');
     }
 
+    if (user.role === 'mentor') {
+      const scopedIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+      if (scopedIds !== null && !scopedIds.includes(menteeId)) {
+        throw new ForbiddenError('You can only view certificates for mentees in your clan');
+      }
+    }
+
     return models.CertificateInstance.findAll({
       where: { menteeId },
       include: [
@@ -363,6 +368,13 @@ class CertificateService {
 
     if (user.role === 'mentee' && user.id !== instance.menteeId) {
       throw new ForbiddenError('You can only view your own certificates');
+    }
+
+    if (user.role === 'mentor') {
+      const scopedIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+      if (scopedIds !== null && !scopedIds.includes(instance.menteeId)) {
+        throw new ForbiddenError('Access denied to this certificate');
+      }
     }
 
     return instance;
@@ -561,7 +573,7 @@ class CertificateService {
 
     const whereClause = { templateId: id };
 
-    const menteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+    const menteeIds = await this.getMentorScopedMenteeIds(user.id, template.programId || null, user.role);
     if (menteeIds !== null) {
       whereClause.menteeId = { [Op.in]: menteeIds };
     }
@@ -592,14 +604,7 @@ class CertificateService {
 
     return instances.map(inst => {
       const q = queueMap[inst.id];
-      let status = 'completed';
-      if (inst.pdfUrl && inst.imageUrl) {
-        status = 'completed';
-      } else if (q) {
-        status = q.status;
-      } else {
-        status = 'pending';
-      }
+      const status = (inst.pdfUrl && inst.imageUrl) ? 'completed' : (q?.status ?? 'pending');
 
       return {
         id: inst.id,
@@ -623,9 +628,16 @@ class CertificateService {
   /**
    * Delete / revoke single instance
    */
-  async deleteCertificateInstance(id) {
+  async deleteCertificateInstance(id, user) {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
+
+    if (user && user.role === 'mentor') {
+      const scopedIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+      if (scopedIds !== null && !scopedIds.includes(instance.menteeId)) {
+        throw new ForbiddenError('You can only revoke certificates for mentees in your clan');
+      }
+    }
 
     await models.CertificateQueue.destroy({ where: { instanceId: id } });
     await instance.destroy();
@@ -649,6 +661,30 @@ class CertificateService {
       await queueEntry.save();
     }
     return queueEntry;
+  }
+
+  async bulkResetQueueEntries(instanceIds) {
+    if (!instanceIds.length) return;
+
+    await models.CertificateQueue.update(
+      { status: 'pending', attempts: 0, error: null, lockedAt: null },
+      { where: { instanceId: { [Op.in]: instanceIds } } }
+    );
+
+    const existing = await models.CertificateQueue.findAll({
+      where: { instanceId: { [Op.in]: instanceIds } },
+      attributes: ['instanceId'],
+      raw: true
+    });
+    const existingIds = new Set(existing.map(e => e.instanceId));
+    const missing = instanceIds.filter(id => !existingIds.has(id));
+
+    if (missing.length > 0) {
+      const { v4: uuidv4 } = require('uuid');
+      await models.CertificateQueue.bulkCreate(
+        missing.map(id => ({ id: uuidv4(), instanceId: id, status: 'pending', attempts: 0 }))
+      );
+    }
   }
 
   /**
@@ -741,9 +777,7 @@ class CertificateService {
       { where: { id: { [Op.in]: targetInstanceIds } } }
     );
 
-    for (const instId of targetInstanceIds) {
-      await this.resetQueueEntry(instId);
-    }
+    await this.bulkResetQueueEntries(targetInstanceIds);
 
     return { updated: targetInstanceIds.length };
   }
@@ -816,23 +850,16 @@ class CertificateService {
     let targetRunId = runId;
 
     if (!targetRunId && templateId) {
-      const activeJob = await models.AIEvaluationQueue.findOne({
-        where: { templateId, status: { [Op.in]: ['pending', 'processing'] } },
-        order: [['createdAt', 'DESC']],
+      const latestJob = await models.AIEvaluationQueue.findOne({
+        where: { templateId },
+        order: [
+          [sequelize.literal(`CASE WHEN status IN ('pending', 'processing') THEN 0 ELSE 1 END`), 'ASC'],
+          ['createdAt', 'DESC']
+        ],
         attributes: ['runId'],
         raw: true
       });
-      if (activeJob) {
-        targetRunId = activeJob.runId;
-      } else {
-        const latestJob = await models.AIEvaluationQueue.findOne({
-          where: { templateId },
-          order: [['createdAt', 'DESC']],
-          attributes: ['runId'],
-          raw: true
-        });
-        if (latestJob) targetRunId = latestJob.runId;
-      }
+      if (latestJob) targetRunId = latestJob.runId;
     }
 
     if (!targetRunId) {
@@ -859,23 +886,7 @@ class CertificateService {
       .filter(j => j.status === 'completed' && j.result)
       .map(j => j.result);
 
-    let enrichedResults = completedResults;
-    if (completedResults.length > 0) {
-      const menteeIds = completedResults.map(r => r.mentee_id);
-      const mentees = await models.User.findAll({
-        where: { id: { [Op.in]: menteeIds } },
-        attributes: ['id', 'firstName', 'lastName', 'email'],
-        raw: true
-      });
-      const menteeMap = Object.fromEntries(mentees.map(m => [m.id, m]));
-      enrichedResults = completedResults.map(ev => ({
-        ...ev,
-        firstName: menteeMap[ev.mentee_id]?.firstName ?? '',
-        lastName: menteeMap[ev.mentee_id]?.lastName ?? '',
-        email: menteeMap[ev.mentee_id]?.email ?? ''
-      }));
-      enrichedResults.sort((a, b) => b.match_score - a.match_score);
-    }
+    const enrichedResults = await enrichEvaluationResults(completedResults);
 
     return {
       runId: targetRunId,

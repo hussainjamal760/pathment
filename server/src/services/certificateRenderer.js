@@ -129,44 +129,53 @@ function compileHtml(template, data) {
   `;
 }
 
-/**
- * Launch puppeteer browser using pre-installed Chrome binary
- */
+let _browser = null;
+let _browserBooting = false;
+
 async function getBrowserInstance() {
-  return await puppeteer.launch({
-    executablePath: '/usr/bin/google-chrome',
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-gpu'
-    ]
-  });
+  if (_browser) {
+    try {
+      await _browser.version();
+      return _browser;
+    } catch {
+      _browser = null;
+    }
+  }
+  if (_browserBooting) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return getBrowserInstance();
+  }
+  _browserBooting = true;
+  try {
+    _browser = await puppeteer.launch({
+      executablePath: '/usr/bin/google-chrome',
+      headless: 'new',
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    });
+    _browser.on('disconnected', () => { _browser = null; });
+    return _browser;
+  } finally {
+    _browserBooting = false;
+  }
 }
 
-/**
- * Renders HTML certificate using Puppeteer to PDF and PNG buffers
- * @returns {Promise<{ pdfBuffer: Buffer, pngBuffer: Buffer }>}
- */
+exports.closeBrowser = async () => {
+  if (_browser) {
+    await _browser.close().catch(() => {});
+    _browser = null;
+  }
+};
+
 exports.renderCertificate = async (template, data) => {
   const html = compileHtml(template, data);
   const browser = await getBrowserInstance();
+  const page = await browser.newPage();
 
   try {
-    const page = await browser.newPage();
-    await page.setViewport({
-      width: 1200,
-      height: 848,
-      deviceScaleFactor: 2
-    });
-
+    await page.setViewport({ width: 1200, height: 848, deviceScaleFactor: 2 });
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    const pngBuffer = await page.screenshot({
-      type: 'png',
-      omitBackground: false
-    });
+    const pngBuffer = await page.screenshot({ type: 'png', omitBackground: false });
 
     const pdfBuffer = await page.pdf({
       width: '11.69in',
@@ -177,6 +186,6 @@ exports.renderCertificate = async (template, data) => {
 
     return { pdfBuffer, pngBuffer };
   } finally {
-    await browser.close();
+    await page.close();
   }
 };

@@ -365,7 +365,6 @@ async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria) {
 
 module.exports = {
   aggregateMenteeData,
-  preCheckHardConstraints,
   evaluateSingleMentee,
   enqueueEvaluation,
   buildFallbackResult

@@ -46,7 +46,8 @@ EXTENSION_HANDLED: 'extension_handled',
   REVIEW_SCHEDULED: 'review_scheduled',
   REVIEW_REMINDER: 'review_reminder',
   ADMIN_MEETING_INVITE: 'admin_meeting_invite',
-  ADMIN_MEETING_REMINDER: 'admin_meeting_reminder'
+  ADMIN_MEETING_REMINDER: 'admin_meeting_reminder',
+  CERTIFICATE_AWARDED: 'certificate_awarded'
 };
 
 // Which role's "hat" a notification concerns, so the bell + list can scope to the
@@ -352,6 +353,12 @@ const NOTIFICATION_MATRIX = {
     type: 'system',
     audience: 'any',
     preferenceKey: 'admin_meeting_reminder',
+    channels: { inApp: true, email: false, chat: false }
+  },
+  [NOTIFICATION_EVENTS.CERTIFICATE_AWARDED]: {
+    type: 'system',
+    audience: 'mentee',
+    preferenceKey: 'certificate_awarded',
     channels: { inApp: true, email: false, chat: false }
   }
 };

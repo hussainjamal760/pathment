@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { certificatesApi } from '@/lib/services/certificates-api';
-import { TierCriteria } from './useTierModal';
+import { TierCriteria } from '../certificate-constants';
 
 interface UseCertificateQualificationsOptions {
   templateId: string | null;

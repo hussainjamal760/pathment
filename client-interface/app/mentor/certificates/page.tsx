@@ -14,8 +14,8 @@ import CertificateHistoryLog from '@/components/admin/certificates/CertificateHi
 import { DuplicateWarnModal } from '@/components/shared';
 import { getTierBadgeColor, getTierButtonColor, getTierIconColor } from '@/lib/utils/certificates';
 import { Drawer } from '@/components/shared/Drawer';
-import { AIDetailDrawer, AIEvaluationBanner } from '@/components/certificates/shared';
-import { useAIEvaluationProgress } from '@/components/admin/certificates/hooks/useAIEvaluationProgress';
+import { AIDetailDrawer, AIEvaluationBanner, RecipientRosterTable } from '@/components/certificates/shared';
+import { useAIEvaluationProgress } from '@/components/admin/certificates/hooks';
 
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -128,6 +128,8 @@ export default function MentorCertificatesPage() {
       setSelectedIds(autoSelected);
     }
   });
+
+
 
   const getTierName = (tierId: string) => {
     if (!tierId || typeof tierId !== 'string') return '';
@@ -926,7 +928,7 @@ export default function MentorCertificatesPage() {
             <CertificateHistoryLog templateId={activeTemplateId!} userRole="mentor" />
           </div>
         ) : (
-          <div className="bg-card border border-border/80 rounded-3xl p-6 shadow-2xs flex flex-col min-h-[580px] bg-white/70 dark:bg-slate-900/70 backdrop-blur-md">
+          <div className="bg-card border border-border rounded-3xl p-6 shadow-xs flex flex-col min-h-[580px]">
             {/* Table Top Header: Title + Active Count + AI Action */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border/60 mb-5 gap-3">
               <div>
@@ -953,6 +955,8 @@ export default function MentorCertificatesPage() {
                 )}
               </button>
             </div>
+
+
 
 
               {/* Sub-bar: AI evaluation status info */}
@@ -983,7 +987,7 @@ export default function MentorCertificatesPage() {
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search mentees by name or email..."
-                    className="w-full pl-10 pr-10 py-2.5 text-xs bg-muted/40 hover:bg-muted/60 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/50 transition-all shadow-3xs"
+                    className="w-full pl-10 pr-10 py-2.5 text-xs bg-background hover:bg-muted/30 border border-border/70 focus:border-brand-500 rounded-xl text-foreground focus:outline-none placeholder:text-muted-foreground/50 transition-all shadow-3xs"
                   />
                   {search && (
                     <button
@@ -1001,7 +1005,7 @@ export default function MentorCertificatesPage() {
                   <select
                     value={badgeFilter}
                     onChange={e => setBadgeFilter(e.target.value)}
-                    className="w-full px-3.5 py-2.5 pr-8 text-xs bg-muted/40 hover:bg-muted/60 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
+                    className="w-full px-3.5 py-2.5 pr-8 text-xs bg-background hover:bg-muted/30 border border-border/70 focus:border-brand-500 rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
                   >
                     <option value="all">All Badges</option>
                     {criteria.map((c: any) => (
@@ -1016,7 +1020,7 @@ export default function MentorCertificatesPage() {
                   <select
                     value={sortBy}
                     onChange={e => setSortBy(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 pr-8 text-xs bg-muted/40 hover:bg-muted/60 border border-transparent focus:border-border/60 focus:bg-background rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
+                    className="w-full px-3.5 py-2.5 pr-8 text-xs bg-background hover:bg-muted/30 border border-border/70 focus:border-brand-500 rounded-xl text-foreground font-semibold focus:outline-none transition-all cursor-pointer appearance-none shadow-3xs"
                   >
                     <option value="none">Sort: Default</option>
                     <option value="score_desc">High Score first</option>
@@ -1065,137 +1069,23 @@ export default function MentorCertificatesPage() {
 
               {/* Mentee table */}
               <div className="flex-1 flex flex-col min-h-0">
-                {loadingQualifications ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-3 py-20">
-                    <Loader2 className="animate-spin w-6 h-6 text-brand-500" />
-                    <span className="text-xs text-muted-foreground font-semibold">Loading qualification roster...</span>
-                  </div>
-                ) : filtered.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center py-20 gap-2.5 text-center">
-                    <Users className="w-8 h-8 text-muted-foreground/30" />
-                    <p className="text-xs font-bold text-muted-foreground">
-                      {search ? 'No mentees match your search.' : 'No active mentees found.'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border border-border/60 rounded-xl overflow-hidden flex flex-col bg-background/40">
-                    {/* Table header */}
-                    <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/40 text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider items-center border-b border-border/40 select-none">
-                      <div className="col-span-1 flex items-center justify-center">
-                        <input
-                          type="checkbox"
-                          checked={allSelected}
-                          onChange={toggleAll}
-                          className="w-3.5 h-3.5 rounded border-border text-brand-600 focus:ring-brand-500 accent-brand-600 cursor-pointer shadow-3xs"
-                        />
-                      </div>
-                      <div className="col-span-3">Mentee</div>
-                      <div className="col-span-3 text-center">AI Recommendation</div>
-                      <div className="col-span-3 text-center">Final Assigned Badge</div>
-                      <div className="col-span-2 text-center">Issued Badges</div>
-                    </div>
-
-                    {/* Table rows */}
-                    <div className="max-h-[350px] overflow-y-auto divide-y divide-border/30">
-                      {filtered.map(m => {
-                        const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
-                        const selectedTier = mentorTiers[m.id] ?? defaultTier;
-                        const matchPercent = m.tierMatches?.[selectedTier] ?? 0;
-                        const issuedTiersList = m.issuedTiers ?? [];
-                        const initials = `${m.firstName?.charAt(0) || ''}${m.lastName?.charAt(0) || ''}`.toUpperCase();
-
-                        return (
-                          <div key={m.id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-xs hover:bg-muted/20 dark:hover:bg-muted/5 transition-all duration-150">
-                            <div className="col-span-1 flex items-center justify-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(m.id)}
-                                onChange={() => toggleOne(m.id)}
-                                className="w-3.5 h-3.5 rounded border-border text-brand-600 focus:ring-brand-500 accent-brand-600 cursor-pointer shadow-3xs"
-                              />
-                            </div>
-                            <div className="col-span-3 flex items-center gap-2.5 min-w-0">
-                              <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-brand-500/10 to-indigo-500/10 dark:from-brand-500/20 dark:to-indigo-500/20 text-brand-700 dark:text-brand-300 flex items-center justify-center text-[9px] font-extrabold border border-brand-500/20 shrink-0">
-                                {initials}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-bold text-foreground truncate">{m.firstName} {m.lastName}</p>
-                                <p className="text-[9px] text-muted-foreground/80 truncate">{m.email}</p>
-                              </div>
-                            </div>
-                            {/* Column 3: AI Recommendation */}
-                            <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
-                              {aiEvalMap[m.id] ? (
-                                <div className="flex items-center gap-1.5 bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-xl">
-                                  <span className="text-[10px] font-extrabold text-violet-700 dark:text-violet-300 flex items-center gap-1">
-                                    <Sparkles className="w-3 h-3 text-violet-500" /> {getTierName(aiEvalMap[m.id].certificate_tier)}
-                                  </span>
-                                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
-                                    (aiEvalMap[m.id].match_score ?? 0) >= 75
-                                      ? 'text-emerald-600 bg-emerald-500/20'
-                                      : 'text-amber-600 bg-amber-500/20'
-                                  }`}>
-                                    {aiEvalMap[m.id].match_score}%
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setAiDetailMentee(aiEvalMap[m.id])}
-                                    className="p-0.5 hover:bg-violet-500/20 rounded text-violet-600 dark:text-violet-400 transition-colors"
-                                    title="View AI Analysis & Breakdown"
-                                  >
-                                    <Info className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <EligibilityBadge match={matchPercent} />
-                              )}
-                            </div>
-
-                            {/* Column 4: Final Assigned Badge Dropdown */}
-                            <div className="col-span-3 flex flex-col items-center justify-center">
-                              <div className="relative inline-flex items-center w-full max-w-[170px] shadow-3xs rounded-lg border border-border/40 bg-background/50 hover:bg-background transition-colors">
-                                <select
-                                  value={selectedTier}
-                                  onChange={e => handleTierChange(m.id, e.target.value)}
-                                  className="w-full appearance-none pr-8 pl-3 py-1.5 bg-transparent text-[11px] font-semibold text-foreground cursor-pointer focus:outline-none"
-                                >
-                                  {criteria.map((c: any) => (
-                                    <option key={c.id} value={c.id} className="text-foreground bg-card font-medium">
-                                      {c.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <ChevronDown className="absolute right-2.5 w-3 h-3 pointer-events-none text-muted-foreground/60" />
-                              </div>
-                              {aiEvalMap[m.id] && aiEvalMap[m.id].certificate_tier !== selectedTier && (
-                                <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 dark:text-amber-400 mt-0.5">
-                                  <Edit3 className="w-2.5 h-2.5" /> Overridden by Mentor
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Column 5: Issued Badges */}
-                            <div className="col-span-2 flex flex-wrap justify-center gap-1">
-                              {issuedTiersList.length === 0 ? (
-                                <span className="text-[10px] text-muted-foreground/40 font-semibold select-none">—</span>
-                              ) : (
-                                issuedTiersList.map((tier: string, idx: number) => {
-                                  const badgeColor = getTierBadgeColor(tier);
-                                  const shortTierName = getTierName(tier).replace(/\s*certificate\s*/i, '');
-                                  return (
-                                    <span key={`${tier}-${idx}`} className={`px-2 py-0.5 rounded-md border text-[9px] font-extrabold uppercase tracking-wider shadow-3xs ${badgeColor}`}>
-                                      {shortTierName}
-                                    </span>
-                                  );
-                                })
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                <RecipientRosterTable
+                  filtered={filtered}
+                  criteria={criteria}
+                  aiEvalMap={aiEvalMap}
+                  selectedIds={selectedIds}
+                  toggleOne={toggleOne}
+                  toggleAll={toggleAll}
+                  allSelected={allSelected}
+                  assignedTiers={mentorTiers}
+                  handleTierChange={handleTierChange}
+                  onInspectAI={setAiDetailMentee}
+                  loading={loadingQualifications}
+                  getTierName={getTierName}
+                  userRole="mentor"
+                  recipientTypeLabel="Mentee"
+                  emptyMessage={search ? 'No mentees match your search.' : 'No active mentees found.'}
+                />
               </div>
 
               {/* Footer */}
