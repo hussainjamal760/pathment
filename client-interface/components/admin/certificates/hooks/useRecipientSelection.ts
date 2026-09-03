@@ -51,6 +51,20 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     return recipientPausedList;
   }, [recipientType, recipientMenteesList, recipientMentorsList, recipientPausedList]);
 
+  const getEffectiveTier = useCallback((mOrId: any): string => {
+    const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
+    const id = typeof mOrId === 'string' ? mOrId : mOrId?.id;
+    if (!id) return defaultTier;
+
+    if (assignedTiers[id]) return assignedTiers[id];
+    if (aiResults?.[id]?.certificate_tier) return aiResults[id].certificate_tier;
+
+    const m = typeof mOrId === 'object' ? mOrId : activeList.find((x: any) => x.id === id);
+    if (m?.assignedTier) return m.assignedTier;
+
+    return defaultTier;
+  }, [assignedTiers, aiResults, activeList, criteria]);
+
   const filtered = useMemo(() => {
     let result = [...activeList];
 
@@ -62,9 +76,8 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     }
 
     if (badgeFilter !== 'all') {
-      const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
       result = result.filter((m: any) => {
-        const tier = assignedTiers[m.id] ?? defaultTier;
+        const tier = getEffectiveTier(m);
         return tier === badgeFilter;
       });
     }
@@ -90,7 +103,7 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     }
 
     return result;
-  }, [activeList, recipientSearch, badgeFilter, sortBy, assignedTiers, criteria, aiResults]);
+  }, [activeList, recipientSearch, badgeFilter, sortBy, getEffectiveTier, aiResults]);
 
   const allFilteredIds = useMemo(() => filtered.map((m: any) => m.id), [filtered]);
 
@@ -102,13 +115,16 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
   const selectedSummary = useMemo(() => {
     const summary: Record<string, number> = {};
     criteria.forEach(c => { summary[c.id] = 0; });
-    const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
     selectedMenteeIds.forEach(id => {
-      const tier = assignedTiers[id] ?? defaultTier;
-      summary[tier] = (summary[tier] ?? 0) + 1;
+      const tier = getEffectiveTier(id);
+      if (summary[tier] !== undefined) {
+        summary[tier] = (summary[tier] ?? 0) + 1;
+      } else {
+        summary[tier] = 1;
+      }
     });
     return summary;
-  }, [criteria, selectedMenteeIds, assignedTiers]);
+  }, [criteria, selectedMenteeIds, getEffectiveTier]);
 
   const toggleAll = useCallback(() => {
     setSelectedMenteeIds(prev => {
@@ -199,6 +215,7 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     allFilteredIds,
     allSelected,
     selectedSummary,
+    getEffectiveTier,
     toggleAll,
     toggleOne,
     handleTierChange,

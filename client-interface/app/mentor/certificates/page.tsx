@@ -288,37 +288,6 @@ export default function MentorCertificatesPage() {
     return list;
   }, [qualifiedData]);
 
-  const filtered = useMemo(() => {
-    let result = [...activeMentees];
-
-    const q = search.toLowerCase().trim();
-    if (q) {
-      result = result.filter(m =>
-        `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(q)
-      );
-    }
-
-    if (badgeFilter !== 'all') {
-      const activeTemplate = templates.find(t => t.id === activeTemplateId);
-      const criteria = activeTemplate?.criteria ?? [];
-      const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
-      result = result.filter((m: any) => {
-        const assignedTier = mentorTiers[m.id] ?? defaultTier;
-        return assignedTier === badgeFilter;
-      });
-    }
-
-    if (sortBy === 'score_desc') {
-      result.sort((a: any, b: any) => (b.normalizedScore ?? 0) - (a.normalizedScore ?? 0));
-    } else if (sortBy === 'score_asc') {
-      result.sort((a: any, b: any) => (a.normalizedScore ?? 0) - (b.normalizedScore ?? 0));
-    }
-
-    return result;
-  }, [activeMentees, search, badgeFilter, sortBy, mentorTiers, templates, activeTemplateId]);
-
-  const allSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
-
   const mentorAIResults = useMemo(() => {
     const activeIds = new Set(activeMentees.map(m => m.id));
     return aiResults.filter((r: any) => activeIds.has(r.mentee_id));
@@ -330,6 +299,50 @@ export default function MentorCertificatesPage() {
     return map;
   }, [mentorAIResults]);
 
+  const getEffectiveTier = useCallback((mOrId: any): string => {
+    const activeTemplate = templates.find(t => t.id === activeTemplateId);
+    const criteria = activeTemplate?.criteria ?? [];
+    const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
+    const id = typeof mOrId === 'string' ? mOrId : mOrId?.id;
+    if (!id) return defaultTier;
+
+    if (mentorTiers[id]) return mentorTiers[id];
+    if (aiEvalMap[id]?.certificate_tier) return aiEvalMap[id].certificate_tier;
+
+    const m = typeof mOrId === 'object' ? mOrId : activeMentees.find((x: any) => x.id === id);
+    if (m?.assignedTier) return m.assignedTier;
+
+    return defaultTier;
+  }, [mentorTiers, aiEvalMap, activeMentees, templates, activeTemplateId]);
+
+  const filtered = useMemo(() => {
+    let result = [...activeMentees];
+
+    const q = search.toLowerCase().trim();
+    if (q) {
+      result = result.filter(m =>
+        `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(q)
+      );
+    }
+
+    if (badgeFilter !== 'all') {
+      result = result.filter((m: any) => {
+        const assignedTier = getEffectiveTier(m);
+        return assignedTier === badgeFilter;
+      });
+    }
+
+    if (sortBy === 'score_desc') {
+      result.sort((a: any, b: any) => (b.normalizedScore ?? 0) - (a.normalizedScore ?? 0));
+    } else if (sortBy === 'score_asc') {
+      result.sort((a: any, b: any) => (a.normalizedScore ?? 0) - (b.normalizedScore ?? 0));
+    }
+
+    return result;
+  }, [activeMentees, search, badgeFilter, sortBy, getEffectiveTier]);
+
+  const allSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
+
   const selectedSummary = useMemo(() => {
     const activeTemplate = templates.find(t => t.id === activeTemplateId);
     const criteria = activeTemplate?.criteria ?? [];
@@ -340,8 +353,7 @@ export default function MentorCertificatesPage() {
     });
 
     selectedIds.forEach(id => {
-      const defaultTier = criteria[criteria.length - 1]?.id || 'participation';
-      const tier = mentorTiers[id] ?? defaultTier;
+      const tier = getEffectiveTier(id);
       if (counts[tier] !== undefined) {
         counts[tier]++;
       } else {
@@ -353,7 +365,7 @@ export default function MentorCertificatesPage() {
       total: selectedIds.size,
       counts
     };
-  }, [selectedIds, mentorTiers, templates, activeTemplateId]);
+  }, [selectedIds, getEffectiveTier, templates, activeTemplateId]);
 
   const toggleAll = useCallback(() => {
     setSelectedIds(prev => {

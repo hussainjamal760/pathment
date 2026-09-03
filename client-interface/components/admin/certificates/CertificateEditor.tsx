@@ -298,13 +298,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           const autoSelected = new Set<string>();
 
           activeList.forEach(m => {
-            const defTier = m.assignedTier || '';
+            const defTier = m.assignedTier || aiEvalMap[m.id]?.certificate_tier || criteria[criteria.length - 1]?.id || 'participation';
             initialTiers[m.id] = defTier;
-
-            const matchPercent = m.tierMatches?.[defTier] ?? 0;
-            if (defTier && matchPercent >= 75) {
-              autoSelected.add(m.id);
-            }
+            autoSelected.add(m.id);
           });
 
           const mentorDefaultTier = criteria[criteria.length - 1]?.id || 'participation';
@@ -1219,7 +1215,19 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   <button
                     key={type}
                     type="button"
-                    onClick={() => { setRecipientType(type); setSelectedMenteeIds(new Set()); setRecipientSearch(''); }}
+                    onClick={() => {
+                      setRecipientType(type);
+                      setRecipientSearch('');
+                      setBadgeFilter('all');
+                      const list = type === 'all'
+                        ? [...recipientMenteesList, ...recipientMentorsList]
+                        : type === 'mentees'
+                          ? recipientMenteesList
+                          : type === 'mentors'
+                            ? recipientMentorsList
+                            : recipientPausedList;
+                      setSelectedMenteeIds(new Set(list.map(m => m.id)));
+                    }}
                     className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${recipientType === type
                       ? 'border-brand-600 text-brand-600'
                       : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -1340,7 +1348,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               getTierName={getTierName}
               userRole="admin"
               recipientTypeLabel={recipientType === 'all' ? 'Recipient' : recipientType === 'mentees' ? 'Mentee' : recipientType === 'mentors' ? 'Mentor' : 'Paused Mentee'}
-              emptyMessage={`No ${recipientType === 'paused' ? 'paused mentees' : 'active ' + recipientType} found in this program.`}
+              emptyMessage={`No ${recipientType === 'paused' ? 'paused mentees' : recipientType === 'all' ? 'active recipients' : 'active ' + recipientType} found in this program.`}
             />
 
             {}

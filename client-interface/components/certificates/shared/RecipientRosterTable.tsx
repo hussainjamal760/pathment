@@ -82,7 +82,7 @@ export function RecipientRosterTable({
       <div className="max-h-[350px] overflow-y-auto divide-y divide-border">
         {filtered.map((m: any) => {
           const defaultTier = m.isPaused ? '' : (criteria[criteria.length - 1]?.id ?? 'participation');
-          const selectedTier = assignedTiers[m.id] ?? (aiEvalMap[m.id]?.certificate_tier || m.assignedTier || defaultTier);
+          const selectedTier = assignedTiers[m.id] || (aiEvalMap[m.id]?.certificate_tier || m.assignedTier || defaultTier);
           const issuedTiersList: string[] = m.issuedTiers ?? [];
           const initials = `${m.firstName?.charAt(0) || ''}${m.lastName?.charAt(0) || ''}`.toUpperCase();
 
