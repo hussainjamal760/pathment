@@ -45,9 +45,10 @@ async function checkRunCompletion(runId, triggeredBy) {
   const failed = statusMap['failed'] || 0;
 
   if (pending === 0 && processing === 0) {
+    // BUG-3: Include templateId in the same query — no extra findOne needed.
     const finishedJobs = await models.AIEvaluationQueue.findAll({
       where: { runId, status: 'completed' },
-      attributes: ['menteeId', 'result'],
+      attributes: ['menteeId', 'result', 'templateId'],
       raw: true
     });
 
@@ -57,9 +58,7 @@ async function checkRunCompletion(runId, triggeredBy) {
 
     const enrichedResults = await enrichEvaluationResults(results);
 
-    const templateId = finishedJobs[0]
-      ? (await models.AIEvaluationQueue.findOne({ where: { runId }, attributes: ['templateId'], raw: true }))?.templateId
-      : null;
+    const templateId = finishedJobs[0]?.templateId ?? null;
 
     if (templateId) {
       const ranAt = new Date().toISOString();
@@ -147,11 +146,30 @@ async function processBatchJobs(batchJobs) {
     logger.info(`[AI Eval Worker] Micro-batch completed (${completedCount}/${totalCount})`);
     await checkRunCompletion(runId, triggeredBy);
   } catch (batchError) {
-    logger.error(`[AI Eval Worker] Micro-batch failed: ${batchError.message}`);
+    // SEC-3: Log full stack server-side but store only the sanitized message in the DB.
+    // Stack traces in the DB are returned to the frontend via getAIEvaluationStatus, exposing
+    // internal file paths and library details.
+    logger.error(`[AI Eval Worker] Micro-batch failed: ${batchError.stack || batchError.message}`);
+
+    // BUG-4: Query real progress counts before emitting — hardcoded 0,0 would reset the UI
+    // progress bar for the entire run even if most other batches completed successfully.
+    let errorCompletedCount = 0;
+    let errorTotalCount = 0;
+    try {
+      const [counts] = await sequelize.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE status IN ('completed', 'failed')) AS "completedCount",
+           COUNT(*) AS "totalCount"
+         FROM ai_evaluation_queue WHERE run_id = :runId`,
+        { replacements: { runId }, type: sequelize.QueryTypes.SELECT }
+      );
+      errorCompletedCount = Number(counts?.completedCount ?? 0);
+      errorTotalCount     = Number(counts?.totalCount     ?? 0);
+    } catch (_) { /* non-fatal — fallback to 0,0 only as last resort */ }
 
     for (const job of batchJobs) {
       job.status = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
-      job.error = batchError.stack || batchError.message;
+      job.error  = batchError.message; // SEC-3: sanitized message only
       await job.save();
 
       if (job.status === 'failed') {
@@ -166,17 +184,17 @@ async function processBatchJobs(batchJobs) {
         });
 
         emitToUser(triggeredBy, 'ai-eval:progress', {
-          runId: job.runId,
+          runId:    job.runId,
           menteeId: job.menteeId,
           result: {
             ...fallbackResult,
             firstName: mentee?.firstName ?? '',
-            lastName: mentee?.lastName ?? '',
-            email: mentee?.email ?? '',
+            lastName:  mentee?.lastName  ?? '',
+            email:     mentee?.email     ?? '',
             _failed: true
           },
-          completed: 0,
-          total: 0
+          completed: errorCompletedCount, // BUG-4: real counts
+          total:     errorTotalCount
         });
       }
     }

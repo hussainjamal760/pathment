@@ -1,6 +1,12 @@
 /**
- * aiEvalPromptBuilder — Constructs structured system & user prompts for AI certificate evaluation.
+ * aiEvalPromptBuilder — Constructs system & user prompts for batch AI certificate evaluation.
+ *
+ * NOTE: criteria arrays MUST be ordered highest-tier-first (index 0 = top tier).
+ * This is the contract enforced at template creation time and relied upon everywhere in
+ * the evaluation pipeline (preCheckHardConstraints, isTierAllowed, prompt hierarchy).
  */
+const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
+
 
 function buildTierDescriptions(criteria) {
   return criteria.map(c => {
@@ -28,53 +34,16 @@ function getDynamicTierOrder(criteria) {
   return { hierarchy, topTierId, topTierName };
 }
 
-function buildSingleMenteePrompt(criteria, preCheckResult) {
-  const tierDescriptions = buildTierDescriptions(criteria);
-  const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(criteria);
-
-  return `You are an expert AI evaluator assessing ONE mentee for certificate eligibility on a mentorship platform.
-
-TIER DEFINITIONS & QUALIFICATION RULES:
-${tierDescriptions || '- participation: everyone with >= 1 completed task'}
-
-SERVER PRE-CHECK UPPER CEILING: "${preCheckResult.maxEligibleTier}"
-
-EVALUATION RULES:
-1. "maxEligibleTier" ("${preCheckResult.maxEligibleTier}") is the MAXIMUM ALLOWED tier based on server-side performance math. You MAY NOT assign a tier higher than "${preCheckResult.maxEligibleTier}".
-2. DYNAMIC TIER STEP-DOWN HIERARCHY (highest to lowest): ${hierarchy}.
-3. You MUST evaluate the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks (status === "completed").
-4. STRICT EXPLICIT CRITERIA ONLY: DO NOT invent, assume, or penalize for missing technologies (such as Node, Express, MongoDB, REST design, Databases, Docker, etc.) that are NOT explicitly listed in the tier's "Required Tech Stack / Keywords" or "Custom Qualification Rule"! Only evaluate keywords explicitly listed in TIER DEFINITIONS for that tier.
-5. If the mentee fails the explicit Custom Qualification Rule or explicit Tech Stack Keywords for "${preCheckResult.maxEligibleTier}", STEP DOWN to the next lower tier in the hierarchy. Do NOT jump straight to the bottom! Assign the highest lower tier whose rules & keywords the mentee DOES satisfy.
-6. MANDATORY MAXIMUM QUALIFIED TIER ASSIGNMENT: If a mentee's "maxEligibleTier" is "${topTierId}", AND the mentee's completed tasks satisfy explicit keywords and custom rules for "${topTierName}", YOU MUST ASSIGN "certificate_tier": "${topTierId}". Unjustified step-downs are strictly prohibited!
-7. Compute "match_score" (0-100) reflecting how strongly the mentee aligns with the assigned tier.
-8. List "matched_keywords" (keywords present in completed tasks) and "missing_keywords" (required keywords missing).
-9. Generate "custom_rules_check": Array of objects [{ "rule": "<rule name/description>", "passed": boolean, "evidence": "<exact task title or metric reason>" }] detailing pass/fail results for each custom rule and tech stack requirement.
-10. Write a 3-4 sentence detailed narrative in "reasoning" referencing task titles, custom rule evaluation, and performance metrics. NEVER state that a mentee failed a tier for unlisted technologies!
-
-OUTPUT FORMAT (pure JSON object):
-{
-  "mentee_id": "<string>",
-  "is_eligible": true,
-  "certificate_tier": "<assigned_tier>",
-  "match_score": 85,
-  "matched_keywords": [],
-  "missing_keywords": [],
-  "custom_rules_check": [
-    { "rule": "Custom Qualification Rule", "passed": true, "evidence": "Completed multi-step form task" }
-  ],
-  "overall_percentage": 0,
-  "hard_constraints_check": {},
-  "blockers_analysis": { "total": 0, "resolved": 0, "open": 0, "impact": "Low", "summary": "" },
-  "reasoning": ""
-}`;
-}
-
 /**
- * Build prompt for a BATCH of mentees.
+ * Build the system prompt for a BATCH of mentees.
+ * @param {Array} criteria - Tier criteria array, ordered highest tier first.
+ * @param {number} batchSize - Max number of mentees in a single AI call.
  */
 function buildBatchMenteePrompt(criteria, batchSize) {
-  const tierDescriptions = buildTierDescriptions(criteria);
-  const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(criteria);
+  // Sort by explicit priority so the prompt hierarchy matches the actual evaluation order.
+  const sorted = sortCriteriaByPriority(criteria);
+  const tierDescriptions = buildTierDescriptions(sorted);
+  const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(sorted);
 
   return `You are an expert AI evaluator assessing a BATCH of up to ${batchSize} mentees for certificate eligibility on a mentorship platform.
 
@@ -143,4 +112,4 @@ EVALUATION INSTRUCTIONS:
 ]`;
 }
 
-module.exports = { buildSingleMenteePrompt, buildBatchMenteePrompt };
+module.exports = { buildBatchMenteePrompt };

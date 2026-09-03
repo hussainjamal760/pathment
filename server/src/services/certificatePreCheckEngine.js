@@ -1,18 +1,30 @@
+const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
+
 /**
  * certificatePreCheckEngine — Server-side deterministic mathematical pre-check engine.
  *
  * Responsibilities:
- *   - Evaluates mentee performance metrics (normalized score, open blockers, completion rate, on-time rate, mentor rating, cohort attendance).
+ *   - Evaluates mentee performance metrics (normalized score, open blockers, completion rate,
+ *     on-time rate, mentor rating, cohort attendance).
  *   - Determines highest eligible certificate tier BEFORE sending payload to LLM.
  *   - 100% deterministic (no AI/LLM dependencies).
+ *
+ * CRITICAL INVARIANT: The `criteria` array MUST be ordered highest-tier-first (index 0 = top
+ * tier). The engine stops at the FIRST tier a mentee fully passes and records it as the ceiling.
+ * Callers (enqueueEvaluation, etc.) are responsible for maintaining this order. An incorrect
+ * order will silently produce a wrong (too-low) tier ceiling — no error will be thrown.
+ *
+ * This invariant is enforced at template creation/update time: the UI always stores tiers in
+ * the display order which is highest → lowest. Do not reorder without updating the UI contract.
  */
 
 /**
  * Determine the highest eligible tier for a mentee using server-side hard constraints.
  *
- * @param {Object} menteePayload - Data snapshot containing scores, tasks, blockers, cohort_reviews, etc.
- * @param {Array} criteria - Array of template criteria tier definitions.
- * @returns {Object} { maxEligibleTier, hardChecks }
+ * @param {Object} menteePayload - Data snapshot: normalized_score, blockers, completion_rate,
+ *   on_time_rate, avg_rating, cohort_reviews.
+ * @param {Array}  criteria      - Tier definitions, ordered highest-priority-first.
+ * @returns {{ maxEligibleTier: string, hardChecks: Object }}
  */
 function preCheckHardConstraints(menteePayload, criteria) {
   if (!criteria || !criteria.length) {
@@ -22,26 +34,31 @@ function preCheckHardConstraints(menteePayload, criteria) {
     };
   }
 
+  // Sort highest-priority tier first. This is the guarantee that replaces the
+  // old "array position = prestige" implicit contract (BUG-1 fix, now enforced here).
+  const sortedCriteria = sortCriteriaByPriority(criteria);
+
   const hardChecks = {};
   let maxEligibleTier = null;
 
-  for (const tier of criteria) {
+  for (const tier of sortedCriteria) {
     const tierId = tier.id;
     const checks = {
-      score_ok: true,
-      blockers_ok: true,
+      score_ok:           true,
+      blockers_ok:        true,
       completion_rate_ok: true,
-      on_time_rate_ok: true,
-      rating_ok: true,
-      attendance_ok: true
+      on_time_rate_ok:    true,
+      rating_ok:          true,
+      attendance_ok:      true,
     };
 
     if (tier.minScorePercent != null && menteePayload.normalized_score < tier.minScorePercent) {
       checks.score_ok = false;
     }
 
-    // maxOpenBlockers: -1 = unlimited (no restriction). Only apply check when >= 0.
-    if (tier.maxOpenBlockers != null && tier.maxOpenBlockers >= 0 && menteePayload.blockers.open > tier.maxOpenBlockers) {
+    // maxOpenBlockers: -1 = unlimited (no restriction). Enforce only when >= 0.
+    const openBlockers = menteePayload.blockers?.open ?? 0;
+    if (tier.maxOpenBlockers != null && tier.maxOpenBlockers >= 0 && openBlockers > tier.maxOpenBlockers) {
       checks.blockers_ok = false;
     }
 
@@ -57,12 +74,10 @@ function preCheckHardConstraints(menteePayload, criteria) {
       checks.rating_ok = false;
     }
 
-    // Attendance check: only enforced when minAttendanceRate is set AND data is available.
-    // If no cohort sessions have been held yet, skip (do not penalize mentee).
-    if (
-      tier.minAttendanceRate != null &&
-      menteePayload.cohort_reviews?.data_available === true
-    ) {
+    // Attendance: only enforced when minAttendanceRate is set AND data is available.
+    // If no sessions have been held yet (data_available === false), attendance passes by default.
+    // This is intentional: a new cohort with no sessions should not fail the attendance gate.
+    if (tier.minAttendanceRate != null && menteePayload.cohort_reviews?.data_available === true) {
       const attendancePct = menteePayload.cohort_reviews.attendance_pct ?? 0;
       if (attendancePct < tier.minAttendanceRate) {
         checks.attendance_ok = false;
@@ -71,6 +86,7 @@ function preCheckHardConstraints(menteePayload, criteria) {
 
     hardChecks[tierId] = checks;
 
+    // First tier that passes ALL hard constraints becomes the ceiling (criteria are highest-first).
     const allHardPass = Object.values(checks).every(Boolean);
     if (allHardPass && !maxEligibleTier) {
       maxEligibleTier = tierId;
@@ -79,10 +95,8 @@ function preCheckHardConstraints(menteePayload, criteria) {
 
   return {
     maxEligibleTier: maxEligibleTier || 'participation',
-    hardChecks
+    hardChecks,
   };
 }
 
-module.exports = {
-  preCheckHardConstraints
-};
+module.exports = { preCheckHardConstraints };

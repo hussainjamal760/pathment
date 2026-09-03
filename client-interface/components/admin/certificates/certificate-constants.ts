@@ -11,6 +11,12 @@
 export interface TierCriteria {
   id: string;
   name: string;
+  /**
+   * Explicit rank: 1 = top tier (best certificate), 2 = second best, etc.
+   * Admin drags tiers to reorder in CriteriaTable; priority is re-assigned as array index + 1 on save.
+   * When missing on legacy templates, Infinity is used as fallback to preserve existing array order.
+   */
+  priority?: number;
   badgeUrl?: string;
   keywords?: string[] | null;
   minScorePercent?: number | null;
@@ -54,10 +60,10 @@ export const DYNAMIC_SHORTCUTS = [
 // ─── Default Tier Criteria (used when creating a new template) ──────────────────
 
 export const DEFAULT_CRITERIA: TierCriteria[] = [
-  { id: 'gold', name: 'Gold Certificate', badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, minAttendanceRate: 80, customRule: '' },
-  { id: 'silver', name: 'Silver Certificate', badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2, minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, minAttendanceRate: 70, customRule: '' },
-  { id: 'bronze', name: 'Bronze Certificate', badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5, minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, minAttendanceRate: 50, customRule: '' },
-  { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0, maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, minAttendanceRate: null, customRule: '' },
+  { id: 'gold',          priority: 1, name: 'Gold Certificate',          badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, minAttendanceRate: 80, customRule: '' },
+  { id: 'silver',        priority: 2, name: 'Silver Certificate',        badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2, minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, minAttendanceRate: 70, customRule: '' },
+  { id: 'bronze',        priority: 3, name: 'Bronze Certificate',        badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5, minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, minAttendanceRate: 50, customRule: '' },
+  { id: 'participation', priority: 4, name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0,  maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, minAttendanceRate: null, customRule: '' },
 ];
 
 // ─── Background SVG Presets ─────────────────────────────────────────────────────

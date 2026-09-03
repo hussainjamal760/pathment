@@ -238,19 +238,25 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           if (t.logoConfig) setLogoConfig(t.logoConfig);
           setElements(t.config || []);
           if (Array.isArray(t.criteria)) {
-            setCriteria(t.criteria.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              badgeUrl: c.badgeUrl ?? '',
-              keywords: Array.isArray(c.keywords) ? c.keywords : [],
-              minScorePercent: c.minScorePercent ?? null,
-              maxOpenBlockers: c.maxOpenBlockers ?? null,
+            const loaded = t.criteria.map((c: any, fallbackIdx: number) => ({
+              id:                c.id,
+              name:              c.name,
+              // Preserve stored priority; fall back to array position for legacy templates
+              // that were saved before the priority field existed.
+              priority:          c.priority ?? fallbackIdx + 1,
+              badgeUrl:          c.badgeUrl ?? '',
+              keywords:          Array.isArray(c.keywords) ? c.keywords : [],
+              minScorePercent:   c.minScorePercent ?? null,
+              maxOpenBlockers:   c.maxOpenBlockers ?? null,
               minCompletionRate: c.minCompletionRate ?? null,
-              minOnTimeRate: c.minOnTimeRate ?? null,
-              minAvgRating: c.minAvgRating ?? null,
+              minOnTimeRate:     c.minOnTimeRate ?? null,
+              minAvgRating:      c.minAvgRating ?? null,
               minAttendanceRate: c.minAttendanceRate ?? null,
-              customRule: c.customRule ?? ''
-            })));
+              customRule:        c.customRule ?? ''
+            }));
+            // Sort by priority ascending so the list always renders highest-tier-first
+            loaded.sort((a: any, b: any) => (a.priority ?? Infinity) - (b.priority ?? Infinity));
+            setCriteria(loaded);
           }
           // Load cached AI evaluation if present
           if (t.aiEvaluation?.results) {
@@ -691,6 +697,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         const newTier: TierCriteria = {
           id: `tier-${Date.now()}`,
           name: savedFields.name || 'New Tier',
+          // New tiers are appended at the end — assign next priority value
+          priority: prev.length + 1,
           ...savedFields,
         };
         return [...prev, newTier];
@@ -1173,6 +1181,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         onAdd={() => openTierModal()}
         onEdit={(tier) => openTierModal(tier as any)}
         onDelete={deleteTier}
+        onReorder={setCriteria}
       />
 
       {/* SECTION 3: Select Recipients & Issue */}

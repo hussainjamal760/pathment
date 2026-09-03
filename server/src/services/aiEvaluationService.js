@@ -1,9 +1,12 @@
 /**
  * aiEvaluationService — Certificate eligibility evaluation via AI.
- * Supports micro-batching (up to 10 mentees per API call), fingerprint caching,
- * qualitative custom rule & tech stack keyword evaluation, and AbortController request cancellation.
+ * Supports micro-batching (up to 10 mentees per API call), qualitative custom rule
+ * & tech stack keyword evaluation, and AbortController request cancellation.
+ *
+ * Criteria arrays are ALWAYS sorted by `priority` (ascending, 1 = top tier) before
+ * any processing. sortCriteriaByPriority is applied at every entry point so callers
+ * don't need to think about order.
  */
-const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { models } = require('../db');
 const groqService = require('./groqService');
@@ -11,56 +14,71 @@ const { ValidationError } = require('../utils/errors/errorTypes');
 const logger = require('../utils/logger');
 const { preCheckHardConstraints } = require('./certificatePreCheckEngine');
 const { aggregateMenteeData } = require('./aiEvalDataService');
-const { buildSingleMenteePrompt, buildBatchMenteePrompt } = require('./aiEvalPromptBuilder');
+const { buildBatchMenteePrompt } = require('./aiEvalPromptBuilder');
+const { extractJsonFromText } = require('../utils/aiEvalHelpers');
+const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
 
 /**
- * Helper: Check if an assigned tier is allowed under the server math ceiling (maxAllowedTierId).
- * Higher tiers (e.g. Gold) come first in criteria order. Assigned tier index must be >= maxAllowed index.
+ * Check if an AI-assigned tier falls within the server math ceiling (maxAllowedTierId).
+ *
+ * Criteria are ordered highest-first. A lower index = more prestigious. Assigned tier is
+ * "allowed" only when its index >= maxAllowed index (i.e., it is the ceiling or below it).
+ *
+ * Special case: 'participation' is the sentinel floor tier and is never in the criteria array.
+ * When the ceiling is 'participation', NO custom tier is allowed — only 'participation' itself.
+ *
+ * @param {string} assignedTier    - Tier the AI wants to assign.
+ * @param {string} maxAllowedTierId - Server-computed ceiling tier id.
+ * @param {Array}  criteria         - Template criteria array, highest-first.
+ * @returns {boolean}
  */
 function isTierAllowed(assignedTier, maxAllowedTierId, criteria) {
   if (!assignedTier || !maxAllowedTierId) return false;
   if (assignedTier === maxAllowedTierId) return true;
 
+  // 'participation' ceiling means the mentee failed all hard constraints.
+  // No custom tier can be assigned — only participation itself is valid.
+  if (maxAllowedTierId === 'participation') return false;
+
   const tierOrder = (criteria || []).map(c => c.id);
   const assignedIdx = tierOrder.indexOf(assignedTier);
-  const maxIdx = tierOrder.indexOf(maxAllowedTierId);
+  const maxIdx      = tierOrder.indexOf(maxAllowedTierId);
 
-  if (assignedIdx === -1) return false;
-  if (maxIdx === -1) return true;
+  if (assignedIdx === -1) return false; // unknown tier → deny
+  if (maxIdx === -1) return false;      // unknown ceiling → deny (conservative)
 
+  // assignedIdx >= maxIdx means assignedTier is the ceiling or below it (lower prestige)
   return assignedIdx >= maxIdx;
 }
 
 /**
- * Compute SHA256 fingerprint hash of mentee data & criteria for caching.
+ * Builds human-readable failure messages for tiers the mentee could NOT reach,
+ * so the AI can reference them verbatim in its reasoning.
  */
-function computeMenteeFingerprint(payload, criteria) {
-  const dataToHash = {
-    mentee_id: payload.mentee_id,
-    score: payload.normalized_score,
-    completion: payload.completion_rate,
-    on_time: payload.on_time_rate,
-    avg_rating: payload.avg_rating,
-    tasks: payload.tasks,
-    blockers: payload.blockers,
-    criteria
-  };
-  return crypto.createHash('sha256').update(JSON.stringify(dataToHash)).digest('hex');
-}
-
 function buildHardConstraintFailures(preCheck, criteria) {
-  const failures = [];
+  const failures  = [];
   const hardChecks = preCheck.hardChecks || {};
-  const maxTierId = preCheck.maxEligibleTier;
+  const maxTierId  = preCheck.maxEligibleTier;
 
-  const tierIds = (criteria || []).map(c => c.id);
+  const tierIds     = (criteria || []).map(c => c.id);
   const maxTierIndex = tierIds.indexOf(maxTierId);
-  const higherTiers = maxTierIndex > 0 ? tierIds.slice(0, maxTierIndex) : (maxTierIndex === -1 ? tierIds : []);
+
+  // Report failures only for tiers ABOVE the ceiling (those the mentee didn't qualify for).
+  //
+  // Three cases:
+  //   maxTierIndex > 0  → ceiling is not the top tier → report failures for everything above it
+  //   maxTierIndex === 0 → mentee achieved the top tier → NO tiers above it → no failures to report
+  //   maxTierIndex === -1 → 'participation' (not in criteria array) → ALL tiers were failed
+  const higherTiers = maxTierIndex > 0
+    ? tierIds.slice(0, maxTierIndex)
+    : maxTierIndex === 0
+      ? []       // top tier achieved: nothing above to report
+      : tierIds; // participation ceiling: every tier was failed
 
   for (const tierId of higherTiers) {
     const tierConfig = criteria.find(c => c.id === tierId);
-    const checks = hardChecks[tierId] || {};
-    const tierName = tierConfig?.name || tierId;
+    const checks     = hardChecks[tierId] || {};
+    const tierName   = tierConfig?.name || tierId;
 
     if (checks.completion_rate_ok === false && tierConfig?.minCompletionRate != null) {
       failures.push(`Failed ${tierName} Hard Constraint: Mentee completion rate is below required ${tierConfig.minCompletionRate}% threshold.`);
@@ -87,7 +105,7 @@ function buildHardConstraintFailures(preCheck, criteria) {
 
 /**
  * Evaluate a BATCH of up to 20 mentees in ONE single AI API request.
- * Evaluates qualitative Custom Rules and Tech Stack Keywords against completed task titles/descriptions.
+ * Evaluates qualitative Custom Rules and Tech Stack Keywords against completed tasks.
  */
 async function evaluateBatchMentees(template, batchItems, adminUserId) {
   if (!batchItems || batchItems.length === 0) return [];
@@ -99,37 +117,47 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     );
   }
 
-  const criteria = Array.isArray(template.criteria) ? template.criteria : [];
+  // Sort by priority so the AI prompt hierarchy and isTierAllowed comparisons
+  // always operate on a deterministic highest-first order.
+  const criteria     = sortCriteriaByPriority(Array.isArray(template.criteria) ? template.criteria : []);
   const systemPrompt = buildBatchMenteePrompt(criteria, batchItems.length);
 
-  // Compact payload with task titles AND descriptions for custom rule & keyword matching
-  const compactPayloads = batchItems.map(item => ({
-    mentee_id: item.menteePayload.mentee_id,
-    score: Math.min(100, Math.max(0, item.menteePayload.normalized_score || 0)),
-    completion: item.menteePayload.completion_rate,
-    on_time: item.menteePayload.on_time_rate,
-    avg_rating: item.menteePayload.avg_rating,
-    max_eligible_tier: item.preCheck.maxEligibleTier,
-    hard_constraint_failures: buildHardConstraintFailures(item.preCheck, criteria),
-    score_breakdown: item.menteePayload.score_breakdown,
-    cohort_reviews: item.menteePayload.cohort_reviews,
-    clan_name: item.menteePayload.clan_name,
-    tasks: (item.menteePayload.tasks || []).map(t => ({
-      title: t.title,
-      status: t.status,
-      type: t.type,
-      isCustom: Boolean(t.isCustomTask),
-      desc: t.description ? t.description.slice(0, 300) : undefined,
-      rating: t.rating,
-      difficulty: t.difficulty,
-      points_pct: t.pointsPct
-    })),
-    blockers: {
-      total: item.menteePayload.blockers.total,
-      open: item.menteePayload.blockers.open,
-      open_by_severity: item.menteePayload.blockers.open_by_severity
-    }
-  }));
+  // Re-run preCheckHardConstraints from the live template criteria at evaluation time.
+  // The stored item.preCheck was computed at ENQUEUE time — if the admin changed any
+  // threshold between enqueue and processing, the stale snapshot would send wrong
+  // max_eligible_tier and wrong failure messages to the AI (the root cause of the
+  // "static values overriding dynamic changes" bug).
+  const compactPayloads = batchItems.map(item => {
+    const livePreCheck = preCheckHardConstraints(item.menteePayload, criteria);
+    return {
+      mentee_id:                item.menteePayload.mentee_id,
+      score:                    item.menteePayload.normalized_score,
+      completion:               item.menteePayload.completion_rate,
+      on_time:                  item.menteePayload.on_time_rate,
+      avg_rating:               item.menteePayload.avg_rating,
+      max_eligible_tier:        livePreCheck.maxEligibleTier,
+      hard_constraint_failures: buildHardConstraintFailures(livePreCheck, criteria),
+      score_breakdown:          item.menteePayload.score_breakdown,
+      cohort_reviews:           item.menteePayload.cohort_reviews,
+      clan_name:                item.menteePayload.clan_name,
+      tasks: (item.menteePayload.tasks || []).map(t => ({
+        title:      t.title,
+        status:     t.status,
+        type:       t.type,
+        isCustom:   Boolean(t.isCustomTask),
+        desc:       t.description ? t.description.slice(0, 300) : undefined,
+        rating:     t.rating,
+        difficulty: t.difficulty,
+        points_pct: t.pointsPct
+      })),
+      blockers: {
+        total:            item.menteePayload.blockers?.total            ?? 0,
+        open:             item.menteePayload.blockers?.open             ?? 0,
+        open_by_severity: item.menteePayload.blockers?.open_by_severity ?? {}
+      }
+    };
+  });
+
 
   const userPrompt = JSON.stringify(compactPayloads);
 
@@ -142,9 +170,9 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     initialCandidates.push('gpt-4o-mini', 'gpt-4o');
   }
 
-  const modelQueue = [...new Set(initialCandidates.filter(Boolean))];
+  const modelQueue  = [...new Set(initialCandidates.filter(Boolean))];
   const triedModels = new Set();
-  let lastError = null;
+  let lastError     = null;
 
   for (let idx = 0; idx < modelQueue.length; idx++) {
     const m = modelQueue[idx];
@@ -152,7 +180,7 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     triedModels.add(m);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    const timeoutId  = setTimeout(() => controller.abort(), 35000);
 
     try {
       response = await ai.client.chat.completions.create(
@@ -160,20 +188,19 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
           model: m,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
+            { role: 'user',   content: userPrompt }
           ],
           temperature: 0.1,
-          max_tokens: 3500
+          max_tokens:  3500
         },
         { signal: controller.signal }
       );
       if (response) break;
     } catch (err) {
-      if (err.name === 'AbortError' || controller.signal.aborted) {
-        lastError = new Error(`AI Request Timeout for model ${m} during batch evaluation after 35s`);
-      } else {
-        lastError = err;
-      }
+      lastError = err.name === 'AbortError' || controller.signal.aborted
+        ? new Error(`AI Request Timeout for model ${m} during batch evaluation after 35s`)
+        : err;
+
       logger.warn(`[aiEvaluationService] Model ${m} batch failed: ${lastError.message}`);
 
       if (/401|unauthorized|auth|api_key|invalid_key|429|rate_limit|quota|billing/i.test(lastError?.message || '')) {
@@ -188,7 +215,7 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     logger.warn('[aiEvaluationService] Batch AI call failed, generating fallbacks for batch');
     return batchItems.map(item => ({
       menteeId: item.menteeId,
-      result: buildFallbackResult(item.menteePayload, item.preCheck)
+      result:   buildFallbackResult(item.menteePayload, item.preCheck)
     }));
   }
 
@@ -197,7 +224,8 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
 }
 
 /**
- * Helper: Attempt a single AI self-correction retry prompt if JSON parsing fails.
+ * Attempt a single AI self-correction retry when JSON parsing fails.
+ * Uses the shared extractJsonFromText helper.
  */
 async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
   try {
@@ -215,22 +243,12 @@ async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
         }
       ],
       temperature: 0.0,
-      max_tokens: 3500
+      max_tokens:  3500
     });
 
-    const repairedRaw = repairResponse.choices[0]?.message?.content || '';
-    let jsonStr = repairedRaw.trim();
-    const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlock) jsonStr = codeBlock[1];
-
-    const firstBracket = jsonStr.indexOf('[');
-    const lastBracket = jsonStr.lastIndexOf(']');
-    if (firstBracket !== -1 && lastBracket > firstBracket) {
-      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
-    }
-    const result = JSON.parse(jsonStr);
+    const repaired = JSON.parse(extractJsonFromText(repairResponse.choices[0]?.message?.content || ''));
     logger.info('[aiEvaluationService] AI self-correction retry successfully repaired the JSON!');
-    return result;
+    return repaired;
   } catch (err) {
     logger.warn(`[aiEvaluationService] JSON self-correction retry failed: ${err.message}`);
     return null;
@@ -239,122 +257,155 @@ async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
 
 /**
  * Parse JSON array returned by LLM for a batch of mentees.
+ * SIMPLIFY-2: Removed positional fallback (parsedArray[idx]).
+ * If a mentee_id is not found in the AI result map, we use buildFallbackResult.
+ * Positional matching was unsafe — if the AI returned results out of order,
+ * the wrong AI analysis would be assigned to the wrong mentee.
  */
 async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
-  let jsonStr = raw.trim();
-  const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (codeBlock) jsonStr = codeBlock[1];
-
-  const firstBracket = jsonStr.indexOf('[');
-  const lastBracket = jsonStr.lastIndexOf(']');
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
-  }
-
   let parsedArray = [];
+
   try {
-    parsedArray = JSON.parse(jsonStr);
+    const jsonStr = extractJsonFromText(raw);
+    parsedArray   = JSON.parse(jsonStr);
     if (!Array.isArray(parsedArray)) parsedArray = [];
   } catch (err) {
     logger.warn(`[aiEvaluationService] Direct JSON parse failed (${err.message}). Trying AI self-correction retry...`);
     if (ai) {
       const repaired = await attemptJSONSelfCorrection(raw, err.message, ai);
-      if (Array.isArray(repaired)) {
-        parsedArray = repaired;
-      }
+      if (Array.isArray(repaired)) parsedArray = repaired;
     }
-    if (!Array.isArray(parsedArray)) parsedArray = [];
   }
 
+  // Build a lookup map keyed by mentee_id for O(1) access.
   const resultMap = new Map();
   for (const item of parsedArray) {
     const id = item?.mentee_id || item?.id;
-    if (id) {
-      resultMap.set(String(id), item);
-    }
+    if (id) resultMap.set(String(id), item);
   }
 
-  return batchItems.map((batchItem, idx) => {
+  return batchItems.map(batchItem => {
     const menteeId = batchItem.menteePayload.mentee_id;
-    let aiItem = resultMap.get(String(menteeId));
+    const aiItem   = resultMap.get(String(menteeId));
 
-    if (!aiItem && parsedArray[idx]) {
-      aiItem = parsedArray[idx];
-    }
+    // Always re-compute preCheck from the live criteria at parse time.
+    // batchItem.preCheck is the enqueue-time snapshot and may be stale
+    // if the admin changed criteria thresholds between enqueue and processing.
+    const livePreCheck = preCheckHardConstraints(batchItem.menteePayload, criteria);
 
+    // No match → safe fallback (server-side tier, no keywords/reasoning).
     if (!aiItem) {
-      return {
-        menteeId,
-        result: buildFallbackResult(batchItem.menteePayload, batchItem.preCheck)
-      };
+      return { menteeId, result: buildFallbackResult(batchItem.menteePayload, livePreCheck) };
     }
 
-    const preCheck = batchItem.preCheck;
     const menteePayload = batchItem.menteePayload;
-
-    // Validate assigned tier against server math ceiling (support camelCase & snake_case)
-    const assignedTier = aiItem.certificate_tier || aiItem.certificateTier || aiItem.tier || preCheck.maxEligibleTier;
-    const validTier = isTierAllowed(assignedTier, preCheck.maxEligibleTier, criteria)
-      ? assignedTier
-      : preCheck.maxEligibleTier;
+    const sortedCriteria = sortCriteriaByPriority(criteria);
+    const maxTierId     = livePreCheck.maxEligibleTier;
 
     const rawMatchScore = aiItem.match_score ?? aiItem.matchScore ?? menteePayload.normalized_score;
-    const cappedScore = Math.min(100, Math.max(0, Number(rawMatchScore) || 0));
+    const cappedScore   = Math.min(100, Math.max(0, Number(rawMatchScore) || 0));
 
-    const matchedKw = Array.isArray(aiItem.matched_keywords)
-      ? aiItem.matched_keywords
+    const matchedKw = Array.isArray(aiItem.matched_keywords) ? aiItem.matched_keywords
       : (Array.isArray(aiItem.matchedKeywords) ? aiItem.matchedKeywords : []);
 
-    const missingKw = Array.isArray(aiItem.missing_keywords)
-      ? aiItem.missing_keywords
+    const missingKw = Array.isArray(aiItem.missing_keywords) ? aiItem.missing_keywords
       : (Array.isArray(aiItem.missingKeywords) ? aiItem.missingKeywords : []);
 
-    const customRulesCheckRaw = Array.isArray(aiItem.custom_rules_check)
-      ? aiItem.custom_rules_check
-      : (Array.isArray(aiItem.customRulesCheck) ? aiItem.customRulesCheck : []);
-
-    const customRulesCheck = customRulesCheckRaw.map(crc => ({
-      rule: String(crc.rule || crc.name || 'Custom Qualification Rule').trim(),
-      passed: Boolean(crc.passed ?? crc.status === 'passed'),
+    const customRulesCheck = (
+      Array.isArray(aiItem.custom_rules_check) ? aiItem.custom_rules_check
+        : (Array.isArray(aiItem.customRulesCheck) ? aiItem.customRulesCheck : [])
+    ).map(crc => ({
+      rule:     String(crc.rule || crc.name || 'Custom Qualification Rule').trim(),
+      passed:   Boolean(crc.passed ?? crc.status === 'passed'),
       evidence: String(crc.evidence || crc.reason || '').trim()
     }));
 
     const blockersAnalysisObj = aiItem.blockers_analysis || aiItem.blockersAnalysis || {};
 
+    // Determine the highest tier in priority order for which ALL requirements pass:
+    // 1. Hard constraints ceiling (maxTierId)
+    // 2. Explicit required tech stack keywords
+    // 3. Custom AI qualification rules
+    let qualifiedTier = 'participation';
+    const normalizedMatched = matchedKw.map(k => String(k).toLowerCase());
+
+    for (const tierConfig of sortedCriteria) {
+      const tierId = tierConfig.id;
+
+      // Cannot assign a tier above maxEligibleTier ceiling
+      if (!isTierAllowed(tierId, maxTierId, sortedCriteria)) {
+        continue;
+      }
+
+      // Check required tech stack keywords for this tier
+      const requiredKw = Array.isArray(tierConfig.keywords) ? tierConfig.keywords : [];
+      const unfulfilledKw = requiredKw.filter(kw => !normalizedMatched.includes(String(kw).toLowerCase()));
+      if (unfulfilledKw.length > 0) {
+        continue; // Missing explicit keywords for this tier
+      }
+
+      // Check custom AI rule for this tier
+      if (tierConfig.customRule?.trim()) {
+        const failedRule = customRulesCheck.some(c => c.passed === false);
+        if (failedRule) {
+          continue; // Custom rule failed for this tier
+        }
+      }
+
+      // If hard constraints, keywords, and custom rule all pass, this tier is earned!
+      qualifiedTier = tierId;
+      break;
+    }
+
+    const assignedTier = aiItem.certificate_tier || aiItem.certificateTier || aiItem.tier || maxTierId;
+
+    // Authoritative tier: if mentee earned qualifiedTier, enforce it to prevent AI hallucination downgrades
+    const validTier = qualifiedTier !== 'participation' ? qualifiedTier : assignedTier;
+
+    // Use livePreCheck.hardChecks for the hard constraints display.
+    const hardConstraintsCheck = livePreCheck.hardChecks[validTier]
+      ?? (validTier === 'participation'
+        ? Object.values(livePreCheck.hardChecks)[0] ?? { score_ok: false, blockers_ok: false, completion_rate_ok: false, on_time_rate_ok: false, rating_ok: false, attendance_ok: false }
+        : { score_ok: true, blockers_ok: true, completion_rate_ok: true, on_time_rate_ok: true, rating_ok: true, attendance_ok: true });
+
+    let finalReasoning = aiItem.reasoning || aiItem.summary || '';
+    if (validTier !== assignedTier) {
+      const tierName = sortedCriteria.find(c => c.id === validTier)?.name || validTier;
+      finalReasoning = `Mentee qualifies for the ${tierName} based on priority tier evaluation: hard constraints, required keywords, and custom rules were all satisfied.`;
+    }
+
     const result = {
-      mentee_id: menteeId,
-      is_eligible: aiItem.is_eligible ?? aiItem.isEligible ?? true,
-      certificate_tier: validTier,
-      match_score: cappedScore,
-      matched_keywords: matchedKw,
-      missing_keywords: missingKw,
-      custom_rules_check: customRulesCheck,
-      overall_percentage: Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
-      completion_rate: menteePayload.completion_rate,
-      on_time_rate: menteePayload.on_time_rate,
-      avg_rating: menteePayload.avg_rating,
-      score_breakdown: menteePayload.score_breakdown,
-      cohort_reviews: menteePayload.cohort_reviews,
-      hard_constraints_check: preCheck.hardChecks[validTier] || {
-        score_ok: true, blockers_ok: true, completion_rate_ok: true,
-        on_time_rate_ok: true, rating_ok: true, attendance_ok: true
-      },
+      mentee_id:            menteeId,
+      is_eligible:          validTier !== 'participation',
+      certificate_tier:     validTier,
+      match_score:          cappedScore,
+      matched_keywords:     matchedKw,
+      missing_keywords:     missingKw,
+      custom_rules_check:   customRulesCheck,
+      overall_percentage:   Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
+      completion_rate:      menteePayload.completion_rate,
+      on_time_rate:         menteePayload.on_time_rate,
+      avg_rating:           menteePayload.avg_rating,
+      score_breakdown:      menteePayload.score_breakdown,
+      cohort_reviews:       menteePayload.cohort_reviews,
+      hard_constraints_check: hardConstraintsCheck,
       blockers_analysis: {
-        total: Number(blockersAnalysisObj.total) || menteePayload.blockers.total,
-        resolved: Number(blockersAnalysisObj.resolved) || menteePayload.blockers.resolved,
-        open: Number(blockersAnalysisObj.open) || menteePayload.blockers.open,
-        impact: blockersAnalysisObj.impact || 'Low',
-        summary: blockersAnalysisObj.summary || ''
+        total:    Number(blockersAnalysisObj.total)    || (menteePayload.blockers?.total    ?? 0),
+        resolved: Number(blockersAnalysisObj.resolved) || (menteePayload.blockers?.resolved ?? 0),
+        open:     Number(blockersAnalysisObj.open)     || (menteePayload.blockers?.open     ?? 0),
+        impact:   blockersAnalysisObj.impact  || 'Low',
+        summary:  blockersAnalysisObj.summary || ''
       },
-      reasoning: aiItem.reasoning || aiItem.summary || ''
+      reasoning:            finalReasoning
     };
 
     return { menteeId, result };
   });
+
 }
 
 /**
- * Evaluate ONE mentee against template criteria using AI.
+ * Evaluate ONE mentee via the batch path (single-item batch).
  */
 async function evaluateSingleMentee(template, menteePayload, preCheckResult, adminUserId) {
   const batchRes = await evaluateBatchMentees(
@@ -366,68 +417,86 @@ async function evaluateSingleMentee(template, menteePayload, preCheckResult, adm
 }
 
 /**
- * Fallback result when AI call or parse fails.
+ * Fallback result when AI call or parse fails — uses server math ceiling only.
  */
 function buildFallbackResult(menteePayload, preCheckResult) {
   const cappedScore = Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0));
+  const blockers    = menteePayload.blockers ?? {};
+
   return {
-    mentee_id: menteePayload.mentee_id,
-    is_eligible: preCheckResult.maxEligibleTier !== 'participation',
+    mentee_id:       menteePayload.mentee_id,
+    is_eligible:     preCheckResult.maxEligibleTier !== 'participation',
     certificate_tier: preCheckResult.maxEligibleTier,
-    match_score: cappedScore,
+    match_score:     cappedScore,
     matched_keywords: [],
     missing_keywords: [],
-    overall_percentage: cappedScore,
-    completion_rate: menteePayload.completion_rate,
-    on_time_rate: menteePayload.on_time_rate,
-    avg_rating: menteePayload.avg_rating,
-    score_breakdown: menteePayload.score_breakdown,
-    cohort_reviews: menteePayload.cohort_reviews,
-    hard_constraints_check: preCheckResult.hardChecks[preCheckResult.maxEligibleTier] || {
-      score_ok: true, blockers_ok: true, completion_rate_ok: true,
-      on_time_rate_ok: true, rating_ok: true, attendance_ok: true
+    overall_percentage:   cappedScore,
+    completion_rate:      menteePayload.completion_rate,
+    on_time_rate:         menteePayload.on_time_rate,
+    avg_rating:           menteePayload.avg_rating,
+    score_breakdown:      menteePayload.score_breakdown,
+    cohort_reviews:       menteePayload.cohort_reviews,
+    hard_constraints_check: preCheckResult.hardChecks[preCheckResult.maxEligibleTier] ?? {
+      score_ok: false, blockers_ok: false, completion_rate_ok: false,
+      on_time_rate_ok: false, rating_ok: false, attendance_ok: false
     },
     blockers_analysis: {
-      total: menteePayload.blockers.total,
-      resolved: menteePayload.blockers.resolved,
-      open: menteePayload.blockers.open,
-      impact: menteePayload.blockers.open > 2 ? 'High' : menteePayload.blockers.open > 0 ? 'Medium' : 'Low',
-      summary: 'AI response could not be parsed. Tier assigned by server-side constraint checks.'
+      total:    blockers.total    ?? 0,
+      resolved: blockers.resolved ?? 0,
+      open:     blockers.open     ?? 0,
+      impact:   (blockers.open ?? 0) > 2 ? 'High' : (blockers.open ?? 0) > 0 ? 'Medium' : 'Low',
+      summary:  'AI response could not be parsed. Tier assigned by server-side constraint checks.'
     },
     reasoning: `Server pre-check determined ${preCheckResult.maxEligibleTier} tier based on: score=${cappedScore}%, completion=${menteePayload.completion_rate}%, on-time=${menteePayload.on_time_rate}%.`
   };
 }
 
 /**
- * Enqueue per-mentee (per-clan) evaluation jobs into AIEvaluationQueue.
- * If clanId is provided, tasks and cohort reviews are scoped to that clan.
+ * Enqueue per-mentee evaluation jobs into AIEvaluationQueue.
+ *
+ * BUG-6 fix: Delete old rows for this templateId before creating new ones so the status
+ * endpoint never returns stale results from a previous run during the transition period.
+ *
+ * @param {string}      templateId   - Certificate template UUID.
+ * @param {string[]}    menteeIds    - Array of mentee user IDs to evaluate.
+ * @param {string}      triggeredBy  - User ID who triggered the run.
+ * @param {Array}       criteria     - Tier criteria, highest-first.
+ * @param {string|null} clanId       - Optional clan scope for task/cohort aggregation.
+ * @param {string}      [runId]      - Optional pre-generated run UUID (for multi-clan grouping).
+ * @returns {{ runId: string, total: number }}
  */
-async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria, clanId = null) {
+async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria, clanId = null, runId = null) {
+  // Sort by priority before storing into queue rows so the pre-check snapshot
+  // is always in the canonical order regardless of how the caller built the array.
+  const sortedCriteria = sortCriteriaByPriority(criteria);
+
+  // Remove stale rows from previous runs for this template before enqueuing new jobs.
+  await models.AIEvaluationQueue.destroy({ where: { templateId } });
+
   const payloads = await aggregateMenteeData(menteeIds, clanId);
-  const runId = uuidv4();
+  const jobRunId = runId || uuidv4();
 
   const queueRows = payloads.map(payload => {
-    const preCheck = preCheckHardConstraints(payload, criteria);
+    const preCheck = preCheckHardConstraints(payload, sortedCriteria);
     return {
-      runId,
+      runId:        jobRunId,
       templateId,
-      menteeId: payload.mentee_id,
+      menteeId:     payload.mentee_id,
       triggeredBy,
-      status: 'pending',
+      status:       'pending',
       menteePayload: payload,
       preCheck,
-      attempts: 0
+      attempts:     0
     };
   });
 
   await models.AIEvaluationQueue.bulkCreate(queueRows);
-  logger.info(`[aiEvaluationService] Enqueued ${queueRows.length} fresh evaluation jobs (runId=${runId}, clanId=${clanId ?? 'none'})`);
+  logger.info(`[aiEvaluationService] Enqueued ${queueRows.length} evaluation jobs (runId=${jobRunId}, clanId=${clanId ?? 'none'})`);
 
-  return { runId, total: queueRows.length };
+  return { runId: jobRunId, total: queueRows.length };
 }
 
 module.exports = {
-  aggregateMenteeData,
   evaluateSingleMentee,
   evaluateBatchMentees,
   enqueueEvaluation,

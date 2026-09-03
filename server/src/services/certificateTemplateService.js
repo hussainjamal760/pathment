@@ -149,8 +149,11 @@ class CertificateTemplateService {
       if (!Array.isArray(criteria)) {
         throw new ValidationError('Template criteria must be an array of tiers');
       }
+      // DEBUG: log received criteria to trace null value persistence
+      console.log('[DEBUG updateTemplate] criteria received:', JSON.stringify(criteria, null, 2));
       template.criteria = criteria;
     }
+
 
     await template.save();
     return template;

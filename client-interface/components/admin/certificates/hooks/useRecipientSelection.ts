@@ -139,19 +139,16 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     });
   }, []);
 
+  /**
+   * Update a single mentee's manually assigned tier.
+   * SIMPLIFY-4: No longer auto-deselects the mentee when their score doesn't reach 90%.
+   * That behaviour was counter-intuitive: admin intentionally picks a tier, but the system
+   * silently kicks them out of the selection. Selection is now the admin's own responsibility.
+   */
   const handleTierChange = useCallback((menteeId: string, value: string) => {
     setAssignedTiers(prev => ({ ...prev, [menteeId]: value }));
-    const mentee = activeList.find((m: any) => m.id === menteeId);
-    if (mentee) {
-      const match = (mentee as any).tierMatches?.[value] ?? 0;
-      setSelectedMenteeIds(prev => {
-        const next = new Set(prev);
-        if (match >= 90) next.add(menteeId);
-        else next.delete(menteeId);
-        return next;
-      });
-    }
-  }, [activeList]);
+  }, []);
+
 
   const bulkSetBadge = useCallback((badge: string, getTierNameFn?: (b: string) => string) => {
     const updatedTiers = { ...assignedTiers };

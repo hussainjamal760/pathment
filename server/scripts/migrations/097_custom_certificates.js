@@ -194,6 +194,19 @@ async function up() {
       await sequelize.query(`CREATE INDEX idx_ai_eval_queue_template_id ON ai_evaluation_queue (template_id);`, { transaction: t });
       console.log(`  ✓ Created index ${aiTemplateIdx}`);
     }
+
+    // ARCH-4: Unique constraint on (run_id, mentee_id) — prevents duplicate evaluation rows
+    // if a race occurs between the DELETE and bulkCreate in enqueueEvaluation.
+    const aiRunMenteeUnique = 'ai_eval_queue_run_mentee_unique';
+    if (await indexExists(aiRunMenteeUnique, t)) {
+      console.log(`  ℹ ${aiRunMenteeUnique} exists, skipping`);
+    } else {
+      await sequelize.query(`
+        CREATE UNIQUE INDEX ai_eval_queue_run_mentee_unique
+        ON ai_evaluation_queue (run_id, mentee_id)
+      `, { transaction: t });
+      console.log(`  ✓ Created UNIQUE index ${aiRunMenteeUnique} (run_id, mentee_id)`);
+    }
   });
 
   console.log('✅ Migration 097 complete');
