@@ -7,9 +7,10 @@ import { TierCriteria } from '../certificate-constants';
 export interface UseRecipientSelectionOptions {
   criteria: TierCriteria[];
   qualifiedData: Record<string, any[]>;
+  aiResults?: Record<string, any>;
 }
 
-export function useRecipientSelection({ criteria, qualifiedData }: UseRecipientSelectionOptions) {
+export function useRecipientSelection({ criteria, qualifiedData, aiResults }: UseRecipientSelectionOptions) {
   const [recipientSearch, setRecipientSearch] = useState('');
   const [badgeFilter, setBadgeFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'none' | 'score_desc' | 'score_asc'>('none');
@@ -69,15 +70,30 @@ export function useRecipientSelection({ criteria, qualifiedData }: UseRecipientS
       });
     }
 
+    // Helper: Extract composite/performance score from mentee item or aiResults map
+    const getScore = (m: any): number => {
+      const aiRes = aiResults?.[m.id];
+      if (aiRes) {
+        if (aiRes.overall_percentage != null) return Number(aiRes.overall_percentage);
+        if (aiRes.match_score != null) return Number(aiRes.match_score);
+      }
+      if (m.overall_percentage != null) return Number(m.overall_percentage);
+      if (m.normalized_score != null) return Number(m.normalized_score);
+      if (m.normalizedScore != null) return Number(m.normalizedScore);
+      if (m.match_score != null) return Number(m.match_score);
+      if (m.score != null) return Number(m.score);
+      return 0;
+    };
+
     // 3. Sort by score
     if (sortBy === 'score_desc') {
-      result.sort((a: any, b: any) => (b.normalizedScore ?? 0) - (a.normalizedScore ?? 0));
+      result.sort((a: any, b: any) => getScore(b) - getScore(a));
     } else if (sortBy === 'score_asc') {
-      result.sort((a: any, b: any) => (a.normalizedScore ?? 0) - (b.normalizedScore ?? 0));
+      result.sort((a: any, b: any) => getScore(a) - getScore(b));
     }
 
     return result;
-  }, [activeList, recipientSearch, badgeFilter, sortBy, assignedTiers, criteria]);
+  }, [activeList, recipientSearch, badgeFilter, sortBy, assignedTiers, criteria, aiResults]);
 
   const allFilteredIds = useMemo(() => filtered.map((m: any) => m.id), [filtered]);
 

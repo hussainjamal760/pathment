@@ -72,19 +72,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [aiDetailMentee, setAiDetailMentee] = useState<any | null>(null);
   const [expandedAIRows, setExpandedAIRows] = useState<Set<string>>(new Set());
 
-  // Recipient selection hook
-  const {
-    recipientSearch, setRecipientSearch,
-    badgeFilter, setBadgeFilter,
-    sortBy, setSortBy,
-    recipientType, setRecipientType,
-    selectedMenteeIds, setSelectedMenteeIds,
-    assignedTiers: adminTiers, setAssignedTiers: setAdminTiers,
-    recipientMenteesList, recipientMentorsList, filtered, allSelected,
-    selectedSummary, toggleAll, toggleOne, handleTierChange,
-    bulkSetBadge: bulkSetBadgeHook, resetToAIRecommendations: resetToAIRecommendationsHook
-  } = useRecipientSelection({ criteria, qualifiedData });
-
   // AI progress hook
   const {
     aiResults, setAiResults, aiRanAt, setAiRanAt, runningAI,
@@ -108,6 +95,19 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       setSelectedMenteeIds(autoSelected);
     }
   });
+
+  // Recipient selection hook
+  const {
+    recipientSearch, setRecipientSearch,
+    badgeFilter, setBadgeFilter,
+    sortBy, setSortBy,
+    recipientType, setRecipientType,
+    selectedMenteeIds, setSelectedMenteeIds,
+    assignedTiers: adminTiers, setAssignedTiers: setAdminTiers,
+    recipientMenteesList, recipientMentorsList, filtered, allSelected,
+    selectedSummary, toggleAll, toggleOne, handleTierChange,
+    bulkSetBadge: bulkSetBadgeHook, resetToAIRecommendations: resetToAIRecommendationsHook
+  } = useRecipientSelection({ criteria, qualifiedData, aiResults: aiEvalMap });
 
   // Roadmap tasks & Programs
   const [availableTasks, setAvailableTasks] = useState<Array<{ id: string; title: string }>>([]);
