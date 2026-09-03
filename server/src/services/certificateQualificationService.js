@@ -71,18 +71,39 @@ class CertificateQualificationService {
     const activeMentees = [];
     const pausedMentees = [];
 
+    // Pre-query set of mentee IDs whose ClanMembership is status='paused' in this program
+    const pausedMenteeIdsSet = new Set();
+    if (programId) {
+      const pausedMemberships = await models.ClanMembership.findAll({
+        where: { role: 'mentee', status: 'paused' },
+        include: [{
+          model: models.Clan,
+          as: 'clan',
+          where: { programId },
+          attributes: ['id']
+        }],
+        attributes: ['userId'],
+        raw: true
+      });
+      pausedMemberships.forEach(pm => pausedMenteeIdsSet.add(pm.userId));
+    }
+
     if (mentorId) {
       const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
       if (clanIds.length > 0) {
         const menteeMembers = await models.ClanMembership.findAll({
-          where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
+          where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: { [Op.in]: ['active', 'paused'] } },
           include: [{ model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
         });
+        const seenMentees = new Set();
         for (const mem of menteeMembers) {
-          if (!mem.user) continue;
+          if (!mem.user || seenMentees.has(mem.user.id)) continue;
+          seenMentees.add(mem.user.id);
           const u = mem.user;
           const row = { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email };
-          u.status === 'suspended' ? pausedMentees.push(row) : activeMentees.push(row);
+          (mem.status === 'paused' || u.status === 'suspended' || pausedMenteeIdsSet.has(u.id))
+            ? pausedMentees.push(row)
+            : activeMentees.push(row);
         }
       }
     } else {
@@ -93,7 +114,9 @@ class CertificateQualificationService {
       for (const e of enrollments) {
         if (!e.mentee) continue;
         const row = { id: e.mentee.id, firstName: e.mentee.firstName, lastName: e.mentee.lastName, email: e.mentee.email };
-        (e.status === 'paused' || e.mentee.status === 'suspended') ? pausedMentees.push(row) : activeMentees.push(row);
+        (e.status === 'paused' || e.mentee.status === 'suspended' || pausedMenteeIdsSet.has(e.mentee.id))
+          ? pausedMentees.push(row)
+          : activeMentees.push(row);
       }
     }
 

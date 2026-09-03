@@ -104,7 +104,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     recipientType, setRecipientType,
     selectedMenteeIds, setSelectedMenteeIds,
     assignedTiers: adminTiers, setAssignedTiers: setAdminTiers,
-    recipientMenteesList, recipientMentorsList, filtered, allSelected,
+    recipientMenteesList, recipientMentorsList, recipientPausedList, filtered, allSelected,
     selectedSummary, toggleAll, toggleOne, handleTierChange,
     bulkSetBadge: bulkSetBadgeHook, resetToAIRecommendations: resetToAIRecommendationsHook
   } = useRecipientSelection({ criteria, qualifiedData, aiResults: aiEvalMap });
@@ -1241,7 +1241,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             {/* Recipient Type Tabs & Rules */}
             <div className="flex items-center justify-between border-b border-border -mx-6 px-6 pb-px mb-2">
               <div className="flex gap-4">
-                {(['all', 'mentees', 'mentors'] as const).map(type => (
+                {(['all', 'mentees', 'mentors', 'paused'] as const).map(type => (
                   <button
                     key={type}
                     type="button"
@@ -1255,7 +1255,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                       ? `All (${recipientMenteesList.length + recipientMentorsList.length})`
                       : type === 'mentees'
                         ? `Mentees (${recipientMenteesList.length})`
-                        : `Mentors (${recipientMentorsList.length})`}
+                        : type === 'mentors'
+                          ? `Mentors (${recipientMentorsList.length})`
+                          : `Paused (${recipientPausedList.length})`}
                   </button>
                 ))}
               </div>
@@ -1363,8 +1365,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               loading={loadingQualifications}
               getTierName={getTierName}
               userRole="admin"
-              recipientTypeLabel={recipientType === 'all' ? 'Recipient' : recipientType === 'mentees' ? 'Mentee' : 'Mentor'}
-              emptyMessage={`No active ${recipientType} found in this program.`}
+              recipientTypeLabel={recipientType === 'all' ? 'Recipient' : recipientType === 'mentees' ? 'Mentee' : recipientType === 'mentors' ? 'Mentor' : 'Paused Mentee'}
+              emptyMessage={`No ${recipientType === 'paused' ? 'paused mentees' : 'active ' + recipientType} found in this program.`}
             />
 
             {/* Selection Summary badges rollup */}

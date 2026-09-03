@@ -14,7 +14,7 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
   const [recipientSearch, setRecipientSearch] = useState('');
   const [badgeFilter, setBadgeFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'none' | 'score_desc' | 'score_asc'>('none');
-  const [recipientType, setRecipientType] = useState<'all' | 'mentees' | 'mentors'>('all');
+  const [recipientType, setRecipientType] = useState<'all' | 'mentees' | 'mentors' | 'paused'>('all');
   const [selectedMenteeIds, setSelectedMenteeIds] = useState<Set<string>>(new Set());
   const [assignedTiers, setAssignedTiers] = useState<Record<string, string>>({});
 
@@ -24,30 +24,35 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     const list: any[] = [];
     criteria.forEach(c => {
       (qualifiedData[c.id] ?? []).forEach((m: any) => {
-        if (!seen.has(m.id)) { seen.add(m.id); list.push({ ...m, role: 'mentee' }); }
+        if (!seen.has(m.id)) { seen.add(m.id); list.push({ ...m, role: 'mentee', isPaused: false }); }
       });
     });
     // Pick up any remaining mentees from data keys not covered by current criteria
     Object.keys(qualifiedData).forEach(key => {
       if (key === 'mentors' || key === 'paused') return;
       (qualifiedData[key] ?? []).forEach((m: any) => {
-        if (!seen.has(m.id)) { seen.add(m.id); list.push({ ...m, role: 'mentee' }); }
+        if (!seen.has(m.id)) { seen.add(m.id); list.push({ ...m, role: 'mentee', isPaused: false }); }
       });
     });
     return list;
   }, [criteria, qualifiedData]);
 
+  const recipientPausedList = useMemo(() => {
+    return (qualifiedData.paused ?? []).map((m: any) => ({ ...m, role: 'mentee', isPaused: true }));
+  }, [qualifiedData]);
+
   const recipientMentorsList = useMemo(
-    () => (qualifiedData.mentors ?? []).map((m: any) => ({ ...m, role: 'mentor' })),
+    () => (qualifiedData.mentors ?? []).map((m: any) => ({ ...m, role: 'mentor', isPaused: false })),
     [qualifiedData]
   );
 
-  /** Filtered by current Recipient Type tab (All / Mentees / Mentors) */
+  /** Filtered by current Recipient Type tab (All / Mentees / Mentors / Paused) */
   const activeList = useMemo(() => {
     if (recipientType === 'all') return [...recipientMenteesList, ...recipientMentorsList];
     if (recipientType === 'mentees') return recipientMenteesList;
-    return recipientMentorsList;
-  }, [recipientType, recipientMenteesList, recipientMentorsList]);
+    if (recipientType === 'mentors') return recipientMentorsList;
+    return recipientPausedList;
+  }, [recipientType, recipientMenteesList, recipientMentorsList, recipientPausedList]);
 
   /** Further filtered by search field, badge filter, and sorted by score */
   const filtered = useMemo(() => {
@@ -205,6 +210,7 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     setAssignedTiers,
     recipientMenteesList,
     recipientMentorsList,
+    recipientPausedList,
     activeList,
     filtered,
     allFilteredIds,

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Loader2, Users, Sparkles, Info, Edit3, ChevronDown } from 'lucide-react';
+import { Loader2, Users, Sparkles, Info, Edit3, ChevronDown, PauseCircle } from 'lucide-react';
 import { getTierBadgeColor } from '@/lib/utils/certificates';
 import { TierCriteria } from '@/components/admin/certificates/certificate-constants';
 
@@ -86,7 +86,7 @@ export function RecipientRosterTable({
       {/* Table rows */}
       <div className="max-h-[350px] overflow-y-auto divide-y divide-border">
         {filtered.map((m: any) => {
-          const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
+          const defaultTier = m.isPaused ? '' : (criteria[criteria.length - 1]?.id ?? 'participation');
           const selectedTier = assignedTiers[m.id] ?? (aiEvalMap[m.id]?.certificate_tier || m.assignedTier || defaultTier);
           const issuedTiersList: string[] = m.issuedTiers ?? [];
           const initials = `${m.firstName?.charAt(0) || ''}${m.lastName?.charAt(0) || ''}`.toUpperCase();
@@ -94,7 +94,11 @@ export function RecipientRosterTable({
           return (
             <div
               key={m.id}
-              className="grid grid-cols-12 gap-2 px-4 py-3 items-center text-xs hover:bg-muted/20 dark:hover:bg-muted/10 transition-all duration-150"
+              className={`grid grid-cols-12 gap-2 px-4 py-3 items-center text-xs transition-all duration-150 ${
+                m.isPaused
+                  ? 'bg-amber-500/5 dark:bg-amber-500/10 hover:bg-amber-500/10'
+                  : 'hover:bg-muted/20 dark:hover:bg-muted/10'
+              }`}
             >
               <div className="col-span-1 flex items-center justify-center">
                 <input
@@ -113,8 +117,13 @@ export function RecipientRosterTable({
                 <div className="min-w-0">
                   <div className="font-bold text-foreground truncate flex items-center gap-1.5">
                     <span className="truncate">{m.firstName} {m.lastName}</span>
-                    {m.role && m.role !== 'mentee' && (
-                      <span className="px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    {m.isPaused && (
+                      <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
+                        PAUSED
+                      </span>
+                    )}
+                    {m.role && m.role !== 'mentee' && !m.isPaused && (
+                      <span className="px-1.5 py-0.2 rounded text-[8px] font-extrabold uppercase tracking-wider bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 shrink-0">
                         {m.role}
                       </span>
                     )}
@@ -148,6 +157,10 @@ export function RecipientRosterTable({
                       <Info className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                ) : m.isPaused ? (
+                  <span className="text-[10px] font-bold text-amber-600/80 dark:text-amber-400/80 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <PauseCircle className="w-3 h-3" /> Paused (No Auto Cert)
+                  </span>
                 ) : (
                   <span className="text-[10px] text-muted-foreground/50 font-semibold select-none">—</span>
                 )}
