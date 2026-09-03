@@ -243,11 +243,12 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               name: c.name,
               badgeUrl: c.badgeUrl ?? '',
               keywords: Array.isArray(c.keywords) ? c.keywords : [],
-              minScorePercent: c.minScorePercent ?? 0,
-              maxOpenBlockers: c.maxOpenBlockers ?? -1,
-              minCompletionRate: c.minCompletionRate ?? 0,
-              minOnTimeRate: c.minOnTimeRate ?? 0,
-              minAvgRating: c.minAvgRating ?? 0,
+              minScorePercent: c.minScorePercent ?? null,
+              maxOpenBlockers: c.maxOpenBlockers ?? null,
+              minCompletionRate: c.minCompletionRate ?? null,
+              minOnTimeRate: c.minOnTimeRate ?? null,
+              minAvgRating: c.minAvgRating ?? null,
+              minAttendanceRate: c.minAttendanceRate ?? null,
               customRule: c.customRule ?? ''
             })));
           }

@@ -169,7 +169,7 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
   };
   if (clanMentorIds !== null) {
     if (clanMentorIds.length === 0) {
-      taskWhere.mentorId = { [Op.in]: ['__no_match__'] };
+      taskWhere.mentorId = { [Op.in]: ['00000000-0000-0000-0000-000000000000'] };
     } else {
       taskWhere.mentorId = { [Op.in]: clanMentorIds };
     }

@@ -16,8 +16,21 @@ function buildTierDescriptions(criteria) {
   }).join('\n\n');
 }
 
+function getDynamicTierOrder(criteria) {
+  if (!Array.isArray(criteria) || criteria.length === 0) {
+    return { hierarchy: '"participation"', topTierId: 'participation', topTierName: 'Participation Certificate' };
+  }
+
+  const hierarchy = criteria.map(c => `"${c.id}" ("${c.name}")`).join(' -> ');
+  const topTierId = criteria[0].id;
+  const topTierName = criteria[0].name || topTierId;
+
+  return { hierarchy, topTierId, topTierName };
+}
+
 function buildSingleMenteePrompt(criteria, preCheckResult) {
   const tierDescriptions = buildTierDescriptions(criteria);
+  const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(criteria);
 
   return `You are an expert AI evaluator assessing ONE mentee for certificate eligibility on a mentorship platform.
 
@@ -28,13 +41,15 @@ SERVER PRE-CHECK UPPER CEILING: "${preCheckResult.maxEligibleTier}"
 
 EVALUATION RULES:
 1. "maxEligibleTier" ("${preCheckResult.maxEligibleTier}") is the MAXIMUM ALLOWED tier based on server-side performance math. You MAY NOT assign a tier higher than "${preCheckResult.maxEligibleTier}".
-2. TIER STEP-DOWN HIERARCHY: gold -> silver -> bronze -> participation.
+2. DYNAMIC TIER STEP-DOWN HIERARCHY (highest to lowest): ${hierarchy}.
 3. You MUST evaluate the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks (status === "completed").
-4. If the mentee fails the Custom Qualification Rule or Tech Stack Keywords for "${preCheckResult.maxEligibleTier}", STEP DOWN to the next lower tier in the hierarchy (e.g. silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules & keywords the mentee DOES satisfy.
-5. Compute "match_score" (0-100) reflecting how strongly the mentee aligns with the assigned tier.
-6. List "matched_keywords" (keywords present in completed tasks) and "missing_keywords" (required keywords missing).
-7. Generate "custom_rules_check": Array of objects [{ "rule": "<rule name/description>", "passed": boolean, "evidence": "<exact task title or metric reason>" }] detailing pass/fail results for each custom rule and tech stack requirement.
-8. Write a 3-4 sentence detailed narrative in "reasoning" referencing task titles, custom rule evaluation, and performance metrics.
+4. STRICT EXPLICIT CRITERIA ONLY: DO NOT invent, assume, or penalize for missing technologies (such as Node, Express, MongoDB, REST design, Databases, Docker, etc.) that are NOT explicitly listed in the tier's "Required Tech Stack / Keywords" or "Custom Qualification Rule"! Only evaluate keywords explicitly listed in TIER DEFINITIONS for that tier.
+5. If the mentee fails the explicit Custom Qualification Rule or explicit Tech Stack Keywords for "${preCheckResult.maxEligibleTier}", STEP DOWN to the next lower tier in the hierarchy. Do NOT jump straight to the bottom! Assign the highest lower tier whose rules & keywords the mentee DOES satisfy.
+6. MANDATORY MAXIMUM QUALIFIED TIER ASSIGNMENT: If a mentee's "maxEligibleTier" is "${topTierId}", AND the mentee's completed tasks satisfy explicit keywords and custom rules for "${topTierName}", YOU MUST ASSIGN "certificate_tier": "${topTierId}". Unjustified step-downs are strictly prohibited!
+7. Compute "match_score" (0-100) reflecting how strongly the mentee aligns with the assigned tier.
+8. List "matched_keywords" (keywords present in completed tasks) and "missing_keywords" (required keywords missing).
+9. Generate "custom_rules_check": Array of objects [{ "rule": "<rule name/description>", "passed": boolean, "evidence": "<exact task title or metric reason>" }] detailing pass/fail results for each custom rule and tech stack requirement.
+10. Write a 3-4 sentence detailed narrative in "reasoning" referencing task titles, custom rule evaluation, and performance metrics. NEVER state that a mentee failed a tier for unlisted technologies!
 
 OUTPUT FORMAT (pure JSON object):
 {
@@ -59,6 +74,7 @@ OUTPUT FORMAT (pure JSON object):
  */
 function buildBatchMenteePrompt(criteria, batchSize) {
   const tierDescriptions = buildTierDescriptions(criteria);
+  const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(criteria);
 
   return `You are an expert AI evaluator assessing a BATCH of up to ${batchSize} mentees for certificate eligibility on a mentorship platform.
 
@@ -77,20 +93,36 @@ EVALUATION INSTRUCTIONS:
      CRITICAL RULE 1: Only tasks with status === "completed" count as finished work. Tasks with status "assigned", "in_progress", or "submitted" are UNFINISHED and CANNOT satisfy custom rules or keywords!
      CRITICAL RULE 2: CUSTOM QUALIFICATION RULE & TECH STACK CHECKING:
      - Search completed tasks (status === "completed") for titles, descriptions, task types, or isCustom === true flags that match the tier's "Custom Qualification Rule" (e.g. "must have multivendor project done", "at least 2 custom tasks", "project type task").
-     - Match keywords against completed task titles and descriptions loosely (e.g. HTML, CSS, React, Node, etc.).
+     - Match keywords against completed task titles and descriptions loosely based ONLY on the explicit keywords specified for that tier.
 
-2. TIER STEP-DOWN HIERARCHY: gold -> silver -> bronze -> participation.
+     CRITICAL RULE 3: STRICT EXPLICIT CRITERIA ONLY (NO HALLUCINATED TECH STACK REQUIREMENTS):
+     - DO NOT invent, assume, or penalize for missing technologies (such as Node, Express, MongoDB, REST design, Databases, Docker, etc.) that are NOT explicitly listed in the tier's "Required Tech Stack / Keywords" or "Custom Qualification Rule"!
+     - Only evaluate against keywords explicitly listed in TIER DEFINITIONS for that tier. If the tier keywords are "HTML, css, js", you MUST ONLY check for HTML, css, js. If all keywords listed for that tier are present in completed tasks (or if no keywords are specified), the Tech Stack check is 100% PASSED.
+     - NEVER state in your "reasoning" or "custom_rules_check" that a mentee failed a tier for unlisted technologies!
+
+     CRITICAL RULE 4: EXPLICIT DYNAMIC REASONING FOR HARD CONSTRAINT FAILURES & TIER STEP-DOWN:
+     - Each mentee item contains "hard_constraint_failures": Array of exact dynamic metric failure reasons calculated by server math.
+     - IF "max_eligible_tier" is lower than "${topTierId}" AND "hard_constraint_failures" contains entries, your "reasoning" MUST quote the exact dynamic failure message provided in "hard_constraint_failures" word-for-word (using the exact threshold percentage specified in hard_constraint_failures).
+     - NEVER output hardcoded numbers (like 90%) unless that exact number is provided in hard_constraint_failures!
+     - DO NOT invent, guess, or claim missing technologies (like Node, MongoDB, REST design, etc.) as the reason for stepping down! Your reasoning MUST be grounded 100% on actual metric failures from hard_constraint_failures or missing explicit keywords.
+
+     CRITICAL RULE 5: MANDATORY MAXIMUM QUALIFIED TIER ASSIGNMENT (NO UNJUSTIFIED STEP-DOWNS):
+     - If a mentee's "max_eligible_tier" is "${topTierId}", AND the mentee's completed tasks satisfy explicit keywords (or if no keywords are required) AND custom rule (or if no custom rule is set) for "${topTierName}", YOU MUST ASSIGN "certificate_tier": "${topTierId}"!
+     - Stepping down from "max_eligible_tier" to a lower tier is STRICTLY PROHIBITED unless there is an explicit missing keyword or explicit failed Custom Qualification Rule!
+     - DO NOT invent "cohort-relative" or unlisted threshold excuses to downgrade a mentee!
+
+2. DYNAMIC TIER STEP-DOWN HIERARCHY (highest to lowest): ${hierarchy}.
 
 3. FOR EVERY MENTEE IN THE INPUT ARRAY, EVALUATE:
    - "certificate_tier": Check the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks.
-     * If the mentee satisfies the Custom Rule and Tech Stack for "max_eligible_tier", assign "certificate_tier": "max_eligible_tier".
-     * If the mentee FAILS the Custom Rule or Tech Stack for "max_eligible_tier" (e.g. Gold), STEP DOWN to the next lower tier (e.g. Silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules the mentee DOES satisfy.
+     * If the mentee satisfies the Custom Rule and explicit Tech Stack for "max_eligible_tier", assign "certificate_tier": "max_eligible_tier".
+     * If the mentee FAILS the explicit Custom Rule or explicit Tech Stack for "max_eligible_tier", STEP DOWN to the next lower tier in the hierarchy. Do NOT jump straight to the bottom! Assign the highest lower tier whose rules the mentee DOES satisfy.
    - "match_score": Integer (0-100) reflecting relevance and task quality.
    - "matched_keywords": Array of target keywords matched in completed tasks.
    - "missing_keywords": Array of target keywords missing from completed tasks.
    - "custom_rules_check": Array of [{ "rule": "<rule name/description>", "passed": boolean, "evidence": "<exact task title or metric reason>" }] detailing pass/fail status for custom rules & keyword checks.
    - "blockers_analysis": { "total": number, "resolved": number, "open": number, "impact": "Low"|"Medium"|"High", "summary": "brief summary" }
-   - "reasoning": 3-4 sentence detailed narrative explicitly stating which custom rules passed/failed, matched keywords, task performance, cohort attendance, and why the tier was assigned or stepped down.
+   - "reasoning": 3-4 sentence detailed narrative explicitly stating hard_constraint_failures (if any), custom rules passed/failed, matched keywords, task performance, and why the tier was assigned or stepped down. NEVER invent unlisted technology names!
 
 4. OUTPUT FORMAT: PURE JSON ARRAY containing exactly one result object per input mentee.
 [
@@ -106,7 +138,7 @@ EVALUATION INSTRUCTIONS:
     ],
     "overall_percentage": 92,
     "blockers_analysis": { "total": 0, "resolved": 0, "open": 0, "impact": "Low", "summary": "No blockers" },
-    "reasoning": "Mentee completed advanced assignments with a 92% score. Custom qualification rule for Silver tier satisfied."
+    "reasoning": "Mentee completed advanced assignments with a 92% score. Custom qualification rule satisfied."
   }
 ]`;
 }

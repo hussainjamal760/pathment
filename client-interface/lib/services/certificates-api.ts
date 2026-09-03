@@ -178,12 +178,12 @@ export const certificatesApi = {
         }>;
       };
       criteriaTasks?: Array<{ id: string; title: string }>;
-    }>(`/certificates/templates/${id}/qualification?${qs.toString()}`);
+    }>(`/certificates/templates/${id}/qualification?${qs.toString()}`, { timeout: 120000 });
   },
 
   sendToMentors: (templateId: string, programId: string) =>
     apiClient.post<{ success: boolean; message: string; sent: number }>(
-      `/certificates/templates/${templateId}/send-to-mentors`, { programId }
+      `/certificates/templates/${templateId}/send-to-mentors`, { programId }, { timeout: 120000 }
     ),
 
   // Instances / Issuance
@@ -194,7 +194,7 @@ export const certificatesApi = {
     tier?: string;
     recipients?: Array<{ menteeId: string; tier: string }>
   }) => 
-    apiClient.post<{ success: boolean; message: string; data: { instances: any[]; jobs: any[] } }>('/certificates/instances', data),
+    apiClient.post<{ success: boolean; message: string; data: { instances: any[]; jobs: any[] } }>('/certificates/instances', data, { timeout: 120000 }),
     
   listMenteeCertificates: (menteeId: string) => 
     apiClient.get<{ success: boolean; data: CertificateInstance[] }>(`/certificates/instances/mentee/${menteeId}`),
@@ -231,7 +231,7 @@ export const certificatesApi = {
 
   runAIEvaluation: (id: string, mentorId?: string) => {
     const qs = mentorId ? `?mentorId=${encodeURIComponent(mentorId)}` : '';
-    return apiClient.post<{ success: boolean; runId: string; total: number; message: string }>(`/certificates/templates/${id}/ai-evaluate${qs}`, {});
+    return apiClient.post<{ success: boolean; runId: string; total: number; message: string }>(`/certificates/templates/${id}/ai-evaluate${qs}`, {}, { timeout: 120000 });
   },
 
   getAIEvaluationStatus: (id: string, runId?: string) => {
@@ -246,7 +246,7 @@ export const certificatesApi = {
       pending: number;
       data: AIEvaluationResult[];
       ranAt: string | null;
-    }>(`/certificates/templates/${id}/ai-evaluate/status${qs}`);
+    }>(`/certificates/templates/${id}/ai-evaluate/status${qs}`, { timeout: 60000 });
   }
 };
 

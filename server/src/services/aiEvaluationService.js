@@ -48,18 +48,49 @@ function computeMenteeFingerprint(payload, criteria) {
   return crypto.createHash('sha256').update(JSON.stringify(dataToHash)).digest('hex');
 }
 
+function buildHardConstraintFailures(preCheck, criteria) {
+  const failures = [];
+  const hardChecks = preCheck.hardChecks || {};
+  const maxTierId = preCheck.maxEligibleTier;
+
+  const tierIds = (criteria || []).map(c => c.id);
+  const maxTierIndex = tierIds.indexOf(maxTierId);
+  const higherTiers = maxTierIndex > 0 ? tierIds.slice(0, maxTierIndex) : (maxTierIndex === -1 ? tierIds : []);
+
+  for (const tierId of higherTiers) {
+    const tierConfig = criteria.find(c => c.id === tierId);
+    const checks = hardChecks[tierId] || {};
+    const tierName = tierConfig?.name || tierId;
+
+    if (checks.completion_rate_ok === false && tierConfig?.minCompletionRate != null) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee completion rate is below required ${tierConfig.minCompletionRate}% threshold.`);
+    }
+    if (checks.score_ok === false && tierConfig?.minScorePercent != null) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee score is below required ${tierConfig.minScorePercent}% threshold.`);
+    }
+    if (checks.blockers_ok === false && tierConfig?.maxOpenBlockers != null && tierConfig.maxOpenBlockers >= 0) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee open blockers exceeds max limit of ${tierConfig.maxOpenBlockers}.`);
+    }
+    if (checks.on_time_rate_ok === false && tierConfig?.minOnTimeRate != null) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee on-time submission rate is below required ${tierConfig.minOnTimeRate}% threshold.`);
+    }
+    if (checks.rating_ok === false && tierConfig?.minAvgRating != null) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee average mentor rating is below required ${tierConfig.minAvgRating} threshold.`);
+    }
+    if (checks.attendance_ok === false && tierConfig?.minAttendanceRate != null) {
+      failures.push(`Failed ${tierName} Hard Constraint: Mentee attendance rate is below required ${tierConfig.minAttendanceRate}% threshold.`);
+    }
+  }
+
+  return failures;
+}
+
 /**
  * Evaluate a BATCH of up to 20 mentees in ONE single AI API request.
  * Evaluates qualitative Custom Rules and Tech Stack Keywords against completed task titles/descriptions.
  */
 async function evaluateBatchMentees(template, batchItems, adminUserId) {
   if (!batchItems || batchItems.length === 0) return [];
-
-  if (batchItems.length === 1) {
-    const single = batchItems[0];
-    const res = await evaluateSingleMentee(template, single.menteePayload, single.preCheck, adminUserId);
-    return [{ menteeId: single.menteeId, result: res }];
-  }
 
   const ai = await groqService._resolve('certificates', adminUserId);
   if (!ai.enabled) {
@@ -79,6 +110,7 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     on_time: item.menteePayload.on_time_rate,
     avg_rating: item.menteePayload.avg_rating,
     max_eligible_tier: item.preCheck.maxEligibleTier,
+    hard_constraint_failures: buildHardConstraintFailures(item.preCheck, criteria),
     score_breakdown: item.menteePayload.score_breakdown,
     cohort_reviews: item.menteePayload.cohort_reviews,
     clan_name: item.menteePayload.clan_name,
@@ -325,147 +357,12 @@ async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
  * Evaluate ONE mentee against template criteria using AI.
  */
 async function evaluateSingleMentee(template, menteePayload, preCheckResult, adminUserId) {
-  const ai = await groqService._resolve('certificates', adminUserId);
-  if (!ai.enabled) {
-    throw new ValidationError(
-      'AI is not configured. Add a provider key in Settings → AI Connections and route it to "certificates".'
-    );
-  }
-
-  const criteria = Array.isArray(template.criteria) ? template.criteria : [];
-  const systemPrompt = buildSingleMenteePrompt(criteria, preCheckResult);
-  const userPrompt = JSON.stringify(menteePayload, null, 2);
-
-  let response = null;
-  const initialCandidates = [ai.model];
-
-  if (ai.provider === 'groq' || /groq/i.test(ai.baseURL || '')) {
-    initialCandidates.push('llama-3.3-70b-versatile', 'llama-3.1-8b-instant');
-  } else if (ai.provider === 'openai' || /openai/i.test(ai.baseURL || '')) {
-    initialCandidates.push('gpt-4o-mini', 'gpt-4o');
-  }
-
-  const modelQueue = [...new Set(initialCandidates.filter(Boolean))];
-  const triedModels = new Set();
-  let lastError = null;
-
-  for (let idx = 0; idx < modelQueue.length; idx++) {
-    const m = modelQueue[idx];
-    if (triedModels.has(m)) continue;
-    triedModels.add(m);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-    try {
-      response = await ai.client.chat.completions.create(
-        {
-          model: m,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.1,
-          max_tokens: 2000
-        },
-        { signal: controller.signal }
-      );
-      if (response) break;
-    } catch (err) {
-      if (err.name === 'AbortError' || controller.signal.aborted) {
-        lastError = new Error(`AI Request Timeout for model ${m} after 25s`);
-      } else {
-        lastError = err;
-      }
-      logger.warn(`[aiEvaluationService] Model ${m} failed: ${lastError.message}`);
-
-      if (/401|unauthorized|auth|api_key|invalid_key|429|rate_limit|quota|billing/i.test(lastError?.message || '')) {
-        break;
-      }
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  if (!response) {
-    throw new ValidationError(groqService._friendlyAiError(lastError));
-  }
-
-  const raw = response.choices[0]?.message?.content || '';
-  return parseSingleAIResponse(raw, criteria, menteePayload, preCheckResult);
-}
-
-/**
- * Response parsing with fallback safety
- */
-function parseSingleAIResponse(raw, criteria, menteePayload, preCheckResult) {
-  let jsonStr = raw.trim();
-
-  const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (codeBlock) jsonStr = codeBlock[1];
-
-  const firstBrace = jsonStr.indexOf('{');
-  const lastBrace = jsonStr.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-  }
-
-  let item;
-  try {
-    item = JSON.parse(jsonStr);
-  } catch {
-    logger.error('[aiEvaluationService] Failed to parse AI response, using fallback result');
-    return buildFallbackResult(menteePayload, preCheckResult);
-  }
-
-  if (!item || typeof item !== 'object') {
-    return buildFallbackResult(menteePayload, preCheckResult);
-  }
-
-  const assignedTier = item.certificate_tier || item.certificateTier || item.tier || preCheckResult.maxEligibleTier;
-  const validTier = isTierAllowed(assignedTier, preCheckResult.maxEligibleTier, criteria)
-    ? assignedTier
-    : preCheckResult.maxEligibleTier;
-
-  const rawMatchScore = item.match_score ?? item.matchScore ?? menteePayload.normalized_score;
-  const cappedScore = Math.min(100, Math.max(0, Number(rawMatchScore) || 0));
-
-  const matchedKw = Array.isArray(item.matched_keywords)
-    ? item.matched_keywords
-    : (Array.isArray(item.matchedKeywords) ? item.matchedKeywords : []);
-
-  const missingKw = Array.isArray(item.missing_keywords)
-    ? item.missing_keywords
-    : (Array.isArray(item.missingKeywords) ? item.missingKeywords : []);
-
-  const blockersAnalysisObj = item.blockers_analysis || item.blockersAnalysis || {};
-
-  return {
-    mentee_id: menteePayload.mentee_id,
-    is_eligible: item.is_eligible ?? item.isEligible ?? true,
-    certificate_tier: validTier,
-    match_score: cappedScore,
-    matched_keywords: matchedKw,
-    missing_keywords: missingKw,
-    overall_percentage: Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
-    completion_rate: menteePayload.completion_rate,
-    on_time_rate: menteePayload.on_time_rate,
-    avg_rating: menteePayload.avg_rating,
-    score_breakdown: menteePayload.score_breakdown,
-    cohort_reviews: menteePayload.cohort_reviews,
-    hard_constraints_check: preCheckResult.hardChecks[validTier] || {
-      score_ok: true, blockers_ok: true, completion_rate_ok: true,
-      on_time_rate_ok: true, rating_ok: true, attendance_ok: true
-    },
-    blockers_analysis: {
-      total: Number(blockersAnalysisObj.total) || menteePayload.blockers.total,
-      resolved: Number(blockersAnalysisObj.resolved) || menteePayload.blockers.resolved,
-      open: Number(blockersAnalysisObj.open) || menteePayload.blockers.open,
-      impact: blockersAnalysisObj.impact || 'Low',
-      summary: blockersAnalysisObj.summary || ''
-    },
-    reasoning: item.reasoning || item.summary || ''
-  };
+  const batchRes = await evaluateBatchMentees(
+    template,
+    [{ menteeId: menteePayload.mentee_id, menteePayload, preCheck: preCheckResult }],
+    adminUserId
+  );
+  return batchRes[0]?.result;
 }
 
 /**

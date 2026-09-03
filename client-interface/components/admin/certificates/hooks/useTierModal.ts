@@ -29,6 +29,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
   const [tierModalMinCompletion, setTierModalMinCompletion] = useState(80);
   const [tierModalMinOnTime, setTierModalMinOnTime] = useState(80);
   const [tierModalMinRating, setTierModalMinRating] = useState(4.0);
+  const [tierModalMinAttendance, setTierModalMinAttendance] = useState(70);
   const [tierModalCustomRule, setTierModalCustomRule] = useState('');
   const [uploadingTierBadge, setUploadingTierBadge] = useState(false);
 
@@ -39,6 +40,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
   const [enableMinCompletion, setEnableMinCompletion] = useState(true);
   const [enableMinOnTime, setEnableMinOnTime] = useState(true);
   const [enableMinRating, setEnableMinRating] = useState(true);
+  const [enableMinAttendance, setEnableMinAttendance] = useState(false);
   const [enableCustomRule, setEnableCustomRule] = useState(true);
 
   // Open Add/Edit Tier dialog
@@ -54,6 +56,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       setEnableMinCompletion(tier.minCompletionRate != null);
       setEnableMinOnTime(tier.minOnTimeRate != null);
       setEnableMinRating(tier.minAvgRating != null);
+      setEnableMinAttendance(tier.minAttendanceRate != null);
       setEnableCustomRule(Boolean(tier.customRule && tier.customRule.trim()));
 
       setTierModalKeywords(tier.keywords || []);
@@ -62,6 +65,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       setTierModalMinCompletion(tier.minCompletionRate ?? 80);
       setTierModalMinOnTime(tier.minOnTimeRate ?? 80);
       setTierModalMinRating(tier.minAvgRating ?? 4.0);
+      setTierModalMinAttendance(tier.minAttendanceRate ?? 70);
       setTierModalCustomRule(tier.customRule ?? '');
     } else {
       setEditingTier(null);
@@ -74,6 +78,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       setEnableMinCompletion(true);
       setEnableMinOnTime(true);
       setEnableMinRating(true);
+      setEnableMinAttendance(false);
       setEnableCustomRule(true);
 
       setTierModalKeywords([]);
@@ -82,6 +87,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       setTierModalMinCompletion(80);
       setTierModalMinOnTime(80);
       setTierModalMinRating(4.0);
+      setTierModalMinAttendance(70);
       setTierModalCustomRule('');
     }
     setTierModalKeywordInput('');
@@ -124,6 +130,7 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       minCompletionRate: enableMinCompletion ? tierModalMinCompletion : null,
       minOnTimeRate:     enableMinOnTime ? tierModalMinOnTime : null,
       minAvgRating:      enableMinRating ? tierModalMinRating : null,
+      minAttendanceRate: enableMinAttendance ? tierModalMinAttendance : null,
       customRule:        enableCustomRule ? tierModalCustomRule.trim() : null,
     };
 
