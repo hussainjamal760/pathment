@@ -15,7 +15,7 @@ import { DuplicateWarnModal } from '@/components/shared';
 import { getTierBadgeColor, getTierButtonColor, getTierIconColor } from '@/lib/utils/certificates';
 import { Drawer } from '@/components/shared/Drawer';
 import { AIDetailDrawer, AIEvaluationBanner } from '@/components/certificates/shared';
-import { getSocket } from '@/lib/services/socket-client';
+import { useAIEvaluationProgress } from '@/components/admin/certificates/hooks/useAIEvaluationProgress';
 
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -105,119 +105,29 @@ export default function MentorCertificatesPage() {
 
   // Mentor's manual tier selections for each mentee
   const [mentorTiers, setMentorTiers] = useState<Record<string, string>>({});
-
-  // AI evaluation state
-  const [aiResults, setAiResults] = useState<any[]>([]);
-  const [aiRanAt, setAiRanAt] = useState<string | null>(null);
-  const [runningAI, setRunningAI] = useState(false);
   const [aiDetailMentee, setAiDetailMentee] = useState<any | null>(null);
 
-  // Real-time AI queue evaluation progress states
-  const [aiProgressCount, setAiProgressCount] = useState(0);
-  const [aiTotalCount, setAiTotalCount] = useState(0);
-  const [aiEvaluationRunId, setAiEvaluationRunId] = useState<string | null>(null);
-
-  // Listen to AI evaluation progress in real-time
-  useEffect(() => {
-    if (!aiEvaluationRunId || !activeTemplateId) return;
-
-    const socket = getSocket();
-    let pollInterval: NodeJS.Timeout | null = null;
-
-    const handleProgress = (data: { runId: string; menteeId: string; result: any; completed: number; total: number }) => {
-      if (data.runId !== aiEvaluationRunId) return;
-      setAiProgressCount(data.completed);
-      setAiTotalCount(data.total);
-
-      // Merge incremental result
-      setAiResults(prev => {
-        const index = prev.findIndex(r => r.mentee_id === data.result.mentee_id);
-        if (index > -1) {
-          const updated = [...prev];
-          updated[index] = data.result;
-          return updated;
-        } else {
-          return [...prev, data.result];
-        }
-      });
-
-      // Automatically check or pre-select tier
-      setMentorTiers(prev => ({
-        ...prev,
-        [data.result.mentee_id]: data.result.certificate_tier
-      }));
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        next.add(data.result.mentee_id);
-        return next;
-      });
-    };
-
-    const handleComplete = (data: { runId: string; results: any[]; ranAt: string }) => {
-      if (data.runId !== aiEvaluationRunId) return;
-      setAiResults(data.results || []);
-      setAiRanAt(data.ranAt);
-      
+  // AI evaluation progress hook
+  const {
+    aiResults, setAiResults, aiRanAt, setAiRanAt, runningAI,
+    aiProgressCount, aiTotalCount, runAIEvaluation
+  } = useAIEvaluationProgress({
+    templateId: activeTemplateId,
+    onSingleProgress: (result) => {
+      setMentorTiers(prev => ({ ...prev, [result.mentee_id]: result.certificate_tier }));
+      setSelectedIds(prev => new Set(prev).add(result.mentee_id));
+    },
+    onBatchComplete: (results) => {
       const newTiers: Record<string, string> = {};
       const autoSelected = new Set<string>();
-      for (const r of (data.results || [])) {
+      for (const r of results) {
         newTiers[r.mentee_id] = r.certificate_tier;
         autoSelected.add(r.mentee_id);
       }
       setMentorTiers(prev => ({ ...prev, ...newTiers }));
       setSelectedIds(autoSelected);
-      setRunningAI(false);
-      setAiEvaluationRunId(null);
-      toast.success(`AI evaluation completed successfully for ${data.results.length} mentees!`);
-    };
-
-    if (socket) {
-      socket.on('ai-eval:progress', handleProgress);
-      socket.on('ai-eval:complete', handleComplete);
     }
-
-    // Polling fallback (in case WebSocket fails or isn't active)
-    pollInterval = setInterval(async () => {
-      try {
-        const res = await certificatesApi.getAIEvaluationStatus(activeTemplateId, aiEvaluationRunId);
-        if (res.success) {
-          setAiProgressCount(res.completed);
-          setAiTotalCount(res.total);
-          
-          if (res.data && res.data.length > 0) {
-            setAiResults(res.data);
-            
-            const newTiers: Record<string, string> = {};
-            const autoSelected = new Set<string>();
-            for (const r of res.data) {
-              newTiers[r.mentee_id] = r.certificate_tier;
-              autoSelected.add(r.mentee_id);
-            }
-            setMentorTiers(prev => ({ ...prev, ...newTiers }));
-            setSelectedIds(autoSelected);
-          }
-
-          if (res.isDone) {
-            setAiRanAt(res.ranAt || new Date().toISOString());
-            setRunningAI(false);
-            setAiEvaluationRunId(null);
-            if (pollInterval) clearInterval(pollInterval);
-            toast.success(`AI evaluation completed successfully!`);
-          }
-        }
-      } catch (err) {
-        console.error('AI status poll error:', err);
-      }
-    }, 4000);
-
-    return () => {
-      if (socket) {
-        socket.off('ai-eval:progress', handleProgress);
-        socket.off('ai-eval:complete', handleComplete);
-      }
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [aiEvaluationRunId, activeTemplateId]);
+  });
 
   const getTierName = (tierId: string) => {
     if (!tierId || typeof tierId !== 'string') return '';
@@ -558,23 +468,8 @@ export default function MentorCertificatesPage() {
     }
   };
 
-  const handleRunAIEvaluation = async () => {
-    if (!activeTemplateId || !user?.id) return;
-    try {
-      setRunningAI(true);
-      setAiProgressCount(0);
-      setAiTotalCount(0);
-      setAiResults([]); // Clear previous results
-      const res = await certificatesApi.runAIEvaluation(activeTemplateId, user.id);
-      if (res.success) {
-        setAiEvaluationRunId(res.runId);
-        setAiTotalCount(res.total);
-        toast.info(`AI evaluation started for ${res.total} mentees...`);
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'AI evaluation failed. Check your AI key in Settings.');
-      setRunningAI(false);
-    }
+  const handleRunAIEvaluation = () => {
+    if (activeTemplateId) runAIEvaluation(activeTemplateId);
   };
 
   const executeIssuance = async (recipientsList: Array<{ menteeId: string; tier: string }>) => {

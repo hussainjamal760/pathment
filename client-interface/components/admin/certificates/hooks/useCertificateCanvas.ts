@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
-import { CertificateElement, BACKGROUND_PRESETS, BACKGROUND_PRESETS_MAP } from '@/lib/services/certificates-api';
+import { CertificateElement } from '@/lib/services/certificates-api';
+import { BACKGROUND_PRESETS, BACKGROUND_PRESETS_MAP } from '../certificate-constants';
 
 interface UseCertificateCanvasOptions {
   elements: CertificateElement[];
@@ -27,14 +28,13 @@ export function useCertificateCanvas({ elements, setElements }: UseCertificateCa
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Set classic navy preset by default if no background is set
+  // Set default preset if no background is set
   useEffect(() => {
     if (!bgImageUrl) {
-      const defaultPreset = BACKGROUND_PRESETS_MAP['preset-classic-navy'];
+      const defaultPreset = BACKGROUND_PRESETS[0];
       if (defaultPreset) {
-        const base64Svg = typeof window !== 'undefined' ? btoa(unescape(encodeURIComponent(defaultPreset.svg))) : '';
-        setBgImageUrl(`data:image/svg+xml;base64,${base64Svg}`);
-        setActivePresetId('preset-classic-navy');
+        setBgImageUrl(defaultPreset.imageUrl);
+        setActivePresetId(defaultPreset.id);
       }
     }
   }, [bgImageUrl]);
@@ -69,9 +69,7 @@ export function useCertificateCanvas({ elements, setElements }: UseCertificateCa
     if (!preset) return;
 
     try {
-      const base64Svg = typeof window !== 'undefined' ? btoa(unescape(encodeURIComponent(preset.svg))) : '';
-      const dataUrl = `data:image/svg+xml;base64,${base64Svg}`;
-      setBgImageUrl(dataUrl);
+      setBgImageUrl(preset.imageUrl);
       setActivePresetId(presetId);
       toast.success(`Applied ${preset.name} background preset!`);
     } catch (err) {

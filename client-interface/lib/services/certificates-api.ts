@@ -16,30 +16,6 @@ export interface CertificateElement {
   imageUrl?: string;
 }
 
-export const BACKGROUND_PRESETS = [
-  {
-    id: 'preset-classic-navy',
-    name: 'Classic Navy & Gold',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
-      <rect width="800" height="600" fill="#0f172a"/>
-      <rect x="20" y="20" width="760" height="560" fill="none" stroke="#e2e8f0" stroke-width="2" opacity="0.1"/>
-      <rect x="30" y="30" width="740" height="540" fill="none" stroke="#d97706" stroke-width="1.5" opacity="0.4"/>
-    </svg>`
-  },
-  {
-    id: 'preset-emerald-luxury',
-    name: 'Emerald Luxury',
-    svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
-      <rect width="800" height="600" fill="#064e3b"/>
-      <rect x="25" y="25" width="750" height="550" fill="none" stroke="#34d399" stroke-width="2" opacity="0.2"/>
-    </svg>`
-  }
-];
-
-export const BACKGROUND_PRESETS_MAP: Record<string, typeof BACKGROUND_PRESETS[0]> = Object.fromEntries(
-  BACKGROUND_PRESETS.map(p => [p.id, p])
-);
-
 export interface CertificateTemplate {
   id: string;
   name: string;

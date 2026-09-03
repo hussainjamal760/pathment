@@ -1,62 +1,27 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { certificatesApi, AIEvaluationResult } from '@/lib/services/certificates-api';
+import { certificatesApi } from '@/lib/services/certificates-api';
 import { getSocket } from '@/lib/services/socket-client';
 
-interface UseAIEvaluationProgressOptions {
-  templateId: string | null;
-  onIncrementalResult?: (result: AIEvaluationResult) => void;
-  onCompleteResults?: (results: AIEvaluationResult[], ranAt: string) => void;
+export interface UseAIEvaluationProgressOptions {
+  templateId?: string | null;
+  onSingleProgress?: (result: any) => void;
+  onBatchComplete?: (results: any[]) => void;
 }
 
-/**
- * Custom hook to handle real-time AI evaluation progress via Socket.IO,
- * polling fallback, background queue status, and auto-resume on mount.
- */
-export function useAIEvaluationProgress({
-  templateId,
-  onIncrementalResult,
-  onCompleteResults
-}: UseAIEvaluationProgressOptions) {
-  const [runningAI, setRunningAI] = useState(false);
+export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions = {}) {
+  const { templateId, onSingleProgress, onBatchComplete } = options;
+
+  const [aiResults, setAiResults] = useState<any[]>([]);
   const [aiRanAt, setAiRanAt] = useState<string | null>(null);
-  const [aiResults, setAiResults] = useState<AIEvaluationResult[]>([]);
+  const [runningAI, setRunningAI] = useState(false);
   const [aiProgressCount, setAiProgressCount] = useState(0);
   const [aiTotalCount, setAiTotalCount] = useState(0);
   const [aiEvaluationRunId, setAiEvaluationRunId] = useState<string | null>(null);
 
-  // Auto-detect active evaluation run on mount / templateId load
-  useEffect(() => {
-    if (!templateId) return;
-
-    const checkActiveRun = async () => {
-      try {
-        const statusRes: any = await certificatesApi.getAIEvaluationStatus(templateId);
-        if (statusRes.success) {
-          const payload = statusRes.data?.data ? statusRes.data : statusRes;
-          const activeRunId = payload.runId || statusRes.runId;
-          const isDone = payload.isDone ?? statusRes.isDone ?? true;
-          const completed = payload.completed ?? statusRes.completed ?? 0;
-          const total = payload.total ?? statusRes.total ?? 0;
-
-          if (!isDone && activeRunId) {
-            setAiEvaluationRunId(activeRunId);
-            setRunningAI(true);
-            setAiProgressCount(completed);
-            setAiTotalCount(total);
-          }
-        }
-      } catch (e) {
-        // Silently ignore status check error on mount
-      }
-    };
-
-    checkActiveRun();
-  }, [templateId]);
-
-  // Listen to Socket.IO & Polling fallback when an evaluation run is active
+  // Listen to real-time AI evaluation progress via WebSocket + Polling fallback
   useEffect(() => {
     if (!aiEvaluationRunId || !templateId) return;
 
@@ -68,6 +33,7 @@ export function useAIEvaluationProgress({
       setAiProgressCount(data.completed);
       setAiTotalCount(data.total);
 
+      // Merge incremental result
       setAiResults(prev => {
         const index = prev.findIndex(r => r.mentee_id === data.result.mentee_id);
         if (index > -1) {
@@ -79,19 +45,23 @@ export function useAIEvaluationProgress({
         }
       });
 
-      onIncrementalResult?.(data.result);
+      if (onSingleProgress) {
+        onSingleProgress(data.result);
+      }
     };
 
     const handleComplete = (data: { runId: string; results: any[]; ranAt: string }) => {
       if (data.runId !== aiEvaluationRunId) return;
-      const resList = data.results || [];
-      setAiResults(resList);
+      setAiResults(data.results || []);
       setAiRanAt(data.ranAt);
       setRunningAI(false);
       setAiEvaluationRunId(null);
 
-      onCompleteResults?.(resList, data.ranAt);
-      toast.success(`AI evaluation completed successfully for ${resList.length} mentees!`);
+      if (onBatchComplete) {
+        onBatchComplete(data.results || []);
+      }
+
+      toast.success(`AI evaluation completed successfully for ${(data.results || []).length} mentees!`);
     };
 
     if (socket) {
@@ -99,7 +69,7 @@ export function useAIEvaluationProgress({
       socket.on('ai-eval:complete', handleComplete);
     }
 
-    // Polling fallback
+    // Polling fallback (in case WebSocket fails or isn't active)
     pollInterval = setInterval(async () => {
       try {
         const res: any = await certificatesApi.getAIEvaluationStatus(templateId, aiEvaluationRunId);
@@ -115,12 +85,13 @@ export function useAIEvaluationProgress({
 
           if (Array.isArray(resultsList) && resultsList.length > 0) {
             setAiResults(resultsList);
-            onCompleteResults?.(resultsList, payload.ranAt || res.ranAt || new Date().toISOString());
+            if (onBatchComplete) {
+              onBatchComplete(resultsList);
+            }
           }
 
           if (isDone) {
-            const finalRanAt = payload.ranAt || res.ranAt || new Date().toISOString();
-            setAiRanAt(finalRanAt);
+            setAiRanAt(payload.ranAt || res.ranAt || new Date().toISOString());
             setRunningAI(false);
             setAiEvaluationRunId(null);
             if (pollInterval) clearInterval(pollInterval);
@@ -139,54 +110,89 @@ export function useAIEvaluationProgress({
       }
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [aiEvaluationRunId, templateId, onIncrementalResult, onCompleteResults]);
+  }, [aiEvaluationRunId, templateId, onSingleProgress, onBatchComplete]);
 
-  // Trigger AI evaluation batch run
-  const triggerAIEvaluation = async (mentorId?: string) => {
-    if (!templateId) return;
+  // Trigger running AI evaluation
+  const runAIEvaluation = useCallback(async (targetTemplateId?: string) => {
+    const idToUse = targetTemplateId || templateId;
+    if (!idToUse) return;
 
     try {
       setRunningAI(true);
       setAiProgressCount(0);
+      setAiTotalCount(0);
+      setAiResults([]); // Clear previous results
 
-      const res = await certificatesApi.runAIEvaluation(templateId, mentorId);
-      const total = res.total ?? (res as any).data?.total ?? 0;
-      const runId = res.runId || (res as any).data?.runId;
+      const res: any = await certificatesApi.runAIEvaluation(idToUse);
+      const runId = res.runId || res.data?.runId;
+      const total = res.total ?? res.data?.total ?? 0;
 
-      if (total === 0) {
-        toast.info('No active mentees found to evaluate');
-        setRunningAI(false);
-        return;
-      }
-
-      setAiTotalCount(total);
-
-      if (runId) {
+      if (res.success && runId) {
         setAiEvaluationRunId(runId);
-        toast.success(`AI evaluation queued for ${total} mentee(s). Evaluating in real-time...`);
+        setAiTotalCount(total);
+        toast.info(`AI evaluation started for ${total} mentees...`);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to start AI evaluation');
+      toast.error(err.message || 'AI evaluation failed. Check AI connection in Settings.');
       setRunningAI(false);
     }
-  };
+  }, [templateId]);
 
+  // Check initial AI status on mount / templateId change
+  useEffect(() => {
+    if (!templateId) return;
+
+    let isMounted = true;
+    async function checkInitialStatus() {
+      try {
+        const statusRes: any = await certificatesApi.getAIEvaluationStatus(templateId!);
+        if (statusRes.success && isMounted) {
+          const payload = statusRes.data?.data ? statusRes.data : statusRes;
+          const activeRunId = payload.runId || statusRes.runId;
+          const isDone = payload.isDone ?? statusRes.isDone ?? true;
+          const completed = payload.completed ?? statusRes.completed ?? 0;
+          const total = payload.total ?? statusRes.total ?? 0;
+
+          if (!isDone && activeRunId) {
+            setAiEvaluationRunId(activeRunId);
+            setRunningAI(true);
+            setAiProgressCount(completed);
+            setAiTotalCount(total);
+          }
+        }
+      } catch (e) {
+        // Silently ignore on mount
+      }
+    }
+
+    checkInitialStatus();
+    return () => { isMounted = false; };
+  }, [templateId]);
+
+  // Map AI evaluation results by mentee_id
   const aiEvalMap = useMemo(() => {
     const map: Record<string, any> = {};
-    (aiResults || []).forEach(r => { map[r.mentee_id] = r; });
+    (aiResults || []).forEach(r => {
+      if (r.mentee_id) map[r.mentee_id] = r;
+    });
     return map;
   }, [aiResults]);
 
   return {
-    runningAI,
-    aiRanAt,
-    setAiRanAt,
     aiResults,
     setAiResults,
+    aiRanAt,
+    setAiRanAt,
+    runningAI,
+    setRunningAI,
     aiProgressCount,
+    setAiProgressCount,
     aiTotalCount,
+    setAiTotalCount,
     aiEvaluationRunId,
-    triggerAIEvaluation,
-    aiEvalMap
+    setAiEvaluationRunId,
+    aiEvalMap,
+    runAIEvaluation,
   };
 }
+
