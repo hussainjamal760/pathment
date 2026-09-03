@@ -79,17 +79,23 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     on_time: item.menteePayload.on_time_rate,
     avg_rating: item.menteePayload.avg_rating,
     max_eligible_tier: item.preCheck.maxEligibleTier,
+    score_breakdown: item.menteePayload.score_breakdown,
+    cohort_reviews: item.menteePayload.cohort_reviews,
+    clan_name: item.menteePayload.clan_name,
     tasks: (item.menteePayload.tasks || []).map(t => ({
       title: t.title,
       status: t.status,
+      type: t.type,
       isCustom: Boolean(t.isCustomTask),
-      desc: t.description ? t.description.slice(0, 150) : undefined,
+      desc: t.description ? t.description.slice(0, 300) : undefined,
       rating: t.rating,
-      difficulty: t.difficulty
+      difficulty: t.difficulty,
+      points_pct: t.pointsPct
     })),
     blockers: {
       total: item.menteePayload.blockers.total,
-      open: item.menteePayload.blockers.open
+      open: item.menteePayload.blockers.open,
+      open_by_severity: item.menteePayload.blockers.open_by_severity
     }
   }));
 
@@ -234,9 +240,14 @@ function parseBatchAIResponse(raw, criteria, batchItems) {
       matched_keywords: matchedKw,
       missing_keywords: missingKw,
       overall_percentage: Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
+      completion_rate: menteePayload.completion_rate,
+      on_time_rate: menteePayload.on_time_rate,
+      avg_rating: menteePayload.avg_rating,
+      score_breakdown: menteePayload.score_breakdown,
+      cohort_reviews: menteePayload.cohort_reviews,
       hard_constraints_check: preCheck.hardChecks[validTier] || {
         score_ok: true, blockers_ok: true, completion_rate_ok: true,
-        on_time_rate_ok: true, rating_ok: true
+        on_time_rate_ok: true, rating_ok: true, attendance_ok: true
       },
       blockers_analysis: {
         total: Number(blockersAnalysisObj.total) || menteePayload.blockers.total,
@@ -379,9 +390,14 @@ function parseSingleAIResponse(raw, criteria, menteePayload, preCheckResult) {
     matched_keywords: matchedKw,
     missing_keywords: missingKw,
     overall_percentage: Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
+    completion_rate: menteePayload.completion_rate,
+    on_time_rate: menteePayload.on_time_rate,
+    avg_rating: menteePayload.avg_rating,
+    score_breakdown: menteePayload.score_breakdown,
+    cohort_reviews: menteePayload.cohort_reviews,
     hard_constraints_check: preCheckResult.hardChecks[validTier] || {
       score_ok: true, blockers_ok: true, completion_rate_ok: true,
-      on_time_rate_ok: true, rating_ok: true
+      on_time_rate_ok: true, rating_ok: true, attendance_ok: true
     },
     blockers_analysis: {
       total: Number(blockersAnalysisObj.total) || menteePayload.blockers.total,
@@ -407,9 +423,14 @@ function buildFallbackResult(menteePayload, preCheckResult) {
     matched_keywords: [],
     missing_keywords: [],
     overall_percentage: cappedScore,
+    completion_rate: menteePayload.completion_rate,
+    on_time_rate: menteePayload.on_time_rate,
+    avg_rating: menteePayload.avg_rating,
+    score_breakdown: menteePayload.score_breakdown,
+    cohort_reviews: menteePayload.cohort_reviews,
     hard_constraints_check: preCheckResult.hardChecks[preCheckResult.maxEligibleTier] || {
       score_ok: true, blockers_ok: true, completion_rate_ok: true,
-      on_time_rate_ok: true, rating_ok: true
+      on_time_rate_ok: true, rating_ok: true, attendance_ok: true
     },
     blockers_analysis: {
       total: menteePayload.blockers.total,
@@ -423,10 +444,11 @@ function buildFallbackResult(menteePayload, preCheckResult) {
 }
 
 /**
- * Enqueue per-mentee evaluation jobs into AIEvaluationQueue with fingerprint caching.
+ * Enqueue per-mentee (per-clan) evaluation jobs into AIEvaluationQueue.
+ * If clanId is provided, tasks and cohort reviews are scoped to that clan.
  */
-async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria) {
-  const payloads = await aggregateMenteeData(menteeIds);
+async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria, clanId = null) {
+  const payloads = await aggregateMenteeData(menteeIds, clanId);
   const runId = uuidv4();
 
   const queueRows = payloads.map(payload => {
@@ -444,7 +466,7 @@ async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria) {
   });
 
   await models.AIEvaluationQueue.bulkCreate(queueRows);
-  logger.info(`[aiEvaluationService] Enqueued ${queueRows.length} fresh evaluation jobs (runId=${runId})`);
+  logger.info(`[aiEvaluationService] Enqueued ${queueRows.length} fresh evaluation jobs (runId=${runId}, clanId=${clanId ?? 'none'})`);
 
   return { runId, total: queueRows.length };
 }

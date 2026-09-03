@@ -2,8 +2,7 @@
  * certificatePreCheckEngine — Server-side deterministic mathematical pre-check engine.
  *
  * Responsibilities:
- *   - Evaluates mentee performance metrics (normalized score, open blockers, completion rate, on-time rate, mentor rating).
- *   - Evaluates qualitative custom rules against completed task titles.
+ *   - Evaluates mentee performance metrics (normalized score, open blockers, completion rate, on-time rate, mentor rating, cohort attendance).
  *   - Determines highest eligible certificate tier BEFORE sending payload to LLM.
  *   - 100% deterministic (no AI/LLM dependencies).
  */
@@ -11,25 +10,19 @@
 /**
  * Determine the highest eligible tier for a mentee using server-side hard constraints.
  *
- * @param {Object} menteePayload - Data snapshot containing scores, tasks, blockers, etc.
+ * @param {Object} menteePayload - Data snapshot containing scores, tasks, blockers, cohort_reviews, etc.
  * @param {Array} criteria - Array of template criteria tier definitions.
- * @returns {Object} { maxEligibleTier, hardChecks, customRuleChecks }
+ * @returns {Object} { maxEligibleTier, hardChecks }
  */
 function preCheckHardConstraints(menteePayload, criteria) {
   if (!criteria || !criteria.length) {
     return {
       maxEligibleTier: 'participation',
       hardChecks: {},
-      customRuleChecks: {}
     };
   }
 
-  const completedTitlesLower = (menteePayload.tasks || [])
-    .filter(t => t.status === 'completed')
-    .map(t => (t.title || '').toLowerCase());
-
   const hardChecks = {};
-  const customRuleChecks = {};
   let maxEligibleTier = null;
 
   for (const tier of criteria) {
@@ -39,13 +32,15 @@ function preCheckHardConstraints(menteePayload, criteria) {
       blockers_ok: true,
       completion_rate_ok: true,
       on_time_rate_ok: true,
-      rating_ok: true
+      rating_ok: true,
+      attendance_ok: true
     };
 
     if (tier.minScorePercent != null && menteePayload.normalized_score < tier.minScorePercent) {
       checks.score_ok = false;
     }
 
+    // maxOpenBlockers: -1 = unlimited (no restriction). Only apply check when >= 0.
     if (tier.maxOpenBlockers != null && tier.maxOpenBlockers >= 0 && menteePayload.blockers.open > tier.maxOpenBlockers) {
       checks.blockers_ok = false;
     }
@@ -60,6 +55,18 @@ function preCheckHardConstraints(menteePayload, criteria) {
 
     if (tier.minAvgRating != null && (menteePayload.avg_rating == null || menteePayload.avg_rating < tier.minAvgRating)) {
       checks.rating_ok = false;
+    }
+
+    // Attendance check: only enforced when minAttendanceRate is set AND data is available.
+    // If no cohort sessions have been held yet, skip (do not penalize mentee).
+    if (
+      tier.minAttendanceRate != null &&
+      menteePayload.cohort_reviews?.data_available === true
+    ) {
+      const attendancePct = menteePayload.cohort_reviews.attendance_pct ?? 0;
+      if (attendancePct < tier.minAttendanceRate) {
+        checks.attendance_ok = false;
+      }
     }
 
     hardChecks[tierId] = checks;

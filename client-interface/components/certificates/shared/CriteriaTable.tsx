@@ -12,6 +12,7 @@ interface TierCriteria {
   minCompletionRate?: number | null;
   minOnTimeRate?: number | null;
   minAvgRating?: number | null;
+  minAttendanceRate?: number | null;
   customRule?: string | null;
 }
 
@@ -79,6 +80,7 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete }: CriteriaTab
             if (tier.minCompletionRate != null)      parts.push(`Completion ≥${tier.minCompletionRate}%`);
             if (tier.minOnTimeRate != null)          parts.push(`On-Time ≥${tier.minOnTimeRate}%`);
             if (tier.minAvgRating != null)           parts.push(`Rating ≥${tier.minAvgRating}`);
+            if (tier.minAttendanceRate != null)      parts.push(`Attendance ≥${tier.minAttendanceRate}%`);
 
             const summaryText = parts.length > 0
               ? parts.join(' · ')

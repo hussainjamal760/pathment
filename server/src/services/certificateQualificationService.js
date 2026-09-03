@@ -310,11 +310,18 @@ class CertificateQualificationService {
 
     const menteeIds = mentees.map(m => m.id);
 
+    // For mentor-scoped runs, pass the first clan for clan-isolated data aggregation.
+    // Admin-wide runs (no mentorId) pass null — tasks are not clan-filtered in that case.
+    const clanId = mentorId
+      ? (await this.getMentorScopedMenteeClans(mentorId, programId, user.role))[0] ?? null
+      : null;
+
     const { runId, total } = await aiEvaluationService.enqueueEvaluation(
       id,
       menteeIds,
       user.id,
-      criteria
+      criteria,
+      clanId
     );
 
     return { runId, total };

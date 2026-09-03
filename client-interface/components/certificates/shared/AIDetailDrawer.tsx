@@ -78,31 +78,67 @@ export function AIDetailDrawer({
             <div className="p-4 rounded-2xl border border-border bg-card shadow-2xs space-y-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hard Constraints Check</p>
               <div className="grid grid-cols-2 gap-2">
-                {([
-                  { key: 'score_ok',           label: 'Min Score' },
-                  { key: 'blockers_ok',        label: 'Open Blockers' },
-                  { key: 'completion_rate_ok', label: 'Completion Rate' },
-                  { key: 'on_time_rate_ok',    label: 'On-Time Rate' },
-                  { key: 'rating_ok',          label: 'Avg Rating' },
-                ] as const).map(({ key, label }) => {
-                  const ok = mentee.hard_constraints_check?.[key] !== false;
+                {[
+                  { key: 'score_ok',           label: 'Min Score',       sub: `${mentee.overall_percentage}%` },
+                  { key: 'blockers_ok',        label: 'Open Blockers',    sub: `${mentee.blockers_analysis?.open ?? 0} open` },
+                  { key: 'completion_rate_ok', label: 'Completion Rate', sub: `${mentee.completion_rate ?? mentee.overall_percentage}%` },
+                  { key: 'on_time_rate_ok',    label: 'On-Time Rate',    sub: `${mentee.on_time_rate ?? mentee.score_breakdown?.on_time_pct ?? 100}%` },
+                  { key: 'rating_ok',          label: 'Avg Rating',      sub: mentee.avg_rating != null ? `${mentee.avg_rating}★` : 'OK' },
+                  { key: 'attendance_ok',      label: 'Attendance Rate', sub: mentee.cohort_reviews?.attendance_pct != null ? `${mentee.cohort_reviews.attendance_pct}%` : 'N/A' },
+                ].map(({ key, label, sub }) => {
+                  const ok = mentee.hard_constraints_check?.[key as keyof typeof mentee.hard_constraints_check] !== false;
                   return (
                     <div
                       key={key}
-                      className={`flex items-center gap-2 p-2 rounded-xl text-[10px] font-bold ${
+                      className={`flex items-center justify-between p-2 rounded-xl text-[10px] font-bold ${
                         ok
                           ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
                           : 'bg-red-500/10 text-red-600 dark:text-red-400'
                       }`}
                     >
-                      {ok
-                        ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        : <XCircle className="w-3.5 h-3.5 shrink-0" />
-                      }
-                      {label}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {ok
+                          ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                          : <XCircle className="w-3.5 h-3.5 shrink-0" />
+                        }
+                        <span className="truncate">{label}</span>
+                      </div>
+                      <span className="text-[9px] opacity-80 shrink-0 font-extrabold ml-1">({sub})</span>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Score Formula Breakdown */}
+          {mentee.score_breakdown && (
+            <div className="p-4 rounded-2xl border border-brand-500/20 bg-brand-500/5 dark:bg-brand-500/10 space-y-2">
+              <p className="text-[10px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider flex items-center justify-between">
+                <span>Score Formula Breakdown</span>
+                <span className="text-xs font-black">{mentee.score_breakdown.composite}% Composite</span>
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <div className="p-2 rounded-xl bg-background border border-border">
+                  <span className="text-muted-foreground block text-[9px]">Task Score (60% pts + 40% rating)</span>
+                  <span className="font-extrabold text-foreground">{mentee.score_breakdown.task_score}%</span>
+                </div>
+                <div className="p-2 rounded-xl bg-background border border-border">
+                  <span className="text-muted-foreground block text-[9px]">Cohort Meeting Attendance</span>
+                  <span className="font-extrabold text-foreground">
+                    {mentee.cohort_reviews?.attendance_pct != null
+                      ? `${mentee.cohort_reviews.attendance_pct}% (${mentee.cohort_reviews.present} present, ${mentee.cohort_reviews.excused} excused)`
+                      : 'No Sessions'}
+                  </span>
+                </div>
+                <div className="p-2 rounded-xl bg-background border border-border">
+                  <span className="text-muted-foreground block text-[9px]">Weighted On-Time Submission</span>
+                  <span className="font-extrabold text-foreground">{mentee.score_breakdown.on_time_pct}%</span>
+                </div>
+                <div className="p-2 rounded-xl bg-background border border-border">
+                  <span className="text-muted-foreground block text-[9px]">Blocker Resolution Score</span>
+                  <span className="font-extrabold text-foreground">{mentee.score_breakdown.blocker_score}%</span>
+                </div>
               </div>
             </div>
           )}

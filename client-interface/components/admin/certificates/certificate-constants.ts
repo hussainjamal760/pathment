@@ -18,6 +18,7 @@ export interface TierCriteria {
   minCompletionRate?: number | null;
   minOnTimeRate?: number | null;
   minAvgRating?: number | null;
+  minAttendanceRate?: number | null;
   customRule?: string | null;
 }
 
@@ -53,10 +54,10 @@ export const DYNAMIC_SHORTCUTS = [
 // ─── Default Tier Criteria (used when creating a new template) ──────────────────
 
 export const DEFAULT_CRITERIA: TierCriteria[] = [
-  { id: 'gold', name: 'Gold Certificate', badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, customRule: '' },
-  { id: 'silver', name: 'Silver Certificate', badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2, minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, customRule: '' },
-  { id: 'bronze', name: 'Bronze Certificate', badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5, minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, customRule: '' },
-  { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0, maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, customRule: '' },
+  { id: 'gold', name: 'Gold Certificate', badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, minAttendanceRate: 80, customRule: '' },
+  { id: 'silver', name: 'Silver Certificate', badgeUrl: '', keywords: [], minScorePercent: 65, maxOpenBlockers: 2, minCompletionRate: 75, minOnTimeRate: 60, minAvgRating: 3.5, minAttendanceRate: 70, customRule: '' },
+  { id: 'bronze', name: 'Bronze Certificate', badgeUrl: '', keywords: [], minScorePercent: 50, maxOpenBlockers: 5, minCompletionRate: 60, minOnTimeRate: 50, minAvgRating: 3.0, minAttendanceRate: 50, customRule: '' },
+  { id: 'participation', name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0, maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, minAttendanceRate: null, customRule: '' },
 ];
 
 // ─── Background SVG Presets ─────────────────────────────────────────────────────

@@ -69,21 +69,23 @@ EVALUATION INSTRUCTIONS:
    - "on_time": On-time submission rate (0-100)
    - "avg_rating": Average mentor rating (1.0-5.0)
    - "max_eligible_tier": Maximum allowed tier ceiling determined by server math.
-   - "tasks": List of assigned tasks with "title", "status" ("completed"|"in_progress"|"assigned"|"submitted"), "isCustom" (boolean), "rating", and "desc".
-     CRITICAL: Only tasks with status === "completed" count as finished work. Tasks with status "assigned", "in_progress", or "submitted" are UNFINISHED and do not count towards completed milestones or custom rules!
-   - "blockers": Total and open blockers count
+   - "tasks": List of assigned tasks with "title", "status" ("completed"|"in_progress"|"assigned"|"submitted"), "type" ("project"|"assignment"|"practical"|"exercise"|"quiz"|"custom"), "isCustom" (boolean true for mentor custom tasks), "rating", and "desc".
+     CRITICAL RULE 1: Only tasks with status === "completed" count as finished work. Tasks with status "assigned", "in_progress", or "submitted" are UNFINISHED and CANNOT satisfy custom rules or keywords!
+     CRITICAL RULE 2: CUSTOM QUALIFICATION RULE & TECH STACK CHECKING:
+     - Search completed tasks (status === "completed") for titles, descriptions, task types, or isCustom === true flags that match the tier's "Custom Qualification Rule" (e.g. "must have multivendor project done", "at least 2 custom tasks", "project type task").
+     - Match keywords against completed task titles and descriptions loosely (e.g. HTML, CSS, React, Node, etc.).
 
 2. TIER STEP-DOWN HIERARCHY: gold -> silver -> bronze -> participation.
 
 3. FOR EVERY MENTEE IN THE INPUT ARRAY, EVALUATE:
    - "certificate_tier": Check the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks.
-     * If the mentee satisfies the Custom Rule for "max_eligible_tier", assign "certificate_tier": "max_eligible_tier".
-     * If the mentee FAILS the Custom Rule for "max_eligible_tier" (e.g. Gold), STEP DOWN to the next lower tier (e.g. Silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules the mentee DOES satisfy.
+     * If the mentee satisfies the Custom Rule and Tech Stack for "max_eligible_tier", assign "certificate_tier": "max_eligible_tier".
+     * If the mentee FAILS the Custom Rule or Tech Stack for "max_eligible_tier" (e.g. Gold), STEP DOWN to the next lower tier (e.g. Silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules the mentee DOES satisfy.
    - "match_score": Integer (0-100) reflecting relevance and task quality.
    - "matched_keywords": Array of target keywords matched in completed tasks.
    - "missing_keywords": Array of target keywords missing from completed tasks.
    - "blockers_analysis": { "total": number, "resolved": number, "open": number, "impact": "Low"|"Medium"|"High", "summary": "brief summary" }
-   - "reasoning": 3-4 sentence detailed narrative explaining the custom rule evaluation, task performance, and tier assignment.
+   - "reasoning": 3-4 sentence detailed narrative explicitly stating which custom rules passed/failed, matched keywords, task performance, cohort attendance, and why the tier was assigned or stepped down.
 
 4. OUTPUT FORMAT: PURE JSON ARRAY containing exactly one result object per input mentee.
 [

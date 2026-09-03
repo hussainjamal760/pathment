@@ -26,6 +26,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   const [enableMinCompletion, setEnableMinCompletion] = useState(true);
   const [enableMinOnTime, setEnableMinOnTime] = useState(true);
   const [enableMinRating, setEnableMinRating] = useState(true);
+  const [enableMinAttendance, setEnableMinAttendance] = useState(false);
   const [enableCustomRule, setEnableCustomRule] = useState(true);
 
   // Field values
@@ -36,6 +37,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   const [tierModalMinCompletion, setTierModalMinCompletion] = useState(80);
   const [tierModalMinOnTime, setTierModalMinOnTime] = useState(80);
   const [tierModalMinRating, setTierModalMinRating] = useState(4.0);
+  const [tierModalMinAttendance, setTierModalMinAttendance] = useState(70);
   const [tierModalCustomRule, setTierModalCustomRule] = useState('');
 
   // Sync state when editingTier or isOpen changes
@@ -52,6 +54,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       setEnableMinCompletion(editingTier.minCompletionRate != null);
       setEnableMinOnTime(editingTier.minOnTimeRate != null);
       setEnableMinRating(editingTier.minAvgRating != null);
+      setEnableMinAttendance(editingTier.minAttendanceRate != null);
       setEnableCustomRule(Boolean(editingTier.customRule && editingTier.customRule.trim()));
 
       setTierModalKeywords(editingTier.keywords || []);
@@ -60,6 +63,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       setTierModalMinCompletion(editingTier.minCompletionRate ?? 80);
       setTierModalMinOnTime(editingTier.minOnTimeRate ?? 80);
       setTierModalMinRating(editingTier.minAvgRating ?? 4.0);
+      setTierModalMinAttendance(editingTier.minAttendanceRate ?? 70);
       setTierModalCustomRule(editingTier.customRule ?? '');
     } else {
       setTierModalName('');
@@ -71,6 +75,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       setEnableMinCompletion(true);
       setEnableMinOnTime(true);
       setEnableMinRating(true);
+      setEnableMinAttendance(false);
       setEnableCustomRule(true);
 
       setTierModalKeywords([]);
@@ -79,6 +84,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       setTierModalMinCompletion(80);
       setTierModalMinOnTime(80);
       setTierModalMinRating(4.0);
+      setTierModalMinAttendance(70);
       setTierModalCustomRule('');
     }
     setTierModalKeywordInput('');
@@ -122,6 +128,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       minCompletionRate: enableMinCompletion ? tierModalMinCompletion : null,
       minOnTimeRate: enableMinOnTime ? tierModalMinOnTime : null,
       minAvgRating: enableMinRating ? tierModalMinRating : null,
+      minAttendanceRate: enableMinAttendance ? tierModalMinAttendance : null,
       customRule: enableCustomRule ? tierModalCustomRule.trim() : null,
     };
 
@@ -361,6 +368,31 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
                   disabled={!enableMinRating}
                   value={tierModalMinRating}
                   onChange={e => setTierModalMinRating(Math.min(5, Math.max(0, Number(e.target.value))))}
+                  className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
+                />
+              </div>
+
+              <div className="space-y-1.5 bg-muted/20 p-2.5 rounded-xl border border-border/50 col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-muted-foreground">
+                    Min Attendance %
+                    <span className="ml-1 text-[9px] font-normal text-muted-foreground/60">(cohort reviews)</span>
+                  </label>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableMinAttendance}
+                      onChange={e => setEnableMinAttendance(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-6 h-3.5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[1.5px] after:left-[1.5px] after:bg-white after:rounded-full after:h-2.5 after:w-2.5 after:transition-all peer-checked:bg-brand-600"></div>
+                  </label>
+                </div>
+                <input
+                  type="number" min={0} max={100}
+                  disabled={!enableMinAttendance}
+                  value={tierModalMinAttendance}
+                  onChange={e => setTierModalMinAttendance(Math.min(100, Math.max(0, Number(e.target.value))))}
                   className="w-full px-2.5 py-1 text-xs bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-brand-500/40 disabled:opacity-40"
                 />
               </div>

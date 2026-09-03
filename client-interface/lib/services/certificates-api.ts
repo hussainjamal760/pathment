@@ -80,6 +80,7 @@ export interface CertificateInstance {
 export interface AIBlockersAnalysis {
   total: number;
   resolved: number;
+  open?: number;
   impact: 'Low' | 'Medium' | 'High';
   summary: string;
 }
@@ -93,6 +94,9 @@ export interface AIEvaluationResult {
   certificate_tier: string;
   match_score: number;        // 0-100 holistic quality score WITHIN eligible tier
   overall_percentage: number; // normalized points % (ground truth)
+  completion_rate?: number;
+  on_time_rate?: number;
+  avg_rating?: number | null;
   matched_keywords: string[];
   missing_keywords: string[];
   hard_constraints_check: {
@@ -101,8 +105,26 @@ export interface AIEvaluationResult {
     completion_rate_ok: boolean;
     on_time_rate_ok:    boolean;
     rating_ok:          boolean;
+    attendance_ok?:     boolean;
   };
-  blockers_analysis: AIBlockersAnalysis;
+  score_breakdown?: {
+    points_pct: number;
+    rating_pct: number;
+    task_score: number;
+    blocker_score: number;
+    on_time_pct: number;
+    attendance_pct: number | null;
+    composite: number;
+  };
+  cohort_reviews?: {
+    total_sessions: number;
+    present: number;
+    excused: number;
+    absent: number;
+    attendance_pct: number | null;
+    data_available: boolean;
+  };
+  blockers_analysis?: AIBlockersAnalysis;
   reasoning: string;
 }
 
