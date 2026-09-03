@@ -3,7 +3,7 @@ const { Op } = require('sequelize');
 
 /**
  * aiEvalDataService — Data aggregation for certificate AI eligibility evaluation.
- * Queries assigned tasks, roadmaps, and blockers to build a rich metric snapshot per mentee.
+ * Queries assigned tasks (including custom tasks and overrides), roadmaps, and blockers.
  */
 async function aggregateMenteeData(menteeIds) {
   if (!menteeIds || !menteeIds.length) return [];
@@ -15,12 +15,13 @@ async function aggregateMenteeData(menteeIds) {
     },
     attributes: [
       'menteeId', 'status', 'pointsAwarded', 'pointsBase',
-      'finalRating', 'isLate', 'completedAt', 'isCustomTask', 'dueDate'
+      'finalRating', 'isLate', 'completedAt', 'isCustomTask', 'dueDate',
+      'titleOverride', 'descriptionOverride'
     ],
     include: [{
       model: models.RoadmapTask,
       as: 'roadmapTask',
-      attributes: ['title', 'type', 'difficulty', 'description']
+      attributes: ['title', 'type', 'difficulty', 'description', 'pointsBase']
     }],
     raw: false
   });
@@ -50,23 +51,29 @@ async function aggregateMenteeData(menteeIds) {
     const taskSummaries = [];
 
     for (const t of myTasks) {
-      const base = t.pointsBase ?? t.roadmapTask?.pointsBase ?? 10;
+      const taskTitle = t.titleOverride || t.roadmapTask?.title || (t.isCustomTask ? 'Custom Task' : 'Assigned Task');
+      const taskDesc = t.descriptionOverride || t.roadmapTask?.description || null;
+      const base = (t.pointsBase && t.pointsBase > 0) ? t.pointsBase : (t.roadmapTask?.pointsBase || 10);
       const awarded = t.pointsAwarded ?? 0;
+
       totalBase += base;
-      if (t.status === 'completed') totalAwarded += awarded;
+      if (t.status === 'completed') {
+        totalAwarded += Math.min(awarded, base);
+      }
 
       taskSummaries.push({
-        title: t.roadmapTask?.title ?? (t.isCustomTask ? 'Custom Task' : 'Unknown'),
-        description: t.roadmapTask?.description ? t.roadmapTask.description.slice(0, 300) : null,
-        type: t.roadmapTask?.type ?? 'custom',
+        title: taskTitle,
+        description: taskDesc ? taskDesc.slice(0, 300) : null,
+        type: t.roadmapTask?.type ?? (t.isCustomTask ? 'custom' : 'general'),
         difficulty: t.roadmapTask?.difficulty ?? 'medium',
         status: t.status,
+        isCustomTask: Boolean(t.isCustomTask),
         rating: t.finalRating ? parseFloat(t.finalRating) : null,
         isLate: t.isLate
       });
     }
 
-    const normalizedScore = totalBase > 0 ? Math.round((totalAwarded / totalBase) * 100) : 0;
+    const normalizedScore = totalBase > 0 ? Math.min(100, Math.round((totalAwarded / totalBase) * 100)) : 0;
     const completedTasks = myTasks.filter(t => t.status === 'completed');
     const totalTasks = myTasks.length;
     const completionRate = totalTasks > 0 ? Math.round((completedTasks.length / totalTasks) * 100) : 0;

@@ -46,7 +46,7 @@ function preCheckHardConstraints(menteePayload, criteria) {
       checks.score_ok = false;
     }
 
-    if (tier.maxOpenBlockers != null && menteePayload.blockers.open > tier.maxOpenBlockers) {
+    if (tier.maxOpenBlockers != null && tier.maxOpenBlockers >= 0 && menteePayload.blockers.open > tier.maxOpenBlockers) {
       checks.blockers_ok = false;
     }
 

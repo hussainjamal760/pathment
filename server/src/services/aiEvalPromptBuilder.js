@@ -1,47 +1,45 @@
 /**
  * aiEvalPromptBuilder — Constructs structured system & user prompts for AI certificate evaluation.
  */
-function buildSingleMenteePrompt(criteria, preCheckResult) {
-  const tierDescriptions = criteria.map(c => {
-    const lines = [`### ${c.id.toUpperCase()} ("${c.name}")`];
+
+function buildTierDescriptions(criteria) {
+  return criteria.map(c => {
+    const lines = [`### TIER: "${c.id}" ("${c.name}")`];
     if (c.minScorePercent != null) lines.push(`  - Min score: ${c.minScorePercent}%`);
-    if (c.maxOpenBlockers != null) lines.push(`  - Max open blockers: ${c.maxOpenBlockers}`);
+    if (c.maxOpenBlockers != null && c.maxOpenBlockers >= 0) lines.push(`  - Max open blockers: ${c.maxOpenBlockers}`);
     if (c.minCompletionRate != null) lines.push(`  - Min completion rate: ${c.minCompletionRate}%`);
     if (c.minOnTimeRate != null) lines.push(`  - Min on-time rate: ${c.minOnTimeRate}%`);
     if (c.minAvgRating != null) lines.push(`  - Min avg rating: ${c.minAvgRating}`);
-    if (Array.isArray(c.keywords) && c.keywords.length > 0) lines.push(`  - Target Keywords/Tech Stack: ${c.keywords.join(', ')}`);
-    if (c.customRule?.trim()) lines.push(`  - Custom rule: "${c.customRule.trim()}"`);
+    if (Array.isArray(c.keywords) && c.keywords.length > 0) lines.push(`  - Required Tech Stack / Keywords: ${c.keywords.join(', ')}`);
+    if (c.customRule?.trim()) lines.push(`  - Custom Qualification Rule: "${c.customRule.trim()}"`);
     return lines.join('\n');
   }).join('\n\n');
+}
 
-  const preCheckLines = [
-    `SERVER PRE-CHECK VERDICT: maxEligibleTier = "${preCheckResult.maxEligibleTier}"`
-  ];
-  for (const [tierId, checks] of Object.entries(preCheckResult.hardChecks || {})) {
-    const passAll = Object.values(checks).every(Boolean);
-    preCheckLines.push(`  ${tierId}: hardConstraints=${passAll ? 'PASS' : 'FAIL'}`);
-  }
+function buildSingleMenteePrompt(criteria, preCheckResult) {
+  const tierDescriptions = buildTierDescriptions(criteria);
 
-  return `You are evaluating ONE mentee for certificate eligibility on a mentorship platform.
+  return `You are an expert AI evaluator assessing ONE mentee for certificate eligibility on a mentorship platform.
 
-TIER DEFINITIONS:
+TIER DEFINITIONS & QUALIFICATION RULES:
 ${tierDescriptions || '- participation: everyone with >= 1 completed task'}
 
-SERVER-SIDE PRE-CHECK VERDICT:
-${preCheckLines.join('\n')}
+SERVER PRE-CHECK UPPER CEILING: "${preCheckResult.maxEligibleTier}"
 
-YOU MUST ASSIGN: "${preCheckResult.maxEligibleTier}" as the certificate_tier. The tier decision is FINAL.
-
-YOUR JOB:
-1. Compute "match_score" (0-100) based on task quality and relevance.
-2. Identify matched_keywords and missing_keywords.
-3. Write detailed reasoning (4-5 sentences) explaining the evaluation.
+EVALUATION RULES:
+1. "maxEligibleTier" ("${preCheckResult.maxEligibleTier}") is the MAXIMUM ALLOWED tier based on server-side performance math. You MAY NOT assign a tier higher than "${preCheckResult.maxEligibleTier}".
+2. TIER STEP-DOWN HIERARCHY: gold -> silver -> bronze -> participation.
+3. You MUST evaluate the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks (status === "completed").
+4. If the mentee fails the Custom Qualification Rule or Tech Stack Keywords for "${preCheckResult.maxEligibleTier}", STEP DOWN to the next lower tier in the hierarchy (e.g. silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules & keywords the mentee DOES satisfy.
+5. Compute "match_score" (0-100) reflecting how strongly the mentee aligns with the assigned tier.
+6. List "matched_keywords" (keywords present in completed tasks) and "missing_keywords" (required keywords missing).
+7. Write a 3-4 sentence detailed narrative in "reasoning" referencing task titles, custom rule evaluation, and performance metrics.
 
 OUTPUT FORMAT (pure JSON object):
 {
   "mentee_id": "<string>",
   "is_eligible": true,
-  "certificate_tier": "${preCheckResult.maxEligibleTier}",
+  "certificate_tier": "<assigned_tier>",
   "match_score": 85,
   "matched_keywords": [],
   "missing_keywords": [],
@@ -52,4 +50,55 @@ OUTPUT FORMAT (pure JSON object):
 }`;
 }
 
-module.exports = { buildSingleMenteePrompt };
+/**
+ * Build prompt for a BATCH of mentees.
+ */
+function buildBatchMenteePrompt(criteria, batchSize) {
+  const tierDescriptions = buildTierDescriptions(criteria);
+
+  return `You are an expert AI evaluator assessing a BATCH of up to ${batchSize} mentees for certificate eligibility on a mentorship platform.
+
+TIER DEFINITIONS & QUALIFICATION RULES:
+${tierDescriptions || '- participation: everyone with >= 1 completed task'}
+
+EVALUATION INSTRUCTIONS:
+1. Each mentee item in the input array contains:
+   - "mentee_id": Mentee ID string
+   - "score": Normalized performance percentage (0-100)
+   - "completion": Task completion rate (0-100)
+   - "on_time": On-time submission rate (0-100)
+   - "avg_rating": Average mentor rating (1.0-5.0)
+   - "max_eligible_tier": Maximum allowed tier ceiling determined by server math.
+   - "tasks": List of assigned tasks with "title", "status" ("completed"|"in_progress"|"assigned"|"submitted"), "isCustom" (boolean), "rating", and "desc".
+     CRITICAL: Only tasks with status === "completed" count as finished work. Tasks with status "assigned", "in_progress", or "submitted" are UNFINISHED and do not count towards completed milestones or custom rules!
+   - "blockers": Total and open blockers count
+
+2. TIER STEP-DOWN HIERARCHY: gold -> silver -> bronze -> participation.
+
+3. FOR EVERY MENTEE IN THE INPUT ARRAY, EVALUATE:
+   - "certificate_tier": Check the tier's "Custom Qualification Rule" and "Required Tech Stack / Keywords" against the mentee's completed tasks.
+     * If the mentee satisfies the Custom Rule for "max_eligible_tier", assign "certificate_tier": "max_eligible_tier".
+     * If the mentee FAILS the Custom Rule for "max_eligible_tier" (e.g. Gold), STEP DOWN to the next lower tier (e.g. Silver). Do NOT jump straight to participation! Assign the highest lower tier whose rules the mentee DOES satisfy.
+   - "match_score": Integer (0-100) reflecting relevance and task quality.
+   - "matched_keywords": Array of target keywords matched in completed tasks.
+   - "missing_keywords": Array of target keywords missing from completed tasks.
+   - "blockers_analysis": { "total": number, "resolved": number, "open": number, "impact": "Low"|"Medium"|"High", "summary": "brief summary" }
+   - "reasoning": 3-4 sentence detailed narrative explaining the custom rule evaluation, task performance, and tier assignment.
+
+4. OUTPUT FORMAT: PURE JSON ARRAY containing exactly one result object per input mentee.
+[
+  {
+    "mentee_id": "<exact input mentee_id>",
+    "is_eligible": true,
+    "certificate_tier": "<assigned tier id>",
+    "match_score": 85,
+    "matched_keywords": ["React", "Node.js"],
+    "missing_keywords": [],
+    "overall_percentage": 92,
+    "blockers_analysis": { "total": 0, "resolved": 0, "open": 0, "impact": "Low", "summary": "No blockers" },
+    "reasoning": "Mentee completed advanced assignments with a 92% score. Custom qualification rule for Silver tier satisfied."
+  }
+]`;
+}
+
+module.exports = { buildSingleMenteePrompt, buildBatchMenteePrompt };
