@@ -130,6 +130,15 @@ async function tick() {
 
       if (!pendingJob) return null;
 
+      // Exponential backoff check: if retrying, ensure backoff delay has elapsed
+      if (pendingJob.attempts > 0 && pendingJob.status === 'pending') {
+        const backoffMs = Math.pow(2, pendingJob.attempts - 1) * 3000;
+        const lastUpdated = new Date(pendingJob.updatedAt).getTime();
+        if (Date.now() - lastUpdated < backoffMs) {
+          return null; // Skip for now, backoff in progress
+        }
+      }
+
       pendingJob.status = 'processing';
       pendingJob.lockedAt = new Date();
       pendingJob.attempts += 1;
@@ -144,7 +153,7 @@ async function tick() {
     }
 
     try {
-      logger.info(`[AI Eval Worker] Processing job ${job.id} (mentee ${job.menteeId}, run ${job.runId})`);
+      logger.info(`[AI Eval Worker] Processing job ${job.id} (mentee ${job.menteeId}, run ${job.runId}, attempt ${job.attempts}/${MAX_ATTEMPTS})`);
       const result = await processJob(job);
 
       job.status = 'completed';
@@ -181,7 +190,7 @@ async function tick() {
 
       await checkRunCompletion(job.runId, job.triggeredBy);
     } catch (jobError) {
-      logger.error(`[AI Eval Worker] Job ${job.id} failed: ${jobError.message}`);
+      logger.error(`[AI Eval Worker] Job ${job.id} failed (attempt ${job.attempts}/${MAX_ATTEMPTS}): ${jobError.message}`);
 
       job.status = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
       job.error = jobError.stack || jobError.message;
@@ -234,9 +243,14 @@ function start() {
   logger.info(`AI evaluation worker started (poll ${POLL_MS}ms)`);
 }
 
-function stop() {
+async function stop() {
   if (timer) { clearInterval(timer); timer = null; }
-  logger.info('AI evaluation worker stopped');
+  let waitCount = 0;
+  while (running && waitCount < 10) {
+    await new Promise(r => setTimeout(r, 500));
+    waitCount++;
+  }
+  logger.info('AI evaluation worker stopped gracefully');
 }
 
 module.exports = { start, stop, tick };

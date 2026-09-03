@@ -150,10 +150,19 @@ async function tick() {
   running = true;
 
   try {
+    const STALE_LOCK_MS = 5 * 60 * 1000; // 5 minutes lock timeout
+    const now = new Date();
+
     const job = await sequelize.transaction(async (t) => {
       const pendingJob = await models.CertificateQueue.findOne({
         where: {
-          status: 'pending',
+          [Op.or]: [
+            { status: 'pending' },
+            {
+              status: 'processing',
+              lockedAt: { [Op.lt]: new Date(Date.now() - STALE_LOCK_MS) }
+            }
+          ],
           attempts: { [Op.lt]: MAX_ATTEMPTS }
         },
         order: [['createdAt', 'ASC']],
@@ -164,8 +173,17 @@ async function tick() {
 
       if (!pendingJob) return null;
 
+      // Exponential backoff check: if retrying, ensure backoff delay has elapsed
+      if (pendingJob.attempts > 0 && pendingJob.status === 'pending') {
+        const backoffMs = Math.pow(2, pendingJob.attempts - 1) * 3000;
+        const lastUpdated = new Date(pendingJob.updatedAt).getTime();
+        if (Date.now() - lastUpdated < backoffMs) {
+          return null; // Skip for now, backoff in progress
+        }
+      }
+
       pendingJob.status = 'processing';
-      pendingJob.lockedAt = new Date();
+      pendingJob.lockedAt = now;
       pendingJob.attempts += 1;
       await pendingJob.save({ transaction: t });
 
@@ -178,7 +196,7 @@ async function tick() {
     }
 
     try {
-      logger.info(`[Certificate Worker] Processing job ${job.id} (instance ${job.instanceId})`);
+      logger.info(`[Certificate Worker] Processing job ${job.id} (instance ${job.instanceId}, attempt ${job.attempts}/${MAX_ATTEMPTS})`);
       await processJob(job);
 
       job.status = 'completed';
@@ -186,7 +204,7 @@ async function tick() {
       await job.save();
       logger.info(`[Certificate Worker] Job ${job.id} completed successfully.`);
     } catch (jobError) {
-      logger.error(`[Certificate Worker] Job ${job.id} failed: ${jobError.message}`);
+      logger.error(`[Certificate Worker] Job ${job.id} failed (attempt ${job.attempts}/${MAX_ATTEMPTS}): ${jobError.message}`);
 
       job.status = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
       job.error = jobError.stack || jobError.message;
@@ -206,12 +224,18 @@ function start() {
   logger.info(`Certificate worker started (polling every ${POLL_MS}ms)`);
 }
 
-function stop() {
+async function stop() {
   if (timer) {
     clearInterval(timer);
     timer = null;
   }
-  logger.info('Certificate worker stopped');
+  // Graceful shutdown: wait for running tick to finish
+  let waitCount = 0;
+  while (running && waitCount < 10) {
+    await new Promise(r => setTimeout(r, 500));
+    waitCount++;
+  }
+  logger.info('Certificate worker stopped gracefully');
 }
 
 module.exports = {
