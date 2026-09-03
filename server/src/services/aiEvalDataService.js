@@ -57,6 +57,7 @@ async function aggregateMenteeData(menteeIds) {
 
       taskSummaries.push({
         title: t.roadmapTask?.title ?? (t.isCustomTask ? 'Custom Task' : 'Unknown'),
+        description: t.roadmapTask?.description ? t.roadmapTask.description.slice(0, 300) : null,
         type: t.roadmapTask?.type ?? 'custom',
         difficulty: t.roadmapTask?.difficulty ?? 'medium',
         status: t.status,
