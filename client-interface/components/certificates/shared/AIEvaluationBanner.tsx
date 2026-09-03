@@ -12,9 +12,6 @@ interface AIEvaluationBannerProps {
   totalCount?: number;
 }
 
-/**
- * AI Evaluation Banner — uses common QueueProgressBanner under the hood with design system tokens.
- */
 export function AIEvaluationBanner({
   count,
   ranAt,

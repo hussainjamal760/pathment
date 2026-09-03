@@ -65,7 +65,7 @@ export default function ConfirmModal({
         className="bg-card border border-border w-full max-w-md rounded-3xl overflow-hidden shadow-2xl flex flex-col relative animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
-        {/* Close Button */}
+        {}
         <button 
           onClick={onCancel}
           className="absolute top-4 right-4 p-1.5 text-muted-foreground hover:text-foreground rounded-lg transition-colors"
@@ -73,7 +73,7 @@ export default function ConfirmModal({
           <X className="w-4 h-4" />
         </button>
 
-        {/* Content */}
+        {}
         <div className="p-6 pt-8 flex flex-col items-center text-center space-y-4">
           {getIcon()}
           
@@ -83,7 +83,7 @@ export default function ConfirmModal({
           </div>
         </div>
 
-        {/* Actions */}
+        {}
         <div className="px-6 py-4 bg-muted/40 border-t border-border flex items-center justify-end gap-2.5">
           <button
             type="button"

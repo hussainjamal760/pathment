@@ -33,7 +33,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [criteria, setCriteria] = useState<Array<{ id: string; name: string }>>([]);
 
-  // Confirm Modal state
   const [confirmConfig, setConfirmConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -74,7 +73,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     }
   };
 
-  // Initial load
   useEffect(() => {
     fetchHistory(true);
     if (templateId) {
@@ -82,7 +80,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     }
   }, [templateId]);
 
-  // Auto-polling effect: poll history every 5 seconds IF there are active 'pending' or 'processing' certificates
   useEffect(() => {
     const hasActiveJobs = history.some(item => item.status === 'pending' || item.status === 'processing');
     if (!hasActiveJobs) return;
@@ -94,7 +91,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     return () => clearInterval(interval);
   }, [history]);
 
-  // Filtered log items
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     return history.filter(item => {
@@ -108,7 +104,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     });
   }, [history, search, statusFilter]);
 
-  // Queue stats calculation
   const stats = useMemo(() => {
     const total = history.length;
     const completed = history.filter(item => item.status === 'completed').length;
@@ -121,7 +116,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     return { total, completed, pending, processing, failed, activeJobs, progressPercent };
   }, [history]);
 
-  // Resend / Regenerate certificate action
   const handleResend = (id: string) => {
     setConfirmConfig({
       isOpen: true,
@@ -137,7 +131,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
           const res = await certificatesApi.resendCertificateInstance(id);
           if (res.success) {
             toast.success('Certificate queued for regeneration successfully!');
-            // Update local status to pending immediately
             setHistory(prev => prev.map(item => 
               item.id === id ? { ...item, status: 'pending', pdfUrl: null, imageUrl: null } : item
             ));
@@ -151,7 +144,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
     });
   };
 
-  // Revoke / Delete certificate action
   const handleRevoke = (id: string) => {
     setConfirmConfig({
       isOpen: true,
@@ -167,7 +159,6 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
           const res = await certificatesApi.deleteCertificateInstance(id);
           if (res.success) {
             toast.success('Certificate revoked and deleted successfully!');
-            // Remove from list
             setHistory(prev => prev.filter(item => item.id !== id));
           }
         } catch (err: any) {
@@ -248,7 +239,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
 
   return (
     <div className="space-y-4">
-      {/* Live Queue Progress Dashboard */}
+      {}
       {stats.total > 0 && (
         <div className="bg-muted/30 border border-border/80 rounded-2xl p-4.5 space-y-3.5 shadow-3xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
@@ -277,7 +268,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
             </div>
           </div>
 
-          {/* Progress Bar */}
+          {}
           <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
             <div
               className="bg-gradient-to-r from-brand-500 via-indigo-500 to-emerald-500 h-1.5 rounded-full transition-all duration-500 ease-out"
@@ -285,7 +276,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
             />
           </div>
 
-          {/* Mini Cards Grid */}
+          {}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
             <div className="bg-background border border-border p-2.5 rounded-xl flex items-center justify-between shadow-3xs">
               <div>
@@ -322,7 +313,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
         </div>
       )}
 
-      {/* Header controls */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
@@ -389,7 +380,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
         </div>
       </div>
 
-      {/* History table */}
+      {}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <Loader2 className="animate-spin w-5 h-5 text-brand-500" />
@@ -400,7 +391,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
         </div>
       ) : (
         <div className="border border-border rounded-2xl overflow-hidden divide-y divide-border">
-          {/* Table Header */}
+          {}
           <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider items-center">
             <div className="col-span-4">Recipient</div>
             <div className="col-span-2 text-center">Badge Tier</div>
@@ -409,7 +400,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
             <div className="col-span-2 text-right">Actions</div>
           </div>
 
-          {/* Table Rows */}
+          {}
           <div className="max-h-[350px] overflow-y-auto divide-y divide-border">
             {filtered.map(item => {
               const dateStr = new Date(item.createdAt).toLocaleDateString('en-US', {
@@ -420,7 +411,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
 
               return (
                 <div key={item.id} className="grid grid-cols-12 gap-2 px-4 py-3.5 items-center text-xs hover:bg-muted/10 transition-colors">
-                  {/* Recipient info */}
+                  {}
                   <div className="col-span-4 min-w-0">
                     <div className="font-bold text-foreground flex items-center gap-1.5 flex-wrap">
                       <span className="truncate">{item.recipient ? `${item.recipient.firstName} ${item.recipient.lastName}` : 'Deleted User'}</span>
@@ -435,19 +426,19 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
                     <div className="text-[10px] text-muted-foreground truncate">{item.recipient?.email || 'N/A'}</div>
                   </div>
 
-                  {/* Badge Tier */}
+                  {}
                   <div className="col-span-2 flex justify-center">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 border rounded-full text-[10px] font-bold uppercase tracking-wider ${getTierColor(item.tier)}`}>
                       <Award className="w-3.5 h-3.5" /> {getTierName(item.tier)}
                     </span>
                   </div>
 
-                  {/* Issued Date */}
+                  {}
                   <div className="col-span-2 text-center text-muted-foreground font-semibold text-[11px]">
                     {dateStr}
                   </div>
 
-                  {/* Status Badge */}
+                  {}
                   <div className="col-span-2 flex justify-center">
                     {item.status === 'completed' && item.imageUrl ? (
                       <a
@@ -473,7 +464,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
                     )}
                   </div>
 
-                  {/* Actions */}
+                  {}
                   <div className="col-span-2 flex items-center justify-end gap-2.5">
                     <button
                       type="button"

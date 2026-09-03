@@ -4,13 +4,7 @@ const { models, sequelize } = require('../db');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors/errorTypes');
 const certificateQualificationService = require('./certificateQualificationService');
 
-/**
- * certificateIssuanceService — Manages certificate issuance, instance queries, revocation, and queue resets.
- */
 class CertificateIssuanceService {
-  /**
-   * Issue certificates to one or more mentees inside a transaction
-   */
   async issueCertificates({ templateId, menteeIds, mentorId, tier, recipients }, userId) {
     if (!templateId) {
       throw new ValidationError('Template ID is required');
@@ -80,19 +74,12 @@ class CertificateIssuanceService {
     }
   }
 
-  /**
-   * List all certificates for a mentee
-   */
   async listMenteeCertificates(menteeId, user) {
     if (user.role === 'mentee' && user.id !== menteeId) {
       throw new ForbiddenError('You can only view your own certificates');
     }
 
     if (user.role === 'mentor') {
-      // BUG-8: Pass template.programId so the scope is limited to the mentor's current program,
-      // not all historical programs they've ever been a mentor in.
-      // We can't know the programId here without looking it up from the instance, so we scope
-      // by mentee only and let the FK do the rest. For extra safety, load a sample instance first.
       const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
       if (scopedIds !== null && !scopedIds.includes(menteeId)) {
         throw new ForbiddenError('You can only view certificates for mentees in your clan');
@@ -122,9 +109,6 @@ class CertificateIssuanceService {
     });
   }
 
-  /**
-   * Get single certificate instance
-   */
   async getCertificateInstance(id, user) {
     const instance = await models.CertificateInstance.findOne({
       where: { id },
@@ -169,9 +153,6 @@ class CertificateIssuanceService {
     return instance;
   }
 
-  /**
-   * Delete / revoke single instance
-   */
   async deleteCertificateInstance(id, user) {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
@@ -188,9 +169,6 @@ class CertificateIssuanceService {
     return true;
   }
 
-  /**
-   * Helper: Reset or create a pending CertificateQueue entry for an instance.
-   */
   async resetQueueEntry(instanceId) {
     const [queueEntry, created] = await models.CertificateQueue.findOrCreate({
       where: { instanceId },
@@ -207,9 +185,6 @@ class CertificateIssuanceService {
     return queueEntry;
   }
 
-  /**
-   * Bulk reset queue entries
-   */
   async bulkResetQueueEntries(instanceIds) {
     if (!instanceIds.length) return;
 
@@ -227,16 +202,12 @@ class CertificateIssuanceService {
     const missing = instanceIds.filter(id => !existingIds.has(id));
 
     if (missing.length > 0) {
-      // REMOVE-5: Use built-in crypto.randomUUID() — already imported at top of file.
       await models.CertificateQueue.bulkCreate(
         missing.map(id => ({ id: crypto.randomUUID(), instanceId: id, status: 'pending', attempts: 0 }))
       );
     }
   }
 
-  /**
-   * Resend single certificate instance
-   */
   async resendCertificateInstance(id) {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
@@ -249,27 +220,17 @@ class CertificateIssuanceService {
     return true;
   }
 
-  /**
-   * Revoke all certificates for a template.
-   *
-   * BUG-9 fix: Mentors must be scoped to the template's owning program. Without this check,
-   * a mentor in Program A could call DELETE /templates/<Program-B-id>/instances and revoke
-   * certificates that belong to a completely different program's template.
-   */
   async revokeAllTemplateCertificates(id, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');
 
-    // BUG-9: Validate that the mentor belongs to the program that owns this template.
     if (user.role === 'mentor') {
       const mentorScopedIds = await certificateQualificationService.getMentorScopedMenteeIds(
         user.id, template.programId, user.role
       );
       if (mentorScopedIds === null) {
-        // getMentorScopedMenteeIds returning null means admin-wide — shouldn't happen for mentor.
         throw new ForbiddenError('Unauthorized: unable to verify program scope');
       }
-      // If the mentor has no mentees in this template's program, they don't own it.
       if (mentorScopedIds.length === 0) {
         throw new ForbiddenError('You do not have access to this certificate template');
       }
@@ -296,9 +257,6 @@ class CertificateIssuanceService {
     return { count: instances.length };
   }
 
-  /**
-   * Resend all or failed certificates for a template
-   */
   async resendAllTemplateCertificates(id, failedOnly, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');

@@ -21,7 +21,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
   const [aiTotalCount, setAiTotalCount] = useState(0);
   const [aiEvaluationRunId, setAiEvaluationRunId] = useState<string | null>(null);
 
-  // Listen to real-time AI evaluation progress via WebSocket + Polling fallback
   useEffect(() => {
     if (!aiEvaluationRunId || !templateId) return;
 
@@ -33,7 +32,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
       setAiProgressCount(data.completed);
       setAiTotalCount(data.total);
 
-      // Merge incremental result
       setAiResults(prev => {
         const index = prev.findIndex(r => r.mentee_id === data.result.mentee_id);
         if (index > -1) {
@@ -69,7 +67,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
       socket.on('ai-eval:complete', handleComplete);
     }
 
-    // Polling fallback (in case WebSocket fails or isn't active)
     pollInterval = setInterval(async () => {
       try {
         const res: any = await certificatesApi.getAIEvaluationStatus(templateId, aiEvaluationRunId);
@@ -112,7 +109,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
     };
   }, [aiEvaluationRunId, templateId, onSingleProgress, onBatchComplete]);
 
-  // Trigger running AI evaluation
   const runAIEvaluation = useCallback(async (targetTemplateId?: string) => {
     const idToUse = targetTemplateId || templateId;
     if (!idToUse) return;
@@ -121,7 +117,7 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
       setRunningAI(true);
       setAiProgressCount(0);
       setAiTotalCount(0);
-      setAiResults([]); // Clear previous results
+      setAiResults([]); 
 
       const res: any = await certificatesApi.runAIEvaluation(idToUse);
       const runId = res.runId || res.data?.runId;
@@ -138,7 +134,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
     }
   }, [templateId]);
 
-  // Check initial AI status on mount / templateId change
   useEffect(() => {
     if (!templateId) return;
 
@@ -161,7 +156,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
           }
         }
       } catch (e) {
-        // Silently ignore on mount
       }
     }
 
@@ -169,7 +163,6 @@ export function useAIEvaluationProgress(options: UseAIEvaluationProgressOptions 
     return () => { isMounted = false; };
   }, [templateId]);
 
-  // Map AI evaluation results by mentee_id
   const aiEvalMap = useMemo(() => {
     const map: Record<string, any> = {};
     (aiResults || []).forEach(r => {

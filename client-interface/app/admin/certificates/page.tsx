@@ -15,7 +15,6 @@ export default function AdminCertificatesPage() {
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>('all');
   const [loadingPrograms, setLoadingPrograms] = useState(true);
   
-  // Delete confirm states
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
 
@@ -79,7 +78,7 @@ export default function AdminCertificatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header section */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border/60 pb-5 gap-4">
         <div>
           <h1 className="text-xl font-bold text-foreground">Certificates</h1>
@@ -87,7 +86,7 @@ export default function AdminCertificatesPage() {
         </div>
 
         <div className="flex items-center gap-3.5 flex-wrap">
-          {/* Custom styled select box */}
+          {}
           <div className="relative inline-flex items-center shadow-3xs rounded-xl border border-border/80 bg-background hover:bg-muted/30 transition-colors">
             <span className="pl-3.5 pr-1.5 text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider select-none border-r border-border/60 py-2">
               Program
@@ -117,7 +116,7 @@ export default function AdminCertificatesPage() {
         </div>
       </div>
 
-      {/* Templates List */}
+      {}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
           <Loader2 className="animate-spin h-8 w-8 text-brand-500" />
@@ -151,7 +150,7 @@ export default function AdminCertificatesPage() {
                 key={template.id} 
                 className="group bg-card border border-border hover:border-brand-500/20 hover:shadow-md rounded-2xl overflow-hidden shadow-3xs transition-all duration-300 flex flex-col hover:-translate-y-0.5"
               >
-                {/* Image Preview Container */}
+                {}
                 <div className="relative aspect-[1.414] bg-muted overflow-hidden border-b border-border">
                   {template.bgImageUrl ? (
                     <img 
@@ -173,7 +172,7 @@ export default function AdminCertificatesPage() {
                   )}
                 </div>
 
-                {/* Details Footer */}
+                {}
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
                   <div className="space-y-2">
                     <span className="inline-block text-[9px] bg-brand-500/10 text-brand-600 dark:text-brand-400 px-2.5 py-0.5 rounded-md font-bold uppercase tracking-wider">
@@ -220,7 +219,7 @@ export default function AdminCertificatesPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {}
       <ConfirmModal
         isOpen={deleteConfirmOpen}
         title="Delete Certificate Template"

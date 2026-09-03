@@ -1,8 +1,5 @@
 const puppeteer = require('puppeteer');
 
-/**
- * Compiles certificate HTML template with dynamic values
- */
 function compileHtml(template, data) {
   const bgImageUrl = template.bgImageUrl || '';
   const logoUrl = template.logoUrl || '';

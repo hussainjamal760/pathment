@@ -18,9 +18,6 @@ import { AIDetailDrawer, AIEvaluationBanner, RecipientRosterTable } from '@/comp
 import { useAIEvaluationProgress } from '@/components/admin/certificates/hooks';
 
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────────────────────
 
 type CriteriaTier = {
   id: string;
@@ -43,9 +40,6 @@ type MenteeRow = {
 
 type QualifiedData = Record<string, MenteeRow[]>;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ──────────────────────────────────────────────────────────────────────────────
 
 function EligibilityBadge({ match }: { match: number }) {
   if (match === 100) {
@@ -69,9 +63,6 @@ function EligibilityBadge({ match }: { match: number }) {
   );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Main Page
-// ──────────────────────────────────────────────────────────────────────────────
 
 export default function MentorCertificatesPage() {
   const { user } = useAuth();
@@ -85,17 +76,14 @@ export default function MentorCertificatesPage() {
   const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
 
-  // Selected template workspace
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [workspaceTab, setWorkspaceTab] = useState<'issue' | 'history'>('issue');
 
-  // Backend qualification data
   const [qualifiedData, setQualifiedData] = useState<QualifiedData>({});
   const [loadingQualifications, setLoadingQualifications] = useState(false);
   const [isRulesDrawerOpen, setIsRulesDrawerOpen] = useState(false);
   const [criteriaTasks, setCriteriaTasks] = useState<Array<{ id: string; title: string }>>([]);
 
-  // UI state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [badgeFilter, setBadgeFilter] = useState('all');
@@ -103,11 +91,9 @@ export default function MentorCertificatesPage() {
   const [personalNote, setPersonalNote] = useState('');
   const [issuing, setIssuing] = useState(false);
 
-  // Mentor's manual tier selections for each mentee
   const [mentorTiers, setMentorTiers] = useState<Record<string, string>>({});
   const [aiDetailMentee, setAiDetailMentee] = useState<any | null>(null);
 
-  // AI evaluation progress hook
   const {
     aiResults, setAiResults, aiRanAt, setAiRanAt, runningAI,
     aiProgressCount, aiTotalCount, runAIEvaluation
@@ -138,7 +124,6 @@ export default function MentorCertificatesPage() {
     return match ? match.name : tierId.charAt(0).toUpperCase() + tierId.slice(1);
   };
 
-  // Duplicate warn modal state
   const [duplicateWarnState, setDuplicateWarnState] = useState<{
     isOpen: boolean;
     duplicates: Array<{ id: string; name: string; email: string; tier: string }>;
@@ -151,10 +136,8 @@ export default function MentorCertificatesPage() {
 
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Tab switching state
   const [activeTab, setActiveTab] = useState<'issue' | 'my'>('issue');
 
-  // Mentor's own certificates
   const [myCertificates, setMyCertificates] = useState<CertificateInstance[]>([]);
   const [loadingMyCertificates, setLoadingMyCertificates] = useState(true);
   const [previewCert, setPreviewCert] = useState<CertificateInstance | null>(null);
@@ -184,7 +167,6 @@ export default function MentorCertificatesPage() {
     }
   }, [activeTab, user?.id]);
 
-  // ── Fetch templates ──
   useEffect(() => {
     certificatesApi.listTemplates()
       .then(res => { if (res.success) setTemplates((res.data ?? []).filter(t => t.status === 'active')); })
@@ -192,7 +174,6 @@ export default function MentorCertificatesPage() {
       .finally(() => setLoadingTemplates(false));
   }, []);
 
-  // ── Load qualification when template selected or user changes ──
   useEffect(() => {
     if (!activeTemplateId || !user) {
       setQualifiedData({});
@@ -218,7 +199,6 @@ export default function MentorCertificatesPage() {
           const activeTemplate = templates.find(t => t.id === activeTemplateId);
           const criteria = activeTemplate?.criteria ?? [];
 
-          // Build all active mentees list dynamically
           const activeList: any[] = [];
           const seenIds = new Set<string>();
 
@@ -232,7 +212,6 @@ export default function MentorCertificatesPage() {
             });
           });
 
-          // Pick up any remaining mentees from data keys not covered by criteria
           Object.keys(data).forEach(key => {
             if (key === 'mentors' || key === 'paused') return;
             const list = data[key] || [];
@@ -244,7 +223,6 @@ export default function MentorCertificatesPage() {
             });
           });
 
-          // Initialize default tiers dynamically
           const initialTiers: Record<string, string> = {};
           const autoSelected = new Set<string>();
 
@@ -264,14 +242,12 @@ export default function MentorCertificatesPage() {
             }
             initialTiers[m.id] = defTier;
 
-            // Auto-select if the defaulted tier has high criteria match (>= 90%)
             const matchPercent = m.tierMatches?.[defTier] ?? 0;
             if (matchPercent >= 90) {
               autoSelected.add(m.id);
             }
           });
 
-          // Sync cached AI evaluation if available on template
           if (activeTemplate?.aiEvaluation?.results) {
             const aiRes = activeTemplate.aiEvaluation.results;
             setAiResults(aiRes);
@@ -295,7 +271,6 @@ export default function MentorCertificatesPage() {
       .finally(() => setLoadingQualifications(false));
   }, [activeTemplateId, user, refreshKey]);
 
-  // ── Unified active mentees list (exclude paused) ──
   const activeMentees = useMemo<MenteeRow[]>(() => {
     const list: MenteeRow[] = [];
     const seen = new Set<string>();
@@ -313,11 +288,9 @@ export default function MentorCertificatesPage() {
     return list;
   }, [qualifiedData]);
 
-  // ── Filtered list based on search, badge filter, and sorted by score ──
   const filtered = useMemo(() => {
     let result = [...activeMentees];
 
-    // 1. Filter by search query
     const q = search.toLowerCase().trim();
     if (q) {
       result = result.filter(m =>
@@ -325,7 +298,6 @@ export default function MentorCertificatesPage() {
       );
     }
 
-    // 2. Filter by assigned badge (tier)
     if (badgeFilter !== 'all') {
       const activeTemplate = templates.find(t => t.id === activeTemplateId);
       const criteria = activeTemplate?.criteria ?? [];
@@ -336,7 +308,6 @@ export default function MentorCertificatesPage() {
       });
     }
 
-    // 3. Sort by score
     if (sortBy === 'score_desc') {
       result.sort((a: any, b: any) => (b.normalizedScore ?? 0) - (a.normalizedScore ?? 0));
     } else if (sortBy === 'score_asc') {
@@ -348,13 +319,11 @@ export default function MentorCertificatesPage() {
 
   const allSelected = filtered.length > 0 && filtered.every(m => selectedIds.has(m.id));
 
-  // ── Filtered AI evaluation results for mentor's clan mentees ──
   const mentorAIResults = useMemo(() => {
     const activeIds = new Set(activeMentees.map(m => m.id));
     return aiResults.filter((r: any) => activeIds.has(r.mentee_id));
   }, [aiResults, activeMentees]);
 
-  // ── Map AI evaluation results by mentee_id ──
   const aiEvalMap = useMemo(() => {
     const map: Record<string, any> = {};
     mentorAIResults.forEach((r: any) => { map[r.mentee_id] = r; });
@@ -386,7 +355,6 @@ export default function MentorCertificatesPage() {
     };
   }, [selectedIds, mentorTiers, templates, activeTemplateId]);
 
-  // ── Handlers ──
   const toggleAll = useCallback(() => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -454,7 +422,6 @@ export default function MentorCertificatesPage() {
   const handleTierChange = (menteeId: string, value: string) => {
     setMentorTiers(prev => ({ ...prev, [menteeId]: value }));
 
-    // Auto-select/deselect based on new tier qualification match
     const mentee = activeMentees.find(m => m.id === menteeId);
     if (mentee) {
       const match = mentee.tierMatches?.[value] ?? 0;
@@ -533,9 +500,6 @@ export default function MentorCertificatesPage() {
     }
   };
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // TEMPLATE GRID VIEW
-  // ══════════════════════════════════════════════════════════════════════════
 
   if (!activeTemplateId) {
     return (
@@ -547,7 +511,7 @@ export default function MentorCertificatesPage() {
               Manage certifications and view your achievements.
             </p>
           </div>
-          {/* Tabs */}
+          {}
           <div className="flex bg-muted/40 border border-border p-1 rounded-2xl gap-1">
             <button
               onClick={() => setActiveTab('issue')}
@@ -601,7 +565,7 @@ export default function MentorCertificatesPage() {
                     className="group bg-card border border-border rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col cursor-pointer"
                     onClick={() => !isPending && setPreviewCert(cert)}
                   >
-                    {/* Visual Preview */}
+                    {}
                     <div className="relative aspect-[1.777] bg-muted overflow-hidden border-b border-border flex items-center justify-center">
                       {isPending ? (
                         <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center" onClick={e => e.stopPropagation()}>
@@ -626,7 +590,7 @@ export default function MentorCertificatesPage() {
                       )}
                     </div>
 
-                    {/* Card Details */}
+                    {}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-4" onClick={e => e.stopPropagation()}>
                       <div className="space-y-1">
                         <h3
@@ -648,7 +612,7 @@ export default function MentorCertificatesPage() {
                         </div>
                       </div>
 
-                      {/* Actions */}
+                      {}
                       {!isPending && (
                         <div className="flex gap-2">
                           <button
@@ -739,7 +703,7 @@ export default function MentorCertificatesPage() {
           )
         )}
 
-        {/* Preview lightbox modal portal for mentor's certificates */}
+        {}
         {previewCert && (
           <div
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-4 md:p-8 animate-fade-in"
@@ -813,13 +777,10 @@ export default function MentorCertificatesPage() {
     );
   }
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // ISSUANCE WORKSPACE
-  // ══════════════════════════════════════════════════════════════════════════
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {}
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <button
@@ -834,7 +795,7 @@ export default function MentorCertificatesPage() {
           </div>
         </div>
 
-        {/* Tab Switchers inside workspace */}
+        {}
         <div className="flex items-center gap-3">
           {workspaceTab === 'issue' && (
             <button
@@ -872,9 +833,9 @@ export default function MentorCertificatesPage() {
       </div>
     </div>
 
-      {/* ── TOP ROW: Template Preview & Selected Summary Cards ── */}
+      {}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 mb-6">
-        {/* Template preview */}
+        {}
         <div className="md:col-span-7 bg-card border border-border/80 rounded-3xl p-5 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -892,7 +853,7 @@ export default function MentorCertificatesPage() {
           )}
         </div>
 
-        {/* Selected Summary Card */}
+        {}
         <div className="md:col-span-5 bg-card border border-border/80 rounded-3xl p-5 shadow-2xs flex flex-col justify-between">
           <div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Selected Summary</p>
@@ -918,7 +879,7 @@ export default function MentorCertificatesPage() {
         </div>
       </div>
 
-      {/* ── BOTTOM ROW: Full Width Table or History Log ── */}
+      {}
       <div className="w-full">
         {workspaceTab === 'history' ? (
           <div className="bg-card border border-border/80 rounded-3xl p-6 shadow-2xs flex flex-col min-h-[560px]">
@@ -929,7 +890,7 @@ export default function MentorCertificatesPage() {
           </div>
         ) : (
           <div className="bg-card border border-border rounded-3xl p-6 shadow-xs flex flex-col min-h-[580px]">
-            {/* Table Top Header: Title + Active Count + AI Action */}
+            {}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-border/60 mb-5 gap-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -959,7 +920,7 @@ export default function MentorCertificatesPage() {
 
 
 
-              {/* Sub-bar: AI evaluation status info */}
+              {}
                 <AIEvaluationBanner
                   count={mentorAIResults.length}
                   ranAt={aiRanAt}
@@ -968,7 +929,7 @@ export default function MentorCertificatesPage() {
                   totalCount={aiTotalCount}
                 />
 
-              {/* ── Mentor AI Detail Drawer ───────────────────────────────── */}
+              {}
               <AIDetailDrawer
                 mentee={aiDetailMentee}
                 onClose={() => setAiDetailMentee(null)}
@@ -979,7 +940,7 @@ export default function MentorCertificatesPage() {
               />
 
 
-              {/* Filters & Sorting row */}
+              {}
               <div className="flex flex-col sm:flex-row gap-3 mb-5">
                 <div className="relative flex-1">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
@@ -1000,7 +961,7 @@ export default function MentorCertificatesPage() {
                   )}
                 </div>
 
-                {/* Badge Filter select */}
+                {}
                 <div className="relative min-w-[150px]">
                   <select
                     value={badgeFilter}
@@ -1015,7 +976,7 @@ export default function MentorCertificatesPage() {
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
                 </div>
 
-                {/* Sort by Score select */}
+                {}
                 <div className="relative min-w-[150px]">
                   <select
                     value={sortBy}
@@ -1030,7 +991,7 @@ export default function MentorCertificatesPage() {
                 </div>
               </div>
 
-              {/* Bulk Actions Banner - slides/fades in when mentees selected */}
+              {}
               {selectedIds.size > 0 && filtered.length > 0 && (
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between bg-brand-500/5 dark:bg-brand-500/10 border border-brand-500/20 dark:border-brand-500/30 rounded-xl p-3.5 text-xs mb-5 animate-in fade-in slide-in-from-top-2 duration-200 gap-3">
                   <div className="flex items-center gap-2">
@@ -1067,7 +1028,7 @@ export default function MentorCertificatesPage() {
                 </div>
               )}
 
-              {/* Mentee table */}
+              {}
               <div className="flex-1 flex flex-col min-h-0">
                 <RecipientRosterTable
                   filtered={filtered}
@@ -1088,7 +1049,7 @@ export default function MentorCertificatesPage() {
                 />
               </div>
 
-              {/* Footer */}
+              {}
               <div className="flex items-center justify-between border-t border-border/60 pt-4 mt-4">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground font-semibold">
                   <Users className="w-4 h-4 text-brand-500" />

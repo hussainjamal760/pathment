@@ -32,7 +32,6 @@ export default function MenteeCertificatesPage() {
     fetchCertificates();
   }, [user?.id]);
 
-  // LinkedIn Share URL Builder
   const getLinkedInShareUrl = (cert: CertificateInstance) => {
     const url = cert.imageUrl || cert.pdfUrl || window.location.href;
     const title = `Awarded: ${cert.template?.name || 'Certificate of Mastery'} from Pathment`;
@@ -41,7 +40,7 @@ export default function MenteeCertificatesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
+      {}
       <div className="border-b border-border pb-4">
         <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
           <Award className="w-6 h-6 text-brand-500" />
@@ -50,7 +49,7 @@ export default function MenteeCertificatesPage() {
         <p className="text-xs text-muted-foreground">View, download, and share your earned accomplishments</p>
       </div>
 
-      {/* Certificates Grid */}
+      {}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[300px] gap-3">
           <Loader2 className="animate-spin h-8 w-8 text-brand-500" />
@@ -81,7 +80,7 @@ export default function MenteeCertificatesPage() {
                 className="group bg-card border border-border rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col cursor-pointer"
                 onClick={() => !isPending && setPreviewCert(cert)}
               >
-                {/* Visual Preview */}
+                {}
                 <div className="relative aspect-[1.777] bg-muted overflow-hidden border-b border-border flex items-center justify-center">
                   {isPending ? (
                     <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center" onClick={e => e.stopPropagation()}>
@@ -106,7 +105,7 @@ export default function MenteeCertificatesPage() {
                   )}
                 </div>
 
-                {/* Card Details */}
+                {}
                 <div className="p-4 flex-1 flex flex-col justify-between space-y-4" onClick={e => e.stopPropagation()}>
                   <div className="space-y-1">
                     <h3 
@@ -128,10 +127,10 @@ export default function MenteeCertificatesPage() {
                     </div>
                   </div>
 
-                  {/* Actions */}
+                  {}
                   {!isPending && (
                     <div className="flex gap-2">
-                      {/* View */}
+                      {}
                       <button
                         onClick={() => setPreviewCert(cert)}
                         className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-[10px] font-bold transition-colors"
@@ -140,7 +139,7 @@ export default function MenteeCertificatesPage() {
                         View
                       </button>
 
-                      {/* Download PNG */}
+                      {}
                       {cert.imageUrl && (
                         <a
                           href={cert.imageUrl.replace('/upload/', '/upload/fl_attachment/')}
@@ -154,7 +153,7 @@ export default function MenteeCertificatesPage() {
                         </a>
                       )}
 
-                      {/* LinkedIn Share */}
+                      {}
                       <a
                         href={getLinkedInShareUrl(cert)}
                         target="_blank"
@@ -173,13 +172,13 @@ export default function MenteeCertificatesPage() {
         </div>
       )}
 
-      {/* Lightbox Preview Modal */}
+      {}
       {previewCert && (
         <div 
           className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-4 md:p-8 animate-fade-in"
           onClick={() => setPreviewCert(null)}
         >
-          {/* Close trigger top right */}
+          {}
           <button 
             onClick={() => setPreviewCert(null)}
             className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/5"
@@ -187,12 +186,12 @@ export default function MenteeCertificatesPage() {
             <X className="w-5 h-5" />
           </button>
 
-          {/* Modal Container */}
+          {}
           <div 
             className="w-full max-w-4xl flex flex-col items-center gap-5 mt-4"
             onClick={e => e.stopPropagation()}
           >
-            {/* The Certificate Image Box */}
+            {}
             <div className="w-full aspect-[1.777] bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
               <img 
                 src={previewCert.imageUrl} 
@@ -201,7 +200,7 @@ export default function MenteeCertificatesPage() {
               />
             </div>
 
-            {/* Title / Issuer Details */}
+            {}
             <div className="text-center space-y-1">
               <h2 className="text-white text-base font-bold">{previewCert.template?.name || 'Certificate of Mastery'}</h2>
               <p className="text-white/60 text-[11px] font-medium">
@@ -209,9 +208,9 @@ export default function MenteeCertificatesPage() {
               </p>
             </div>
 
-            {/* Actions Bar */}
+            {}
             <div className="flex gap-3 bg-white/5 border border-white/10 px-5 py-3 rounded-2xl backdrop-blur-xs select-none">
-              {/* Open PNG in new tab */}
+              {}
               {previewCert.imageUrl && (
                 <a
                   href={previewCert.imageUrl}
@@ -224,7 +223,7 @@ export default function MenteeCertificatesPage() {
                 </a>
               )}
 
-              {/* Download PNG */}
+              {}
               {previewCert.imageUrl && (
                 <a
                   href={previewCert.imageUrl.replace('/upload/', '/upload/fl_attachment/')}
@@ -237,7 +236,7 @@ export default function MenteeCertificatesPage() {
                 </a>
               )}
 
-              {/* Share */}
+              {}
               <a
                 href={getLinkedInShareUrl(previewCert)}
                 target="_blank"

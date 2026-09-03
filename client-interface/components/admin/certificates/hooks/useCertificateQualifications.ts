@@ -13,10 +13,6 @@ interface UseCertificateQualificationsOptions {
   setRefreshKey: React.Dispatch<React.SetStateAction<number>>;
 }
 
-/**
- * Custom hook for cohort mentee qualification data fetching, recipient selection,
- * tier overrides, duplicate detection modal, and certificate issuance execution.
- */
 export function useCertificateQualifications({
   templateId,
   selectedProgramId,
@@ -32,7 +28,6 @@ export function useCertificateQualifications({
   const [issuing, setIssuing] = useState(false);
   const [sendingToMentors, setSendingToMentors] = useState(false);
 
-  // Duplicate Warning Modal state
   const [duplicateWarningModal, setDuplicateWarningModal] = useState<{
     isOpen: boolean;
     duplicates: Array<{ id: string; name: string; email: string; tier: string }>;
@@ -43,7 +38,6 @@ export function useCertificateQualifications({
     allSelectedRecipients: []
   });
 
-  // Load cohort qualifications when program, criteria, or refreshKey change
   useEffect(() => {
     if (!templateId || !selectedProgramId) return;
 

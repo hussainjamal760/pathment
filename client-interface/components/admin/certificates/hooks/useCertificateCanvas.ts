@@ -10,10 +10,6 @@ interface UseCertificateCanvasOptions {
   setElements: React.Dispatch<React.SetStateAction<CertificateElement[]>>;
 }
 
-/**
- * Custom hook for certificate visual canvas layout management, active element selection,
- * background presets, drag moves, font family loading, and layer manipulation.
- */
 export function useCertificateCanvas({ elements, setElements }: UseCertificateCanvasOptions) {
   const [name, setName] = useState('');
   const [selectedProgramId, setSelectedProgramId] = useState('');
@@ -28,7 +24,6 @@ export function useCertificateCanvas({ elements, setElements }: UseCertificateCa
 
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Set default preset if no background is set
   useEffect(() => {
     if (!bgImageUrl) {
       const defaultPreset = BACKGROUND_PRESETS[0];
@@ -41,7 +36,6 @@ export function useCertificateCanvas({ elements, setElements }: UseCertificateCa
 
   const selectedElement = elements.find(el => el.id === selectedId) || null;
 
-  // Handle Drag Move
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!activeDragId || !canvasRef.current) return;
 

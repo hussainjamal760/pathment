@@ -9,15 +9,12 @@ const { certificateAwardedEmail } = require('../utils/emailTemplate');
 const logger = require('../utils/logger');
 
 
-const POLL_MS = Number(process.env.CERTIFICATE_WORKER_POLL_MS) || 10000; // 10 seconds
+const POLL_MS = Number(process.env.CERTIFICATE_WORKER_POLL_MS) || 10000; 
 const MAX_ATTEMPTS = 5;
 
 let timer = null;
 let running = false;
 
-/**
- * Process a single enqueued certificate job
- */
 async function processJob(job) {
   const instance = await models.CertificateInstance.findOne({
     where: { id: job.instanceId },
@@ -142,15 +139,12 @@ async function processJob(job) {
   });
 }
 
-/**
- * Worker polling tick
- */
 async function tick() {
   if (running) return;
   running = true;
 
   try {
-    const STALE_LOCK_MS = 5 * 60 * 1000; // 5 minutes lock timeout
+    const STALE_LOCK_MS = 5 * 60 * 1000; 
     const now = new Date();
 
     const job = await sequelize.transaction(async (t) => {
@@ -173,12 +167,11 @@ async function tick() {
 
       if (!pendingJob) return null;
 
-      // Exponential backoff check: if retrying, ensure backoff delay has elapsed
       if (pendingJob.attempts > 0 && pendingJob.status === 'pending') {
         const backoffMs = Math.pow(2, pendingJob.attempts - 1) * 3000;
         const lastUpdated = new Date(pendingJob.updatedAt).getTime();
         if (Date.now() - lastUpdated < backoffMs) {
-          return null; // Skip for now, backoff in progress
+          return null; 
         }
       }
 
@@ -229,7 +222,6 @@ async function stop() {
     clearInterval(timer);
     timer = null;
   }
-  // Graceful shutdown: wait for running tick to finish
   let waitCount = 0;
   while (running && waitCount < 10) {
     await new Promise(r => setTimeout(r, 500));

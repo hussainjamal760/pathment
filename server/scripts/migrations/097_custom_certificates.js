@@ -37,7 +37,6 @@ async function up() {
   console.log('▶ Running migration 097: custom certificate system (consolidated)');
 
   await sequelize.transaction(async (t) => {
-    // 1. Create certificate_templates
     if (await tableExists('certificate_templates', t)) {
       console.log('  ℹ certificate_templates exists, skipping create');
     } else {
@@ -64,7 +63,6 @@ async function up() {
       console.log('  ✓ Created certificate_templates');
     }
 
-    // 1.1 Add AI evaluation columns to certificate_templates if not exists
     if (!await columnExists('certificate_templates', 'ai_evaluation', t)) {
       await sequelize.query(`ALTER TABLE certificate_templates ADD COLUMN ai_evaluation JSONB`, { transaction: t });
       console.log('  ✓ Added ai_evaluation column to certificate_templates');
@@ -74,7 +72,6 @@ async function up() {
       console.log('  ✓ Added ai_evaluation_ran_at column to certificate_templates');
     }
 
-    // 2. Create certificate_instances
     if (await tableExists('certificate_instances', t)) {
       console.log('  ℹ certificate_instances exists, skipping create');
     } else {
@@ -106,7 +103,6 @@ async function up() {
       console.log('  ✓ Created certificate_instances');
     }
 
-    // 3. Create certificate_queue
     if (await tableExists('certificate_queue', t)) {
       console.log('  ℹ certificate_queue exists, skipping create');
     } else {
@@ -126,7 +122,6 @@ async function up() {
       console.log('  ✓ Created certificate_queue');
     }
 
-    // 4. Create ai_evaluation_queue
     if (await tableExists('ai_evaluation_queue', t)) {
       console.log('  ℹ ai_evaluation_queue exists, skipping create');
     } else {
@@ -152,7 +147,6 @@ async function up() {
       console.log('  ✓ Created ai_evaluation_queue table');
     }
 
-    // Add indexes for certificate_queue performance
     const qStatusIdx = 'certificate_queue_status_attempts';
     if (await indexExists(qStatusIdx, t)) {
       console.log(`  ℹ ${qStatusIdx} exists, skipping`);
@@ -161,7 +155,6 @@ async function up() {
       console.log(`  ✓ Created index ${qStatusIdx}`);
     }
 
-    // Add indexes for instances lookups
     const instMenteeIdx = 'certificate_instances_mentee_id';
     if (await indexExists(instMenteeIdx, t)) {
       console.log(`  ℹ ${instMenteeIdx} exists, skipping`);
@@ -170,7 +163,6 @@ async function up() {
       console.log(`  ✓ Created index ${instMenteeIdx}`);
     }
 
-    // Add indexes for ai_evaluation_queue performance
     const aiStatusIdx = 'idx_ai_eval_queue_status_created';
     if (await indexExists(aiStatusIdx, t)) {
       console.log(`  ℹ ${aiStatusIdx} exists, skipping`);
@@ -195,8 +187,6 @@ async function up() {
       console.log(`  ✓ Created index ${aiTemplateIdx}`);
     }
 
-    // ARCH-4: Unique constraint on (run_id, mentee_id) — prevents duplicate evaluation rows
-    // if a race occurs between the DELETE and bulkCreate in enqueueEvaluation.
     const aiRunMenteeUnique = 'ai_eval_queue_run_mentee_unique';
     if (await indexExists(aiRunMenteeUnique, t)) {
       console.log(`  ℹ ${aiRunMenteeUnique} exists, skipping`);
@@ -230,7 +220,6 @@ async function down() {
       console.log('  ✓ Dropped certificate_instances');
     }
     if (await tableExists('certificate_templates', t)) {
-      // Drop columns first if rollback of Consolidated is partial, but if dropping table, columns go away.
       await qi.dropTable('certificate_templates', { transaction: t });
       console.log('  ✓ Dropped certificate_templates');
     }

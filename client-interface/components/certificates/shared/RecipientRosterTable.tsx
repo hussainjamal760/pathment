@@ -23,11 +23,6 @@ export interface RecipientRosterTableProps {
   emptyMessage?: string;
 }
 
-/**
- * Shared recipient roster table component for Admin and Mentor certificate issuance flows.
- * Provides consistent accessibility, responsive table layout, AI score pill indicators,
- * dropdown tier assignment, and issued badge rollups.
- */
 export function RecipientRosterTable({
   filtered,
   criteria,
@@ -67,7 +62,7 @@ export function RecipientRosterTable({
 
   return (
     <div className="border border-border rounded-2xl overflow-hidden flex flex-col bg-card shadow-xs">
-      {/* Table header */}
+      {}
       <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-muted/50 dark:bg-muted/20 text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider items-center border-b border-border select-none">
         <div className="col-span-1 flex items-center justify-center">
           <input
@@ -83,7 +78,7 @@ export function RecipientRosterTable({
         <div className="col-span-2 text-center">Issued Badges</div>
       </div>
 
-      {/* Table rows */}
+      {}
       <div className="max-h-[350px] overflow-y-auto divide-y divide-border">
         {filtered.map((m: any) => {
           const defaultTier = m.isPaused ? '' : (criteria[criteria.length - 1]?.id ?? 'participation');
@@ -109,7 +104,7 @@ export function RecipientRosterTable({
                 />
               </div>
 
-              {/* Column 2: Recipient Name & Email */}
+              {}
               <div className="col-span-3 flex items-center gap-2.5 min-w-0">
                 <div className="h-7 w-7 rounded-full bg-gradient-to-tr from-brand-500/10 to-indigo-500/10 dark:from-brand-500/20 dark:to-indigo-500/20 text-brand-700 dark:text-brand-300 flex items-center justify-center text-[9px] font-extrabold border border-brand-500/20 shrink-0">
                   {initials || 'U'}
@@ -132,7 +127,7 @@ export function RecipientRosterTable({
                 </div>
               </div>
 
-              {/* Column 3: AI Recommendation */}
+              {}
               <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
                 {aiEvalMap[m.id] ? (
                   <div className="flex items-center gap-1.5 bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-xl">
@@ -166,7 +161,7 @@ export function RecipientRosterTable({
                 )}
               </div>
 
-              {/* Column 4: Final Assigned Badge Dropdown */}
+              {}
               <div className="col-span-3 flex flex-col items-center justify-center">
                 <div className="relative inline-flex items-center w-full max-w-[170px] shadow-2xs rounded-xl border border-border bg-background hover:bg-muted/30 transition-colors">
                   <select
@@ -190,7 +185,7 @@ export function RecipientRosterTable({
                 )}
               </div>
 
-              {/* Column 5: Issued Badges */}
+              {}
               <div className="col-span-2 flex flex-wrap justify-center gap-1">
                 {issuedTiersList.length === 0 ? (
                   <span className="text-[10px] text-muted-foreground/40 font-semibold select-none">—</span>

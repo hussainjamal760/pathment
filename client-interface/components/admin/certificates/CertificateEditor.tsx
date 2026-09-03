@@ -30,7 +30,7 @@ import { useAIEvaluationProgress, useRecipientSelection } from './hooks';
 
 
 interface CertificateEditorProps {
-  templateId?: string; // If provided, we are in Edit Mode
+  templateId?: string; 
 }
 
 export default function CertificateEditor({ templateId }: CertificateEditorProps) {
@@ -40,15 +40,12 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
 
-  // Upload states
   const [uploadingBg, setUploadingBg] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingTierBadge, setUploadingTierBadge] = useState(false);
 
-  // Zoom state
   const [zoom, setZoom] = useState(1.0);
 
-  // Template states
   const [name, setName] = useState('');
   const [bgImageUrl, setBgImageUrl] = useState('https://res.cloudinary.com/djctfho31/image/upload/v1724683050/pathment/templates/default-cert-bg.jpg');
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
@@ -56,23 +53,18 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const [logoUrl, setLogoUrl] = useState('');
   const [logoConfig, setLogoConfig] = useState({ xPercent: 50, yPercent: 20, widthPercent: 12 });
 
-  // Elements & Dragging
   const [elements, setElements] = useState<CertificateElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | 'logo' | null>(null);
 
-  // Dynamic Tiers state (Step 2)
   const [criteria, setCriteria] = useState<TierCriteria[]>(DEFAULT_CRITERIA);
 
-  // Auto-Qualification results
   const [qualifiedData, setQualifiedData] = useState<Record<string, any[]>>({});
   const [loadingQualifications, setLoadingQualifications] = useState(false);
 
-  // AI evaluation state & hook
   const [aiDetailMentee, setAiDetailMentee] = useState<any | null>(null);
   const [expandedAIRows, setExpandedAIRows] = useState<Set<string>>(new Set());
 
-  // AI progress hook
   const {
     aiResults, setAiResults, aiRanAt, setAiRanAt, runningAI,
     aiProgressCount, aiTotalCount, aiEvalMap, runAIEvaluation
@@ -96,7 +88,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     }
   });
 
-  // Recipient selection hook
   const {
     recipientSearch, setRecipientSearch,
     badgeFilter, setBadgeFilter,
@@ -109,13 +100,11 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     bulkSetBadge: bulkSetBadgeHook, resetToAIRecommendations: resetToAIRecommendationsHook
   } = useRecipientSelection({ criteria, qualifiedData, aiResults: aiEvalMap });
 
-  // Roadmap tasks & Programs
   const [availableTasks, setAvailableTasks] = useState<Array<{ id: string; title: string }>>([]);
   const [allRoadmaps, setAllRoadmaps] = useState<any[]>([]);
   const [programs, setPrograms] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedProgramId, setSelectedProgramId] = useState<string>('');
 
-  // Additional UI states
   const [issuing, setIssuing] = useState(false);
   const [sendingToMentors, setSendingToMentors] = useState(false);
   const [isRulesDrawerOpen, setIsRulesDrawerOpen] = useState(false);
@@ -143,7 +132,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
   const bulkSetBadge = (badge: string) => bulkSetBadgeHook(badge, getTierName);
   const resetToAIRecommendations = () => resetToAIRecommendationsHook(aiResults);
 
-  // Duplicate warn modal state
   const [duplicateWarnState, setDuplicateWarnState] = useState<{
     isOpen: boolean;
     duplicates: Array<{ id: string; name: string; email: string; tier: string }>;
@@ -158,12 +146,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
 
 
-  // Tier Modal State
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<TierCriteria | null>(null);
 
 
-  // Fetch roadmap tasks & cohorts on mount
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -172,12 +158,10 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           programsApi.getAll({ limit: 100 })
         ]);
 
-        // Load tasks list
         if (roadmapRes.data && Array.isArray(roadmapRes.data.roadmaps)) {
           setAllRoadmaps(roadmapRes.data.roadmaps);
         }
 
-        // Load cohorts
         if (programsRes.success && programsRes.data) {
           setPrograms(programsRes.data);
           if (programsRes.data.length > 0 && !templateId) {
@@ -191,7 +175,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     loadData();
   }, [templateId]);
 
-  // Dynamically compute available tasks based on selected Program ID
   useEffect(() => {
     if (!selectedProgramId || allRoadmaps.length === 0) {
       setAvailableTasks([]);
@@ -214,7 +197,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     setAvailableTasks(flat);
   }, [selectedProgramId, allRoadmaps]);
 
-  // Fetch initial template if editing
   useEffect(() => {
     if (!templateId) return;
 
@@ -241,8 +223,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             const loaded = t.criteria.map((c: any, fallbackIdx: number) => ({
               id:                c.id,
               name:              c.name,
-              // Preserve stored priority; fall back to array position for legacy templates
-              // that were saved before the priority field existed.
               priority:          c.priority ?? fallbackIdx + 1,
               badgeUrl:          c.badgeUrl ?? '',
               keywords:          Array.isArray(c.keywords) ? c.keywords : [],
@@ -254,11 +234,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               minAttendanceRate: c.minAttendanceRate ?? null,
               customRule:        c.customRule ?? ''
             }));
-            // Sort by priority ascending so the list always renders highest-tier-first
             loaded.sort((a: any, b: any) => (a.priority ?? Infinity) - (b.priority ?? Infinity));
             setCriteria(loaded);
           }
-          // Load cached AI evaluation if present
           if (t.aiEvaluation?.results) {
             setAiResults(t.aiEvaluation.results);
             setAiRanAt(t.aiEvaluation.ranAt ?? null);
@@ -275,7 +253,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     fetchTemplate();
   }, [templateId]);
 
-  // Load cohort qualifications when cohort/program or criteria change
   useEffect(() => {
     if (!templateId || !selectedProgramId) return;
 
@@ -291,7 +268,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             setCriteriaTasks([]);
           }
 
-          // Get list of active mentees
           const activeList: any[] = [];
           const seenIds = new Set<string>();
 
@@ -305,7 +281,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             });
           });
 
-          // Pick up any remaining mentees from data keys not covered by criteria
           Object.keys(res.data).forEach(key => {
             if (key === 'mentors' || key === 'paused') return;
             const list = res.data[key] || [];
@@ -332,7 +307,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             }
           });
 
-          // Set default for mentors to the last tier ID or 'participation' and auto-select them
           const mentorDefaultTier = criteria[criteria.length - 1]?.id || 'participation';
           mentorsList.forEach(m => {
             initialTiers[m.id] = mentorDefaultTier;
@@ -352,7 +326,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     fetchQualifications();
   }, [templateId, selectedProgramId, refreshKey]);
 
-  // Handle Drag Move
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!activeDragId || !canvasRef.current) return;
 
@@ -423,9 +396,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     }
   };
 
-  // Add variable element onto canvas
   const addVariableElement = (key: string, label: string) => {
-    // Avoid duplicates
     if (elements.some(el => el.dynamicKey === key)) {
       const match = elements.find(el => el.dynamicKey === key);
       if (match) setSelectedId(match.id);
@@ -557,7 +528,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     ));
   };
 
-  // Save full template configuration (Step 1 + Step 2)
   const handleSave = async () => {
     if (!name.trim()) {
       toast.error('Please enter a template name');
@@ -620,7 +590,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     }
   };
 
-  // Issue certificates (Step 3) — uses explicitly selected mentees
   const handleIssue = async () => {
     if (selectedMenteeIds.size === 0) {
       toast.error('Please select at least one mentee to issue certificates');
@@ -633,7 +602,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
       tier: adminTiers[id] ?? defaultTier
     }));
 
-    // Build all active recipients dynamically — no hardcoded tier keys
     const allMentees: any[] = [];
     const seenIds = new Set<string>();
     Object.keys(qualifiedData).forEach(key => {
@@ -669,7 +637,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     }
   };
 
-  // Send template to all mentors in the program
   const handleSendToMentors = async () => {
     if (!templateId || !selectedProgramId) return;
     try {
@@ -683,7 +650,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     }
   };
 
-  // Open Add/Edit Tier dialog
   const openTierModal = (tier?: TierCriteria) => {
     setEditingTier(tier || null);
     setIsTierModalOpen(true);
@@ -697,7 +663,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         const newTier: TierCriteria = {
           id: `tier-${Date.now()}`,
           name: savedFields.name || 'New Tier',
-          // New tiers are appended at the end — assign next priority value
           priority: prev.length + 1,
           ...savedFields,
         };
@@ -717,7 +682,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
   const selectedElement = elements.find(el => el.id === selectedId) || null;
 
-  // ─────────────────────────────────────────────────────────────────────────────
 
   if (fetching) {
     return (
@@ -734,9 +698,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         __html: `@import url('${GOOGLE_FONTS_URL}');`
       }} />
 
-      {/* Breadcrumb & Title Header */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-border/60 pb-5">
-        {/* Left side: Breadcrumb & Title */}
+        {}
         <div className="space-y-2 flex-1 max-w-2xl">
           <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
             <span>Certificates</span>
@@ -755,9 +719,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
           <p className="text-xs text-muted-foreground font-medium">Create, customize and issue certificates for this fellowship cycle.</p>
         </div>
 
-        {/* Right side: Meta (Program Select) & Actions (Back, Save) */}
+        {}
         <div className="flex items-center gap-3 flex-wrap md:justify-end shrink-0">
-          {/* Program Select */}
+          {}
           <div className="relative inline-flex items-center shadow-3xs rounded-xl border border-border/80 bg-background hover:bg-muted/30 transition-colors">
             <span className="pl-3.5 pr-1.5 text-[9px] font-extrabold text-muted-foreground uppercase tracking-wider select-none border-r border-border/60 py-2">
               Program
@@ -794,7 +758,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         </div>
       </div>
 
-      {/* SECTION 1: Certificate Template */}
+      {}
       <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
         <div className="flex items-start gap-3.5 border-b border-border pb-4">
           <div className="w-8 h-8 rounded-full bg-brand-500/10 flex items-center justify-center font-bold text-brand-500 text-sm">
@@ -807,9 +771,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* Left Column: Canvas Preview */}
+          {}
           <div className="xl:col-span-8 flex flex-col items-center gap-4">
-            {/* Zoom controls */}
+            {}
             <div className="flex items-center gap-2 bg-muted/40 border border-border px-3 py-1.5 rounded-2xl text-[10px] font-bold text-muted-foreground">
               <button type="button" onClick={() => setZoom(z => Math.max(0.5, z - 0.1))} className="p-1 hover:bg-muted text-foreground rounded-lg transition-colors">
                 <ZoomOut className="w-3.5 h-3.5" />
@@ -824,7 +788,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </button>
             </div>
 
-            {/* Canvas Outer Wrapper */}
+            {}
             <div className="w-full bg-muted/30 border border-border rounded-3xl p-6 flex items-center justify-center overflow-auto min-h-[480px]">
               <div
                 ref={canvasRef}
@@ -842,7 +806,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 }}
                 className="relative rounded-lg shadow-lg overflow-hidden cursor-default select-none border border-border shrink-0"
               >
-                {/* Elements Overlay */}
+                {}
                 {elements.map((el) => {
                   const isSelected = selectedId === el.id;
 
@@ -944,14 +908,14 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
             </div>
 
-            {/* Background template paper */}
+            {}
             <div className="space-y-3 w-full animate-fade-in">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Background template paper</label>
                 <span className="text-[9px] font-bold text-brand-600 bg-brand-500/10 px-2 py-0.5 rounded-full uppercase tracking-wider select-none">Design Setup</span>
               </div>
 
-              {/* Presets Trigger Button */}
+              {}
               <div className="w-full">
                 <button
                   type="button"
@@ -971,9 +935,9 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
             </div>
           </div>
 
-          {/* Right Column: Variables Helper & Layer Customizations */}
+          {}
           <div className="xl:col-span-4 space-y-5">
-            {/* Template Variables Shortcuts */}
+            {}
             <div className="bg-card border border-border rounded-2xl p-5 space-y-3.5 shadow-2xs">
               <div>
                 <h3 className="text-xs font-bold text-foreground uppercase tracking-wide">Variables</h3>
@@ -1039,7 +1003,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
             </div>
 
-            {/* Selected Element Customization Panel */}
+            {}
             {selectedElement ? (
               <div className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-2xs">
                 <div className="flex items-center justify-between border-b border-border pb-3">
@@ -1175,7 +1139,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         </div>
       </div>
 
-      {/* SECTION 2: Certificate Criteria */}
+      {}
       <CriteriaTable
         criteria={criteria}
         onAdd={() => openTierModal()}
@@ -1184,7 +1148,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         onReorder={setCriteria}
       />
 
-      {/* SECTION 3: Select Recipients & Issue */}
+      {}
       <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
         <div className="flex items-start justify-between border-b border-border pb-4">
           <div className="flex items-start gap-3.5">
@@ -1237,7 +1201,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               totalCount={aiTotalCount}
             />
 
-            {/* ── AI Detail Drawer ─────────────────────────────────────────── */}
+            {}
             <AIDetailDrawer
               mentee={aiDetailMentee}
               onClose={() => setAiDetailMentee(null)}
@@ -1247,8 +1211,8 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               overrideLabel="Override Tier (Admin)"
             />
 
-            {/* ── Existing Roster (Tabs + Table) ─────────────────────────── */}
-            {/* Recipient Type Tabs & Rules */}
+            {}
+            {}
             <div className="flex items-center justify-between border-b border-border -mx-6 px-6 pb-px mb-2">
               <div className="flex gap-4">
                 {(['all', 'mentees', 'mentors', 'paused'] as const).map(type => (
@@ -1282,7 +1246,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </button>
             </div>
 
-            {/* Filters & Sorting row */}
+            {}
             <div className="flex flex-col sm:flex-row gap-3 mb-5">
               <div className="relative flex-1">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
@@ -1304,7 +1268,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 )}
               </div>
 
-              {/* Badge Filter select */}
+              {}
               <div className="relative min-w-[150px]">
                 <select
                   value={badgeFilter}
@@ -1319,7 +1283,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground/60 pointer-events-none" />
               </div>
 
-              {/* Sort by Score select */}
+              {}
               <div className="relative min-w-[150px]">
                 <select
                   value={sortBy}
@@ -1334,7 +1298,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
             </div>
 
-            {/* Bulk Actions */}
+            {}
             {filtered.length > 0 && (
               <div className="flex items-center gap-1.5 flex-wrap bg-muted/20 border border-border rounded-2xl p-3 text-xs w-full">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mr-1">Set All to:</span>
@@ -1360,7 +1324,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
             )}
 
-            {/* Mentee / Mentor table */}
+            {}
             <RecipientRosterTable
               filtered={filtered}
               criteria={criteria}
@@ -1379,7 +1343,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               emptyMessage={`No ${recipientType === 'paused' ? 'paused mentees' : 'active ' + recipientType} found in this program.`}
             />
 
-            {/* Selection Summary badges rollup */}
+            {}
             {selectedMenteeIds.size > 0 && (
               <div className="bg-muted/20 border border-border rounded-2xl p-4 flex flex-wrap gap-4 text-xs font-semibold text-muted-foreground">
                 {criteria.map(c => (
@@ -1392,7 +1356,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               </div>
             )}
 
-            {/* Footer: selection count + issue button */}
+            {}
             <div className="flex items-center justify-between border-t border-border pt-4">
               <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
                 <Users className="w-4 h-4 text-brand-500" />
@@ -1421,7 +1385,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
 
       </div>
 
-      {/* SECTION 4: Issuance History */}
+      {}
       {templateId && (
         <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
           <div className="border-b border-border pb-4">
@@ -1432,7 +1396,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         </div>
       )}
 
-      {/* TIER CREATION / EDITING MODAL DIALOG */}
+      {}
       <TierCriteriaModal
         isOpen={isTierModalOpen}
         editingTier={editingTier}
@@ -1477,7 +1441,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                       </p>
                     ) : (
                       <>
-                        {/* Keywords */}
+                        {}
                         <div className="space-y-1">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Keywords / Tech Stack</p>
                           {kws.length === 0 ? (
@@ -1491,7 +1455,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           )}
                         </div>
 
-                        {/* Hard Constraints Grid */}
+                        {}
                         <div className="space-y-1">
                           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hard Constraints (AI cannot bypass)</p>
                           <div className="grid grid-cols-3 gap-2">
@@ -1518,7 +1482,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           </div>
                         </div>
 
-                        {/* Custom Rule */}
+                        {}
                         {customRule && (
                           <div className="space-y-1">
                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Custom AI Rule</p>
@@ -1565,7 +1529,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
         width="lg"
       >
         <div className="grid grid-cols-2 gap-4 py-2">
-          {/* Custom Background Uploaded/Dropzone Card */}
+          {}
           {(() => {
             const hasCustomImage = bgImageUrl && !bgImageUrl.startsWith('data:image/svg+xml;base64,');
             const isCustomActive = !activePresetId && hasCustomImage;
@@ -1586,7 +1550,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     }}
                     className="w-full flex flex-col items-start focus:outline-none flex-1"
                   >
-                    {/* Image Preview */}
+                    {}
                     <div className="w-full aspect-[1.414] rounded-xl overflow-hidden border border-border bg-muted/30 relative flex items-center justify-center">
                       <img
                         src={bgImageUrl}
@@ -1612,7 +1576,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     </div>
                   </button>
 
-                  {/* Actions & Replace File Button */}
+                  {}
                   <div className="mt-3 flex items-center justify-between w-full border-t border-border/40 pt-2 shrink-0">
                     {isCustomActive ? (
                       <span className="inline-flex items-center gap-1 text-[8px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full uppercase tracking-wider select-none">
@@ -1647,7 +1611,6 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
               );
             }
 
-            // No custom image uploaded yet - show file dropzone card
             return (
               <FileDragDrop onFilesSelected={handleBgUpload} accept="image/*" multiple={false} disabled={uploadingBg}>
                 {({ openFilePicker }) => (
@@ -1691,7 +1654,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                   : 'border-border hover:border-brand-500/30'
                   }`}
               >
-                {/* Image Preview */}
+                {}
                 <div className="w-full aspect-[1.414] rounded-xl overflow-hidden border border-border bg-muted/30 relative flex items-center justify-center">
                   <img
                     src={preset.imageUrl}
@@ -1715,7 +1678,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                     </p>
                   </div>
 
-                  {/* Status Button at the bottom */}
+                  {}
                   <div className="mt-3">
                     {isActive ? (
                       <span className="inline-flex items-center gap-1 text-[8px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full uppercase tracking-wider">

@@ -2,20 +2,7 @@ const crypto = require('crypto');
 const { models } = require('../db');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors/errorTypes');
 
-/**
- * aiConnectionService - AI provider keys (bring-your-own-key) + feature routing.
- *
- * Scope: a connection's ownerId is NULL for org-wide keys (admin-managed) or a
- * user id for a mentor's personal keys. A user only ever sees/manages the keys
- * in their own scope (admins → org, mentors → personal). Keys are AES-256-GCM
- * encrypted at rest and only ever surfaced masked.
- *
- * Resolution (resolveActiveConfig) is what the live AI client consumes: a
- * mentor's personal routing wins, then org routing, then any connected org key,
- * then the env fallback (handled by the caller).
- */
 
-// OpenAI-compatible default base URLs + a /models probe used to test a key.
 const PROVIDER_BASE = {
   groq: 'https://api.groq.com/openai/v1',
   openai: 'https://api.openai.com/v1',
@@ -25,8 +12,6 @@ const PROVIDER_BASE = {
   custom: null
 };
 const PROVIDERS = Object.keys(PROVIDER_BASE);
-// Per-provider default model used when a connection doesn't specify one. Each id
-// is valid FOR THAT PROVIDER — never cross a Groq id into OpenRouter/OpenAI/etc.
 const PROVIDER_DEFAULT_MODEL = {
   groq: 'llama-3.1-8b-instant',
   openai: 'gpt-4o-mini',
@@ -34,7 +19,6 @@ const PROVIDER_DEFAULT_MODEL = {
   gemini: 'gemini-3.1-flash-lite',
   openrouter: 'meta-llama/llama-3.3-70b-instruct',
   anthropic: 'claude-3-5-haiku-latest',
-  // custom: no safe default — the connection should set one.
 };
 const FEATURES = ['summary', 'delay', 'atrisk', 'nudge', 'stall', 'coaching', 'feedback', 'roadmap', 'assessment', 'rag_embedding', 'rag_generation', 'rag_grounding', 'certificates'];
 
@@ -42,13 +26,12 @@ const isAdmin = (user) => {
   const caps = Array.isArray(user?.capabilities) && user.capabilities.length ? user.capabilities : [user?.role];
   return caps.includes('admin');
 };
-// The scope a user manages: org (null) for admins, personal (their id) otherwise.
 const ownerFor = (user) => (isAdmin(user) ? null : user.id);
 const routingKey = (ownerId) => (ownerId ? `ai.routing:${ownerId}` : 'ai.routing');
 
 function encKey() {
   const secret = process.env.AI_ENCRYPTION_KEY || process.env.JWT_SECRET || 'pathment-ai-default-secret';
-  return crypto.createHash('sha256').update(secret).digest(); // 32 bytes
+  return crypto.createHash('sha256').update(secret).digest(); 
 }
 function encrypt(plain) {
   const iv = crypto.randomBytes(12);
@@ -70,7 +53,6 @@ const publicShape = (c) => ({
 });
 
 class AIConnectionService {
-  // ── owner-scoped CRUD ───────────────────────────────────────────────────
   async list(user) {
     const rows = await models.AIConnection.findAll({ where: { ownerId: ownerFor(user) }, order: [['created_at', 'DESC']] });
     return rows.map(publicShape);
@@ -97,7 +79,6 @@ class AIConnectionService {
     return publicShape(row);
   }
 
-  /** Load a connection the user is allowed to manage (same scope), or throw. */
   async _ownedRow(id, user) {
     const row = await models.AIConnection.findByPk(id);
     if (!row) throw new NotFoundError('Connection not found');
@@ -115,7 +96,6 @@ class AIConnectionService {
     return { removed: true };
   }
 
-  /** Probe the provider's /models endpoint with the stored key. */
   async test(id, user) {
     const row = await this._ownedRow(id, user);
     const ok = await this._probe(row);
@@ -144,7 +124,6 @@ class AIConnectionService {
     }
   }
 
-  // ── routing (per owner) ─────────────────────────────────────────────────
   async _readRouting(ownerId) {
     const row = await models.SystemSettings.findOne({ where: { settingKey: routingKey(ownerId) } });
     let stored = {};
@@ -173,14 +152,10 @@ class AIConnectionService {
     return clean;
   }
 
-  // ── resolution for the live AI client ────────────────────────────────────
   _toConfig(row) {
     return {
       apiKey: decrypt(row.keyEncrypted),
       baseURL: row.baseUrl || PROVIDER_BASE[row.provider],
-      // A connection with no model set must NOT fall back to the env default
-      // (a Groq model id) — that fails on every other provider ("not a valid
-      // model ID"). Use a provider-appropriate default instead.
       model: row.model || PROVIDER_DEFAULT_MODEL[row.provider] || null,
       provider: row.provider
     };
@@ -211,13 +186,7 @@ class AIConnectionService {
     };
   }
 
-  /**
-   * Resolve the AI config the app should use: a mentor's personal routing for
-   * `feature` wins, then org routing, then any connected org key, then null
-   * (the caller falls back to env). `userId` enables the personal path.
-   */
   async resolveActiveConfig(feature = null, userId = null) {
-    // Check if caller is non-admin mentor
     let isMentorCaller = false;
     if (userId) {
       const callerUser = await models.User.findByPk(userId, { attributes: ['id', 'role', 'capabilities'] });
@@ -229,14 +198,12 @@ class AIConnectionService {
       }
     }
 
-    // 1) Personal routing for this user + feature.
     if (userId && feature) {
       const personal = await this._readRouting(userId);
       if (personal[feature]) {
         const row = await models.AIConnection.findOne({ where: { id: personal[feature], ownerId: userId } });
         if (row) return this._toConfig(row);
       }
-      // Check if mentor has any connected personal key
       const personalRows = await models.AIConnection.findAll({ where: { ownerId: userId }, order: [['created_at', 'DESC']] });
       if (personalRows.length) {
         const chosen = personalRows.find((r) => r.status === 'connected') || personalRows[0];
@@ -244,13 +211,10 @@ class AIConnectionService {
       }
     }
 
-    // Strict BYOK rule: mentors MUST have their own personal AI key configured.
-    // If a mentor has no personal key, do NOT fall back to admin/org keys!
     if (isMentorCaller) {
       return null;
     }
 
-    // 2) Org routing for the feature (for admins).
     if (feature) {
       const org = await this._readRouting(null);
       if (org[feature]) {
@@ -258,7 +222,6 @@ class AIConnectionService {
         if (row) return this._toConfig(row);
       }
     }
-    // 3) Any org connection - prefer a connected one, else most recent.
     const orgRows = await models.AIConnection.findAll({ where: { ownerId: null }, order: [['created_at', 'DESC']] });
     if (orgRows.length) {
       const chosen = orgRows.find((r) => r.status === 'connected') || orgRows[0];
@@ -273,13 +236,6 @@ module.exports = new AIConnectionService();
 module.exports.FEATURES = FEATURES;
 module.exports.PROVIDERS = PROVIDERS;
 
-/**
- * Resolves the mentor's Gemini embedding API key.
- * Strategy (BYOK strict — no process.env fallback):
- *   1. Explicit rag_embedding routing set by the mentor.
- *   2. Any connected Gemini connection the mentor owns.
- *   3. null → caller must skip gracefully.
- */
 async function resolveGeminiKey(mentorId) {
   const service = module.exports;
   const routedConfig = await service.resolveActiveConfig('rag_embedding', mentorId);

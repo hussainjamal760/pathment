@@ -7,12 +7,6 @@ const aiEvaluationService = require('./aiEvaluationService');
 const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
 
 
-/**
- * Deduplicate an array of objects by their `.id` field.
- * REMOVE-6: This pattern appeared in two separate places in the service — extracted here.
- * @param {Array} arr - Array of objects with an `id` property.
- * @returns {Array}
- */
 function deduplicateById(arr) {
   const seen = new Set();
   return arr.filter(item => {
@@ -22,14 +16,7 @@ function deduplicateById(arr) {
   });
 }
 
-/**
- * certificateQualificationService — Handles mentor scoping, mentee eligibility, history, and AI evaluation orchestration.
- */
 class CertificateQualificationService {
-  /**
-   * Helper: Resolve mentee IDs scoped to a mentor's active clans within a program.
-   * Returns null if the user is an admin (meaning no mentor clan restriction).
-   */
   async getMentorScopedMenteeIds(mentorId, programId, userRole) {
     if (userRole !== 'mentor') return null;
 
@@ -49,9 +36,6 @@ class CertificateQualificationService {
     return menteeMembers.map(m => m.userId);
   }
 
-  /**
-   * Helper for mentor clan ID lookup in qualification logic.
-   */
   async getMentorScopedMenteeClans(mentorId, programId, userRole) {
     const clanInclude = {
       model: models.Clan,
@@ -76,9 +60,6 @@ class CertificateQualificationService {
     return clanIds;
   }
 
-  /**
-   * Evaluate qualification for mentees against a template's criteria tiers
-   */
   async getQualification(id, queryMentorId, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
@@ -89,7 +70,6 @@ class CertificateQualificationService {
     const activeMentees = [];
     const pausedMentees = [];
 
-    // Pre-query set of mentee IDs whose ClanMembership is status='paused' in this program
     const pausedMenteeIdsSet = new Set();
     if (programId) {
       const pausedMemberships = await models.ClanMembership.findAll({
@@ -150,7 +130,6 @@ class CertificateQualificationService {
 
     const criteria = sortCriteriaByPriority(Array.isArray(template.criteria) ? template.criteria : []);
 
-    // Query latest completed evaluation run directly from AIEvaluationQueue
     const latestQueueRun = await models.AIEvaluationQueue.findOne({
       where: { templateId: id, status: 'completed' },
       order: [['createdAt', 'DESC']],
@@ -233,14 +212,9 @@ class CertificateQualificationService {
       result.mentors = uniqueMentors;
     }
 
-    // REMOVE-4: criteriaTasks was always an empty array with no implementation.
-    // Removed to avoid confusion. Implement properly if needed in a future iteration.
     return result;
   }
 
-  /**
-   * Get template issuance history
-   */
   async getTemplateHistory(id, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id } });
     if (!template) throw new NotFoundError('Certificate template not found');
@@ -299,9 +273,6 @@ class CertificateQualificationService {
     });
   }
 
-  /**
-   * Run AI evaluation for a template
-   */
   async runAIEvaluation(id, queryMentorId, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
@@ -337,7 +308,7 @@ class CertificateQualificationService {
       }
     }
 
-    const mentees = deduplicateById(menteeRows); // REMOVE-6: use shared helper
+    const mentees = deduplicateById(menteeRows); 
 
     if (mentees.length === 0) {
       return { total: 0, runId: null, data: [] };
@@ -346,31 +317,25 @@ class CertificateQualificationService {
     const menteeIds = mentees.map(m => m.id);
 
     if (!mentorId) {
-      // Admin-wide run: no clan scoping — all task sources are included.
       const { runId, total } = await aiEvaluationService.enqueueEvaluation(
         id, menteeIds, user.id, criteria, null
       );
       return { runId, total };
     }
 
-    // BUG-7 fix: For mentors with multiple clans, group mentees by their actual clan and
-    // enqueue per-clan group so each mentee's tasks are scored against their own clan's
-    // mentor assignments (not just the first clan). All groups share the same runId.
     const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
     if (clanIds.length === 0) {
       return { total: 0, runId: null, data: [] };
     }
 
     if (clanIds.length === 1) {
-      // Single clan — simple path (original behaviour, correct).
       const { runId, total } = await aiEvaluationService.enqueueEvaluation(
         id, menteeIds, user.id, criteria, clanIds[0]
       );
       return { runId, total };
     }
 
-    // Multi-clan mentor: find each mentee's actual clan and group them.
-    const menteeClanMap = new Map(); // menteeId -> clanId
+    const menteeClanMap = new Map(); 
     const memberships = await models.ClanMembership.findAll({
       where: {
         userId:  { [Op.in]: menteeIds },
@@ -387,7 +352,6 @@ class CertificateQualificationService {
       }
     }
 
-    // Group menteeIds by their resolved clanId. Mentees with no match fall back to clanIds[0].
     const byClan = new Map();
     for (const menteeId of menteeIds) {
       const clan = menteeClanMap.get(menteeId) ?? clanIds[0];
@@ -395,7 +359,6 @@ class CertificateQualificationService {
       byClan.get(clan).push(menteeId);
     }
 
-    // Use a pre-generated shared runId so all clan groups belong to the same evaluation run.
     const sharedRunId = uuidv4();
     let total = 0;
     for (const [clanId, clanMenteeIds] of byClan) {
@@ -408,9 +371,6 @@ class CertificateQualificationService {
     return { runId: sharedRunId, total };
   }
 
-  /**
-   * Get AI evaluation status
-   */
   async getAIEvaluationStatus(runId, templateId) {
     let targetRunId = runId;
 

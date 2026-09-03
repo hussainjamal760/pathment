@@ -1,21 +1,8 @@
-/**
- * Certificate Editor Static Constants
- *
- * Pure static data extracted from CertificateEditor.tsx to separate data from behavior.
- * Contains: font presets, dynamic variable shortcuts, background SVG presets,
- * default tier criteria, and the TierCriteria type definition.
- */
 
-// ─── TierCriteria Type ─────────────────────────────────────────────────────────
 
 export interface TierCriteria {
   id: string;
   name: string;
-  /**
-   * Explicit rank: 1 = top tier (best certificate), 2 = second best, etc.
-   * Admin drags tiers to reorder in CriteriaTable; priority is re-assigned as array index + 1 on save.
-   * When missing on legacy templates, Infinity is used as fallback to preserve existing array order.
-   */
   priority?: number;
   badgeUrl?: string;
   keywords?: string[] | null;
@@ -28,7 +15,6 @@ export interface TierCriteria {
   customRule?: string | null;
 }
 
-// ─── Font Presets ───────────────────────────────────────────────────────────────
 
 export const FONTS = [
   { value: 'Montserrat, sans-serif', label: 'Montserrat (Modern Sans)' },
@@ -43,11 +29,9 @@ export const FONTS = [
   { value: 'Courier New, monospace', label: 'Courier New (Mono)' }
 ] as const;
 
-// ─── Google Fonts Import URL ────────────────────────────────────────────────────
 
 export const GOOGLE_FONTS_URL = "https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;700&family=Great+Vibes&family=Montserrat:wght@400;600;700&family=Oswald:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Sacramento&family=Lustria&family=Merriweather&display=swap";
 
-// ─── Dynamic Variable Shortcuts ─────────────────────────────────────────────────
 
 export const DYNAMIC_SHORTCUTS = [
   { key: 'mentee_name', label: 'Member Name', tag: '{{name}}' },
@@ -57,7 +41,6 @@ export const DYNAMIC_SHORTCUTS = [
   { key: 'issuer_title', label: 'Issuer Title', tag: '{{issuer_title}}' }
 ] as const;
 
-// ─── Default Tier Criteria (used when creating a new template) ──────────────────
 
 export const DEFAULT_CRITERIA: TierCriteria[] = [
   { id: 'gold',          priority: 1, name: 'Gold Certificate',          badgeUrl: '', keywords: [], minScorePercent: 80, maxOpenBlockers: 0, minCompletionRate: 90, minOnTimeRate: 70, minAvgRating: 4.0, minAttendanceRate: 80, customRule: '' },
@@ -66,7 +49,6 @@ export const DEFAULT_CRITERIA: TierCriteria[] = [
   { id: 'participation', priority: 4, name: 'Participation Certificate', badgeUrl: '', keywords: [], minScorePercent: 0,  maxOpenBlockers: -1, minCompletionRate: 0, minOnTimeRate: 0, minAvgRating: 0, minAttendanceRate: null, customRule: '' },
 ];
 
-// ─── Background SVG Presets ─────────────────────────────────────────────────────
 
 export interface BackgroundPreset {
   id: string;

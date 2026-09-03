@@ -2,9 +2,6 @@
 
 import { useState, useEffect } from 'react';
 
-/**
- * Generic utility hook to evaluate media query matching state (e.g. mobile/desktop views).
- */
 export function useMediaQuery(query: string): boolean {
   const [matches, setMatches] = useState(false);
 

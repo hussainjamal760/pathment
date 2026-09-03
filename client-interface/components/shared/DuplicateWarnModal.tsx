@@ -32,7 +32,7 @@ export default function DuplicateWarnModal({
         className="bg-card border border-border w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] relative animate-scale-in"
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
+        {}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between bg-amber-500/5">
           <h3 className="text-sm font-bold text-amber-600 flex items-center gap-1.5">
             <ShieldAlert className="w-5 h-5 text-amber-500" />
@@ -46,7 +46,7 @@ export default function DuplicateWarnModal({
           </button>
         </div>
 
-        {/* Body */}
+        {}
         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <p className="text-xs text-muted-foreground leading-relaxed">
             The following recipients have already been issued a certificate for the <strong className="text-foreground">same badge tier</strong>:
@@ -71,7 +71,7 @@ export default function DuplicateWarnModal({
           </p>
         </div>
 
-        {/* Footer */}
+        {}
         <div className="px-6 py-4 bg-muted/40 border-t border-border flex flex-col sm:flex-row justify-end gap-2.5">
           <button
             type="button"

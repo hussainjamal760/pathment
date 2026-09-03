@@ -23,7 +23,6 @@ interface CriteriaTableProps {
   onAdd: () => void;
   onEdit: (tier: TierCriteria) => void;
   onDelete: (tierId: string) => void;
-  /** Called when the admin reorders tiers via drag-and-drop. Receives the new sorted array. */
   onReorder?: (reordered: TierCriteria[]) => void;
 }
 
@@ -35,15 +34,6 @@ const RANK_COLORS = [
   'bg-brand-500/10 text-brand-600 dark:text-brand-400 border-brand-500/20',
 ];
 
-/**
- * Displays the list of certificate tiers with a rank badge, criteria summary,
- * drag-to-reorder handle, and edit/delete actions.
- *
- * Drag-to-reorder:
- *   - Drag the ≡ grip handle to change a tier's rank.
- *   - On drop, onReorder fires with the new order (priority values re-assigned as index+1).
- *   - The top tier in this list is the BEST certificate (priority 1).
- */
 export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: CriteriaTableProps) {
   const draggedIdx  = useRef<number | null>(null);
   const dragOverIdx = useRef<number | null>(null);
@@ -68,7 +58,6 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
       const next = [...criteria];
       const [moved] = next.splice(draggedIdx.current, 1);
       next.splice(dragOverIdx.current, 0, moved);
-      // Re-assign priority as 1-based index position
       onReorder(next.map((t, i) => ({ ...t, priority: i + 1 })));
     }
     draggedIdx.current  = null;
@@ -78,7 +67,7 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
 
   return (
     <div className="bg-card border border-border rounded-3xl p-6 shadow-xs space-y-5">
-      {/* Header */}
+      {}
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div className="flex items-start gap-3.5">
           <div className="w-8 h-8 rounded-full bg-brand-500/10 flex items-center justify-center font-bold text-brand-500 text-sm">
@@ -101,9 +90,9 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
         </button>
       </div>
 
-      {/* Table */}
+      {}
       <div className="border border-border rounded-2xl overflow-hidden bg-muted/10 divide-y divide-border">
-        {/* Header row */}
+        {}
         <div className="grid grid-cols-12 gap-4 px-6 py-3.5 bg-muted/40 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
           <div className="col-span-1" />
           <div className="col-span-4">Certificate Type</div>
@@ -111,7 +100,7 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
-        {/* Body */}
+        {}
         {criteria.length === 0 ? (
           <div className="p-12 text-center text-xs text-muted-foreground font-semibold">
             No certificate types configured. Click &quot;+ Add Certificate Type&quot; to begin.
@@ -146,7 +135,7 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
                 onDragOver={e => e.preventDefault()}
                 className={`grid grid-cols-12 gap-4 px-6 py-4 items-center text-xs font-semibold text-foreground bg-card hover:bg-muted/10 transition-colors select-none ${isDraggingThis ? 'opacity-40 scale-[0.99]' : ''}`}
               >
-                {/* Drag handle + rank */}
+                {}
                 <div className="col-span-1 flex items-center gap-1.5">
                   <GripVertical className="w-3.5 h-3.5 text-muted-foreground cursor-grab active:cursor-grabbing shrink-0" />
                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${rankColor}`}>
@@ -154,7 +143,7 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
                   </span>
                 </div>
 
-                {/* Name + Badge */}
+                {}
                 <div className="col-span-4 flex items-center gap-2">
                   {tier.badgeUrl ? (
                     <img src={tier.badgeUrl} className="w-7 h-7 object-contain rounded-md" alt={tier.name} />
@@ -166,12 +155,12 @@ export function CriteriaTable({ criteria, onAdd, onEdit, onDelete, onReorder }: 
                   <span className="font-bold text-foreground">{tier.name}</span>
                 </div>
 
-                {/* Summary */}
+                {}
                 <div className="col-span-5 text-muted-foreground text-[11px] font-medium leading-relaxed">
                   {summaryText}
                 </div>
 
-                {/* Actions */}
+                {}
                 <div className="col-span-2 flex items-center justify-end gap-3">
                   <button
                     type="button"

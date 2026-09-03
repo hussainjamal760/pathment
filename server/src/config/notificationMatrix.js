@@ -38,11 +38,8 @@ EXTENSION_HANDLED: 'extension_handled',
   MENTEE_RETURNED: 'mentee_returned',
   FEEDBACK_SUBMITTED: 'feedback_submitted',
   FEEDBACK_STATUS_UPDATED: 'feedback_status_updated',
-  // Admissions intake (admin-facing)
   APPLICATION_RECEIVED: 'application_received',
   APPLICATION_CAPACITY_REACHED: 'application_capacity_reached',
-  // Recurring cohort reviews + admin-hosted meetings (in-app; the rich email +
-  // calendar .ics is enqueued separately by the scheduling services)
   REVIEW_SCHEDULED: 'review_scheduled',
   REVIEW_REMINDER: 'review_reminder',
   ADMIN_MEETING_INVITE: 'admin_meeting_invite',
@@ -50,27 +47,15 @@ EXTENSION_HANDLED: 'extension_handled',
   CERTIFICATE_AWARDED: 'certificate_awarded'
 };
 
-// Which role's "hat" a notification concerns, so the bell + list can scope to the
-// portal the viewer is currently in (a dual-role mentor/mentee sees only the
-// active role's items; single-role users are unaffected). 'any' = always shown
-// regardless of role (system/security/cross-cutting — never hidden).
-//
-// This is the DECLARED audience per event and the enforcement point (every event
-// must set one — see the matrix-completeness test). At dispatch time the concrete
-// per-notification actionUrl wins when it names a role (see resolveAudience),
-// because a single event can legitimately fan out to different roles; `audience`
-// is the fallback for role-neutral or url-less notifications.
 const NOTIFICATION_AUDIENCES = ['mentor', 'mentee', 'admin', 'any'];
 
 const NOTIFICATION_MATRIX = {
-  // New applicant landed — in-app only (can be frequent; no email spam).
   [NOTIFICATION_EVENTS.APPLICATION_RECEIVED]: {
     type: 'intake',
     audience: 'admin',
     preferenceKey: 'application_received',
     channels: { inApp: true, email: false, chat: false }
   },
-  // Cohort hit its application cap — admins should decide to raise it or close.
   [NOTIFICATION_EVENTS.APPLICATION_CAPACITY_REACHED]: {
     type: 'intake',
     audience: 'admin',
@@ -137,8 +122,6 @@ const NOTIFICATION_MATRIX = {
     preferenceKey: 'program_updates',
     channels: { inApp: true, email: true, chat: false }
   },
-  // Cohort-review deletion lock: admins get notified of unlock requests; mentors
-  // get the approve/decline outcome. New preferenceKeys default to on.
   [NOTIFICATION_EVENTS.REVIEW_UNLOCK_REQUESTED]: {
     type: 'system',
     audience: 'admin',
@@ -259,76 +242,60 @@ const NOTIFICATION_MATRIX = {
     preferenceKey: 'new_mentee_in_clan',
     channels: { inApp: true, email: true, chat: false }
   },
-  // Another mentor asks THIS clan to take one of their mentees. Always in-app;
-  // the email is dispatched with emailOnlyIfOffline so someone who is already in
-  // the app just gets the bell (see notificationOrchestrator.dispatch).
   [NOTIFICATION_EVENTS.MENTEE_TRANSFER_REQUESTED]: {
     type: 'system',
     audience: 'mentor',
     preferenceKey: 'mentee_transfer_requested',
     channels: { inApp: true, email: true, chat: false }
   },
-  // The outcome, back to the requester (and to the mentee once they've moved).
   [NOTIFICATION_EVENTS.MENTEE_TRANSFER_DECIDED]: {
     type: 'system',
-    // Dual-use: the decision goes to the requesting mentor AND to the moved
-    // mentee, so the per-notification actionUrl resolves the audience.
     audience: 'any',
     preferenceKey: 'mentee_transfer_decided',
     channels: { inApp: true, email: true, chat: false }
   },
   [NOTIFICATION_EVENTS.PROMOTION_NOMINATED]: {
     type: 'system',
-    // Dual-use: nomination/awaiting → admins; "you're now a co-mentor" → the
-    // promoted person (mentor-view). actionUrl resolves each per recipient.
     audience: 'any',
     preferenceKey: 'promotion_nominated',
     channels: { inApp: true, email: true, chat: false }
   },
-  // A mentee looks inactive and is suggested for pausing (to the mentor).
   [NOTIFICATION_EVENTS.MENTEE_PAUSE_SUGGESTED]: {
     type: 'system',
     audience: 'mentor',
     preferenceKey: 'mentee_pause_suggested',
     channels: { inApp: true, email: false, chat: false }
   },
-  // A mentee was paused (in-app + email): what it means + ask a mentor to resume.
   [NOTIFICATION_EVENTS.MENTEE_PAUSED]: {
     type: 'system',
     audience: 'mentee',
     preferenceKey: 'mentee_paused',
     channels: { inApp: true, email: true, chat: false }
   },
-  // Win-back reminder to a paused mentee (in-app + email, the Zomato model).
   [NOTIFICATION_EVENTS.MENTEE_REENGAGE]: {
     type: 'system',
     audience: 'mentee',
     preferenceKey: 'mentee_reengage',
     channels: { inApp: true, email: true, chat: false }
   },
-  // A paused mentee re-engaged and is back to active (to the mentor).
   [NOTIFICATION_EVENTS.MENTEE_RETURNED]: {
     type: 'system',
     audience: 'mentor',
     preferenceKey: 'mentee_returned',
     channels: { inApp: true, email: true, chat: false }
   },
-  // A new feedback/bug report was submitted (to admins, in-app only).
   [NOTIFICATION_EVENTS.FEEDBACK_SUBMITTED]: {
     type: 'system',
     audience: 'admin',
     preferenceKey: 'feedback_submitted',
     channels: { inApp: true, email: false, chat: false }
   },
-  // A reporter's feedback changed status (to the reporter — could be anyone).
   [NOTIFICATION_EVENTS.FEEDBACK_STATUS_UPDATED]: {
     type: 'system',
     audience: 'any',
     preferenceKey: 'feedback_status_updated',
     channels: { inApp: true, email: true, chat: false }
   },
-  // Recurring review scheduled / reminder — in-app only here; the calendar
-  // invite email (+ .ics) is enqueued directly by reviewScheduleService.
   [NOTIFICATION_EVENTS.REVIEW_SCHEDULED]: {
     type: 'system',
     audience: 'any',
@@ -341,8 +308,6 @@ const NOTIFICATION_MATRIX = {
     preferenceKey: 'review_reminder',
     channels: { inApp: true, email: false, chat: false }
   },
-  // Admin-hosted meeting invite / reminder — in-app only here; the calendar
-  // invite email (+ .ics) is enqueued directly by adminMeetingService.
   [NOTIFICATION_EVENTS.ADMIN_MEETING_INVITE]: {
     type: 'system',
     audience: 'any',
@@ -363,12 +328,6 @@ const NOTIFICATION_MATRIX = {
   }
 };
 
-/**
- * The role a notification's action link belongs to, from its URL namespace
- * (`/mentor/...` → mentor). Returns null for role-neutral or missing URLs. This
- * is the primary, per-notification signal — the whole app is route-partitioned
- * by role, so the URL namespace IS the role context.
- */
 function deriveAudienceFromUrl(actionUrl) {
   if (!actionUrl || typeof actionUrl !== 'string') return null;
   const seg = actionUrl.split('?')[0].split('/').filter(Boolean)[0];
@@ -376,13 +335,6 @@ function deriveAudienceFromUrl(actionUrl) {
   return null;
 }
 
-/**
- * The audience to STORE on a notification, resolved at dispatch:
- *   1. the concrete actionUrl's role (per-recipient-correct, even when one event
- *      fans out to several roles), else
- *   2. the event's declared matrix audience, else
- *   3. 'any' (always shown — the safe default, never hides anything).
- */
 function resolveAudience(eventKey, actionUrl) {
   const fromUrl = deriveAudienceFromUrl(actionUrl);
   if (fromUrl) return fromUrl;
@@ -390,12 +342,6 @@ function resolveAudience(eventKey, actionUrl) {
   return declared && NOTIFICATION_AUDIENCES.includes(declared) ? declared : 'any';
 }
 
-/**
- * User-facing email notification categories - the emailable, NON-transactional
- * events a person can toggle in Settings. Each `key` is the preferenceKey the
- * orchestrator checks in `emailNotifications`. (Transactional mail - password
- * reset, account welcome - is intentionally excluded; it always sends.)
- */
 const EMAIL_PREFERENCE_CATEGORIES = [
   { group: 'Tasks', key: 'task_assigned', label: 'A task is assigned to me' },
   { group: 'Tasks', key: 'task_submitted', label: 'A mentee submits a task' },

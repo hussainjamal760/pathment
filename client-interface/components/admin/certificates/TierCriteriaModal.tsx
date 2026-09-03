@@ -19,7 +19,6 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   const [tierModalBadgeUrl, setTierModalBadgeUrl] = useState('');
   const [uploadingBadge, setUploadingBadge] = useState(false);
 
-  // Field toggles
   const [enableKeywords, setEnableKeywords] = useState(true);
   const [enableMinScore, setEnableMinScore] = useState(true);
   const [enableMaxBlockers, setEnableMaxBlockers] = useState(true);
@@ -29,7 +28,6 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   const [enableMinAttendance, setEnableMinAttendance] = useState(false);
   const [enableCustomRule, setEnableCustomRule] = useState(true);
 
-  // Field values
   const [tierModalKeywords, setTierModalKeywords] = useState<string[]>([]);
   const [tierModalKeywordInput, setTierModalKeywordInput] = useState('');
   const [tierModalMinScore, setTierModalMinScore] = useState(75);
@@ -40,7 +38,6 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   const [tierModalMinAttendance, setTierModalMinAttendance] = useState(70);
   const [tierModalCustomRule, setTierModalCustomRule] = useState('');
 
-  // Sync state when editingTier or isOpen changes
   useEffect(() => {
     if (!isOpen) return;
 
@@ -114,7 +111,6 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
       return;
     }
 
-    // Flush any pending keyword input
     const kws = [...tierModalKeywords];
     const pending = tierModalKeywordInput.trim();
     if (pending && !kws.includes(pending)) kws.push(pending);
@@ -140,7 +136,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
       <div className="bg-card border border-border w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-        {/* Header */}
+        {}
         <div className="px-6 py-5 border-b border-border flex items-center justify-between">
           <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
             <Award className="w-4.5 h-4.5 text-brand-500" />
@@ -151,7 +147,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
           </button>
         </div>
 
-        {/* Body */}
+        {}
         <div className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground">Certificate Type Name</label>
@@ -164,7 +160,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
             />
           </div>
 
-          {/* Badge Uploader */}
+          {}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
               Upload Badge Icon
@@ -192,7 +188,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
             </FileDragDrop>
           </div>
 
-          {/* Keywords / Tech Stack */}
+          {}
           <div className="space-y-2 border-t border-border/60 pt-3">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 cursor-pointer">
@@ -255,7 +251,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
             </div>
           </div>
 
-          {/* Hard Constraints */}
+          {}
           <div className="space-y-3 border-t border-border/60 pt-3">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Hard Constraints <span className="normal-case font-normal text-muted-foreground/60">(AI cannot bypass these)</span>
@@ -399,7 +395,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
             </div>
           </div>
 
-          {/* Custom AI Rule */}
+          {}
           <div className="space-y-2 border-t border-border/60 pt-3">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
@@ -426,7 +422,7 @@ export function TierCriteriaModal({ isOpen, editingTier, onClose, onSave }: Tier
           </div>
         </div>
 
-        {/* Footer */}
+        {}
         <div className="px-6 py-4 bg-muted/20 border-t border-border flex justify-end gap-3">
           <button
             type="button"

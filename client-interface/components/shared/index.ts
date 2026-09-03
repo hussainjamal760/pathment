@@ -1,4 +1,3 @@
-// Shared components barrel export
 export { DataTable } from './DataTable';
 export type { DataTableColumn, DataTableProps } from './DataTable';
 
@@ -25,7 +24,6 @@ export { BackupCodesModal } from './BackupCodesModal';
 
 export { UserProfileCard } from './UserProfileCard';
 
-// Pre-existing shared components
 export { default as FileUploader } from './FileUploader';
 export { default as Navigation } from './Navigation';
 export { default as OnboardingGuard } from './OnboardingGuard';

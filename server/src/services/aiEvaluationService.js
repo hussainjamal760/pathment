@@ -1,12 +1,3 @@
-/**
- * aiEvaluationService — Certificate eligibility evaluation via AI.
- * Supports micro-batching (up to 10 mentees per API call), qualitative custom rule
- * & tech stack keyword evaluation, and AbortController request cancellation.
- *
- * Criteria arrays are ALWAYS sorted by `priority` (ascending, 1 = top tier) before
- * any processing. sortCriteriaByPriority is applied at every entry point so callers
- * don't need to think about order.
- */
 const { v4: uuidv4 } = require('uuid');
 const { models } = require('../db');
 const groqService = require('./groqService');
@@ -18,43 +9,22 @@ const { buildBatchMenteePrompt } = require('./aiEvalPromptBuilder');
 const { extractJsonFromText } = require('../utils/aiEvalHelpers');
 const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
 
-/**
- * Check if an AI-assigned tier falls within the server math ceiling (maxAllowedTierId).
- *
- * Criteria are ordered highest-first. A lower index = more prestigious. Assigned tier is
- * "allowed" only when its index >= maxAllowed index (i.e., it is the ceiling or below it).
- *
- * Special case: 'participation' is the sentinel floor tier and is never in the criteria array.
- * When the ceiling is 'participation', NO custom tier is allowed — only 'participation' itself.
- *
- * @param {string} assignedTier    - Tier the AI wants to assign.
- * @param {string} maxAllowedTierId - Server-computed ceiling tier id.
- * @param {Array}  criteria         - Template criteria array, highest-first.
- * @returns {boolean}
- */
 function isTierAllowed(assignedTier, maxAllowedTierId, criteria) {
   if (!assignedTier || !maxAllowedTierId) return false;
   if (assignedTier === maxAllowedTierId) return true;
 
-  // 'participation' ceiling means the mentee failed all hard constraints.
-  // No custom tier can be assigned — only participation itself is valid.
   if (maxAllowedTierId === 'participation') return false;
 
   const tierOrder = (criteria || []).map(c => c.id);
   const assignedIdx = tierOrder.indexOf(assignedTier);
   const maxIdx      = tierOrder.indexOf(maxAllowedTierId);
 
-  if (assignedIdx === -1) return false; // unknown tier → deny
-  if (maxIdx === -1) return false;      // unknown ceiling → deny (conservative)
+  if (assignedIdx === -1) return false; 
+  if (maxIdx === -1) return false;      
 
-  // assignedIdx >= maxIdx means assignedTier is the ceiling or below it (lower prestige)
   return assignedIdx >= maxIdx;
 }
 
-/**
- * Builds human-readable failure messages for tiers the mentee could NOT reach,
- * so the AI can reference them verbatim in its reasoning.
- */
 function buildHardConstraintFailures(preCheck, criteria) {
   const failures  = [];
   const hardChecks = preCheck.hardChecks || {};
@@ -63,17 +33,11 @@ function buildHardConstraintFailures(preCheck, criteria) {
   const tierIds     = (criteria || []).map(c => c.id);
   const maxTierIndex = tierIds.indexOf(maxTierId);
 
-  // Report failures only for tiers ABOVE the ceiling (those the mentee didn't qualify for).
-  //
-  // Three cases:
-  //   maxTierIndex > 0  → ceiling is not the top tier → report failures for everything above it
-  //   maxTierIndex === 0 → mentee achieved the top tier → NO tiers above it → no failures to report
-  //   maxTierIndex === -1 → 'participation' (not in criteria array) → ALL tiers were failed
   const higherTiers = maxTierIndex > 0
     ? tierIds.slice(0, maxTierIndex)
     : maxTierIndex === 0
-      ? []       // top tier achieved: nothing above to report
-      : tierIds; // participation ceiling: every tier was failed
+      ? []       
+      : tierIds; 
 
   for (const tierId of higherTiers) {
     const tierConfig = criteria.find(c => c.id === tierId);
@@ -103,10 +67,6 @@ function buildHardConstraintFailures(preCheck, criteria) {
   return failures;
 }
 
-/**
- * Evaluate a BATCH of up to 20 mentees in ONE single AI API request.
- * Evaluates qualitative Custom Rules and Tech Stack Keywords against completed tasks.
- */
 async function evaluateBatchMentees(template, batchItems, adminUserId) {
   if (!batchItems || batchItems.length === 0) return [];
 
@@ -117,16 +77,9 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
     );
   }
 
-  // Sort by priority so the AI prompt hierarchy and isTierAllowed comparisons
-  // always operate on a deterministic highest-first order.
   const criteria     = sortCriteriaByPriority(Array.isArray(template.criteria) ? template.criteria : []);
   const systemPrompt = buildBatchMenteePrompt(criteria, batchItems.length);
 
-  // Re-run preCheckHardConstraints from the live template criteria at evaluation time.
-  // The stored item.preCheck was computed at ENQUEUE time — if the admin changed any
-  // threshold between enqueue and processing, the stale snapshot would send wrong
-  // max_eligible_tier and wrong failure messages to the AI (the root cause of the
-  // "static values overriding dynamic changes" bug).
   const compactPayloads = batchItems.map(item => {
     const livePreCheck = preCheckHardConstraints(item.menteePayload, criteria);
     return {
@@ -223,10 +176,6 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
   return parseBatchAIResponse(raw, criteria, batchItems, ai);
 }
 
-/**
- * Attempt a single AI self-correction retry when JSON parsing fails.
- * Uses the shared extractJsonFromText helper.
- */
 async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
   try {
     logger.info('[aiEvaluationService] Triggering AI self-correction retry prompt for malformed JSON...');
@@ -255,13 +204,6 @@ async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
   }
 }
 
-/**
- * Parse JSON array returned by LLM for a batch of mentees.
- * SIMPLIFY-2: Removed positional fallback (parsedArray[idx]).
- * If a mentee_id is not found in the AI result map, we use buildFallbackResult.
- * Positional matching was unsafe — if the AI returned results out of order,
- * the wrong AI analysis would be assigned to the wrong mentee.
- */
 async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
   let parsedArray = [];
 
@@ -277,7 +219,6 @@ async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
     }
   }
 
-  // Build a lookup map keyed by mentee_id for O(1) access.
   const resultMap = new Map();
   for (const item of parsedArray) {
     const id = item?.mentee_id || item?.id;
@@ -288,12 +229,8 @@ async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
     const menteeId = batchItem.menteePayload.mentee_id;
     const aiItem   = resultMap.get(String(menteeId));
 
-    // Always re-compute preCheck from the live criteria at parse time.
-    // batchItem.preCheck is the enqueue-time snapshot and may be stale
-    // if the admin changed criteria thresholds between enqueue and processing.
     const livePreCheck = preCheckHardConstraints(batchItem.menteePayload, criteria);
 
-    // No match → safe fallback (server-side tier, no keywords/reasoning).
     if (!aiItem) {
       return { menteeId, result: buildFallbackResult(batchItem.menteePayload, livePreCheck) };
     }
@@ -322,47 +259,37 @@ async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
 
     const blockersAnalysisObj = aiItem.blockers_analysis || aiItem.blockersAnalysis || {};
 
-    // Determine the highest tier in priority order for which ALL requirements pass:
-    // 1. Hard constraints ceiling (maxTierId)
-    // 2. Explicit required tech stack keywords
-    // 3. Custom AI qualification rules
     let qualifiedTier = 'participation';
     const normalizedMatched = matchedKw.map(k => String(k).toLowerCase());
 
     for (const tierConfig of sortedCriteria) {
       const tierId = tierConfig.id;
 
-      // Cannot assign a tier above maxEligibleTier ceiling
       if (!isTierAllowed(tierId, maxTierId, sortedCriteria)) {
         continue;
       }
 
-      // Check required tech stack keywords for this tier
       const requiredKw = Array.isArray(tierConfig.keywords) ? tierConfig.keywords : [];
       const unfulfilledKw = requiredKw.filter(kw => !normalizedMatched.includes(String(kw).toLowerCase()));
       if (unfulfilledKw.length > 0) {
-        continue; // Missing explicit keywords for this tier
+        continue; 
       }
 
-      // Check custom AI rule for this tier
       if (tierConfig.customRule?.trim()) {
         const failedRule = customRulesCheck.some(c => c.passed === false);
         if (failedRule) {
-          continue; // Custom rule failed for this tier
+          continue; 
         }
       }
 
-      // If hard constraints, keywords, and custom rule all pass, this tier is earned!
       qualifiedTier = tierId;
       break;
     }
 
     const assignedTier = aiItem.certificate_tier || aiItem.certificateTier || aiItem.tier || maxTierId;
 
-    // Authoritative tier: if mentee earned qualifiedTier, enforce it to prevent AI hallucination downgrades
     const validTier = qualifiedTier !== 'participation' ? qualifiedTier : assignedTier;
 
-    // Use livePreCheck.hardChecks for the hard constraints display.
     const hardConstraintsCheck = livePreCheck.hardChecks[validTier]
       ?? (validTier === 'participation'
         ? Object.values(livePreCheck.hardChecks)[0] ?? { score_ok: false, blockers_ok: false, completion_rate_ok: false, on_time_rate_ok: false, rating_ok: false, attendance_ok: false }
@@ -404,9 +331,6 @@ async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
 
 }
 
-/**
- * Evaluate ONE mentee via the batch path (single-item batch).
- */
 async function evaluateSingleMentee(template, menteePayload, preCheckResult, adminUserId) {
   const batchRes = await evaluateBatchMentees(
     template,
@@ -416,9 +340,6 @@ async function evaluateSingleMentee(template, menteePayload, preCheckResult, adm
   return batchRes[0]?.result;
 }
 
-/**
- * Fallback result when AI call or parse fails — uses server math ceiling only.
- */
 function buildFallbackResult(menteePayload, preCheckResult) {
   const cappedScore = Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0));
   const blockers    = menteePayload.blockers ?? {};
@@ -451,26 +372,9 @@ function buildFallbackResult(menteePayload, preCheckResult) {
   };
 }
 
-/**
- * Enqueue per-mentee evaluation jobs into AIEvaluationQueue.
- *
- * BUG-6 fix: Delete old rows for this templateId before creating new ones so the status
- * endpoint never returns stale results from a previous run during the transition period.
- *
- * @param {string}      templateId   - Certificate template UUID.
- * @param {string[]}    menteeIds    - Array of mentee user IDs to evaluate.
- * @param {string}      triggeredBy  - User ID who triggered the run.
- * @param {Array}       criteria     - Tier criteria, highest-first.
- * @param {string|null} clanId       - Optional clan scope for task/cohort aggregation.
- * @param {string}      [runId]      - Optional pre-generated run UUID (for multi-clan grouping).
- * @returns {{ runId: string, total: number }}
- */
 async function enqueueEvaluation(templateId, menteeIds, triggeredBy, criteria, clanId = null, runId = null) {
-  // Sort by priority before storing into queue rows so the pre-check snapshot
-  // is always in the canonical order regardless of how the caller built the array.
   const sortedCriteria = sortCriteriaByPriority(criteria);
 
-  // Remove stale rows from previous runs for this template before enqueuing new jobs.
   await models.AIEvaluationQueue.destroy({ where: { templateId } });
 
   const payloads = await aggregateMenteeData(menteeIds, clanId);

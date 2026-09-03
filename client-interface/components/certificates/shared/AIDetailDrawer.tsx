@@ -8,22 +8,14 @@ import type { AIEvaluationResult } from '@/lib/services/certificates-api';
 interface TierOption { id: string; name: string; }
 
 interface AIDetailDrawerProps {
-  /** The AI result to show; null/undefined = drawer closed */
   mentee: (AIEvaluationResult & { mentee_id: string }) | null;
   onClose: () => void;
-  /** Tier options for the override dropdown */
   criteria: TierOption[];
-  /** Currently selected tier for this mentee (may differ from AI recommendation) */
   selectedTier?: string;
   onTierChange: (menteeId: string, tier: string) => void;
-  /** Label for the override section: "Override Tier" for admin, "Override Tier" for mentor */
   overrideLabel?: string;
 }
 
-/**
- * Shared AI Detail Drawer used by both Admin (CertificateEditor) and Mentor issuance page.
- * Shows AI score, hard constraint check, reasoning, keyword match, blockers, and tier override.
- */
 export function AIDetailDrawer({
   mentee,
   onClose,
@@ -44,7 +36,7 @@ export function AIDetailDrawer({
     >
       {mentee && (
         <div className="space-y-5 pt-1">
-          {/* Header Banner */}
+          {}
           <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-gradient-to-r from-violet-500/10 via-brand-500/5 to-transparent border border-violet-500/20">
             <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center font-bold text-base shadow-xs shrink-0">
               <Sparkles className="w-4 h-4" />
@@ -55,7 +47,7 @@ export function AIDetailDrawer({
             </div>
           </div>
 
-          {/* Stat Cards */}
+          {}
           <div className="grid grid-cols-3 gap-3">
             <div className="p-3.5 rounded-2xl border border-violet-500/20 bg-violet-500/5 dark:bg-violet-500/10 text-center">
               <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1">AI Score</p>
@@ -73,7 +65,7 @@ export function AIDetailDrawer({
             </div>
           </div>
 
-          {/* Hard Constraints Check */}
+          {}
           {mentee.hard_constraints_check && (
             <div className="p-4 rounded-2xl border border-border bg-card shadow-2xs space-y-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Hard Constraints Check</p>
@@ -111,7 +103,7 @@ export function AIDetailDrawer({
             </div>
           )}
 
-          {/* Score Formula Breakdown */}
+          {}
           {mentee.score_breakdown && (
             <div className="p-4 rounded-2xl border border-brand-500/20 bg-brand-500/5 dark:bg-brand-500/10 space-y-2">
               <p className="text-[10px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider flex items-center justify-between">
@@ -143,7 +135,7 @@ export function AIDetailDrawer({
             </div>
           )}
 
-          {/* AI Reasoning */}
+          {}
           <div className="p-4 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/5 to-brand-500/5 space-y-1.5">
             <div className="flex items-center gap-1.5 text-violet-600 dark:text-violet-400 font-extrabold text-[10px] uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5" /> AI Reasoning & Summary
@@ -153,7 +145,7 @@ export function AIDetailDrawer({
             </p>
           </div>
 
-          {/* Matched Keywords */}
+          {}
           <div className="space-y-2">
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Matched Keywords / Tech Stack</p>
             <div className="flex flex-wrap gap-1.5">
@@ -172,7 +164,7 @@ export function AIDetailDrawer({
             </div>
           </div>
 
-          {/* Missing Keywords */}
+          {}
           {(mentee.missing_keywords || []).length > 0 && (
             <div className="space-y-2">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Missing Keywords</p>
@@ -189,7 +181,7 @@ export function AIDetailDrawer({
             </div>
           )}
 
-          {/* Custom Rules & Keyword Audit Breakdown */}
+          {}
           {mentee.custom_rules_check && mentee.custom_rules_check.length > 0 && (
             <div className="p-4 rounded-2xl border border-violet-500/20 bg-violet-500/5 space-y-2.5 shadow-3xs">
               <div className="flex items-center justify-between">
@@ -238,7 +230,7 @@ export function AIDetailDrawer({
             </div>
           )}
 
-          {/* Blockers Analysis */}
+          {}
           {mentee.blockers_analysis && (
             <div className="p-4 rounded-2xl border border-border bg-card space-y-2.5 shadow-3xs">
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Blocker Resolution Activity</p>
@@ -270,7 +262,7 @@ export function AIDetailDrawer({
             </div>
           )}
 
-          {/* Override Tier */}
+          {}
           <div className="p-4 rounded-2xl border border-border bg-muted/20 space-y-2">
             <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
               {overrideLabel}

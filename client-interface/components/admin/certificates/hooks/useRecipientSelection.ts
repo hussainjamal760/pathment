@@ -18,7 +18,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
   const [selectedMenteeIds, setSelectedMenteeIds] = useState<Set<string>>(new Set());
   const [assignedTiers, setAssignedTiers] = useState<Record<string, string>>({});
 
-  // Deriving lists from qualifiedData
   const recipientMenteesList = useMemo(() => {
     const seen = new Set<string>();
     const list: any[] = [];
@@ -27,7 +26,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
         if (!seen.has(m.id)) { seen.add(m.id); list.push({ ...m, role: 'mentee', isPaused: false }); }
       });
     });
-    // Pick up any remaining mentees from data keys not covered by current criteria
     Object.keys(qualifiedData).forEach(key => {
       if (key === 'mentors' || key === 'paused') return;
       (qualifiedData[key] ?? []).forEach((m: any) => {
@@ -46,7 +44,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     [qualifiedData]
   );
 
-  /** Filtered by current Recipient Type tab (All / Mentees / Mentors / Paused) */
   const activeList = useMemo(() => {
     if (recipientType === 'all') return [...recipientMenteesList, ...recipientMentorsList];
     if (recipientType === 'mentees') return recipientMenteesList;
@@ -54,11 +51,9 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     return recipientPausedList;
   }, [recipientType, recipientMenteesList, recipientMentorsList, recipientPausedList]);
 
-  /** Further filtered by search field, badge filter, and sorted by score */
   const filtered = useMemo(() => {
     let result = [...activeList];
 
-    // 1. Filter by search query
     const q = recipientSearch.toLowerCase().trim();
     if (q) {
       result = result.filter((m: any) =>
@@ -66,7 +61,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
       );
     }
 
-    // 2. Filter by assigned badge (tier)
     if (badgeFilter !== 'all') {
       const defaultTier = criteria[criteria.length - 1]?.id ?? 'participation';
       result = result.filter((m: any) => {
@@ -75,7 +69,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
       });
     }
 
-    // Helper: Extract composite/performance score from mentee item or aiResults map
     const getScore = (m: any): number => {
       const aiRes = aiResults?.[m.id];
       if (aiRes) {
@@ -90,7 +83,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
       return 0;
     };
 
-    // 3. Sort by score
     if (sortBy === 'score_desc') {
       result.sort((a: any, b: any) => getScore(b) - getScore(a));
     } else if (sortBy === 'score_asc') {
@@ -139,12 +131,6 @@ export function useRecipientSelection({ criteria, qualifiedData, aiResults }: Us
     });
   }, []);
 
-  /**
-   * Update a single mentee's manually assigned tier.
-   * SIMPLIFY-4: No longer auto-deselects the mentee when their score doesn't reach 90%.
-   * That behaviour was counter-intuitive: admin intentionally picks a tier, but the system
-   * silently kicks them out of the selection. Selection is now the admin's own responsibility.
-   */
   const handleTierChange = useCallback((menteeId: string, value: string) => {
     setAssignedTiers(prev => ({ ...prev, [menteeId]: value }));
   }, []);

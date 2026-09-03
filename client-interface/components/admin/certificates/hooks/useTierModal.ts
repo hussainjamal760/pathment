@@ -11,15 +11,10 @@ interface UseTierModalOptions {
   setCriteria: React.Dispatch<React.SetStateAction<TierCriteria[]>>;
 }
 
-/**
- * Custom hook for tier criteria creation/editing modal, toggle states,
- * badge uploading, tag keywords input, and save/delete handlers.
- */
 export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
   const [isTierModalOpen, setIsTierModalOpen] = useState(false);
   const [editingTier, setEditingTier] = useState<TierCriteria | null>(null);
 
-  // Form input states
   const [tierModalName, setTierModalName] = useState('');
   const [tierModalBadgeUrl, setTierModalBadgeUrl] = useState('');
   const [tierModalKeywords, setTierModalKeywords] = useState<string[]>([]);
@@ -33,7 +28,6 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
   const [tierModalCustomRule, setTierModalCustomRule] = useState('');
   const [uploadingTierBadge, setUploadingTierBadge] = useState(false);
 
-  // Toggle states for enabling/disabling individual criteria checks
   const [enableKeywords, setEnableKeywords] = useState(true);
   const [enableMinScore, setEnableMinScore] = useState(true);
   const [enableMaxBlockers, setEnableMaxBlockers] = useState(true);
@@ -43,7 +37,6 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
   const [enableMinAttendance, setEnableMinAttendance] = useState(false);
   const [enableCustomRule, setEnableCustomRule] = useState(true);
 
-  // Open Add/Edit Tier dialog
   const openTierModal = (tier?: TierCriteria) => {
     if (tier) {
       setEditingTier(tier);
@@ -116,7 +109,6 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
       return;
     }
 
-    // Flush any pending keyword input
     const kws = [...tierModalKeywords];
     const pending = tierModalKeywordInput.trim();
     if (pending && !kws.includes(pending)) kws.push(pending);
@@ -171,7 +163,6 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
     deleteTier,
     handleTierBadgeUpload,
     uploadingTierBadge,
-    // Inputs & Setters
     tierModalName, setTierModalName,
     tierModalBadgeUrl, setTierModalBadgeUrl,
     tierModalKeywords, setTierModalKeywords,
@@ -182,7 +173,6 @@ export function useTierModal({ criteria, setCriteria }: UseTierModalOptions) {
     tierModalMinOnTime, setTierModalMinOnTime,
     tierModalMinRating, setTierModalMinRating,
     tierModalCustomRule, setTierModalCustomRule,
-    // Toggles & Setters
     enableKeywords, setEnableKeywords,
     enableMinScore, setEnableMinScore,
     enableMaxBlockers, setEnableMaxBlockers,

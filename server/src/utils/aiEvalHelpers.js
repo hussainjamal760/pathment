@@ -1,19 +1,12 @@
 const { models } = require('../db');
 const { Op } = require('sequelize');
 
-/**
- * Extracts the first valid JSON array or object substring from a raw LLM response.
- * Strips markdown code fences, then finds the outermost [ ] or { } boundaries.
- * Returns the extracted JSON string, or the original trimmed string if nothing found.
- */
 function extractJsonFromText(text) {
   let str = (text || '').trim();
 
-  // Strip markdown code fences (```json ... ``` or ``` ... ```)
   const codeBlock = str.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (codeBlock) str = codeBlock[1].trim();
 
-  // Prefer array extraction, fall back to object
   const firstBracket = str.indexOf('[');
   const lastBracket  = str.lastIndexOf(']');
   if (firstBracket !== -1 && lastBracket > firstBracket) {
@@ -29,12 +22,6 @@ function extractJsonFromText(text) {
   return str;
 }
 
-/**
- * Enriches AI evaluation results with mentee name/email from the database.
- * Sorts by match_score descending.
- * @param {Array} results - Array of AI result objects with mentee_id field
- * @returns {Promise<Array>} - Enriched and sorted results
- */
 async function enrichEvaluationResults(results) {
   if (!results.length) return results;
 

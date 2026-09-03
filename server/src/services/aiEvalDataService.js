@@ -1,25 +1,10 @@
 const { models } = require('../db');
 const { Op } = require('sequelize');
 
-/**
- * aiEvalDataService — Per-clan data aggregation for certificate AI eligibility evaluation.
- *
- * Key design:
- *   - Tasks are clan-scoped: only tasks assigned by a mentor of the specified clan count.
- *   - Blockers are mentee-wide (not clan-scoped) — blockers are personal, not clan-bound.
- *   - Cohort reviews are clan-scoped: finished sessions for the mentee's clan are counted.
- *   - Auto-resolves mentee active clan when clanId param is null (e.g. Admin evaluation).
- *   - CrossClanAssignment tasks are excluded — each clan is fully isolated.
- *   - Returns one result object per mentee.
- */
 
 const SEVERITY_WEIGHT = { high: 3, medium: 2, low: 1 };
 const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3, expert: 4 };
 
-/**
- * Compute severity-weighted blocker score.
- * Perfect (no blockers) = 100. Open blockers = penalty, resolved = partial reward.
- */
 function computeBlockerScore(openBlockers, resolvedBlockers) {
   const total = openBlockers.length + resolvedBlockers.length;
   if (total === 0) return 100;
@@ -31,10 +16,6 @@ function computeBlockerScore(openBlockers, resolvedBlockers) {
   return Math.min(100, Math.round((raw / maxPenalty) * 100));
 }
 
-/**
- * Compute difficulty-weighted on-time rate.
- * Hard tasks missed on-time count more against the mentee than easy tasks.
- */
 function computeWeightedOnTimeRate(completedTasks) {
   if (completedTasks.length === 0) return 0;
 
@@ -48,15 +29,6 @@ function computeWeightedOnTimeRate(completedTasks) {
   return wtTotal > 0 ? Math.round((wtOntime / wtTotal) * 100) : 0;
 }
 
-/**
- * Compute cohort review attendance for a mentee in a specific clan.
- * Accepted = present OR excused. Absent/missing = absent.
- *
- * @param {string} menteeId
- * @param {Array}  clanSessions  - finished CohortReviewSession rows for this clan
- * @param {Map}    entryMap      - Map<`${sessionId}:${menteeId}`, entry> for fast lookup
- * @returns {{ total_sessions, present, excused, absent, attendance_pct, avg_contribution_pts, data_available }}
- */
 function computeAttendance(menteeId, clanSessions, entryMap) {
   if (!clanSessions || clanSessions.length === 0) {
     return {
@@ -88,7 +60,7 @@ function computeAttendance(menteeId, clanSessions, entryMap) {
     } else if (att === 'excused') {
       excused++;
     } else {
-      absent++; // 'absent' or no entry
+      absent++; 
     }
   }
 
@@ -108,17 +80,9 @@ function computeAttendance(menteeId, clanSessions, entryMap) {
   };
 }
 
-/**
- * Aggregate mentee evaluation data, scoped per clan.
- *
- * @param {string[]} menteeIds     - Array of mentee UUIDs to evaluate.
- * @param {string|null} clanId    - Target clan ID. If null, auto-resolves each mentee's active clan.
- * @returns {Promise<Array>}        One result per mentee.
- */
 async function aggregateMenteeData(menteeIds, clanId = null) {
   if (!menteeIds || !menteeIds.length) return [];
 
-  // ── 1. Auto-resolve mentee active clans from ClanMembership ─────────────────
   const menteeMemberships = await models.ClanMembership.findAll({
     where: {
       userId: { [Op.in]: menteeIds },
@@ -130,7 +94,7 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
     raw: false
   });
 
-  const menteeClanMap = new Map(); // menteeId -> { clanId, clanName }
+  const menteeClanMap = new Map(); 
   const allMenteeClanIds = new Set();
 
   for (const m of menteeMemberships) {
@@ -142,7 +106,6 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
     }
   }
 
-  // ── 2. Resolve clan mentor IDs for task scoping ────────────────────────────
   let clanMentorIds = null;
   let clanName      = null;
 
@@ -162,7 +125,6 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
     clanMentorIds = mentorMemberships.map(m => m.userId);
   }
 
-  // ── 3. Fetch tasks scoped to clan mentors ──────────────────────────────────
   const taskWhere = {
     menteeId: { [Op.in]: menteeIds },
     status:   { [Op.ne]: 'cancelled' }
@@ -190,17 +152,15 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
     raw: false
   });
 
-  // ── 4. Fetch ALL blockers for mentees (not clan-scoped) ──────────────────
   const blockers = await models.Blocker.findAll({
     where: { menteeId: { [Op.in]: menteeIds } },
     attributes: ['menteeId', 'status', 'category', 'severity', 'openedAt', 'resolvedAt'],
     raw: true
   });
 
-  // ── 5. Fetch cohort review sessions for active clans ─────────────────────
   const targetClanIds = clanId ? [clanId] : [...allMenteeClanIds];
-  let clanSessionsMap = new Map(); // clanId -> Array of CohortReviewSession
-  let entryMap        = new Map(); // `${sessionId}:${menteeId}` -> entry
+  let clanSessionsMap = new Map(); 
+  let entryMap        = new Map(); 
 
   if (targetClanIds.length > 0) {
     const sessions = await models.CohortReviewSession.findAll({
@@ -230,14 +190,12 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
     }
   }
 
-  // ── 6. Build per-mentee maps ───────────────────────────────────────────────
   const taskMap    = {};
   const blockerMap = {};
   for (const id of menteeIds) { taskMap[id] = []; blockerMap[id] = []; }
   for (const t of tasks)   taskMap[t.menteeId]?.push(t);
   for (const b of blockers) blockerMap[b.menteeId]?.push(b);
 
-  // ── 7. Aggregate per mentee ────────────────────────────────────────────────
   return menteeIds.map((id) => {
     const myTasks    = taskMap[id]    || [];
     const myBlockers = blockerMap[id] || [];
@@ -284,24 +242,20 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
       ? Math.round((completedTasks.length / totalTasks) * 100)
       : 0;
 
-    // Rating percentage
     const ratedTasks = completedTasks.filter(t => t.finalRating != null);
     const avgRating  = ratedTasks.length > 0
       ? parseFloat((ratedTasks.reduce((s, t) => s + parseFloat(t.finalRating), 0) / ratedTasks.length).toFixed(2))
       : null;
 
-    // Task score = points_pct (60%) + rating_pct (40%)
     const pointsPct  = totalBase > 0 ? Math.min(100, (totalAwarded / totalBase) * 100) : 0;
     const ratingPct  = avgRating != null ? (avgRating / 5.0) * 100 : pointsPct;
     const taskScore  = Math.round((pointsPct * 0.6) + (ratingPct * 0.4));
 
-    // Difficulty-weighted on-time rate
     const onTimePct  = computeWeightedOnTimeRate(completedTasks.map(t => ({
       isLate:     t.isLate,
       difficulty: t.roadmapTask?.difficulty ?? 'medium'
     })));
 
-    // Blocker analysis
     const openBlockers     = myBlockers.filter(b => b.status !== 'resolved');
     const resolvedBlockers = myBlockers.filter(b => b.status === 'resolved');
     const blockerScore     = computeBlockerScore(openBlockers, resolvedBlockers);
@@ -312,10 +266,8 @@ async function aggregateMenteeData(menteeIds, clanId = null) {
       return acc;
     }, {});
 
-    // Cohort review attendance
     const cohortReviews = computeAttendance(id, menteeClanSessions, entryMap);
 
-    // Final composite score
     let normalizedScore;
     if (cohortReviews.data_available) {
       normalizedScore = Math.round(

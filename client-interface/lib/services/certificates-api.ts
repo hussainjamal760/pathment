@@ -92,8 +92,8 @@ export interface AIEvaluationResult {
   email: string;
   is_eligible: boolean;
   certificate_tier: string;
-  match_score: number;        // 0-100 holistic quality score WITHIN eligible tier
-  overall_percentage: number; // normalized points % (ground truth)
+  match_score: number;        
+  overall_percentage: number; 
   completion_rate?: number;
   on_time_rate?: number;
   avg_rating?: number | null;
@@ -135,7 +135,6 @@ export interface AIEvaluationResult {
 
 export const certificatesApi = {
 
-  // Templates CRUD
   listTemplates: (programId?: string) => {
     const qs = new URLSearchParams();
     if (programId) qs.set('programId', programId);
@@ -186,7 +185,6 @@ export const certificatesApi = {
       `/certificates/templates/${templateId}/send-to-mentors`, { programId }, { timeout: 120000 }
     ),
 
-  // Instances / Issuance
   issueCertificates: (data: { 
     templateId: string; 
     menteeIds?: string[]; 

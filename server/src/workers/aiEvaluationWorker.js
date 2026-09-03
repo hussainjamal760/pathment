@@ -1,8 +1,3 @@
-/**
- * aiEvaluationWorker — DB-backed queue processor for per-mentee AI evaluation.
- * Micro-batches up to 10 mentees per AI API call for 95%+ cost & time reduction.
- * Handles exact remainders (1-10 items) cleanly without errors.
- */
 const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
 const { emitToUser } = require('../socket');
@@ -18,9 +13,6 @@ const CONCURRENT_BATCHES = 4;
 let timer = null;
 let running = false;
 
-/**
- * Check if all jobs in a run are finished and emit completion if so.
- */
 async function checkRunCompletion(runId, triggeredBy) {
   const stats = await models.AIEvaluationQueue.findAll({
     where: { runId },
@@ -45,7 +37,6 @@ async function checkRunCompletion(runId, triggeredBy) {
   const failed = statusMap['failed'] || 0;
 
   if (pending === 0 && processing === 0) {
-    // BUG-3: Include templateId in the same query — no extra findOne needed.
     const finishedJobs = await models.AIEvaluationQueue.findAll({
       where: { runId, status: 'completed' },
       attributes: ['menteeId', 'result', 'templateId'],
@@ -81,9 +72,6 @@ async function checkRunCompletion(runId, triggeredBy) {
   }
 }
 
-/**
- * Process a single micro-batch of up to BATCH_SIZE (10) mentees.
- */
 async function processBatchJobs(batchJobs) {
   if (!batchJobs || batchJobs.length === 0) return;
 
@@ -146,13 +134,8 @@ async function processBatchJobs(batchJobs) {
     logger.info(`[AI Eval Worker] Micro-batch completed (${completedCount}/${totalCount})`);
     await checkRunCompletion(runId, triggeredBy);
   } catch (batchError) {
-    // SEC-3: Log full stack server-side but store only the sanitized message in the DB.
-    // Stack traces in the DB are returned to the frontend via getAIEvaluationStatus, exposing
-    // internal file paths and library details.
     logger.error(`[AI Eval Worker] Micro-batch failed: ${batchError.stack || batchError.message}`);
 
-    // BUG-4: Query real progress counts before emitting — hardcoded 0,0 would reset the UI
-    // progress bar for the entire run even if most other batches completed successfully.
     let errorCompletedCount = 0;
     let errorTotalCount = 0;
     try {
@@ -165,11 +148,11 @@ async function processBatchJobs(batchJobs) {
       );
       errorCompletedCount = Number(counts?.completedCount ?? 0);
       errorTotalCount     = Number(counts?.totalCount     ?? 0);
-    } catch (_) { /* non-fatal — fallback to 0,0 only as last resort */ }
+    } catch (_) {  }
 
     for (const job of batchJobs) {
       job.status = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';
-      job.error  = batchError.message; // SEC-3: sanitized message only
+      job.error  = batchError.message; 
       await job.save();
 
       if (job.status === 'failed') {
@@ -193,7 +176,7 @@ async function processBatchJobs(batchJobs) {
             email:     mentee?.email     ?? '',
             _failed: true
           },
-          completed: errorCompletedCount, // BUG-4: real counts
+          completed: errorCompletedCount, 
           total:     errorTotalCount
         });
       }
@@ -201,9 +184,6 @@ async function processBatchJobs(batchJobs) {
   }
 }
 
-/**
- * Worker tick — claims and processes up to CONCURRENT_BATCHES in parallel.
- */
 async function tick() {
   if (running) return;
   running = true;

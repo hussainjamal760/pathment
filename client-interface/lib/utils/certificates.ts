@@ -1,15 +1,5 @@
-/**
- * Shared utilities for the certificates feature.
- * Single source of truth for tier color mappings — eliminates 5 identical
- * ternary blocks duplicated across CertificateEditor.tsx and mentor/certificates/page.tsx.
- */
 
-// ─── Badge / pill color classes ───────────────────────────────────────────────
 
-/**
- * Returns Tailwind classes for an issued-tier badge pill (border variant).
- * Falls back to blue for any custom / unknown tier ID.
- */
 export function getTierBadgeColor(tierId: string): string {
   switch (tierId) {
     case 'gold':   return 'text-amber-600 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/20 border-amber-500/20 dark:border-amber-500/30';
@@ -19,9 +9,6 @@ export function getTierBadgeColor(tierId: string): string {
   }
 }
 
-/**
- * Returns Tailwind classes for a bulk-action button (filled + hover variant).
- */
 export function getTierButtonColor(tierId: string): string {
   switch (tierId) {
     case 'gold':   return 'bg-amber-500/10 hover:bg-amber-500/20 dark:bg-amber-500/20 dark:hover:bg-amber-500/30 text-amber-600 dark:text-amber-400 border-amber-500/20 dark:border-amber-500/30';
@@ -31,9 +18,6 @@ export function getTierButtonColor(tierId: string): string {
   }
 }
 
-/**
- * Returns a Tailwind text-color class for tier icons in summary rollups.
- */
 export function getTierIconColor(tierId: string): string {
   switch (tierId) {
     case 'gold':   return 'text-amber-500 dark:text-amber-400';

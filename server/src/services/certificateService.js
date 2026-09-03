@@ -2,12 +2,7 @@ const certificateTemplateService = require('./certificateTemplateService');
 const certificateIssuanceService = require('./certificateIssuanceService');
 const certificateQualificationService = require('./certificateQualificationService');
 
-/**
- * CertificateService — Facade coordinator orchestrating domain-focused certificate sub-services.
- * Preserves 100% backward compatibility for controllers, workers, and legacy API callers.
- */
 class CertificateService {
-  // ── Mentor Scoping Helpers ──────────────────────────────────────────────────
   getMentorScopedMenteeIds(...args) {
     return certificateQualificationService.getMentorScopedMenteeIds(...args);
   }
@@ -15,7 +10,6 @@ class CertificateService {
     return certificateQualificationService.getMentorScopedMenteeClans(...args);
   }
 
-  // ── Template Operations ────────────────────────────────────────────────────
   createTemplate(...args) {
     return certificateTemplateService.createTemplate(...args);
   }
@@ -38,7 +32,6 @@ class CertificateService {
     return certificateTemplateService.sendToMentors(...args);
   }
 
-  // ── Issuance & Instance Operations ──────────────────────────────────────────
   issueCertificates(...args) {
     return certificateIssuanceService.issueCertificates(...args);
   }
@@ -67,7 +60,6 @@ class CertificateService {
     return certificateIssuanceService.bulkResetQueueEntries(...args);
   }
 
-  // ── Qualification & AI Evaluation Operations ──────────────────────────────
   getQualification(...args) {
     return certificateQualificationService.getQualification(...args);
   }

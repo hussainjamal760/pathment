@@ -1,10 +1,3 @@
-/**
- * aiEvalPromptBuilder — Constructs system & user prompts for batch AI certificate evaluation.
- *
- * NOTE: criteria arrays MUST be ordered highest-tier-first (index 0 = top tier).
- * This is the contract enforced at template creation time and relied upon everywhere in
- * the evaluation pipeline (preCheckHardConstraints, isTierAllowed, prompt hierarchy).
- */
 const { sortCriteriaByPriority } = require('../utils/criteriaUtils');
 
 
@@ -34,13 +27,7 @@ function getDynamicTierOrder(criteria) {
   return { hierarchy, topTierId, topTierName };
 }
 
-/**
- * Build the system prompt for a BATCH of mentees.
- * @param {Array} criteria - Tier criteria array, ordered highest tier first.
- * @param {number} batchSize - Max number of mentees in a single AI call.
- */
 function buildBatchMenteePrompt(criteria, batchSize) {
-  // Sort by explicit priority so the prompt hierarchy matches the actual evaluation order.
   const sorted = sortCriteriaByPriority(criteria);
   const tierDescriptions = buildTierDescriptions(sorted);
   const { hierarchy, topTierId, topTierName } = getDynamicTierOrder(sorted);

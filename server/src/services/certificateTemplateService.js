@@ -3,13 +3,7 @@ const { Op } = require('sequelize');
 const { NotFoundError, ValidationError } = require('../utils/errors/errorTypes');
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 
-/**
- * certificateTemplateService — Manages certificate templates, CRUD operations, assets, and mentor sharing.
- */
 class CertificateTemplateService {
-  /**
-   * Create a new certificate template
-   */
   async createTemplate({ name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId }, userId) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ValidationError('Template name is required');
@@ -34,9 +28,6 @@ class CertificateTemplateService {
     });
   }
 
-  /**
-   * List all certificate templates
-   */
   async listTemplates(queryProgramId, user) {
     const whereClause = { status: 'active' };
 
@@ -88,9 +79,6 @@ class CertificateTemplateService {
     });
   }
 
-  /**
-   * Get single template details
-   */
   async getTemplate(id) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' },
@@ -110,9 +98,6 @@ class CertificateTemplateService {
     return template;
   }
 
-  /**
-   * Update an existing template
-   */
   async updateTemplate(id, { name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId }) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' }
@@ -149,7 +134,6 @@ class CertificateTemplateService {
       if (!Array.isArray(criteria)) {
         throw new ValidationError('Template criteria must be an array of tiers');
       }
-      // DEBUG: log received criteria to trace null value persistence
       console.log('[DEBUG updateTemplate] criteria received:', JSON.stringify(criteria, null, 2));
       template.criteria = criteria;
     }
@@ -159,9 +143,6 @@ class CertificateTemplateService {
     return template;
   }
 
-  /**
-   * Archive/Delete a template
-   */
   async deleteTemplate(id) {
     const template = await models.CertificateTemplate.findOne({
       where: { id, status: 'active' }
@@ -176,9 +157,6 @@ class CertificateTemplateService {
     return true;
   }
 
-  /**
-   * Upload asset to Cloudinary
-   */
   async uploadAsset(fileBuffer) {
     if (!fileBuffer) {
       throw new ValidationError('No file uploaded');
@@ -187,9 +165,6 @@ class CertificateTemplateService {
     return result.secure_url;
   }
 
-  /**
-   * Send template notifications to mentors
-   */
   async sendToMentors(id) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
     if (!template) throw new NotFoundError('Certificate template not found');
@@ -237,7 +212,7 @@ class CertificateTemplateService {
       for (const n of notifications) {
         emitToUser(n.userId, 'notification:new', { title: n.title, message: n.message, type: n.type });
       }
-    } catch (_) { /* socket optional */ }
+    } catch (_) {  }
 
     return { sent: mentorIds.length };
   }
