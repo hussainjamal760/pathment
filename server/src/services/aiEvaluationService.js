@@ -161,13 +161,54 @@ async function evaluateBatchMentees(template, batchItems, adminUserId) {
   }
 
   const raw = response.choices[0]?.message?.content || '';
-  return parseBatchAIResponse(raw, criteria, batchItems);
+  return parseBatchAIResponse(raw, criteria, batchItems, ai);
+}
+
+/**
+ * Helper: Attempt a single AI self-correction retry prompt if JSON parsing fails.
+ */
+async function attemptJSONSelfCorrection(rawText, errorMsg, ai) {
+  try {
+    logger.info('[aiEvaluationService] Triggering AI self-correction retry prompt for malformed JSON...');
+    const repairResponse = await ai.client.chat.completions.create({
+      model: ai.model || 'llama-3.3-70b-versatile',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a specialized JSON repair assistant. Fix the JSON syntax error in the provided text and output valid JSON ONLY. Do NOT add markdown wrappers or explanations.'
+        },
+        {
+          role: 'user',
+          content: `The following response produced a JSON syntax error '${errorMsg}'. Please fix it and return valid JSON array only:\n\n${rawText.slice(0, 3500)}`
+        }
+      ],
+      temperature: 0.0,
+      max_tokens: 3500
+    });
+
+    const repairedRaw = repairResponse.choices[0]?.message?.content || '';
+    let jsonStr = repairedRaw.trim();
+    const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlock) jsonStr = codeBlock[1];
+
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
+    }
+    const result = JSON.parse(jsonStr);
+    logger.info('[aiEvaluationService] AI self-correction retry successfully repaired the JSON!');
+    return result;
+  } catch (err) {
+    logger.warn(`[aiEvaluationService] JSON self-correction retry failed: ${err.message}`);
+    return null;
+  }
 }
 
 /**
  * Parse JSON array returned by LLM for a batch of mentees.
  */
-function parseBatchAIResponse(raw, criteria, batchItems) {
+async function parseBatchAIResponse(raw, criteria, batchItems, ai = null) {
   let jsonStr = raw.trim();
   const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (codeBlock) jsonStr = codeBlock[1];
@@ -182,9 +223,15 @@ function parseBatchAIResponse(raw, criteria, batchItems) {
   try {
     parsedArray = JSON.parse(jsonStr);
     if (!Array.isArray(parsedArray)) parsedArray = [];
-  } catch {
-    logger.error('[aiEvaluationService] Failed to parse batch AI response array');
-    parsedArray = [];
+  } catch (err) {
+    logger.warn(`[aiEvaluationService] Direct JSON parse failed (${err.message}). Trying AI self-correction retry...`);
+    if (ai) {
+      const repaired = await attemptJSONSelfCorrection(raw, err.message, ai);
+      if (Array.isArray(repaired)) {
+        parsedArray = repaired;
+      }
+    }
+    if (!Array.isArray(parsedArray)) parsedArray = [];
   }
 
   const resultMap = new Map();
@@ -230,6 +277,16 @@ function parseBatchAIResponse(raw, criteria, batchItems) {
       ? aiItem.missing_keywords
       : (Array.isArray(aiItem.missingKeywords) ? aiItem.missingKeywords : []);
 
+    const customRulesCheckRaw = Array.isArray(aiItem.custom_rules_check)
+      ? aiItem.custom_rules_check
+      : (Array.isArray(aiItem.customRulesCheck) ? aiItem.customRulesCheck : []);
+
+    const customRulesCheck = customRulesCheckRaw.map(crc => ({
+      rule: String(crc.rule || crc.name || 'Custom Qualification Rule').trim(),
+      passed: Boolean(crc.passed ?? crc.status === 'passed'),
+      evidence: String(crc.evidence || crc.reason || '').trim()
+    }));
+
     const blockersAnalysisObj = aiItem.blockers_analysis || aiItem.blockersAnalysis || {};
 
     const result = {
@@ -239,6 +296,7 @@ function parseBatchAIResponse(raw, criteria, batchItems) {
       match_score: cappedScore,
       matched_keywords: matchedKw,
       missing_keywords: missingKw,
+      custom_rules_check: customRulesCheck,
       overall_percentage: Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0)),
       completion_rate: menteePayload.completion_rate,
       on_time_rate: menteePayload.on_time_rate,

@@ -189,6 +189,55 @@ export function AIDetailDrawer({
             </div>
           )}
 
+          {/* Custom Rules & Keyword Audit Breakdown */}
+          {mentee.custom_rules_check && mentee.custom_rules_check.length > 0 && (
+            <div className="p-4 rounded-2xl border border-violet-500/20 bg-violet-500/5 space-y-2.5 shadow-3xs">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold text-violet-700 dark:text-violet-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-violet-500" /> Custom Rules Audit Breakdown
+                </p>
+                <span className="text-[9px] font-extrabold text-violet-600 dark:text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full border border-violet-500/20">
+                  {mentee.custom_rules_check.filter(c => c.passed).length}/{mentee.custom_rules_check.length} Passed
+                </span>
+              </div>
+              <div className="space-y-2 pt-1">
+                {mentee.custom_rules_check.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-xl border text-xs flex items-start gap-2.5 transition-all ${
+                      item.passed
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-foreground'
+                        : 'bg-red-500/10 border-red-500/20 text-foreground'
+                    }`}
+                  >
+                    {item.passed ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-xs">{item.rule}</span>
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full border ${
+                          item.passed
+                            ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                            : 'bg-red-500/20 text-red-500 border-red-500/30'
+                        }`}>
+                          {item.passed ? 'PASSED' : 'FAILED'}
+                        </span>
+                      </div>
+                      {item.evidence && (
+                        <p className="text-[11px] text-muted-foreground mt-1 leading-snug font-medium">
+                          <span className="font-semibold text-foreground/80">Evidence:</span> {item.evidence}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Blockers Analysis */}
           {mentee.blockers_analysis && (
             <div className="p-4 rounded-2xl border border-border bg-card space-y-2.5 shadow-3xs">

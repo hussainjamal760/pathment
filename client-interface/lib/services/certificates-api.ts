@@ -125,6 +125,11 @@ export interface AIEvaluationResult {
     data_available: boolean;
   };
   blockers_analysis?: AIBlockersAnalysis;
+  custom_rules_check?: Array<{
+    rule: string;
+    passed: boolean;
+    evidence: string;
+  }>;
   reasoning: string;
 }
 
