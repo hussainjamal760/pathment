@@ -41,7 +41,11 @@ const changelogRoutes = require('./changelog');
 const interviewRoutes = require('./interviews');
 const quizRoutes = require('./quizzes');
 
+/**
+ * API Routes
+ */
 
+// Health check
 router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
@@ -50,84 +54,121 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Auth routes
 router.use('/auth', authRoutes);
 
+// Profile and skills routes
 router.use('/profile', profileRoutes);
-router.use('/email', require('./emailPublic')); 
+router.use('/email', require('./emailPublic')); // public: one-click unsubscribe
 router.use('/skills', skillRoutes);
 
+// Admin routes (protected)
 router.use('/admin', adminRoutes);
 
+// Program routes
 router.use('/programs', programRoutes);
 
+// Enrollment and matching routes
 router.use('/enrollments', enrollmentRoutes);
 router.use('/matches', matchingRoutes);
 
+// Performance scores: the mentee's own, a clan ranked, and what it is made of.
 router.use('/performance', performanceRoutes);
 
+// Auto reply: setup, readiness and the drafts waiting on a mentor.
 router.use('/auto-reply', autoReplyRoutes);
 
+// Mentor and Mentee routes
 router.use('/mentors', mentorRoutes);
 router.use('/mentees', menteeRoutes);
 
+// Task routes
 router.use('/tasks', taskRoutes);
 router.use('/interviews', interviewRoutes);
 router.use('/quizzes', quizRoutes);
 
+// Submission routes
 router.use('/submissions', submissionRoutes);
 
+// Messaging & notifications routes
 router.use('/messaging', messagingRoutes);
 
+// Gamification routes
 router.use('/gamification', gamificationRoutes);
 
+// Activity tracking routes
 router.use('/activity', activityRoutes);
 
+// Clan routes (mentor-led groups inside a program)
 router.use('/clans', clanRoutes);
 
+// Mentor-area routes (logged-in mentor's cohort, etc.)
 router.use('/mentor', mentorAreaRoutes);
 
+// Mentee-area routes (logged-in mentee's own progress, etc.)
 router.use('/mentee', menteeAreaRoutes);
 
+// Blockers & delay events (friction / fairness inputs)
 router.use('/', frictionRoutes);
 
+// 1:1 scheduling (availability + meetings)
 router.use('/meetings', meetingRoutes);
 
+// Org announcements
 router.use('/announcements', announcementRoutes);
 
+// In-app "What's New" changelog (role-filtered feed + admin authoring)
 router.use('/changelog', changelogRoutes);
 
+// Mentee cohort community feed
 router.use('/community', communityRoutes);
 
+// Admin clan operations (change requests, cross-clan, policies)
 router.use('/clan-requests', clanRequestRoutes);
 
+// Rewards (gifts + redemptions)
 router.use('/rewards', rewardsRoutes);
 
+// Mentor Library (org documents)
 router.use('/library', libraryRoutes);
 
+// Schedule engine (templates + per-mentee slot schedules)
 router.use('/schedules', scheduleRoutes);
 
+// Tracks (per-mentee personal lanes)
 router.use('/tracks', trackRoutes);
 
+// Linear roadmaps: mentee progress (/me) + admin org authoring (/org)
 router.use('/roadmaps', linearRoadmapRoutes);
 
+// Mentor handbook (admin-authored org doc, read by mentors)
 router.use('/mentor-spec', mentorSpecRoutes);
 
+// Registration intake - cohorts + applications (admin)
 router.use('/intake', intakeRoutes);
 
+// Assessment authoring (admin)
 router.use('/assessments', assessmentRoutes);
 
+// Public, unauthenticated intake - program catalog + apply + applicant status
 router.use('/public', publicRoutes);
 
+// IAM - scoped role grants + effective-permission lookup
 router.use('/access', accessRoutes);
 
+// AI connections - admin BYO provider keys + feature routing
 router.use('/ai-connections', aiConnectionRoutes);
 
+// Program reviews - anonymous mentee→mentor feedback at completion
 router.use('/program-reviews', programReviewRoutes);
 
+// Email queue admin: DLQ inspection, retry, suppression list
 router.use('/admin/emails', require('./emailAdmin'));
 
+// In-app feedback / bug reports: anyone submits, admins triage
 router.use('/feedback', require('./feedback'));
 
+// Custom Certificate Management System
 router.use('/certificates', require('./certificates'));
 
 module.exports = router;

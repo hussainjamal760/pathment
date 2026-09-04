@@ -4,6 +4,9 @@ const { ValidationError } = require('../utils/errors/errorTypes');
 
 class GroqService {
   constructor() {
+    // OpenAI clients are cached by `${baseURL}|${apiKey}` so we don't rebuild
+    // one per call. The active key is resolved per request (configured AI
+    // connection first, env fallback second) - see `_resolve`.
     this._clients = new Map();
     if (!config.ai.apiKey) {
       console.log('ℹ AI: no env key set - relying on configured AI connections (Settings → AI Connections).');
@@ -18,15 +21,31 @@ class GroqService {
     return this._clients.get(cacheKey);
   }
 
+  /**
+   * Resolve the AI client + model to use. Prefers a configured AI connection
+   * (personal routing → org routing → any org key) and falls back to the env
+   * config. Returns { enabled, client, model }.
+   */
   async _resolve(feature = null, userId = null) {
     let cfg = null;
+    let isMentorCaller = false;
     try {
       const aiConnectionService = require('./aiConnectionService');
+      if (userId) {
+        const { models } = require('../db');
+        const user = await models.User.findByPk(userId, { attributes: ['id', 'role', 'capabilities'] });
+        if (user) {
+          const caps = Array.isArray(user.capabilities) && user.capabilities.length ? user.capabilities : [user.role];
+          if (!caps.includes('admin') && user.role === 'mentor') {
+            isMentorCaller = true;
+          }
+        }
+      }
       cfg = await aiConnectionService.resolveActiveConfig(feature, userId);
     } catch (e) {
       console.error('[AI] connection resolve failed:', e.message);
     }
-    if (!cfg && config.ai.apiKey) {
+    if (!cfg && config.ai.apiKey && !isMentorCaller) {
       cfg = { apiKey: config.ai.apiKey, baseURL: config.ai.baseURL, model: config.ai.model, provider: config.ai.provider };
     }
     if (!cfg) return { enabled: false };
@@ -40,6 +59,14 @@ class GroqService {
   }
 
 
+  /**
+   * Transcribe a recorded audio answer with Whisper — far more accurate than the
+   * browser's live speech-to-text, which garbles accents and pronunciation. Uses
+   * the caller's resolved AI connection. Only Groq and OpenAI expose an
+   * OpenAI-compatible audio.transcriptions endpoint; for any other provider we
+   * return null and the caller falls back to whatever transcript it already had.
+   * @returns {Promise<string|null>} transcript text, or null if unavailable.
+   */
   async transcribeAudio({ audioUrl, userId = null, feature = 'feedback', prompt } = {}) {
     if (!audioUrl) return null;
     const ai = await this._resolve(feature, userId);
@@ -47,13 +74,15 @@ class GroqService {
     const isGroq = ai.provider === 'groq' || /groq\.com/i.test(ai.baseURL || '');
     const isOpenAI = ai.provider === 'openai' || /api\.openai\.com/i.test(ai.baseURL || '');
     const model = isGroq ? 'whisper-large-v3' : isOpenAI ? 'whisper-1' : null;
-    if (!model) return null; 
+    if (!model) return null; // provider can't transcribe audio via this endpoint
 
     const resp = await fetch(audioUrl);
     if (!resp.ok) throw new Error(`could not fetch audio (${resp.status})`);
     const buf = Buffer.from(await resp.arrayBuffer());
     const file = await OpenAI.toFile(buf, 'answer.webm', { type: 'audio/webm' });
 
+    // Anchor prompt to bias Whisper against random hallucinations in case of silence/noise
+    // and guide it towards English/Urdu/Hinglish switching.
     const defaultPrompt = "Umm, let me think. Main isko explain karta hoon. So basically, the code does this...";
 
     const out = await ai.client.audio.transcriptions.create({
@@ -64,7 +93,11 @@ class GroqService {
     return (out?.text || '').trim() || null;
   }
 
+  /**
+   * Generate roadmap using Groq AI
+   */
   async generateRoadmap(params) {
+    // Honour the caller's BYO key (personal → org → env) for the 'roadmap' feature.
     const ai = await this._resolve(params?.feature || 'roadmap', params?.userId || null);
     if (!ai.enabled) {
       throw new ValidationError('AI is not configured. Add a provider key in Settings → AI Connections.');
@@ -117,14 +150,17 @@ class GroqService {
       console.log('📥 First 200 chars:', content.substring(0, 200));
       console.log('📥 Last 200 chars:', content.substring(content.length - 200));
       
+      // Try multiple extraction methods
       let jsonContent = content;
       
+      // Method 1: Extract from markdown code blocks
       const codeBlockMatch = content.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
       if (codeBlockMatch) {
         console.log('✓ Extracted JSON from markdown code block');
         jsonContent = codeBlockMatch[1];
       }
       
+      // Method 2: Find first { to last }
       const firstBrace = content.indexOf('{');
       const lastBrace = content.lastIndexOf('}');
       if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
@@ -135,6 +171,7 @@ class GroqService {
         }
       }
       
+      // Clean up common JSON issues
       jsonContent = this.sanitizeJSON(jsonContent);
       
       console.log('🔧 Cleaned JSON length:', jsonContent.length);
@@ -149,6 +186,7 @@ class GroqService {
         console.error('📄 Around error position:', jsonContent.substring(Math.max(0, parseError.message.match(/\d+/)?.[0] - 100), parseError.message.match(/\d+/)?.[0] + 100));
         console.error('📄 Failed content (last 500 chars):', jsonContent.substring(jsonContent.length - 500));
         
+        // Try one more time with aggressive fixing
         try {
           const fixed = this.aggressiveJSONFix(jsonContent);
           roadmapData = JSON.parse(fixed);
@@ -166,6 +204,7 @@ class GroqService {
         console.error('Response data:', error.response.data);
       }
        
+      // Handle specific API errors with user-friendly messages
       let userMessage = `Failed to generate roadmap: ${error.message}`;
       
       if (error.message.includes('413') || error.message.includes('Request too large')) {
@@ -182,32 +221,42 @@ class GroqService {
     }
   }
 
+  /**
+   * Sanitize JSON content - fix common issues
+   */
   sanitizeJSON(content) {
     return content
-      .replace(/\r\n/g, ' ')   
-      .replace(/\n/g, ' ')     
-      .replace(/\r/g, '')      
-      .replace(/\t/g, ' ')     
-      .replace(/\s+/g, ' ')    
-      .replace(/,\s*}/g, '}')  
-      .replace(/,\s*]/g, ']')  
+      .replace(/\r\n/g, ' ')   // Replace Windows line endings
+      .replace(/\n/g, ' ')     // Replace newlines with spaces
+      .replace(/\r/g, '')      // Remove carriage returns
+      .replace(/\t/g, ' ')     // Replace tabs with spaces
+      .replace(/\s+/g, ' ')    // Collapse multiple spaces
+      .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+      .replace(/,\s*]/g, ']')  // Remove trailing commas before ]
       .trim();
   }
 
+  /**
+   * Aggressive JSON fix - try to salvage malformed JSON
+   */
   aggressiveJSONFix(content) {
     let fixed = content;
     
+    // Fix common issues
     fixed = fixed
-      .replace(/,(\s*[}\]])/g, '$1')  
-      .replace(/([}\]])(\s*)([{[])/g, '$1,$2$3')  
-      .replace(/"([^"]*)"(\s*):/g, '"$1":')  
-      .replace(/:\s*'([^']*)'/g, ':"$1"')  
-      .replace(/\\'/g, "'")  
-      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');  
+      .replace(/,(\s*[}\]])/g, '$1')  // Remove trailing commas
+      .replace(/([}\]])(\s*)([{[])/g, '$1,$2$3')  // Add missing commas between objects/arrays
+      .replace(/"([^"]*)"(\s*):/g, '"$1":')  // Ensure proper key formatting
+      .replace(/:\s*'([^']*)'/g, ':"$1"')  // Replace single quotes with double
+      .replace(/\\'/g, "'")  // Unescape single quotes
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '');  // Remove control characters
     
     return fixed;
   }
 
+  /**
+   * Create prompt for roadmap generation
+   */
   createRoadmapPrompt(params) {
     const {
       programName,
@@ -299,6 +348,9 @@ CRITICAL RULES:
 - Keep descriptions concise (max 200 characters each)`;
   }
 
+  /**
+   * Validate and format roadmap data
+   */
   validateAndFormatRoadmap(roadmapData, expectedWeeks) {
     if (!roadmapData || !roadmapData.weeks || !Array.isArray(roadmapData.weeks)) {
       throw new ValidationError('Invalid roadmap format received from AI');
@@ -308,6 +360,7 @@ CRITICAL RULES:
       console.warn(`Expected ${expectedWeeks} weeks, got ${roadmapData.weeks.length}. Adjusting...`);
     }
 
+    // Ensure week numbers are sequential
     roadmapData.weeks = roadmapData.weeks.map((week, index) => ({
       ...week,
       weekNumber: index + 1,
@@ -326,6 +379,9 @@ CRITICAL RULES:
     return roadmapData;
   }
 
+  /**
+   * Generate adaptive recommendations
+   */
   async generateAdaptiveRecommendations(params) {
     const ai = await this._resolve(params?.feature || 'adaptive', params?.userId || null);
     if (!ai.enabled) {
@@ -400,9 +456,13 @@ Output as JSON:
     }
   }
 
+  /**
+   * Generate mentor-mentee matching score
+   */
   async generateMatchingScore(mentorProfile, menteeProfile, programRequirements, opts = {}) {
     const ai = await this._resolve('matching', opts.userId || null);
     if (!ai.enabled) {
+      // Fallback to simple rule-based matching
       return this.calculateBasicMatchScore(mentorProfile, menteeProfile);
     }
 
@@ -465,6 +525,11 @@ Output as JSON:
     }
   }
 
+  /**
+   * Score ALL mentors against a single mentee in ONE API call.
+   * Returns an array of { mentorId, score, breakdown, reasoning, strengths, concerns }.
+   * Falls back to calculateBasicMatchScore per mentor when AI is unavailable.
+   */
   async batchGenerateMatchingScores(mentors, menteeProfile, programRequirements, opts = {}) {
     const ai = await this._resolve('matching', opts.userId || null);
     if (!ai.enabled || mentors.length === 0) {
@@ -474,6 +539,8 @@ Output as JSON:
       }));
     }
 
+    // Each mentor entry uses the same field names as generateMatchingScore's mentorProfile,
+    // with an added `id` so results can be mapped back.
     const mentorList = mentors.map(m => ({
       id: m.id,
       skills: m.skills?.join(', ') || 'Not specified',
@@ -547,9 +614,13 @@ Output as JSON:
   }
 
 
+  /**
+   * Fallback basic matching score calculation
+   */
   calculateBasicMatchScore(mentorProfile, menteeProfile) {
-    let score = 50; 
+    let score = 50; // Base score
 
+    // Skill matching
     const mentorSkills = mentorProfile.skills || [];
     const menteeNeeds = menteeProfile.learningGoals || [];
     const skillMatch = mentorSkills.filter(skill => 
@@ -557,6 +628,7 @@ Output as JSON:
     );
     score += (skillMatch.length / Math.max(menteeNeeds.length, 1)) * 30;
 
+    // Availability
     const availabilityScore = 
       ((mentorProfile.maxMentees - mentorProfile.currentMentees) / mentorProfile.maxMentees) * 20;
     score += availabilityScore;
@@ -575,6 +647,11 @@ Output as JSON:
     };
   }
 
+  /**
+   * Generic plain-text completion. Resolves the AI connection for `feature`
+   * (routed per the mentor/admin's BYO key) and returns the model's text.
+   * Throws a friendly error when no AI connection is configured.
+   */
   async generateText({ system, prompt, feature = 'summary', userId = null, temperature = 0.6, maxTokens = 700 }) {
     const ai = await this._resolve(feature, userId);
     if (!ai.enabled) {
@@ -592,6 +669,7 @@ Output as JSON:
     return (response.choices?.[0]?.message?.content || '').trim();
   }
 
+  /** Map a raw provider error to a friendly, actionable message. */
   _friendlyAiError(error) {
     const msg = String(error?.message || '');
     if (/413|request too large|too large|context length|maximum context|reduce/i.test(msg)) {
@@ -605,6 +683,18 @@ Output as JSON:
   }
 
 
+  /**
+   * Draft a roadmap as a FLAT, ordered list of steps (the linear-roadmap model).
+   * Much lighter than generateRoadmap(): a small prompt + a token budget scaled
+   * to the requested step count, so it doesn't trip the provider's per-request /
+   * TPM size limits (the old 413 "request too large"). Returns steps already
+   * shaped for the editor: { title, type, effort, dueOffsetDays, description, criteria[] }.
+   *
+   * @param {object} p
+   * @param {number|null} p.weeks  pace across N weeks (sets dueOffsetDays); null = no weeks
+   * @param {number} p.count       how many steps to produce (1..40)
+   * @param {string} p.instructions free-text author guidance ("include X, avoid Y…")
+   */
   async generateRoadmapSteps({ feature = 'roadmap', userId = null, name, description, tags, instructions, weeks = null, count = 8 } = {}) {
     const ai = await this._resolve(feature, userId);
     if (!ai.enabled) {
@@ -642,6 +732,7 @@ Return ONLY valid JSON in EXACTLY this shape (no markdown, no commentary):
       });
       content = response.choices?.[0]?.message?.content || '';
     } catch (error) {
+      // Some models/providers reject response_format — retry once without it.
       if (/response_format|json_object|not supported|unrecognized/i.test(error?.message || '')) {
         const response = await ai.client.chat.completions.create({
           model: ai.model, messages, temperature: 0.6, max_tokens: maxTokens,
@@ -652,6 +743,7 @@ Return ONLY valid JSON in EXACTLY this shape (no markdown, no commentary):
       }
     }
 
+    // Parse — tolerate stray prose around the JSON.
     let parsed = null;
     try {
       parsed = JSON.parse(content);

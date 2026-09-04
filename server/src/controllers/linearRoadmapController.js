@@ -32,6 +32,7 @@ const removeStep = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Step removed', { roadmap }));
 });
 
+// Replace a local roadmap's whole step set (the editor sends the full list).
 const replaceSteps = catchAsync(async (req, res) => {
   const roadmap = await linearRoadmapService.replaceSteps(req.user.id, req.params.id, req.body?.steps || []);
   res.status(200).json(successResponse('Steps saved', { roadmap }));
@@ -53,16 +54,19 @@ const assign = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Roadmap assigned', { progress }));
 });
 
+// Mentee IDs that already have this roadmap (so the UI can disable re-assigning).
 const assignees = catchAsync(async (req, res) => {
   const menteeIds = await linearRoadmapService.getAssignees(req.params.id);
   res.status(200).json(successResponse('Roadmap assignees retrieved', { menteeIds }));
 });
 
+// Per-step assignment status for ONE mentee (multi-select batch assign UI).
 const menteeStepStatus = catchAsync(async (req, res) => {
   const data = await linearRoadmapService.getMenteeStepStatus(req.params.id, req.params.menteeId);
   res.status(200).json(successResponse('Mentee step status', data));
 });
 
+// ── Admin org-roadmap authoring ──────────────────────────────────────────────
 const listOrg = catchAsync(async (req, res) => {
   const filter = {};
   if (req.query.programId) {
@@ -92,6 +96,7 @@ const removeOrgStep = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Step removed', { roadmap }));
 });
 
+// Replace an org roadmap's whole step set (the shared editor sends the full list).
 const replaceOrgSteps = catchAsync(async (req, res) => {
   const roadmap = await linearRoadmapService.replaceOrgSteps(req.params.id, req.body?.steps || []);
   res.status(200).json(successResponse('Steps saved', { roadmap }));
@@ -101,16 +106,19 @@ const deleteOrg = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Org roadmap deleted', await linearRoadmapService.deleteOrgRoadmap(req.params.id)));
 });
 
+// ── AI: draft roadmap steps from the brief (optional, author reviews) ─────────
 const generate = catchAsync(async (req, res) => {
   const steps = await linearRoadmapService.generateSteps(req.body, req.user.id);
   res.status(200).json(successResponse('Roadmap drafted', { steps }));
 });
 
+// ── Mentee progress view ─────────────────────────────────────────────────────
 const myRoadmaps = catchAsync(async (req, res) => {
   const roadmaps = await linearRoadmapService.getMenteeRoadmaps(req.user.id);
   res.status(200).json(successResponse('Roadmaps retrieved', { roadmaps }));
 });
 
+// ── Roadmap chaining (reusable graph) ─────────────────────────────────────────
 const getLinks = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Links retrieved', { links: await linearRoadmapService.getNextLinks(req.params.id) }));
 });
@@ -118,6 +126,7 @@ const setLinks = catchAsync(async (req, res) => {
   const links = await linearRoadmapService.setNextLinks(req.user.id, req.params.id, req.body?.toIds || []);
   res.status(200).json(successResponse('Chain updated', { links }));
 });
+// Manually assign a mentee's next roadmap (mentor picks from a branch, or skips).
 const advance = catchAsync(async (req, res) => {
   const { menteeId, nextRoadmapId } = req.body || {};
   const progress = await linearRoadmapService.manualAdvance(req.user.id, menteeId, nextRoadmapId);

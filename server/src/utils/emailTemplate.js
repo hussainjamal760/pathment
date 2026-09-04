@@ -1,4 +1,21 @@
 
+/**
+ * One shared, deliverability‑friendly email template.
+ *
+ * Why it looks the way it does (these all reduce spam scoring / render right):
+ *  - table‑based layout + inline CSS (Outlook and most clients ignore <style>),
+ *  - a hidden **preheader** (preview text) so inboxes don't show raw HTML,
+ *  - a real **plain‑text** alternative is always sent alongside (see `plainText`),
+ *  - a light, high‑contrast design (no image−only emails, no link shorteners),
+ *  - `color-scheme` meta so dark‑mode clients don't invert it oddly,
+ *  - a footer with sender identity + (for non‑transactional mail) an unsubscribe.
+ *
+ * Usage:
+ *   const { renderEmail, plainText } = require('../utils/emailTemplate');
+ *   const html = renderEmail({ heading, bodyHtml, cta:{label,url}, preheader, unsubscribeUrl });
+ *   const text = plainText({ heading, bodyText, cta, unsubscribeUrl });
+ */
+
 const BRAND = '#2563eb';
 const esc = (s) => String(s == null ? '' : s)
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -6,6 +23,15 @@ const esc = (s) => String(s == null ? '' : s)
 const siteUrl = () => (process.env.CLIENT_URL || 'https://pathment.me').replace(/\/$/, '');
 const footerAddress = () => process.env.EMAIL_FOOTER_ADDRESS || 'Pathment';
 
+/**
+ * @param {object} o
+ * @param {string} o.heading        big headline in the body
+ * @param {string} o.bodyHtml       inner HTML (paragraphs, lists) — already trusted markup
+ * @param {{label:string,url:string}} [o.cta]   optional primary button
+ * @param {string} [o.preheader]    hidden preview text (defaults to the heading)
+ * @param {string} [o.footerNote]   small line above the standard footer
+ * @param {string} [o.unsubscribeUrl] if set, shows an unsubscribe link (marketing/notification mail only)
+ */
 function renderEmail({ heading, bodyHtml, cta, preheader, footerNote, unsubscribeUrl } = {}) {
   const pre = esc(preheader || heading || 'Pathment');
   const year = new Date().getFullYear();

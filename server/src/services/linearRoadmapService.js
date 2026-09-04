@@ -8,11 +8,25 @@ const authzService = require('./authzService');
 const taskService = require('./taskService');
 const { pointsForDifficulty } = require('../config/points');
 
+/**
+ * linearRoadmapService - the new design's linear roadmap flow for mentors:
+ * author / import / assign roadmaps as an ordered list of steps, with
+ * per-mentee progress and auto-advance on approval. Kept separate from the
+ * legacy week-based roadmapService so the admin curriculum flow is untouched.
+ *
+ * A roadmap's steps are RoadmapTasks linked directly via roadmap_id, ordered
+ * by task_order. Org roadmaps (source='org', published) are importable; mentors
+ * own 'local' roadmaps.
+ */
 
 const ACTIVE_ENROLLMENT_STATUSES = ['active', 'matched', 'approved', 'pending_completion', 'level_completed'];
 
+// Per-mentee task override fields a mentor can set when assigning a step, so the
+// task is tailored for that mentee without touching the shared roadmap step.
 const OVERRIDE_FIELDS = ['titleOverride', 'descriptionOverride', 'deliverableOverride', 'acceptanceCriteriaOverride', 'resourcesOverride', 'mentorNote'];
 
+/** Normalize a raw override object → only known fields, '' / [] → null. Returns
+ *  null when nothing meaningful is set (so we never write an empty override). */
 function sanitizeOverride(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const out = {};
@@ -29,14 +43,25 @@ function sanitizeOverride(raw) {
 }
 
 class LinearRoadmapService {
+  /**
+   * AI-draft a roadmap's steps from the brief the author already typed (name,
+   * description, tags, duration). Uses the author's BYO key for the 'roadmap'
+   * feature. Returns FLAT draft steps ready for the editor (weeks→tasks
+   * flattened), so the author can review/tweak before saving.
+   */
   async generateSteps(input = {}, userId = null) {
     const groqService = require('./groqService');
 
+    // Two modes:
+    //  - 'weeks': pace the steps across N weeks (sets dueOffsetDays).
+    //  - 'tasks' (default): a plain ordered list, no week scaffolding — smaller
+    //    request, and what most mentors want.
     const mode = input.mode === 'weeks' ? 'weeks' : 'tasks';
     const weeks = mode === 'weeks'
       ? Math.max(1, Math.min(52, Number(input.durationWeeks) || 6))
       : null;
 
+    // How many steps to ask for. Explicit count wins; else derive from weeks; else 8.
     let count = Number(input.count ?? input.stepCount);
     if (!Number.isFinite(count) || count <= 0) count = weeks ? weeks * 3 : 8;
     count = Math.max(1, Math.min(40, Math.round(count)));
@@ -72,6 +97,13 @@ class LinearRoadmapService {
     return { ...json, steps };
   }
 
+  /**
+   * The mentor IDs whose local roadmaps this mentor should see — themselves plus
+   * every lead/co-mentor they SHARE A CLAN with. This is what lets a co-mentor
+   * (or a second lead) assign from the roadmap the clan's lead imported, instead
+   * of staring at an empty "From roadmap" picker. Membership-based (the team
+   * roster), so it self-heals as the clan team changes.
+   */
   async _clanTeamMentorIds(mentorId) {
     const ids = new Set([mentorId]);
     const clanIds = await authzService.mentoredClanIds(mentorId);
@@ -89,6 +121,7 @@ class LinearRoadmapService {
     return [...ids];
   }
 
+  /** A mentor's local roadmaps (incl. their clan team's) + the org library to import. */
   async listForMentor(mentorId) {
     const ownerIds = await this._clanTeamMentorIds(mentorId);
     const [local, org] = await Promise.all([
@@ -96,6 +129,8 @@ class LinearRoadmapService {
       models.Roadmap.findAll({ where: { source: 'org', published: true }, order: [['created_at', 'DESC']] })
     ]);
     const [localWithSteps, orgWithSteps] = await Promise.all([
+      // `isOwner` lets the UI show Assign for the whole clan team but keep
+      // edit/delete on the roadmap's owner (shared ≠ editable by everyone).
       Promise.all(local.map(async (r) => ({ ...(await this.withSteps(r)), isOwner: r.ownerMentorId === mentorId }))),
       Promise.all(org.map((r) => this.withSteps(r)))
     ]);
@@ -108,6 +143,11 @@ class LinearRoadmapService {
     return this.withSteps(roadmap);
   }
 
+  // ── Input validation ────────────────────────────────────────────────────────
+  // The DB caps `title` at VARCHAR(255); without these guards an over-long title
+  // surfaces as an opaque 500 (Postgres "value too long"). We validate up front
+  // and return a friendly 400 instead. Long content belongs in `description`
+  // (TEXT), which the rich-text step editor now fills.
   _assertName(name) {
     const n = String(name || '').trim();
     if (!n) throw new ValidationError('A roadmap name is required');
@@ -129,6 +169,7 @@ class LinearRoadmapService {
     });
   }
 
+  /** Strip a TipTap "empty" paragraph so we don't store noise as a description. */
   _cleanDescription(html) {
     const v = String(html || '').replace(/<p>\s*<\/p>/gi, '').trim();
     return v || null;
@@ -140,6 +181,7 @@ class LinearRoadmapService {
     return {
       roadmapId,
       title,
+      // description is NOT NULL — use a visible placeholder, never copy the title.
       description: desc || step.brief || 'No description provided',
       type: step.type || 'project',
       difficulty: step.difficulty || 'medium',
@@ -151,10 +193,12 @@ class LinearRoadmapService {
       dueOffsetDays: Number.isFinite(Number(step.dueOffsetDays)) && step.dueOffsetDays !== null && step.dueOffsetDays !== '' ? Number(step.dueOffsetDays) : null,
       isMandatory: true,
       isCustomTask: false,
+      // Standard points by difficulty (no hand-typed values).
       pointsBase: pointsForDifficulty(step.difficulty)
     };
   }
 
+  // ── Step resources (the per-step links: videos, courses, repos) ─────────────
   _inferResourceType(url) {
     const u = String(url || '').toLowerCase();
     if (/youtube\.com|youtu\.be/.test(u)) return 'video';
@@ -164,6 +208,7 @@ class LinearRoadmapService {
     return 'link';
   }
 
+  /** Normalize an incoming resources array → TaskResource field objects. */
   _normalizeResources(resources) {
     if (!Array.isArray(resources)) return [];
     return resources.map((r, i) => {
@@ -180,6 +225,7 @@ class LinearRoadmapService {
     }).filter(Boolean).slice(0, 40);
   }
 
+  /** Replace a task's resources (delete + recreate) — idempotent on save. */
   async _syncTaskResources(taskId, resources, transaction = null) {
     const rows = this._normalizeResources(resources);
     await models.TaskResource.destroy({ where: { roadmapTaskId: taskId }, transaction });
@@ -256,6 +302,12 @@ class LinearRoadmapService {
     return this.getRoadmap(roadmapId);
   }
 
+  /**
+   * Replace a local roadmap's whole step set in one call (the editor sends the
+   * full list). Reconciles: steps with an existing id are updated (incl. reorder),
+   * new ones created, and removed ones deleted - but a removed step that's
+   * already been assigned to a mentee blocks the save (same guard as removeStep).
+   */
   async replaceSteps(mentorId, roadmapId, steps) {
     await this._assertOwnedLocal(roadmapId, mentorId);
     this._assertSteps(steps);
@@ -283,6 +335,7 @@ class LinearRoadmapService {
     }).then(() => this.getRoadmap(roadmapId));
   }
 
+  /** Import an org roadmap into a mentor-owned local copy (deep copy of steps). */
   async importOrgRoadmap(mentorId, orgRoadmapId) {
     const org = await models.Roadmap.findByPk(orgRoadmapId);
     if (!org || org.source !== 'org') throw new NotFoundError('Org roadmap not found');
@@ -306,12 +359,15 @@ class LinearRoadmapService {
         steps.map((s, i) => this._stepToTask(s, copy.id, i)),
         { transaction }
       );
+      // Copy each step's resources into the imported copy too.
       for (let i = 0; i < tasks.length; i++) await this._syncTaskResources(tasks[i].id, steps[i].resources, transaction);
 
       return copy;
     }).then((copy) => this.getRoadmap(copy.id));
   }
 
+  // ── Admin org-roadmap authoring ───────────────────────────────────────────
+  // Admins author the shared org library (source='org'); mentors import + assign.
   async listOrgRoadmaps(filter = {}) {
     const roadmaps = await models.Roadmap.findAll({
       where: { source: 'org', ...filter },
@@ -381,6 +437,9 @@ class LinearRoadmapService {
     return this.getRoadmap(roadmapId);
   }
 
+  /** Replace an org roadmap's whole step set in one call (the shared editor sends
+   * the full list) — mirrors the mentor replaceSteps so both editors behave the
+   * same. Org steps are templates (not assigned), so no assigned-task guard. */
   async replaceOrgSteps(roadmapId, steps) {
     await this._assertOrg(roadmapId);
     this._assertSteps(steps);
@@ -406,11 +465,15 @@ class LinearRoadmapService {
 
   async deleteOrgRoadmap(roadmapId) {
     await this._assertOrg(roadmapId);
+    // Org roadmaps are templates; mentors import a copy, so deleting the org
+    // source doesn't touch imported local copies or assigned work.
     await models.RoadmapTask.destroy({ where: { roadmapId } });
     await models.Roadmap.destroy({ where: { id: roadmapId } });
     return { deleted: true };
   }
 
+  // ── Mentee progress view ──────────────────────────────────────────────────
+  /** A mentee's active/complete roadmaps with step X/N progress for their UI. */
   async getMenteeRoadmaps(menteeId) {
     const progresses = await models.RoadmapProgress.findAll({ where: { menteeId }, order: [['created_at', 'DESC']] });
     const out = [];
@@ -421,6 +484,7 @@ class LinearRoadmapService {
       const templateSteps = await this.getSteps(p.roadmapId);
       const templateStepIds = templateSteps.map((s) => s.id);
 
+      // Fetch all non-cancelled AssignedTasks for this mentee and enrollment
       const assignedTasks = p.enrollmentId
         ? await models.AssignedTask.findAll({
             where: {
@@ -442,11 +506,13 @@ class LinearRoadmapService {
           })
         : [];
 
+      // Separate roadmap assignments from custom ones
       const roadmapAssignments = assignedTasks.filter(at => !at.isCustomTask && templateStepIds.includes(at.roadmapTaskId));
       const customAssignments = assignedTasks.filter(at => at.isCustomTask);
 
       const assignedByStepId = new Map(roadmapAssignments.map(at => [at.roadmapTaskId, at]));
 
+      // Build active/completed sequence: both roadmap steps that have been assigned and custom tasks, sorted by assignment date
       const allActiveTasks = [
         ...templateSteps
           .filter(s => assignedByStepId.has(s.id))
@@ -459,15 +525,19 @@ class LinearRoadmapService {
           .map(at => ({ type: 'custom', step: at.roadmapTask, assignedAt: at.assignedAt, assignedTask: at }))
       ];
 
+      // Sort temporally by assignedAt (with ID fallback for stability)
       allActiveTasks.sort((a, b) => new Date(a.assignedAt) - new Date(b.assignedAt) || a.assignedTask.id.localeCompare(b.assignedTask.id));
 
+      // Unassigned template steps are locked
       const lockedRoadmapSteps = templateSteps.filter(s => !assignedByStepId.has(s.id));
 
+      // Unified steps list
       const finalSteps = [];
       let earnedRoadmapPoints = 0;
       let totalRoadmapPoints = 0;
       let completedCount = 0;
 
+      // Add active/completed tasks
       for (const item of allActiveTasks) {
         const s = item.step;
         const at = item.assignedTask;
@@ -508,6 +578,7 @@ class LinearRoadmapService {
         });
       }
 
+      // Add locked tasks
       for (const s of lockedRoadmapSteps) {
         const basePts = s.pointsBase ?? 0;
         totalRoadmapPoints += basePts;
@@ -536,9 +607,11 @@ class LinearRoadmapService {
       let currentStep = p.completed ? total : finalSteps.findIndex((s) => !s.done);
       if (currentStep === -1) currentStep = total;
 
+      // Find next milestone due date from active assigned task if present
       const activeAssignedTask = assignedTasks.find((at) => ['assigned', 'in_progress', 'submitted', 'revision_needed'].includes(at.status));
       const nextMilestoneDueDate = activeAssignedTask?.dueDate || null;
 
+      // Fetch mentee's next upcoming scheduled meeting or cohort review session dynamically
       let mentorCheckInDate = null;
       const nextMeeting = await models.ScheduledMeeting.findOne({
         where: {
@@ -603,6 +676,8 @@ class LinearRoadmapService {
     const ov = sanitizeOverride(override);
     const existing = await models.AssignedTask.findOne({ where: { roadmapTaskId: step.id, menteeId } });
     if (existing) {
+      // A cancelled assignment shouldn't block reassigning the step — reactivate
+      // it in place (fresh lifecycle) so "assign again" actually works.
       if (existing.status === 'cancelled') {
         existing.status = 'assigned';
         existing.cancelledBy = null;
@@ -613,11 +688,14 @@ class LinearRoadmapService {
         existing.submittedAt = null;
         existing.completedAt = null;
         if (dueOverride) { const d = new Date(dueOverride); if (!Number.isNaN(d.getTime())) existing.dueDate = d; }
+        // Apply any fresh per-mentee customization supplied on reassign.
         if (ov) for (const [k, v] of Object.entries(ov)) existing[k] = v;
         await existing.save();
       }
       return existing;
     }
+    // An explicit deadline (mentor picked one at assign time) wins; otherwise fall
+    // back to the step's own dueOffsetDays, then a sensible default of +7 days.
     let due = null;
     if (dueOverride) {
       const d = new Date(dueOverride);
@@ -637,13 +715,16 @@ class LinearRoadmapService {
       assignedAt: new Date(),
       dueDate: due,
       isCustomTask: false,
+      // Standard points by the step's difficulty (single source of truth).
       pointsBase: pointsForDifficulty(step.difficulty),
       ...(ov || {})
     });
 
+    // Notify the mentee (roadmap-assigned tasks notify just like custom ones).
     const mentorUser = await models.User.findByPk(mentorId, { attributes: ['firstName', 'lastName'] });
     const mentorFirst = mentorUser?.firstName || 'Your mentor';
     const stepTitle = step.title || 'a new step';
+    // Format in the mentee's timezone so the notification day matches the card.
     const dueTzSettings = await models.UserSettings.findOne({ where: { userId: menteeId }, attributes: ['timezone'] });
     const dueStr = due.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: dueTzSettings?.timezone || 'UTC' });
     notificationOrchestrator.dispatch({
@@ -664,7 +745,10 @@ class LinearRoadmapService {
     return assigned;
   }
 
+  /** Mentee IDs that already have this roadmap assigned (a RoadmapProgress row). */
   async getAssignees(roadmapId) {
+    // Lineage-aware (see getMenteeStepStatus): a mentee who has the org base or a
+    // sibling import of this roadmap already "has" it, so don't offer to re-assign.
     const roadmap = await models.Roadmap.findByPk(roadmapId, { attributes: ['id', 'importedFrom'] });
     const lineageRoot = (roadmap && roadmap.importedFrom) || roadmapId;
     const siblings = await models.Roadmap.findAll({
@@ -677,18 +761,29 @@ class LinearRoadmapService {
     return [...new Set(rows.map((r) => r.menteeId))];
   }
 
+  /**
+   * Assign a roadmap to a mentee. By default assigns a single step (`startStep`),
+   * but `stepIndexes` lets you hand over a BATCH at once (e.g. this week's steps
+   * 3,4,5) — each becomes its own live task. Auto-advance still works after the
+   * batch. With no `dueDate` each step uses its own dueOffsetDays (per-step due);
+   * a `dueDate` applies one shared deadline to the whole batch.
+   */
   async assignToMentee(mentorId, roadmapId, menteeId, startStep = 0, slot = null, dueDate = null, stepIndexes = null, stepOverrides = null) {
     const roadmap = await models.Roadmap.findByPk(roadmapId);
     const steps = await this.getSteps(roadmapId);
     if (!steps.length) throw new ValidationError('This roadmap has no steps to assign');
 
+    // Which steps to assign now: an explicit batch, or just the start step.
     let indexes;
     if (Array.isArray(stepIndexes) && stepIndexes.length) {
       indexes = [...new Set(stepIndexes.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < steps.length))].sort((a, b) => a - b);
     }
     if (!indexes || !indexes.length) indexes = [Math.max(0, Math.min(startStep, steps.length - 1))];
-    const idx = indexes[0]; 
+    const idx = indexes[0]; // progress sits at the earliest step of the batch
 
+    // A date-only deadline (YYYY-MM-DD) is anchored to END OF DAY in the mentee's
+    // timezone — "due June 10" means their whole June 10 — matching the task
+    // deadline-edit + extension flows. A full ISO instant is used as-is.
     let resolvedDue = null;
     if (dueDate) {
       const raw = String(dueDate);
@@ -703,6 +798,8 @@ class LinearRoadmapService {
 
     let enrollment = await this._activeEnrollment(menteeId);
     if (!enrollment) {
+      // Self-heal: a clan-placed mentee may not have an enrollment yet. Create
+      // one in the roadmap's program rather than failing the assignment.
       if (!roadmap?.programId) throw new ValidationError('Mentee has no enrollment to attach this work to');
       enrollment = await models.Enrollment.create({
         menteeId, programId: roadmap.programId, status: 'active', enrolledAt: new Date()
@@ -712,6 +809,7 @@ class LinearRoadmapService {
     return sequelize.transaction(async (transaction) => {
       let progress = await models.RoadmapProgress.findOne({ where: { roadmapId, menteeId }, transaction });
       if (progress) {
+        // Don't drag progress backwards if they're already further along.
         progress.currentStep = Math.min(progress.currentStep ?? idx, idx);
         progress.completed = false;
         progress.enrollmentId = enrollment.id;
@@ -724,6 +822,8 @@ class LinearRoadmapService {
       }
       return progress;
     }).then(async (progress) => {
+      // Assign each step in the batch (outside the txn is fine; idempotent — an
+      // already-assigned step returns its existing task, never a duplicate).
       const overridesById = stepOverrides && typeof stepOverrides === 'object' ? stepOverrides : null;
       for (const i of indexes) {
         const ov = overridesById ? overridesById[steps[i].id] : null;
@@ -734,10 +834,27 @@ class LinearRoadmapService {
     });
   }
 
+  /**
+   * Per-step assignment status for one mentee on a roadmap — powers the multi-
+   * select assign UI (which steps are already given, how many active) so a
+   * mentor can hand over a week's batch without double-assigning.
+   */
+  /**
+   * Per-step "already assigned?" status for a mentee — LINEAGE-AWARE. Every
+   * mentor imports their OWN copy of an org roadmap (new step ids), and steps can
+   * also be assigned straight from the org base, so matching only the exact copy
+   * being viewed makes work assigned from a sibling copy look unassigned — and a
+   * (co-)mentor would re-hand a step the mentee already has. We therefore match a
+   * step as assigned if the mentee has a non-cancelled task for the EQUIVALENT
+   * step (same title) in ANY roadmap of the same lineage: the org base + every
+   * local import of it. Reports the most-advanced status across copies.
+   */
   async getMenteeStepStatus(roadmapId, menteeId) {
     const steps = await this.getSteps(roadmapId);
     const roadmap = await models.Roadmap.findByPk(roadmapId, { attributes: ['id', 'importedFrom'] });
 
+    // The lineage: the org base (this roadmap if it's the org, else what it was
+    // imported from) plus every local copy imported from that base.
     const lineageRoot = (roadmap && roadmap.importedFrom) || roadmapId;
     const siblings = await models.Roadmap.findAll({
       where: { [Op.or]: [{ id: lineageRoot }, { importedFrom: lineageRoot }] },
@@ -748,6 +865,7 @@ class LinearRoadmapService {
 
     const norm = (t) => String(t || '').trim().toLowerCase();
 
+    // Every step across the lineage → its normalized title.
     const lineageSteps = await models.RoadmapTask.findAll({
       where: { roadmapId: { [Op.in]: siblingIds } },
       attributes: ['id', 'title'],
@@ -762,6 +880,7 @@ class LinearRoadmapService {
       })
       : [];
 
+    // Best (most-advanced) status per step TITLE across all copies.
     const RANK = { assigned: 1, not_started: 1, in_progress: 2, revision_needed: 2, submitted: 3, completed: 4 };
     const statusByTitle = new Map();
     assigned.forEach((a) => {
@@ -780,6 +899,8 @@ class LinearRoadmapService {
     };
   }
 
+  // ── Reusable chain graph (roadmap_links) ────────────────────────────────────
+  /** Outgoing links of a roadmap, with the target's name (for authoring UI). */
   async getNextLinks(roadmapId) {
     const links = await models.RoadmapLink.findAll({
       where: { fromRoadmapId: roadmapId },
@@ -789,6 +910,7 @@ class LinearRoadmapService {
     return links.map((l) => ({ id: l.id, toRoadmapId: l.toRoadmapId, name: l.toRoadmap?.name || null, position: l.position }));
   }
 
+  /** Would adding from→to create a cycle? (to already reaches from, or to===from) */
   async _wouldCreateCycle(fromId, toId) {
     if (fromId === toId) return true;
     const seen = new Set();
@@ -805,6 +927,7 @@ class LinearRoadmapService {
     return false;
   }
 
+  /** Replace a roadmap's outgoing links. Rejects self/duplicate/cycle edges. */
   async setNextLinks(authorId, roadmapId, toIds = []) {
     const from = await models.Roadmap.findByPk(roadmapId);
     if (!from) throw new NotFoundError('Roadmap not found');
@@ -824,16 +947,18 @@ class LinearRoadmapService {
     return this.getNextLinks(roadmapId);
   }
 
+  /** Manually assign the next roadmap (mentor picks from a branch, or skips). */
   async manualAdvance(mentorId, menteeId, nextRoadmapId) {
     return this.assignToMentee(mentorId, nextRoadmapId, menteeId, 0);
   }
 
+  /** Create/reset progress for `nextId` and assign its first step. Idempotent. */
   async _startNextRoadmap(menteeId, nextId, prevAssignment, slotId = null) {
     const steps = await this.getSteps(nextId);
     if (!steps.length) return false;
     const enrollment = await this._activeEnrollment(menteeId);
     const existing = await models.RoadmapProgress.findOne({ where: { roadmapId: nextId, menteeId } });
-    if (existing && !existing.completed) return false; 
+    if (existing && !existing.completed) return false; // already active - don't disturb
     if (existing) {
       existing.currentStep = 0; existing.completed = false; if (slotId) existing.slot = slotId;
       if (enrollment) existing.enrollmentId = enrollment.id;
@@ -847,6 +972,7 @@ class LinearRoadmapService {
     return true;
   }
 
+  /** Tell the mentor what happened when a roadmap completes (auto / choose / paused). */
   async _notifyAdvanced(prevAssignment, menteeId, fromId, nextId, mode, optionIds = []) {
     const mentorId = prevAssignment?.mentorId;
     if (!mentorId) return;
@@ -878,7 +1004,14 @@ class LinearRoadmapService {
     } catch (e) { console.warn('[roadmap-advance notify]', e.message); }
   }
 
+  /**
+   * Chain advance after a roadmap completes. Prefers the reusable roadmap-level
+   * links (one → auto-assign + notify; several → ask the mentor to pick; the
+   * mentee's enrollment can switch auto-advance off). Falls back to the legacy
+   * per-mentee schedule-slot chain. Returns the auto-assigned next id, or null.
+   */
   async _advanceChain(menteeId, completedRoadmapId, prevAssignment) {
+    // 1) Reusable roadmap-level links take precedence.
     const links = await models.RoadmapLink.findAll({ where: { fromRoadmapId: completedRoadmapId }, order: [['position', 'ASC']] });
     if (links.length) {
       const enrollment = await this._activeEnrollment(menteeId);
@@ -889,10 +1022,12 @@ class LinearRoadmapService {
         if (started) { await this._notifyAdvanced(prevAssignment, menteeId, completedRoadmapId, nextId, 'auto'); return nextId; }
         return null;
       }
+      // Branch (multiple) or auto disabled → suggest, don't auto-assign.
       await this._notifyAdvanced(prevAssignment, menteeId, completedRoadmapId, null, autoOn ? 'choose' : 'paused', links.map((l) => l.toRoadmapId));
       return null;
     }
 
+    // 2) Legacy fallback: per-mentee schedule-slot roadmapChain.
     if (!models.MenteeSchedule) return null;
     const ms = await models.MenteeSchedule.findOne({ where: { menteeId } });
     if (!ms || !Array.isArray(ms.schedule)) return null;
@@ -905,11 +1040,12 @@ class LinearRoadmapService {
     return started ? nextId : null;
   }
 
+  /** Start the head roadmap of a slot's chain (used when a roadmap slot is filled). */
   async startChainHead(mentorId, menteeId, slotId, roadmapChain, startStep = 0) {
     if (!Array.isArray(roadmapChain) || !roadmapChain.length) return null;
     const headId = roadmapChain[0];
     const existing = await models.RoadmapProgress.findOne({ where: { roadmapId: headId, menteeId } });
-    if (existing) return null; 
+    if (existing) return null; // already started
     return this.assignToMentee(mentorId, headId, menteeId, Math.max(0, Number(startStep) || 0), slotId);
   }
 
@@ -926,6 +1062,19 @@ class LinearRoadmapService {
     return results;
   }
 
+  /**
+   * Auto-advance on approval: when a roadmap-linked task is approved, advance
+   * the mentee's progress and assign the next step. Safe to call always - it
+   * no-ops for tasks that aren't part of a tracked roadmap.
+   */
+  /**
+   * Assign the NEXT roadmap step as soon as the current one is SUBMITTED, so a
+   * mentee isn't idle for days waiting on a mentor's review. Only advances
+   * WITHIN the roadmap — the roadmap only "finishes" (and chains to a linked
+   * next roadmap) when the last step is APPROVED, which stays in
+   * advanceOnApproval. Idempotent: _assignStep no-ops if the step is already
+   * assigned, so a later approval never double-assigns.
+   */
   async advanceOnSubmission(menteeId, roadmapTaskId) {
     const task = await models.RoadmapTask.findByPk(roadmapTaskId, { attributes: ['id', 'roadmapId'] });
     if (!task || !task.roadmapId) return null;
@@ -938,6 +1087,7 @@ class LinearRoadmapService {
     if (currentIdx === -1) return null;
 
     const nextIdx = currentIdx + 1;
+    // Last step: completion + cross-roadmap chaining wait for approval.
     if (nextIdx >= steps.length) return { atLastStep: true };
 
     const prevAssignment = await models.AssignedTask.findOne({
@@ -947,6 +1097,7 @@ class LinearRoadmapService {
     if (!prevAssignment) return null;
 
     await this._assignStep(steps[nextIdx], menteeId, prevAssignment.mentorId, prevAssignment.enrollmentId);
+    // Move the pointer forward (approval keeps it here — idempotent).
     if ((progress.currentStep || 0) < nextIdx) { progress.currentStep = nextIdx; await progress.save(); }
     return { advancedTo: nextIdx };
   }
@@ -962,6 +1113,7 @@ class LinearRoadmapService {
     const currentIdx = steps.findIndex((s) => s.id === roadmapTaskId);
     if (currentIdx === -1) return null;
 
+    // Mentor of the completed assignment - reused for the next step / chained roadmap.
     const prevAssignment = await models.AssignedTask.findOne({
       where: { roadmapTaskId, menteeId },
       attributes: ['mentorId', 'enrollmentId']
@@ -979,6 +1131,7 @@ class LinearRoadmapService {
     progress.currentStep = nextIdx;
     await progress.save();
 
+    // Assign the next step using the same mentor as the completed assignment.
     if (prevAssignment) {
       await this._assignStep(steps[nextIdx], menteeId, prevAssignment.mentorId, prevAssignment.enrollmentId);
     }
