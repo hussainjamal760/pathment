@@ -223,7 +223,7 @@ class CertificateQualificationService {
 
     const menteeIds = await this.getMentorScopedMenteeIds(user.id, template.programId || null, user.role);
     if (menteeIds !== null) {
-      whereClause.menteeId = { [Op.in]: menteeIds };
+      whereClause.menteeId = { [Op.in]: [...menteeIds, user.id] };
     }
 
     const instances = await models.CertificateInstance.findAll({

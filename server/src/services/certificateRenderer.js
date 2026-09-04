@@ -1,9 +1,36 @@
+const fs = require('fs');
+const path = require('path');
 const puppeteer = require('puppeteer');
 
+function resolveImageUrl(urlStr) {
+  if (!urlStr) return '';
+  if (urlStr.startsWith('data:') || urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+    return urlStr;
+  }
+  if (urlStr.startsWith('/')) {
+    const publicPath = path.join(__dirname, '../../../client-interface/public', urlStr);
+    if (fs.existsSync(publicPath)) {
+      const ext = path.extname(publicPath).toLowerCase();
+      let mimeType = 'image/png';
+      if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.svg') mimeType = 'image/svg+xml';
+      else if (ext === '.webp') mimeType = 'image/webp';
+
+      const base64 = fs.readFileSync(publicPath).toString('base64');
+      return `data:${mimeType};base64,${base64}`;
+    }
+    const frontendHost = process.env.CLIENT_URL || 'http://localhost:3000';
+    return `${frontendHost}${urlStr}`;
+  }
+  return urlStr;
+}
+
 function compileHtml(template, data) {
-  const bgImageUrl = template.bgImageUrl || '';
-  const logoUrl = template.logoUrl || '';
-  const logoConfig = template.logoConfig || { xPercent: 10, yPercent: 10, widthPercent: 15 };
+  const rawBgUrl = template.bgImageUrl || template.bg_image_url || '';
+  const bgImageUrl = resolveImageUrl(rawBgUrl);
+  const rawLogoUrl = template.logoUrl || template.logo_url || '';
+  const logoUrl = resolveImageUrl(rawLogoUrl);
+  const logoConfig = template.logoConfig || template.logo_config || { xPercent: 10, yPercent: 10, widthPercent: 15 };
   const elements = Array.isArray(template.config) ? template.config : [];
 
   const elementsHtml = elements.map((el) => {
@@ -11,6 +38,7 @@ function compileHtml(template, data) {
       const left = el.xPercent != null ? el.xPercent : 50;
       const top = el.yPercent != null ? el.yPercent : 50;
       const width = el.widthPercent || 15;
+      const badgeResolved = resolveImageUrl(el.badgeUrl);
       return `
         <div style="
           position: absolute;
@@ -20,7 +48,7 @@ function compileHtml(template, data) {
           transform: translate(-50%, -50%);
           box-sizing: border-box;
         ">
-          ${el.badgeUrl ? `<img src="${el.badgeUrl}" style="width: 100%; height: auto;" alt="Badge" />` : ''}
+          ${badgeResolved ? `<img src="${badgeResolved}" style="width: 100%; height: auto;" alt="Badge" />` : ''}
         </div>
       `;
     }
@@ -29,6 +57,7 @@ function compileHtml(template, data) {
       const left = el.xPercent != null ? el.xPercent : 50;
       const top = el.yPercent != null ? el.yPercent : 50;
       const width = el.widthPercent || 15;
+      const imageResolved = resolveImageUrl(el.imageUrl);
       return `
         <div style="
           position: absolute;
@@ -38,7 +67,7 @@ function compileHtml(template, data) {
           transform: translate(-50%, -50%);
           box-sizing: border-box;
         ">
-          ${el.imageUrl ? `<img src="${el.imageUrl}" style="width: 100%; height: auto;" alt="Image" />` : ''}
+          ${imageResolved ? `<img src="${imageResolved}" style="width: 100%; height: auto;" alt="Image" />` : ''}
         </div>
       `;
     }

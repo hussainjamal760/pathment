@@ -75,14 +75,16 @@ class CertificateIssuanceService {
   }
 
   async listMenteeCertificates(menteeId, user) {
-    if (user.role === 'mentee' && user.id !== menteeId) {
-      throw new ForbiddenError('You can only view your own certificates');
-    }
+    if (user.id !== menteeId) {
+      if (user.role === 'mentee') {
+        throw new ForbiddenError('You can only view your own certificates');
+      }
 
-    if (user.role === 'mentor') {
-      const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
-      if (scopedIds !== null && !scopedIds.includes(menteeId)) {
-        throw new ForbiddenError('You can only view certificates for mentees in your clan');
+      if (user.role === 'mentor') {
+        const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
+        if (scopedIds !== null && !scopedIds.includes(menteeId)) {
+          throw new ForbiddenError('You can only view certificates for mentees in your clan');
+        }
       }
     }
 
@@ -139,14 +141,16 @@ class CertificateIssuanceService {
       throw new NotFoundError('Certificate not found');
     }
 
-    if (user.role === 'mentee' && user.id !== instance.menteeId) {
-      throw new ForbiddenError('You can only view your own certificates');
-    }
+    if (user.id !== instance.menteeId) {
+      if (user.role === 'mentee') {
+        throw new ForbiddenError('You can only view your own certificates');
+      }
 
-    if (user.role === 'mentor') {
-      const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
-      if (scopedIds !== null && !scopedIds.includes(instance.menteeId)) {
-        throw new ForbiddenError('Access denied to this certificate');
+      if (user.role === 'mentor') {
+        const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
+        if (scopedIds !== null && !scopedIds.includes(instance.menteeId)) {
+          throw new ForbiddenError('Access denied to this certificate');
+        }
       }
     }
 
@@ -157,7 +161,7 @@ class CertificateIssuanceService {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
 
-    if (user && user.role === 'mentor') {
+    if (user && user.role === 'mentor' && user.id !== instance.menteeId) {
       const scopedIds = await certificateQualificationService.getMentorScopedMenteeIds(user.id, null, user.role);
       if (scopedIds !== null && !scopedIds.includes(instance.menteeId)) {
         throw new ForbiddenError('You can only revoke certificates for mentees in your clan');
