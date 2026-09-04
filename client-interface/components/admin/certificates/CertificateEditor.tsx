@@ -72,15 +72,21 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     templateId,
     onSingleProgress: (result) => {
       setAdminTiers(prev => ({ ...prev, [result.mentee_id]: result.certificate_tier }));
-      setSelectedMenteeIds(prev => new Set(prev).add(result.mentee_id));
+      const menteeObj = [...recipientMenteesList, ...recipientMentorsList, ...recipientPausedList].find(m => m.id === result.mentee_id);
+      if (menteeObj && !menteeObj.isPaused) {
+        setSelectedMenteeIds(prev => new Set(prev).add(result.mentee_id));
+      }
     },
     onBatchComplete: (results) => {
       const newTiers: Record<string, string> = {};
       const autoSelected = new Set<string>();
+      const pausedSet = new Set(recipientPausedList.map(m => m.id));
       for (const r of results) {
         if (r.mentee_id) {
           newTiers[r.mentee_id] = r.certificate_tier;
-          autoSelected.add(r.mentee_id);
+          if (!pausedSet.has(r.mentee_id)) {
+            autoSelected.add(r.mentee_id);
+          }
         }
       }
       setAdminTiers(prev => ({ ...prev, ...newTiers }));
@@ -1226,7 +1232,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
                           : type === 'mentors'
                             ? recipientMentorsList
                             : recipientPausedList;
-                      setSelectedMenteeIds(new Set(list.map(m => m.id)));
+                      setSelectedMenteeIds(new Set(list.filter((m: any) => !m.isPaused).map((m: any) => m.id)));
                     }}
                     className={`pb-2.5 text-xs font-bold border-b-2 transition-all ${recipientType === type
                       ? 'border-brand-600 text-brand-600'

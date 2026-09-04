@@ -129,7 +129,11 @@ export function RecipientRosterTable({
 
               {}
               <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
-                {aiEvalMap[m.id] ? (
+                {m.isPaused ? (
+                  <span className="text-[10px] font-bold text-amber-600/80 dark:text-amber-400/80 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                    <PauseCircle className="w-3 h-3" /> Paused (No Auto Cert)
+                  </span>
+                ) : aiEvalMap[m.id] ? (
                   <div className="flex items-center gap-1.5 bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/20 px-2.5 py-1 rounded-xl">
                     <span className="text-[10px] font-extrabold text-violet-700 dark:text-violet-300 flex items-center gap-1">
                       <Sparkles className="w-3 h-3 text-violet-500" /> {getTierName(aiEvalMap[m.id].certificate_tier)}
@@ -152,10 +156,6 @@ export function RecipientRosterTable({
                       <Info className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                ) : m.isPaused ? (
-                  <span className="text-[10px] font-bold text-amber-600/80 dark:text-amber-400/80 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                    <PauseCircle className="w-3 h-3" /> Paused (No Auto Cert)
-                  </span>
                 ) : (
                   <span className="text-[10px] text-muted-foreground/50 font-semibold select-none">—</span>
                 )}
