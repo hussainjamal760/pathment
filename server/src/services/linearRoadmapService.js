@@ -368,11 +368,8 @@ class LinearRoadmapService {
 
   // ── Admin org-roadmap authoring ───────────────────────────────────────────
   // Admins author the shared org library (source='org'); mentors import + assign.
-  async listOrgRoadmaps(filter = {}) {
-    const roadmaps = await models.Roadmap.findAll({
-      where: { source: 'org', ...filter },
-      order: [['created_at', 'DESC']]
-    });
+  async listOrgRoadmaps() {
+    const roadmaps = await models.Roadmap.findAll({ where: { source: 'org' }, order: [['created_at', 'DESC']] });
     return Promise.all(roadmaps.map((r) => this.withSteps(r)));
   }
 

@@ -68,11 +68,7 @@ const menteeStepStatus = catchAsync(async (req, res) => {
 
 // ── Admin org-roadmap authoring ──────────────────────────────────────────────
 const listOrg = catchAsync(async (req, res) => {
-  const filter = {};
-  if (req.query.programId) {
-    filter.programId = req.query.programId;
-  }
-  const roadmaps = await linearRoadmapService.listOrgRoadmaps(filter);
+  const roadmaps = await linearRoadmapService.listOrgRoadmaps();
   res.status(200).json(successResponse('Org roadmaps retrieved', { roadmaps }));
 });
 
