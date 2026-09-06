@@ -262,11 +262,10 @@ class CertificateService {
 
     return instances.map(inst => {
       const q = queueMap[inst.id];
-      const status = (inst.pdfUrl && inst.imageUrl) ? 'completed' : (q?.status ?? 'pending');
+      const status = inst.imageUrl ? 'completed' : (q?.status ?? 'pending');
 
       return {
         id: inst.id,
-        pdfUrl: inst.pdfUrl,
         imageUrl: inst.imageUrl,
         tier: inst.tier,
         createdAt: inst.createdAt,
@@ -1082,7 +1081,7 @@ class CertificateService {
           menteeId: r.menteeId,
           mentorId: mentorId || null,
           issuedBy: userId,
-          pdfUrl: null,
+
           imageUrl: null,
           tier: r.tier || 'participation',
           metadata: {}
@@ -1097,7 +1096,7 @@ class CertificateService {
           menteeId,
           mentorId: mentorId || null,
           issuedBy: userId,
-          pdfUrl: null,
+
           imageUrl: null,
           tier: tier || 'participation',
           metadata: {}
@@ -1269,7 +1268,7 @@ class CertificateService {
     const instance = await models.CertificateInstance.findOne({ where: { id } });
     if (!instance) throw new NotFoundError('Certificate instance not found');
 
-    instance.pdfUrl = null;
+
     instance.imageUrl = null;
     await instance.save();
 
@@ -1354,7 +1353,7 @@ class CertificateService {
     }
 
     await models.CertificateInstance.update(
-      { pdfUrl: null, imageUrl: null },
+      { imageUrl: null },
       { where: { id: { [Op.in]: targetInstanceIds } } }
     );
 

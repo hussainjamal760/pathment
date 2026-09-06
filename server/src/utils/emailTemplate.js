@@ -147,7 +147,7 @@ function certificateAwardedEmail({ firstName, lastName, templateName, tier, tier
             </div>
 
             <p style="font-size: 12px; color: #94a3b8; margin-top: 24px; font-weight: 500;">
-              A print-ready official PDF version of your certificate is also attached to this email.
+              View and download your certificate from your dashboard.
             </p>
           </div>
 

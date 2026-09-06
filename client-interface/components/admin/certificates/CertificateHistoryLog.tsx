@@ -11,7 +11,7 @@ import { ConfirmModal } from '@/components/shared';
 
 type HistoryItem = {
   id: string;
-  pdfUrl: string | null;
+
   imageUrl: string | null;
   tier: string;
   createdAt: string;
@@ -132,7 +132,7 @@ export default function CertificateHistoryLog({ templateId, userRole }: Certific
           if (res.success) {
             toast.success('Certificate queued for regeneration successfully!');
             setHistory(prev => prev.map(item => 
-              item.id === id ? { ...item, status: 'pending', pdfUrl: null, imageUrl: null } : item
+              item.id === id ? { ...item, status: 'pending', imageUrl: null } : item
             ));
           }
         } catch (err: any) {

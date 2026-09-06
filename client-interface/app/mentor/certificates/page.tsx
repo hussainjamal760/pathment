@@ -68,7 +68,7 @@ export default function MentorCertificatesPage() {
   const { user } = useAuth();
 
   const getLinkedInShareUrl = (c: CertificateInstance) => {
-    const url = c.imageUrl || c.pdfUrl || (typeof window !== 'undefined' ? window.location.href : '');
+    const url = c.imageUrl || (typeof window !== 'undefined' ? window.location.href : '');
     const title = `Awarded: ${c.template?.name || 'Certificate of Mastery'} from Pathment`;
     return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
   };
@@ -569,7 +569,7 @@ export default function MentorCertificatesPage() {
                   day: 'numeric'
                 });
 
-                const isPending = !cert.pdfUrl || !cert.imageUrl;
+                const isPending = !cert.imageUrl;
 
                 return (
                   <div

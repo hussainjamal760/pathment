@@ -97,14 +97,10 @@ async function processPDFJob(job) {
       });
   }
 
-  const { pdfBuffer, pngBuffer } = await certificateRenderer.renderCertificate(templateClone, renderData);
+  const { pngBuffer } = await certificateRenderer.renderCertificate(templateClone, renderData);
 
-  const [pdfResult, pngResult] = await Promise.all([
-    uploadToCloudinary(pdfBuffer, 'pathment/certificates', 'auto'),
-    uploadToCloudinary(pngBuffer, 'pathment/certificates', 'image')
-  ]);
+  const pngResult = await uploadToCloudinary(pngBuffer, 'pathment/certificates', 'image');
 
-  instance.pdfUrl = pdfResult.secure_url;
   instance.imageUrl = pngResult.secure_url;
   await instance.save();
 
@@ -129,14 +125,7 @@ async function processPDFJob(job) {
     subject,
     html,
     emailType: 'certificate_awarded',
-    recipientId: instance.menteeId,
-    attachments: [
-      {
-        filename: `${instance.template.name.replace(/[^a-z0-9]/gi, '_')}.pdf`,
-        content: pdfBuffer.toString('base64'),
-        contentType: 'application/pdf'
-      }
-    ]
+    recipientId: instance.menteeId
   });
 
   await notificationOrchestrator.dispatch({

@@ -210,14 +210,7 @@ async function renderCertificate(template, data) {
 
     const pngBuffer = await page.screenshot({ type: 'png', omitBackground: false });
 
-    const pdfBuffer = await page.pdf({
-      width: '11.69in',
-      height: '8.27in',
-      printBackground: true,
-      margin: { top: '0px', right: '0px', bottom: '0px', left: '0px' }
-    });
-
-    return { pdfBuffer, pngBuffer };
+    return { pngBuffer };
   } finally {
     await page.close();
   }

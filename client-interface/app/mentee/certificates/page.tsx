@@ -33,7 +33,7 @@ export default function MenteeCertificatesPage() {
   }, [user?.id]);
 
   const getLinkedInShareUrl = (cert: CertificateInstance) => {
-    const url = cert.imageUrl || cert.pdfUrl || window.location.href;
+    const url = cert.imageUrl || window.location.href;
     const title = `Awarded: ${cert.template?.name || 'Certificate of Mastery'} from Pathment`;
     return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
   };
@@ -72,7 +72,7 @@ export default function MenteeCertificatesPage() {
               day: 'numeric'
             });
 
-            const isPending = !cert.pdfUrl || !cert.imageUrl;
+            const isPending = !cert.imageUrl;
 
             return (
               <div 

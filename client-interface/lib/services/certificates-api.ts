@@ -65,7 +65,7 @@ export interface CertificateInstance {
   menteeId: string;
   mentorId?: string;
   issuedBy: string;
-  pdfUrl?: string;
+
   imageUrl?: string;
   tier: string;
   metadata: any;
@@ -205,7 +205,7 @@ export const certificatesApi = {
       success: boolean;
       data: Array<{
         id: string;
-        pdfUrl: string | null;
+
         imageUrl: string | null;
         tier: string;
         createdAt: string;
