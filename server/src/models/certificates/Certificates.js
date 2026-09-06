@@ -20,7 +20,7 @@ module.exports = (sequelize, DataTypes) => {
     aiEvaluationRanAt: { type: DataTypes.DATE, field: 'ai_evaluation_ran_at' }
   }, { tableName: 'certificate_templates', underscored: true });
 
-  CertificateTemplate.associate = function(models) {
+  CertificateTemplate.associate = function (models) {
     if (models.User) {
       CertificateTemplate.belongsTo(models.User, { foreignKey: 'createdBy', as: 'creator' });
     }
@@ -36,13 +36,12 @@ module.exports = (sequelize, DataTypes) => {
     menteeId: { type: DataTypes.UUID, allowNull: false, field: 'mentee_id' },
     mentorId: { type: DataTypes.UUID, field: 'mentor_id' },
     issuedBy: { type: DataTypes.UUID, allowNull: false, field: 'issued_by' },
-    pdfUrl: { type: DataTypes.TEXT, field: 'pdf_url' },
     imageUrl: { type: DataTypes.TEXT, field: 'image_url' },
     tier: { type: DataTypes.STRING(50), defaultValue: 'participation' },
     metadata: { type: DataTypes.JSONB }
   }, { tableName: 'certificate_instances', underscored: true });
 
-  CertificateInstance.associate = function(models) {
+  CertificateInstance.associate = function (models) {
     if (models.CertificateTemplate) {
       CertificateInstance.belongsTo(models.CertificateTemplate, { foreignKey: 'templateId', as: 'template' });
     }
