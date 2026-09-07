@@ -204,16 +204,15 @@ export const certificatesApi = {
     apiClient.get<{
       success: boolean;
       data: Array<{
-        id: string;
-
-        imageUrl: string | null;
-        tier: string;
+        id:        string;
+        tier:      string;
         createdAt: string;
+        status:    'issued';
         recipient: { id: string; firstName: string; lastName: string; email: string; role: string } | null;
-        status: 'pending' | 'processing' | 'completed' | 'failed';
-        error: string | null;
+        issuedBy:  { id: string; firstName: string; lastName: string; email: string; role: string } | null;
       }>;
     }>(`/certificates/templates/${id}/history`),
+
 
   deleteCertificateInstance: (id: string) =>
     apiClient.delete<{ success: boolean; message: string }>(`/certificates/instances/${id}`),

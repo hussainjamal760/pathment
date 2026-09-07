@@ -1,10 +1,9 @@
 /**
  * Unified Queue Models Definition
  *
- * Defines all 3 background execution queue models in one consolidated file:
- * 1. EmailQueue: Transactional & notification email dispatch queue
- * 2. CertificateQueue: Puppeteer PDF & PNG rendering queue
- * 3. AIEvaluationQueue: OpenAI / Groq LLM micro-batch evaluation queue
+ * Defines background execution queue models in one consolidated file:
+ * 1. EmailQueue:          Transactional & notification email dispatch queue
+ * 2. AIEvaluationQueue:   OpenAI / Groq LLM micro-batch evaluation queue
  */
 module.exports = (sequelize, DataTypes) => {
 
@@ -52,30 +51,7 @@ module.exports = (sequelize, DataTypes) => {
     }
   };
 
-  // 2. Certificate Queue Model (Puppeteer PDF & PNG Rendering)
-  const CertificateQueue = sequelize.define('CertificateQueue', {
-    id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-    instanceId: { type: DataTypes.UUID, allowNull: false, field: 'instance_id' },
-    status: { type: DataTypes.STRING(20), defaultValue: 'pending' },
-    attempts: { type: DataTypes.INTEGER, defaultValue: 0 },
-    error: { type: DataTypes.TEXT },
-    lockedAt: { type: DataTypes.DATE, field: 'locked_at' }
-  }, {
-    tableName: 'certificate_queue',
-    underscored: true,
-    indexes: [
-      { name: 'certificate_queue_status_attempts', fields: ['status', 'attempts'] },
-      { fields: ['instance_id'] }
-    ]
-  });
-
-  CertificateQueue.associate = (models) => {
-    if (models.CertificateInstance) {
-      CertificateQueue.belongsTo(models.CertificateInstance, { foreignKey: 'instanceId', as: 'instance' });
-    }
-  };
-
-  // 3. AI Evaluation Queue Model (LLM Micro-batch Scoring)
+  // 2. AI Evaluation Queue Model (LLM Micro-batch Scoring)
   const AIEvaluationQueue = sequelize.define('AIEvaluationQueue', {
     id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
     runId: { type: DataTypes.UUID, allowNull: false, field: 'run_id' },
@@ -111,5 +87,5 @@ module.exports = (sequelize, DataTypes) => {
     }
   };
 
-  return [EmailQueue, CertificateQueue, AIEvaluationQueue];
+  return [EmailQueue, AIEvaluationQueue];
 };

@@ -1,217 +1,20 @@
 const { Op } = require('sequelize');
 const { models, sequelize } = require('../db');
-const certificateRenderer = require('../utils/certificateUtils');
 const certificateService = require('../services/certificateService');
 const { enrichEvaluationResults } = require('../utils/certificateUtils');
-const emailService = require('../services/emailService');
-const notificationOrchestrator = require('../services/notificationOrchestrator');
-const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
-const { certificateAwardedEmail } = require('../utils/emailTemplate');
 const { emitToUser } = require('../socket');
-const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const logger = require('../utils/logger');
 
 // ==================== WORKER CONFIGURATION ====================
 
-const PDF_POLL_MS = Number(process.env.CERTIFICATE_WORKER_POLL_MS) || 10000;
 const AI_EVAL_POLL_MS = Number(process.env.AI_EVAL_WORKER_POLL_MS) || 1000;
 
-const MAX_PDF_ATTEMPTS = 5;
 const MAX_AI_EVAL_ATTEMPTS = 3;
 const BATCH_SIZE = 10;
 const CONCURRENT_BATCHES = 4;
 
-let pdfTimer = null;
 let aiEvalTimer = null;
-
-let pdfRunning = false;
 let aiEvalRunning = false;
-
-// ==================== PDF GENERATION WORKER LOGIC ====================
-
-async function processPDFJob(job) {
-  const instance = await models.CertificateInstance.findOne({
-    where: { id: job.instanceId },
-    include: [
-      {
-        model: models.CertificateTemplate,
-        as: 'template',
-        include: [{ model: models.Program, as: 'program', required: false }]
-      },
-      { model: models.User, as: 'mentee' },
-      { model: models.User, as: 'mentor', required: false },
-      { model: models.User, as: 'issuer' }
-    ]
-  });
-
-  if (!instance) {
-    throw new Error(`Certificate instance ${job.instanceId} not found in database`);
-  }
-
-  const menteeName = `${instance.mentee.firstName} ${instance.mentee.lastName}`.trim();
-  const mentorName = instance.mentor
-    ? `${instance.mentor.firstName} ${instance.mentor.lastName}`.trim()
-    : `${instance.issuer.firstName} ${instance.issuer.lastName}`.trim();
-
-  const dateIssued = new Date(instance.createdAt).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
-
-  const enrollment = await models.Enrollment.findOne({
-    where: { menteeId: instance.menteeId },
-    include: [{ model: models.Program, as: 'program', required: false }]
-  });
-  const programName = instance.template?.program?.name || enrollment?.program?.name || 'Pathment Program';
-  const fellowshipName = programName;
-
-  const renderData = {
-    menteeName,
-    mentorName,
-    dateIssued,
-    fellowshipName,
-    programName,
-    issuerName: mentorName,
-    issuerTitle: instance.mentor ? 'Mentor' : 'Pathment Admin'
-  };
-
-  const criteria = Array.isArray(instance.template.criteria) ? instance.template.criteria : [];
-  const tierConfig = criteria.find(t => t.id === instance.tier);
-  const badgeUrl = tierConfig ? tierConfig.badgeUrl : null;
-
-  const templateClone = JSON.parse(JSON.stringify(instance.template.get({ plain: true })));
-  if (Array.isArray(templateClone.config)) {
-    templateClone.config = templateClone.config
-      .map(el => {
-        if (el.type === 'badge') {
-          return { ...el, badgeUrl };
-        }
-        return el;
-      })
-      .filter(el => {
-        if (el.type === 'badge') {
-          return !!badgeUrl;
-        }
-        return true;
-      });
-  }
-
-  const { pngBuffer } = await certificateRenderer.renderCertificate(templateClone, renderData);
-
-  const pngResult = await uploadToCloudinary(pngBuffer, 'pathment/certificates', 'image');
-
-  instance.imageUrl = pngResult.secure_url;
-  await instance.save();
-
-  const targetPath = instance.mentee.role === 'mentor' ? '/mentor/certificates' : '/mentee/certificates';
-  const certificateLink = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '')}${targetPath}`;
-
-  const criteriaMatch = criteria.find(c => c.id === instance.tier);
-  const tierDisplayName = criteriaMatch ? criteriaMatch.name : (instance.tier.charAt(0).toUpperCase() + instance.tier.slice(1));
-
-  const { subject, html } = certificateAwardedEmail({
-    firstName: instance.mentee.firstName,
-    lastName: instance.mentee.lastName,
-    templateName: instance.template.name,
-    tier: instance.tier,
-    tierDisplayName,
-    imageUrl: instance.imageUrl,
-    certificateLink
-  });
-
-  await emailService.enqueue({
-    to: instance.mentee.email,
-    subject,
-    html,
-    emailType: 'certificate_awarded',
-    recipientId: instance.menteeId
-  });
-
-  await notificationOrchestrator.dispatch({
-    eventKey: NOTIFICATION_EVENTS.CERTIFICATE_AWARDED,
-    recipients: [{ userId: instance.menteeId }],
-    payload: {
-      title: 'Certificate Awarded!',
-      message: `Congratulations! You have been awarded a certificate for: "${instance.template.name}".`,
-      actionUrl: `/mentee/certificates`,
-      actionLabel: 'View Certificate',
-      relatedEntityType: 'certificate_instance',
-      relatedEntityId: instance.id
-    }
-  });
-}
-
-async function tickPDF() {
-  if (pdfRunning) return;
-  pdfRunning = true;
-
-  try {
-    const STALE_LOCK_MS = 5 * 60 * 1000;
-    const now = new Date();
-
-    const job = await sequelize.transaction(async (t) => {
-      const pendingJob = await models.CertificateQueue.findOne({
-        where: {
-          [Op.or]: [
-            { status: 'pending' },
-            {
-              status: 'processing',
-              lockedAt: { [Op.lt]: new Date(Date.now() - STALE_LOCK_MS) }
-            }
-          ],
-          attempts: { [Op.lt]: MAX_PDF_ATTEMPTS }
-        },
-        order: [['createdAt', 'ASC']],
-        lock: { level: t.LOCK.UPDATE, of: models.CertificateQueue },
-        skipLocked: true,
-        transaction: t
-      });
-
-      if (!pendingJob) return null;
-
-      if (pendingJob.attempts > 0 && pendingJob.status === 'pending') {
-        const backoffMs = Math.pow(2, pendingJob.attempts - 1) * 3000;
-        const lastUpdated = new Date(pendingJob.updatedAt).getTime();
-        if (Date.now() - lastUpdated < backoffMs) {
-          return null;
-        }
-      }
-
-      pendingJob.status = 'processing';
-      pendingJob.lockedAt = now;
-      pendingJob.attempts += 1;
-      await pendingJob.save({ transaction: t });
-
-      return pendingJob;
-    });
-
-    if (!job) {
-      pdfRunning = false;
-      return;
-    }
-
-    try {
-      logger.info(`[Certificate Worker - PDF] Processing job ${job.id} (instance ${job.instanceId}, attempt ${job.attempts}/${MAX_PDF_ATTEMPTS})`);
-      await processPDFJob(job);
-
-      job.status = 'completed';
-      job.error = null;
-      await job.save();
-      logger.info(`[Certificate Worker - PDF] Job ${job.id} completed successfully.`);
-    } catch (jobError) {
-      logger.error(`[Certificate Worker - PDF] Job ${job.id} failed (attempt ${job.attempts}/${MAX_PDF_ATTEMPTS}): ${jobError.message}`);
-
-      job.status = job.attempts >= MAX_PDF_ATTEMPTS ? 'failed' : 'pending';
-      job.error = jobError.stack || jobError.message;
-      await job.save();
-    }
-  } catch (err) {
-    logger.error(`[Certificate Worker - PDF] Loop error: ${err.message}`);
-  } finally {
-    pdfRunning = false;
-  }
-}
 
 // ==================== AI EVALUATION WORKER LOGIC ====================
 
@@ -233,10 +36,10 @@ async function checkRunCompletion(runId, triggeredBy) {
     total += parseInt(s.count, 10);
   }
 
-  const pending = statusMap['pending'] || 0;
+  const pending    = statusMap['pending']    || 0;
   const processing = statusMap['processing'] || 0;
-  const completed = statusMap['completed'] || 0;
-  const failed = statusMap['failed'] || 0;
+  const completed  = statusMap['completed']  || 0;
+  const failed     = statusMap['failed']     || 0;
 
   if (pending === 0 && processing === 0) {
     const finishedJobs = await models.AIEvaluationQueue.findAll({
@@ -245,12 +48,8 @@ async function checkRunCompletion(runId, triggeredBy) {
       raw: true
     });
 
-    const results = finishedJobs
-      .map(j => j.result)
-      .filter(Boolean);
-
+    const results = finishedJobs.map(j => j.result).filter(Boolean);
     const enrichedResults = await enrichEvaluationResults(results);
-
     const templateId = finishedJobs[0]?.templateId ?? null;
 
     if (templateId) {
@@ -277,18 +76,18 @@ async function checkRunCompletion(runId, triggeredBy) {
 async function processBatchJobs(batchJobs) {
   if (!batchJobs || batchJobs.length === 0) return;
 
-  const templateId = batchJobs[0].templateId;
+  const templateId  = batchJobs[0].templateId;
   const triggeredBy = batchJobs[0].triggeredBy;
-  const runId = batchJobs[0].runId;
+  const runId       = batchJobs[0].runId;
 
   try {
     logger.info(`[Certificate Worker - AI Eval] Processing micro-batch of ${batchJobs.length} mentees for run ${runId}`);
     const template = await models.CertificateTemplate.findByPk(templateId);
 
     const batchItems = batchJobs.map(j => ({
-      menteeId: j.menteeId,
+      menteeId:      j.menteeId,
       menteePayload: j.menteePayload,
-      preCheck: j.preCheck
+      preCheck:      j.preCheck
     }));
 
     const batchResults = await certificateService.evaluateBatchMentees(template, batchItems, triggeredBy);
@@ -298,7 +97,7 @@ async function processBatchJobs(batchJobs) {
       const result = resultMap.get(job.menteeId) || certificateService.buildFallbackResult(job.menteePayload, job.preCheck);
       job.status = 'completed';
       job.result = result;
-      job.error = null;
+      job.error  = null;
       await job.save();
     }
 
@@ -325,11 +124,11 @@ async function processBatchJobs(batchJobs) {
         result: {
           ...result,
           firstName: mentee?.firstName ?? '',
-          lastName: mentee?.lastName ?? '',
-          email: mentee?.email ?? ''
+          lastName:  mentee?.lastName  ?? '',
+          email:     mentee?.email     ?? ''
         },
         completed: completedCount,
-        total: totalCount
+        total:     totalCount
       });
     }
 
@@ -400,13 +199,13 @@ async function tickAIEval() {
             [Op.or]: [
               { status: 'pending' },
               {
-                status: 'processing',
+                status:   'processing',
                 lockedAt: { [Op.lt]: new Date(Date.now() - 45000) }
               }
             ],
             attempts: { [Op.lt]: MAX_AI_EVAL_ATTEMPTS }
           },
-          order: [['createdAt', 'ASC']],
+          order:      [['createdAt', 'ASC']],
           attributes: ['runId'],
           raw: true,
           transaction: t
@@ -420,16 +219,16 @@ async function tickAIEval() {
             [Op.or]: [
               { status: 'pending' },
               {
-                status: 'processing',
+                status:   'processing',
                 lockedAt: { [Op.lt]: new Date(Date.now() - 45000) }
               }
             ],
             attempts: { [Op.lt]: MAX_AI_EVAL_ATTEMPTS }
           },
-          order: [['createdAt', 'ASC']],
-          limit: BATCH_SIZE,
-          lock: { level: t.LOCK.UPDATE, of: models.AIEvaluationQueue },
-          skipLocked: true,
+          order:       [['createdAt', 'ASC']],
+          limit:       BATCH_SIZE,
+          lock:        { level: t.LOCK.UPDATE, of: models.AIEvaluationQueue },
+          skipLocked:  true,
           transaction: t
         });
 
@@ -437,7 +236,7 @@ async function tickAIEval() {
 
         const now = new Date();
         for (const j of pendingJobs) {
-          j.status = 'processing';
+          j.status   = 'processing';
           j.lockedAt = now;
           j.attempts += 1;
           await j.save({ transaction: t });
@@ -466,12 +265,6 @@ async function tickAIEval() {
 // ==================== WORKER CONTROLS ====================
 
 function start() {
-  if (!pdfTimer) {
-    pdfTimer = setInterval(tickPDF, PDF_POLL_MS);
-    if (pdfTimer.unref) pdfTimer.unref();
-    logger.info(`Certificate PDF worker started (polling every ${PDF_POLL_MS}ms)`);
-  }
-
   if (!aiEvalTimer && process.env.AI_EVAL_WORKER_DISABLED !== 'true') {
     aiEvalTimer = setInterval(tickAIEval, AI_EVAL_POLL_MS);
     if (aiEvalTimer.unref) aiEvalTimer.unref();
@@ -480,26 +273,17 @@ function start() {
 }
 
 async function stop() {
-  if (pdfTimer) {
-    clearInterval(pdfTimer);
-    pdfTimer = null;
-  }
   if (aiEvalTimer) {
     clearInterval(aiEvalTimer);
     aiEvalTimer = null;
   }
 
   let waitCount = 0;
-  while ((pdfRunning || aiEvalRunning) && waitCount < 10) {
+  while (aiEvalRunning && waitCount < 10) {
     await new Promise(r => setTimeout(r, 500));
     waitCount++;
   }
-  logger.info('Certificate worker (PDF + AI Eval) stopped gracefully');
+  logger.info('Certificate worker (AI Eval) stopped gracefully');
 }
 
-module.exports = {
-  start,
-  stop,
-  tickPDF,
-  tickAIEval
-};
+module.exports = { start, stop, tickAIEval };

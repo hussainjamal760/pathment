@@ -14,8 +14,9 @@ import CertificateHistoryLog from '@/components/admin/certificates/CertificateHi
 import { DuplicateWarnModal } from '@/components/shared';
 import { getTierBadgeColor, getTierButtonColor, getTierIconColor } from '@/lib/utils/certificates';
 import { Drawer } from '@/components/shared/Drawer';
-import { AIDetailDrawer, AIEvaluationBanner, RecipientRosterTable } from '@/components/certificates/shared';
+import { AIDetailDrawer, AIEvaluationBanner, RecipientRosterTable, CertificatePreview, type CertificateRenderData } from '@/components/certificates/shared';
 import { useAIEvaluationProgress } from '@/components/admin/certificates/hooks';
+import { downloadCertificateAsPng } from '@/lib/utils/certificate-renderer';
 
 
 
@@ -68,9 +69,8 @@ export default function MentorCertificatesPage() {
   const { user } = useAuth();
 
   const getLinkedInShareUrl = (c: CertificateInstance) => {
-    const url = c.imageUrl || (typeof window !== 'undefined' ? window.location.href : '');
     const title = `Awarded: ${c.template?.name || 'Certificate of Mastery'} from Pathment`;
-    return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`;
+    return `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}&title=${encodeURIComponent(title)}`;
   };
 
   const [templates, setTemplates] = useState<CertificateTemplate[]>([]);
@@ -141,6 +141,39 @@ export default function MentorCertificatesPage() {
   const [myCertificates, setMyCertificates] = useState<CertificateInstance[]>([]);
   const [loadingMyCertificates, setLoadingMyCertificates] = useState(true);
   const [previewCert, setPreviewCert] = useState<CertificateInstance | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const buildRenderData = (cert: CertificateInstance): CertificateRenderData => ({
+    menteeName:    cert.mentee ? `${cert.mentee.firstName} ${cert.mentee.lastName}`.trim() : (user ? `${user.firstName} ${user.lastName}`.trim() : 'Recipient'),
+    programName:   cert.template?.program?.name || cert.template?.name,
+    fellowshipName: cert.template?.program?.name || cert.template?.name,
+    dateIssued:    new Date(cert.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    issuerName:    cert.mentor ? `${cert.mentor.firstName} ${cert.mentor.lastName}`.trim() : 'Pathment Admin',
+    issuerTitle:   cert.mentor ? 'Mentor' : 'Pathment Admin',
+  });
+
+  const getBadgeUrl = (cert: CertificateInstance): string | null => {
+    const crit = cert.template?.criteria;
+    if (!Array.isArray(crit)) return null;
+    return crit.find(c => c.id === cert.tier)?.badgeUrl ?? null;
+  };
+
+  const handleDownload = async (cert: CertificateInstance) => {
+    if (!cert.template) { toast.error('Template not loaded'); return; }
+    if (downloadingId) return;
+    setDownloadingId(cert.id);
+    try {
+      const data  = buildRenderData(cert);
+      const badge = getBadgeUrl(cert);
+      const name  = (cert.template.name || 'certificate').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+      await downloadCertificateAsPng(cert.template, data, `${name}.png`, badge);
+      toast.success('Certificate downloaded!');
+    } catch {
+      toast.error('Download failed — please try again');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const currentTemplate = templates.find(t => t.id === activeTemplateId) ?? null;
   const criteria = currentTemplate?.criteria ?? [];
@@ -564,58 +597,47 @@ export default function MentorCertificatesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {myCertificates.map((cert) => {
                 const dateStr = new Date(cert.createdAt).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
+                  year: 'numeric', month: 'long', day: 'numeric',
                 });
-
-                const isPending = !cert.imageUrl;
+                const renderData    = buildRenderData(cert);
+                const badgeUrl      = getBadgeUrl(cert);
+                const isDownloading = downloadingId === cert.id;
 
                 return (
                   <div
                     key={cert.id}
                     className="group bg-card border border-border rounded-2xl overflow-hidden shadow-2xs hover:shadow-xs transition-all flex flex-col cursor-pointer"
-                    onClick={() => !isPending && setPreviewCert(cert)}
+                    onClick={() => setPreviewCert(cert)}
                   >
-                    {}
-                    <div className="relative aspect-[1.777] bg-muted overflow-hidden border-b border-border flex items-center justify-center">
-                      {isPending ? (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground p-4 text-center" onClick={e => e.stopPropagation()}>
-                          <Loader2 className="animate-spin w-6 h-6 text-brand-500" />
-                          <span className="text-[11px] font-semibold">Generating document...</span>
-                          <span className="text-[9px] text-muted-foreground/60">Takes less than a minute</span>
-                        </div>
+                    {/* Live preview */}
+                    <div className="relative bg-muted overflow-hidden border-b border-border">
+                      {cert.template ? (
+                        <CertificatePreview
+                          template={cert.template}
+                          recipientData={renderData}
+                          badgeUrlOverride={badgeUrl}
+                        />
                       ) : (
-                        <>
-                          <img
-                            src={cert.imageUrl}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]"
-                            alt="Certificate Awarded"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="bg-white/90 dark:bg-black/90 text-foreground text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm">
-                              <Eye className="w-4 h-4 text-brand-500" />
-                              View Certificate
-                            </span>
-                          </div>
-                        </>
+                        <div className="aspect-[1.777] flex items-center justify-center text-muted-foreground text-xs">No preview</div>
                       )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                        <span className="bg-white/90 dark:bg-black/90 text-foreground text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow-sm">
+                          <Eye className="w-4 h-4 text-brand-500" /> View Certificate
+                        </span>
+                      </div>
                     </div>
 
-                    {}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-4" onClick={e => e.stopPropagation()}>
                       <div className="space-y-1">
                         <h3
                           className="text-xs font-bold text-foreground line-clamp-1 hover:text-brand-500 transition-colors cursor-pointer"
-                          onClick={() => !isPending && setPreviewCert(cert)}
+                          onClick={() => setPreviewCert(cert)}
                         >
                           {cert.template?.name || 'Certificate of Completion'}
                         </h3>
-
                         <div className="space-y-1 pt-1">
                           <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground font-semibold">
-                            <Calendar className="w-3 h-3 text-brand-500" />
-                            Issued: {dateStr}
+                            <Calendar className="w-3 h-3 text-brand-500" /> Issued: {dateStr}
                           </div>
                           <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground font-semibold">
                             <ShieldCheck className="w-3 h-3 text-brand-500" />
@@ -624,41 +646,36 @@ export default function MentorCertificatesPage() {
                         </div>
                       </div>
 
-                      {}
-                      {!isPending && (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setPreviewCert(cert)}
-                            className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-[10px] font-bold transition-colors"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            View
-                          </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPreviewCert(cert)}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 px-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-[10px] font-bold transition-colors"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View
+                        </button>
 
-                          {cert.imageUrl && (
-                            <a
-                              href={cert.imageUrl.replace('/upload/', '/upload/fl_attachment/')}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 bg-muted hover:bg-muted/70 text-foreground border border-border rounded-xl text-xs font-semibold transition-colors flex items-center justify-center"
-                              title="Download PNG"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                              <span className="text-[9px] ml-0.5 font-bold">PNG</span>
-                            </a>
-                          )}
+                        <button
+                          onClick={() => handleDownload(cert)}
+                          disabled={isDownloading}
+                          className="p-2 bg-muted hover:bg-muted/70 text-foreground border border-border rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-0.5 disabled:opacity-60"
+                          title="Download PNG"
+                        >
+                          {isDownloading
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Download className="w-3.5 h-3.5" />}
+                          <span className="text-[9px] font-bold">PNG</span>
+                        </button>
 
-                          <a
-                            href={getLinkedInShareUrl(cert)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 bg-[#0a66c2]/10 hover:bg-[#0a66c2]/20 text-[#0a66c2] rounded-xl transition-colors border border-transparent flex items-center justify-center"
-                            title="Share on LinkedIn"
-                          >
-                            <Linkedin className="w-3.5 h-3.5" />
-                          </a>
-                        </div>
-                      )}
+                        <a
+                          href={getLinkedInShareUrl(cert)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-2 bg-[#0a66c2]/10 hover:bg-[#0a66c2]/20 text-[#0a66c2] rounded-xl transition-colors border border-transparent flex items-center justify-center"
+                          title="Share on LinkedIn"
+                        >
+                          <Linkedin className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
                     </div>
                   </div>
                 );
@@ -718,69 +735,63 @@ export default function MentorCertificatesPage() {
         {}
         {previewCert && (
           <div
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-md p-4 md:p-8 animate-fade-in"
+            className="fixed inset-0 z-50 flex flex-col items-center justify-start md:justify-center overflow-y-auto bg-black/90 backdrop-blur-md p-4 md:p-6 animate-fade-in"
             onClick={() => setPreviewCert(null)}
           >
             <button
               onClick={() => setPreviewCert(null)}
-              className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/5"
+              className="fixed top-4 right-4 z-50 p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors border border-white/10 shadow-lg cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div
-              className="w-full max-w-4xl flex flex-col items-center gap-5 mt-4"
+              className="w-full max-w-3xl lg:max-w-4xl flex flex-col items-center gap-4 my-auto py-4"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-full aspect-[1.777] bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
-                <img
-                  src={previewCert.imageUrl}
-                  className="w-full h-full object-contain select-none"
-                  alt="Certificate Full Preview"
-                />
-              </div>
-
-              <div className="text-center space-y-1">
-                <h2 className="text-white text-base font-bold">{previewCert.template?.name || 'Certificate of Mastery'}</h2>
-                <p className="text-white/60 text-[11px] font-medium font-semibold">
-                  Issued by {previewCert.mentor ? `${previewCert.mentor.firstName} ${previewCert.mentor.lastName}` : 'Pathment Admin'}
-                </p>
-              </div>
-
-              <div className="flex gap-3 bg-white/5 border border-white/10 px-5 py-3 rounded-2xl backdrop-blur-xs select-none">
-                {previewCert.imageUrl && (
-                  <a
-                    href={previewCert.imageUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-white/90 text-black rounded-xl text-xs font-bold transition-all shadow-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open Image
-                  </a>
+              {/* Live full-screen preview */}
+              <div className="w-full border border-white/10 rounded-2xl overflow-hidden shadow-2xl bg-black/40">
+                {previewCert.template ? (
+                  <CertificatePreview
+                    template={previewCert.template}
+                    recipientData={buildRenderData(previewCert)}
+                    badgeUrlOverride={getBadgeUrl(previewCert)}
+                  />
+                ) : (
+                  <div className="aspect-[1.777] flex items-center justify-center text-white/40 text-sm">Template not available</div>
                 )}
+              </div>
 
-                {previewCert.imageUrl && (
-                  <a
-                    href={previewCert.imageUrl.replace('/upload/', '/upload/fl_attachment/')}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white/10 hover:bg-white/20 text-white border border-white/10 rounded-xl text-xs font-semibold transition-all"
+              {/* Combined Title & Action Bar */}
+              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 bg-white/10 border border-white/15 p-4 rounded-2xl backdrop-blur-md shadow-xl select-none">
+                <div className="text-center sm:text-left space-y-0.5">
+                  <h2 className="text-white text-sm md:text-base font-bold">{previewCert.template?.name || 'Certificate of Mastery'}</h2>
+                  <p className="text-white/70 text-[11px] font-medium font-semibold">
+                    Issued by {previewCert.mentor ? `${previewCert.mentor.firstName} ${previewCert.mentor.lastName}` : 'Pathment Admin'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <button
+                    onClick={() => handleDownload(previewCert)}
+                    disabled={!!downloadingId}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-white/90 text-black rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-60 cursor-pointer"
                   >
-                    <Download className="w-4 h-4" />
+                    {downloadingId === previewCert.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <Download className="w-4 h-4" />}
                     Download PNG
-                  </a>
-                )}
+                  </button>
 
-                <a
-                  href={getLinkedInShareUrl(previewCert)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#0a66c2] hover:bg-[#0a66c2]/90 text-white rounded-xl text-xs font-bold transition-all"
-                >
-                  <Linkedin className="w-4 h-4" />
-                  Share
-                </a>
+                  <a
+                    href={getLinkedInShareUrl(previewCert)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#0a66c2] hover:bg-[#0b74de] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                  >
+                    <Linkedin className="w-4 h-4" /> Share
+                  </a>
+                </div>
               </div>
             </div>
           </div>

@@ -6,6 +6,10 @@ const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/err
 const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
 const groqService = require('./groqService');
 const logger = require('../utils/logger');
+const emailService = require('./emailService');
+const notificationOrchestrator = require('./notificationOrchestrator');
+const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
+const { certificateAwardedEmail } = require('../utils/emailTemplate');
 const {
   preCheckHardConstraints,
   aggregateMenteeData,
@@ -70,13 +74,7 @@ class CertificateService {
     return clanIds;
   }
 
-  async getQualification(id, queryMentorId, user) {
-    const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
-    if (!template) throw new NotFoundError('Certificate template not found');
-
-    const programId = template.programId;
-    const mentorId = user.role === 'mentor' ? user.id : queryMentorId;
-
+  async getScopedMenteesForTemplate(programId, mentorId, userRole) {
     const activeMentees = [];
     const pausedMentees = [];
 
@@ -97,7 +95,7 @@ class CertificateService {
     }
 
     if (mentorId) {
-      const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
+      const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, userRole);
       if (clanIds.length > 0) {
         const menteeMembers = await models.ClanMembership.findAll({
           where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: { [Op.in]: ['active', 'paused'] } },
@@ -127,6 +125,21 @@ class CertificateService {
           : activeMentees.push(row);
       }
     }
+
+    return {
+      activeMentees: deduplicateById(activeMentees),
+      pausedMentees: deduplicateById(pausedMentees)
+    };
+  }
+
+  async getQualification(id, queryMentorId, user) {
+    const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
+    if (!template) throw new NotFoundError('Certificate template not found');
+
+    const programId = template.programId;
+    const mentorId = user.role === 'mentor' ? user.id : queryMentorId;
+
+    const { activeMentees, pausedMentees } = await this.getScopedMenteesForTemplate(programId, mentorId, user.role);
 
     const existingInstances = await models.CertificateInstance.findAll({
       where: { templateId: id },
@@ -239,48 +252,38 @@ class CertificateService {
     const instances = await models.CertificateInstance.findAll({
       where: whereClause,
       include: [
-        {
-          model: models.User,
-          as: 'mentee',
-          attributes: ['id', 'firstName', 'lastName', 'email', 'role']
-        },
-        {
-          model: models.User,
-          as: 'mentor',
-          attributes: ['id', 'firstName', 'lastName', 'email']
-        }
+        { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email', 'role'] },
+        { model: models.User, as: 'mentor', attributes: ['id', 'firstName', 'lastName', 'email', 'role'] },
+        { model: models.User, as: 'issuer', attributes: ['id', 'firstName', 'lastName', 'email', 'role'] }
       ],
       order: [['createdAt', 'DESC']]
     });
 
-    const instanceIds = instances.map(i => i.id);
-    const queueEntries = instanceIds.length ? await models.CertificateQueue.findAll({
-      where: { instanceId: { [Op.in]: instanceIds } }
-    }) : [];
-
-    const queueMap = Object.fromEntries(queueEntries.map(q => [q.instanceId, q]));
-
     return instances.map(inst => {
-      const q = queueMap[inst.id];
-      const status = inst.imageUrl ? 'completed' : (q?.status ?? 'pending');
-
+      const issuerObj = inst.issuer || inst.mentor;
       return {
-        id: inst.id,
-        imageUrl: inst.imageUrl,
-        tier: inst.tier,
+        id:        inst.id,
+        tier:      inst.tier,
         createdAt: inst.createdAt,
+        status:    'issued',
         recipient: inst.mentee ? {
-          id: inst.mentee.id,
+          id:        inst.mentee.id,
           firstName: inst.mentee.firstName,
-          lastName: inst.mentee.lastName,
-          email: inst.mentee.email,
-          role: inst.mentee.role
+          lastName:  inst.mentee.lastName,
+          email:     inst.mentee.email,
+          role:      inst.mentee.role
         } : null,
-        status,
-        error: q ? q.error : null
+        issuedBy: issuerObj ? {
+          id:        issuerObj.id,
+          firstName: issuerObj.firstName,
+          lastName:  issuerObj.lastName,
+          email:     issuerObj.email,
+          role:      issuerObj.role
+        } : null
       };
     });
   }
+
 
   async runAIEvaluation(id, queryMentorId, user) {
     const template = await models.CertificateTemplate.findOne({ where: { id, status: 'active' } });
@@ -288,52 +291,10 @@ class CertificateService {
 
     const programId = template.programId;
     const criteria = sortCriteriaByPriority(Array.isArray(template.criteria) ? template.criteria : []);
-
-    const menteeRows = [];
     const mentorId = user.role === 'mentor' ? user.id : queryMentorId;
 
-    const pausedMenteeIdsSet = new Set();
-    if (programId) {
-      const pausedMemberships = await models.ClanMembership.findAll({
-        where: { role: 'mentee', status: 'paused' },
-        include: [{
-          model: models.Clan,
-          as: 'clan',
-          where: { programId },
-          attributes: ['id']
-        }],
-        attributes: ['userId'],
-        raw: true
-      });
-      pausedMemberships.forEach(pm => pausedMenteeIdsSet.add(pm.userId));
-    }
-
-    if (mentorId) {
-      const clanIds = await this.getMentorScopedMenteeClans(mentorId, programId, user.role);
-      if (clanIds.length > 0) {
-        const menteeMembers = await models.ClanMembership.findAll({
-          where: { clanId: { [Op.in]: clanIds }, role: 'mentee', status: 'active' },
-          include: [{ model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
-        });
-        for (const m of menteeMembers) {
-          if (m.user && m.user.status !== 'suspended' && m.status !== 'paused' && !pausedMenteeIdsSet.has(m.user.id)) {
-            menteeRows.push({ id: m.user.id, firstName: m.user.firstName, lastName: m.user.lastName, email: m.user.email });
-          }
-        }
-      }
-    } else {
-      const enrollments = await models.Enrollment.findAll({
-        where: { programId },
-        include: [{ model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'email', 'status'] }]
-      });
-      for (const e of enrollments) {
-        if (e.mentee && e.status !== 'paused' && e.mentee.status !== 'suspended' && !pausedMenteeIdsSet.has(e.mentee.id)) {
-          menteeRows.push({ id: e.mentee.id, firstName: e.mentee.firstName, lastName: e.mentee.lastName, email: e.mentee.email });
-        }
-      }
-    }
-
-    const mentees = deduplicateById(menteeRows);
+    const { activeMentees } = await this.getScopedMenteesForTemplate(programId, mentorId, user.role);
+    const mentees = activeMentees;
 
     if (mentees.length === 0) {
       return { total: 0, runId: null, data: [] };
@@ -772,14 +733,6 @@ class CertificateService {
     });
   }
 
-  async evaluateSingleMentee(template, menteePayload, preCheckResult, adminUserId) {
-    const batchRes = await this.evaluateBatchMentees(
-      template,
-      [{ menteeId: menteePayload.mentee_id, menteePayload, preCheck: preCheckResult }],
-      adminUserId
-    );
-    return batchRes[0]?.result;
-  }
 
   buildFallbackResult(menteePayload, preCheckResult) {
     const cappedScore = Math.min(100, Math.max(0, Number(menteePayload.normalized_score) || 0));
@@ -843,6 +796,23 @@ class CertificateService {
 
   // ==================== TEMPLATE MANAGEMENT METHODS ====================
 
+  validateTemplateConfig(config) {
+    if (!Array.isArray(config)) {
+      throw new ValidationError('Template config must be an array of elements');
+    }
+    for (const el of config) {
+      if (el.xPercent != null && (typeof el.xPercent !== 'number' || el.xPercent < 0 || el.xPercent > 100)) {
+        throw new ValidationError('Element xPercent must be a number between 0 and 100');
+      }
+      if (el.yPercent != null && (typeof el.yPercent !== 'number' || el.yPercent < 0 || el.yPercent > 100)) {
+        throw new ValidationError('Element yPercent must be a number between 0 and 100');
+      }
+      if (el.widthPercent != null && (typeof el.widthPercent !== 'number' || el.widthPercent < 0 || el.widthPercent > 100)) {
+        throw new ValidationError('Element widthPercent must be a number between 0 and 100');
+      }
+    }
+  }
+
   async createTemplate({ name, bgImageUrl, logoUrl, logoConfig, config, criteria, programId }, userId) {
     if (!name || typeof name !== 'string' || !name.trim()) {
       throw new ValidationError('Template name is required');
@@ -850,9 +820,7 @@ class CertificateService {
     if (!programId) {
       throw new ValidationError('Program ID is required');
     }
-    if (!config || !Array.isArray(config)) {
-      throw new ValidationError('Template config must be an array of elements');
-    }
+    this.validateTemplateConfig(config);
 
     return models.CertificateTemplate.create({
       name: name.trim(),
@@ -926,6 +894,11 @@ class CertificateService {
           model: models.User,
           as: 'creator',
           attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: models.Program,
+          as: 'program',
+          attributes: ['id', 'name']
         }
       ]
     });
@@ -964,16 +937,13 @@ class CertificateService {
     if (logoUrl !== undefined) template.logoUrl = logoUrl || null;
     if (logoConfig !== undefined) template.logoConfig = logoConfig || null;
     if (config !== undefined) {
-      if (!Array.isArray(config)) {
-        throw new ValidationError('Template config must be an array');
-      }
+      this.validateTemplateConfig(config);
       template.config = config;
     }
     if (criteria !== undefined) {
       if (!Array.isArray(criteria)) {
         throw new ValidationError('Template criteria must be an array of tiers');
       }
-      console.log('[DEBUG updateTemplate] criteria received:', JSON.stringify(criteria, null, 2));
       template.criteria = criteria;
     }
 
@@ -1066,6 +1036,7 @@ class CertificateService {
     try {
       const template = await models.CertificateTemplate.findOne({
         where: { id: templateId, status: 'active' },
+        include: [{ model: models.Program, as: 'program', required: false }],
         transaction: t
       });
 
@@ -1078,13 +1049,12 @@ class CertificateService {
         instancesData = recipients.map(r => ({
           id: crypto.randomUUID(),
           templateId,
-          menteeId: r.menteeId,
-          mentorId: mentorId || null,
-          issuedBy: userId,
-
-          imageUrl: null,
-          tier: r.tier || 'participation',
-          metadata: {}
+          menteeId:  r.menteeId,
+          mentorId:  mentorId || null,
+          issuedBy:  userId,
+          imageUrl:  null,
+          tier:      r.tier || 'participation',
+          metadata:  {}
         }));
       } else {
         if (!Array.isArray(menteeIds) || menteeIds.length === 0) {
@@ -1096,33 +1066,101 @@ class CertificateService {
           menteeId,
           mentorId: mentorId || null,
           issuedBy: userId,
-
           imageUrl: null,
-          tier: tier || 'participation',
+          tier:     tier || 'participation',
           metadata: {}
         }));
       }
 
-      const queueJobsData = instancesData.map(inst => ({
-        id: crypto.randomUUID(),
-        instanceId: inst.id,
-        status: 'pending',
-        attempts: 0
-      }));
-
       const instances = await models.CertificateInstance.bulkCreate(instancesData, { transaction: t });
-      const queueJobs = await models.CertificateQueue.bulkCreate(queueJobsData, { transaction: t });
-
       await t.commit();
+
+      // Fire-and-forget: send notifications + emails immediately (no image — user downloads from dashboard)
+      this._notifyRecipients(instances, template, mentorId).catch(err =>
+        logger.warn(`[certificateService] Post-issuance notification failed: ${err.message}`)
+      );
 
       return {
         instances: instances.map(i => ({ id: i.id, menteeId: i.menteeId })),
-        jobs: queueJobs.map(j => ({ id: j.id, instanceId: j.instanceId })),
         count: instances.length
       };
     } catch (err) {
       await t.rollback();
       throw err;
+    }
+  }
+
+  async _notifyRecipients(instances, template, mentorId) {
+    if (!instances.length) return;
+
+    const menteeIds = instances.map(i => i.menteeId);
+    const mentees = await models.User.findAll({
+      where: { id: { [Op.in]: menteeIds } },
+      attributes: ['id', 'firstName', 'lastName', 'email', 'role']
+    });
+    const menteeMap = new Map(mentees.map(m => [m.id, m]));
+
+    let mentorUser = null;
+    if (mentorId) {
+      mentorUser = await models.User.findByPk(mentorId, {
+        attributes: ['id', 'firstName', 'lastName']
+      });
+    }
+
+    const clientUrl = (process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '');
+
+    for (const inst of instances) {
+      const mentee = menteeMap.get(inst.menteeId);
+      if (!mentee) continue;
+
+      const tierConfig = Array.isArray(template.criteria)
+        ? template.criteria.find(c => c.id === inst.tier)
+        : null;
+      const tierDisplayName = tierConfig?.name
+        ?? (inst.tier.charAt(0).toUpperCase() + inst.tier.slice(1));
+
+      const targetPath = mentee.role === 'mentor' ? '/mentor/certificates' : '/mentee/certificates';
+      const certificateLink = `${clientUrl}${targetPath}`;
+
+      const issuerName = mentorUser
+        ? `${mentorUser.firstName} ${mentorUser.lastName}`.trim()
+        : 'Pathment Admin';
+
+      const { subject, html } = certificateAwardedEmail({
+        firstName:       mentee.firstName,
+        lastName:        mentee.lastName,
+        templateName:    template.name,
+        tier:            inst.tier,
+        tierDisplayName,
+        imageUrl:        null,
+        certificateLink
+      });
+
+      const idempotencyKey = `certificate_awarded:${inst.menteeId}:certificate_instance:${inst.id}`;
+
+      await emailService.enqueue({
+        to:             mentee.email,
+        subject,
+        html,
+        emailType:      NOTIFICATION_EVENTS.CERTIFICATE_AWARDED,
+        recipientId:    inst.menteeId,
+        idempotencyKey
+      });
+
+      await notificationOrchestrator.dispatch({
+        eventKey:   NOTIFICATION_EVENTS.CERTIFICATE_AWARDED,
+        recipients: [{ userId: inst.menteeId }],
+        payload: {
+          title:             'Certificate Awarded!',
+          message:           `Congratulations! You have been awarded a "${tierDisplayName}" certificate for: "${template.name}". Visit your dashboard to view and download it.`,
+          actionUrl:         targetPath,
+          actionLabel:       'View Certificate',
+          relatedEntityType: 'certificate_instance',
+          relatedEntityId:   inst.id,
+          emailSubject:      subject,
+          emailHtml:         html
+        }
+      });
     }
   }
 
@@ -1146,7 +1184,13 @@ class CertificateService {
         {
           model: models.CertificateTemplate,
           as: 'template',
-          attributes: ['id', 'name', 'bgImageUrl']
+          include: [
+            {
+              model: models.Program,
+              as: 'program',
+              attributes: ['id', 'name']
+            }
+          ]
         },
         {
           model: models.User,
@@ -1169,7 +1213,14 @@ class CertificateService {
       include: [
         {
           model: models.CertificateTemplate,
-          as: 'template'
+          as: 'template',
+          include: [
+            {
+              model: models.Program,
+              as: 'program',
+              attributes: ['id', 'name']
+            }
+          ]
         },
         {
           model: models.User,
@@ -1220,59 +1271,26 @@ class CertificateService {
       }
     }
 
-    await models.CertificateQueue.destroy({ where: { instanceId: id } });
     await instance.destroy();
     return true;
   }
 
-  async resetQueueEntry(instanceId) {
-    const [queueEntry, created] = await models.CertificateQueue.findOrCreate({
-      where: { instanceId },
-      defaults: { status: 'pending', attempts: 0, error: null }
-    });
-
-    if (!created) {
-      queueEntry.status = 'pending';
-      queueEntry.attempts = 0;
-      queueEntry.error = null;
-      queueEntry.lockedAt = null;
-      await queueEntry.save();
-    }
-    return queueEntry;
-  }
-
-  async bulkResetQueueEntries(instanceIds) {
-    if (!instanceIds.length) return;
-
-    await models.CertificateQueue.update(
-      { status: 'pending', attempts: 0, error: null, lockedAt: null },
-      { where: { instanceId: { [Op.in]: instanceIds } } }
-    );
-
-    const existing = await models.CertificateQueue.findAll({
-      where: { instanceId: { [Op.in]: instanceIds } },
-      attributes: ['instanceId'],
-      raw: true
-    });
-    const existingIds = new Set(existing.map(e => e.instanceId));
-    const missing = instanceIds.filter(id => !existingIds.has(id));
-
-    if (missing.length > 0) {
-      await models.CertificateQueue.bulkCreate(
-        missing.map(id => ({ id: crypto.randomUUID(), instanceId: id, status: 'pending', attempts: 0 }))
-      );
-    }
-  }
-
   async resendCertificateInstance(id) {
-    const instance = await models.CertificateInstance.findOne({ where: { id } });
+    const instance = await models.CertificateInstance.findOne({
+      where: { id },
+      include: [
+        { model: models.CertificateTemplate, as: 'template', required: false,
+          include: [{ model: models.Program, as: 'program', required: false }] },
+        { model: models.User, as: 'mentee' }
+      ]
+    });
     if (!instance) throw new NotFoundError('Certificate instance not found');
 
+    // Re-fire the notification so the recipient is reminded
+    this._notifyRecipients([instance], instance.template, instance.mentorId).catch(err =>
+      logger.warn(`[certificateService] Resend notification failed: ${err.message}`)
+    );
 
-    instance.imageUrl = null;
-    await instance.save();
-
-    await this.resetQueueEntry(id);
     return true;
   }
 
@@ -1306,7 +1324,6 @@ class CertificateService {
     const instanceIds = instances.map(i => i.id);
 
     if (instanceIds.length > 0) {
-      await models.CertificateQueue.destroy({ where: { instanceId: { [Op.in]: instanceIds } } });
       await models.CertificateInstance.destroy({ where: { id: { [Op.in]: instanceIds } } });
     }
 
@@ -1314,52 +1331,34 @@ class CertificateService {
   }
 
   async resendAllTemplateCertificates(id, failedOnly, user) {
-    const template = await models.CertificateTemplate.findOne({ where: { id } });
+    const template = await models.CertificateTemplate.findOne({
+      where: { id },
+      include: [{ model: models.Program, as: 'program', required: false }]
+    });
     if (!template) throw new NotFoundError('Certificate template not found');
 
     const whereClause = { templateId: id };
 
-    const menteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
-    if (menteeIds !== null) {
-      whereClause.menteeId = { [Op.in]: menteeIds };
+    const scopedMenteeIds = await this.getMentorScopedMenteeIds(user.id, null, user.role);
+    if (scopedMenteeIds !== null) {
+      whereClause.menteeId = { [Op.in]: scopedMenteeIds };
     }
 
-    const instances = await models.CertificateInstance.findAll({
-      where: whereClause
-    });
-    const instanceIds = instances.map(i => i.id);
+    const instances = await models.CertificateInstance.findAll({ where: whereClause });
 
-    if (instanceIds.length === 0) {
+    if (instances.length === 0) {
       return { updated: 0 };
     }
 
-    const queueEntries = await models.CertificateQueue.findAll({
-      where: { instanceId: { [Op.in]: instanceIds } }
-    });
-    const queueMap = Object.fromEntries(queueEntries.map(q => [q.instanceId, q]));
-
-    let targetInstanceIds = [];
-    if (failedOnly) {
-      targetInstanceIds = instances.filter(inst => {
-        const q = queueMap[inst.id];
-        return q && q.status === 'failed';
-      }).map(i => i.id);
-    } else {
-      targetInstanceIds = instanceIds;
+    // Re-send notifications to all (or just a subset — failedOnly no longer meaningful without a queue,
+    // so we treat failedOnly=false as "all" and failedOnly=true as a no-op for now).
+    if (!failedOnly) {
+      this._notifyRecipients(instances, template, null).catch(err =>
+        logger.warn(`[certificateService] Bulk resend notification failed: ${err.message}`)
+      );
     }
 
-    if (targetInstanceIds.length === 0) {
-      return { updated: 0 };
-    }
-
-    await models.CertificateInstance.update(
-      { imageUrl: null },
-      { where: { id: { [Op.in]: targetInstanceIds } } }
-    );
-
-    await this.bulkResetQueueEntries(targetInstanceIds);
-
-    return { updated: targetInstanceIds.length };
+    return { updated: instances.length };
   }
 }
 

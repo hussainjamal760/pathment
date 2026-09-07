@@ -80,7 +80,7 @@ export default function CertificateEditor({ templateId }: CertificateEditorProps
     onBatchComplete: (results) => {
       const newTiers: Record<string, string> = {};
       const autoSelected = new Set<string>();
-      const pausedSet = new Set(recipientPausedList.map(m => m.id));
+      const pausedSet = new Set(recipientPausedList.map((m: any) => m.id));
       for (const r of results) {
         if (r.mentee_id) {
           newTiers[r.mentee_id] = r.certificate_tier;

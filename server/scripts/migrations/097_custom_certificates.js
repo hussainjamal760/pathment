@@ -4,8 +4,7 @@
  * Sets up custom certificate system tables and AI evaluation:
  * 1. certificate_templates: holds layout configs, coordinates, logo options, background image, and AI evaluation caches
  * 2. certificate_instances: issued certificates tracking mentee, template, issuer, and PDF Cloudinary url
- * 3. certificate_queue: outbox queue to render certificates in the background using Puppeteer
- * 4. ai_evaluation_queue: outbox queue for per-mentee AI evaluation jobs
+ * 3. ai_evaluation_queue: outbox queue for per-mentee AI evaluation jobs
  *
  * Run:      node server/scripts/migrations/097_custom_certificates.js
  * Rollback: node server/scripts/migrations/097_custom_certificates.js --rollback
@@ -103,25 +102,6 @@ async function up() {
       console.log('  ✓ Created certificate_instances');
     }
 
-    if (await tableExists('certificate_queue', t)) {
-      console.log('  ℹ certificate_queue exists, skipping create');
-    } else {
-      await qi.createTable('certificate_queue', {
-        id: { type: Sequelize.UUID, defaultValue: Sequelize.UUIDV4, primaryKey: true },
-        instance_id: {
-          type: Sequelize.UUID, allowNull: false,
-          references: { model: 'certificate_instances', key: 'id' }, onDelete: 'CASCADE', onUpdate: 'CASCADE',
-        },
-        status: { type: Sequelize.STRING(20), allowNull: false, defaultValue: 'pending' },
-        attempts: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
-        error: { type: Sequelize.TEXT, allowNull: true },
-        locked_at: { type: Sequelize.DATE, allowNull: true },
-        created_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.fn('NOW') },
-        updated_at: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.fn('NOW') },
-      }, { transaction: t });
-      console.log('  ✓ Created certificate_queue');
-    }
-
     if (await tableExists('ai_evaluation_queue', t)) {
       console.log('  ℹ ai_evaluation_queue exists, skipping create');
     } else {
@@ -145,14 +125,6 @@ async function up() {
         );
       `, { transaction: t });
       console.log('  ✓ Created ai_evaluation_queue table');
-    }
-
-    const qStatusIdx = 'certificate_queue_status_attempts';
-    if (await indexExists(qStatusIdx, t)) {
-      console.log(`  ℹ ${qStatusIdx} exists, skipping`);
-    } else {
-      await qi.addIndex('certificate_queue', ['status', 'attempts'], { name: qStatusIdx, transaction: t });
-      console.log(`  ✓ Created index ${qStatusIdx}`);
     }
 
     const instMenteeIdx = 'certificate_instances_mentee_id';
