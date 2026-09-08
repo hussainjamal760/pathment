@@ -1,5 +1,6 @@
 const authService = require('../services/authService');
 const securityService = require('../services/securityService');
+const { models } = require('../db');
 const { successResponse } = require('../utils/responses');
 const { AUTH_MESSAGES } = require('../utils/responses/messages');
 const { AuthenticationError } = require('../utils/errors/errorTypes');
@@ -241,6 +242,54 @@ class AuthController {
       successResponse(
         'User retrieved successfully',
         { user }
+      )
+    );
+  });
+
+  /**
+   * Get consolidated bootstrap data for initial page mount
+   * GET /api/auth/me/bootstrap
+   */
+  getBootstrap = catchAsync(async (req, res) => {
+    const userId = req.user.id;
+    const messagingService = require('../services/messagingService');
+
+    // 1. Primary mandatory fetch: Current User (must succeed for valid session)
+    const user = await authService.getCurrentUser(userId);
+
+    // 2. Non-critical secondary queries: Isolated via Promise.allSettled
+    // If notification service or settings table has an issue, dashboard boot STILL works!
+    const [unreadRes, settingsRes] = await Promise.allSettled([
+      messagingService.getUnreadNotificationCount(userId),
+      models.UserSettings.findOne({
+        where: { userId },
+        attributes: ['timezone', 'language', 'theme', 'colorTheme', 'preferences', 'emailNotifications', 'pushNotifications']
+      })
+    ]);
+
+    const unreadNotificationsCount = unreadRes.status === 'fulfilled' ? unreadRes.value : 0;
+    const userSettings = settingsRes.status === 'fulfilled' ? settingsRes.value : null;
+
+    const twoFactorStatus = {
+      enabled: !!user.twoFactorEnabled,
+      hasBackupCodes: Array.isArray(user.twoFactorBackupCodes) && user.twoFactorBackupCodes.length > 0
+    };
+
+    res.status(200).json(
+      successResponse(
+        'Bootstrap data retrieved successfully',
+        {
+          user,
+          twoFactorStatus,
+          unreadNotificationsCount,
+          appearance: userSettings ? {
+            theme: userSettings.theme,
+            colorTheme: userSettings.colorTheme,
+            language: userSettings.language,
+            timezone: userSettings.timezone
+          } : null,
+          userSettings
+        }
       )
     );
   });

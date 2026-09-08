@@ -3,6 +3,7 @@
 // limit would be trivially bypassed by anyone with a v6 allocation.
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 const config = require('../config');
 
 /**
@@ -94,11 +95,48 @@ const apiLimiter = make({
   message: 'Too many requests. Please slow down and try again shortly.',
   skipSuccessfulRequests: false,
   keyGenerator: (req) => {
+    // If request was authenticated prior to this middleware
+    if (req.user && req.user.id) {
+      return `u:${req.user.id}`;
+    }
+
+    // Decode JWT token from Authorization header if present
     const auth = req.headers.authorization;
-    // The token itself identifies the session without needing to verify it here
-    // (verification happens in authenticate); a forged token just buckets alone.
-    if (auth && auth.startsWith('Bearer ')) return `t:${auth.slice(7, 64)}`;
-    return `ip:${ipKeyGenerator(req.ip)}`;
+    if (auth && auth.startsWith('Bearer ')) {
+      const token = auth.slice(7).trim();
+      if (token) {
+        try {
+          const decoded = jwt.decode(token);
+          if (decoded && (decoded.id || decoded.sub)) {
+            return `u:${decoded.id || decoded.sub}`;
+          }
+        } catch (_err) {
+          // Ignore decoding errors for invalid or malformed tokens
+        }
+        return `t:${token.slice(-32)}`;
+      }
+    }
+
+    // Check cookie tokens if present
+    if (req.cookies && (req.cookies.accessToken || req.cookies.token)) {
+      const token = req.cookies.accessToken || req.cookies.token;
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded && (decoded.id || decoded.sub)) {
+          return `u:${decoded.id || decoded.sub}`;
+        }
+      } catch (_err) {
+        // Ignore decoding errors
+      }
+    }
+
+    // Extract true client IP safely behind reverse proxies (Cloudflare, Caddy, Nginx)
+    const clientIp =
+      req.headers['cf-connecting-ip'] ||
+      (req.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req.ip;
+
+    return `ip:${ipKeyGenerator(clientIp)}`;
   },
 });
 

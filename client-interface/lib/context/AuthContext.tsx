@@ -101,17 +101,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (token) {
-        // Try to get user from API
+        // Try to get user from bootstrap API (consolidated initial payload)
         try {
-          const response = await apiClient.get<any>(apiConfig.endpoints.me);
-          // apiClient.get returns: { success, message, statusCode, data: { user } }
+          const endpoint = apiConfig.endpoints.bootstrap || apiConfig.endpoints.me;
+          const response = await apiClient.get<any>(endpoint);
+          // apiClient.get returns: { success, message, statusCode, data: { user, ... } }
           const userData = response.data?.user;
           if (userData) {
             setUser(userData);
             tokenStore.setUser(userData);
           }
         } catch (apiError: any) {
-          // If API fails, try to get from the cached user
+          // If bootstrap fails, fallback to /auth/me if different, or cached user
+          if (apiConfig.endpoints.bootstrap) {
+            try {
+              const fallbackResponse = await apiClient.get<any>(apiConfig.endpoints.me);
+              const fallbackUser = fallbackResponse.data?.user;
+              if (fallbackUser) {
+                setUser(fallbackUser);
+                tokenStore.setUser(fallbackUser);
+                return;
+              }
+            } catch (_fallbackErr) {
+              // Ignore fallback error and proceed to cached check
+            }
+          }
           if (cachedUser) {
             console.log('Using cached user after API fail');
             setUser(cachedUser);

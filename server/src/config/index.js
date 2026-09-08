@@ -53,6 +53,6 @@ module.exports = {
   // single normal session sends, so it is deliberately generous here.
   rateLimit: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
-    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000
+    maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 2000
   }
 };
