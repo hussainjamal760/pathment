@@ -12,6 +12,7 @@ export const apiConfig = {
     refreshToken: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    bootstrap: '/auth/me/bootstrap',
     verify2FALogin: '/auth/verify-2fa-login',
     validateInvite: (token: string) => `/auth/invites/${encodeURIComponent(token)}`,
     

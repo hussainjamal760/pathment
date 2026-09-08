@@ -107,6 +107,13 @@ router.get(
   authController.getCurrentUser
 );
 
+// Get current user bootstrap data (consolidated initial payload)
+router.get(
+  '/me/bootstrap',
+  authenticate,
+  authController.getBootstrap
+);
+
 // Change password
 router.post(
   '/change-password',
