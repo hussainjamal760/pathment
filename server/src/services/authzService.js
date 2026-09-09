@@ -8,6 +8,15 @@ const { AuthorizationError } = require('../utils/errors/errorTypes');
 // a clan/program scope grants the mentor switch (drives getCapabilities).
 const MENTOR_PERMISSIONS = [P.MENTEE_VIEW, P.MENTEE_MANAGE, P.TASK_ASSIGN, P.TASK_REVIEW];
 
+// Membership statuses that still make a mentee *ours* for viewing purposes.
+// A paused mentee is not gone - the mentor has to open their profile to resume
+// them, and mentorshipPauseService links straight to it. Filtering on 'active'
+// alone made every one of those links 403 with "Mentee not found". This mirrors
+// what the rest of the codebase already does (clanService, reviewMeetingService,
+// menteeTransferService, clanAssignmentService). 'invited' and 'removed' stay
+// out: those are correctly denied.
+const VISIBLE_MEMBERSHIP_STATUSES = ['active', 'paused'];
+
 // In-memory cache of admin-defined custom roles (key → { permissions[], scope }).
 // Invalidated by accessService whenever a custom role changes.
 let _customRoles = null;
@@ -290,7 +299,12 @@ class AuthzService {
     if (match) return true;
 
     const menteeClans = await models.ClanMembership.findAll({
-      where: { userId: menteeId, status: 'active', role: 'mentee' }, attributes: ['clanId']
+      where: {
+        userId: menteeId,
+        status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES },
+        role: 'mentee'
+      },
+      attributes: ['clanId']
     });
     for (const c of menteeClans) {
       const resource = await this.scopeOfClan(c.clanId);
@@ -349,7 +363,13 @@ class AuthzService {
       if (enr) out.programId = enr.programId;
     }
     const membership = await models.ClanMembership.findOne({
-      where: { userId: task.menteeId, status: 'active', role: 'mentee' }, attributes: ['clanId']
+      where: {
+        userId: task.menteeId,
+        status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES },
+        role: 'mentee'
+      },
+      attributes: ['clanId'],
+      order: [['status', 'ASC']]
     });
     if (membership) out.clanId = membership.clanId;
     return out;
@@ -472,8 +492,16 @@ class AuthzService {
   async scopeOfMentee(menteeId) {
     if (!menteeId) return null;
     const out = { userId: menteeId };
+    // Paused counts (see VISIBLE_MEMBERSHIP_STATUSES), but an active placement
+    // must win when a mentee holds both - 'active' sorts before 'paused'.
     const membership = await models.ClanMembership.findOne({
-      where: { userId: menteeId, status: 'active', role: 'mentee' }, attributes: ['clanId']
+      where: {
+        userId: menteeId,
+        status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES },
+        role: 'mentee'
+      },
+      attributes: ['clanId'],
+      order: [['status', 'ASC']]
     });
     if (membership) {
       out.clanId = membership.clanId;
@@ -490,7 +518,13 @@ class AuthzService {
     if (!enr) return null;
     const out = { userId: enr.menteeId, programId: enr.programId };
     const membership = await models.ClanMembership.findOne({
-      where: { userId: enr.menteeId, status: 'active', role: 'mentee' }, attributes: ['clanId']
+      where: {
+        userId: enr.menteeId,
+        status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES },
+        role: 'mentee'
+      },
+      attributes: ['clanId'],
+      order: [['status', 'ASC']]
     });
     if (membership) out.clanId = membership.clanId;
     return out;
