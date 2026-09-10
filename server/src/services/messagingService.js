@@ -6,6 +6,7 @@ const {
   ValidationError
 } = require('../utils/errors/errorTypes');
 const schedulingService = require('./schedulingService');
+const { VISIBLE_MEMBERSHIP_STATUSES } = require('../config/membership');
 const logger = require('../utils/logger');
 
 class MessagingService {
@@ -25,7 +26,12 @@ class MessagingService {
     const mentorIds = await schedulingService.getMenteeMentorIds(userId); // matches + clan lead/co mentors
     mentorIds.forEach((id) => allowed.add(id));
 
-    const myClans = await models.ClanMembership.findAll({ where: { userId, status: 'active' }, attributes: ['clanId'] });
+    // Paused counts: a paused mentee is still in their clan, so they keep access
+    // to their clan-mates as well as their mentors.
+    const myClans = await models.ClanMembership.findAll({
+      where: { userId, status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES } },
+      attributes: ['clanId']
+    });
     const clanIds = myClans.map((c) => c.clanId);
     if (clanIds.length) {
       const members = await models.ClanMembership.findAll({
@@ -430,10 +436,13 @@ class MessagingService {
         throw new NotFoundError('Conversation not found');
       }
 
-      // Fetch all participants (even those who have left) to restore them
+      // Fetch all participants (even those who have left) to restore them.
+      // isArchived is selected because a new message un-archives the thread for
+      // everybody but the sender; without it here that check reads undefined on
+      // every row and quietly does nothing.
       const participantRows = await models.ConversationParticipant.findAll({
         where: { conversationId },
-        attributes: ['id', 'userId', 'leftAt'],
+        attributes: ['id', 'userId', 'leftAt', 'isArchived'],
         transaction
       });
 
@@ -463,6 +472,22 @@ class MessagingService {
             transaction
           });
         }
+      }
+
+      // A new message brings an archived conversation back to the inbox, for
+      // everybody except whoever just sent it. Archiving is "I am done with
+      // this for now", not "never show me this person again", and the app has
+      // always told people it works this way. Only the flag is touched: the
+      // history is theirs and they never asked to lose it, which is what makes
+      // this different from the restore above.
+      const archivedParticipants = participantRows.filter(
+        (p) => p.leftAt === null && p.isArchived && p.userId !== senderId
+      );
+      if (archivedParticipants.length > 0) {
+        await models.ConversationParticipant.update(
+          { isArchived: false },
+          { where: { id: archivedParticipants.map((p) => p.id) }, transaction }
+        );
       }
 
       // Fetch active participants after restoration

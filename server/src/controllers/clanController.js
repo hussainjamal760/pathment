@@ -68,6 +68,17 @@ const mentorPrograms = catchAsync(async (req, res) => {
 });
 
 /**
+ * GET /api/clans/mentor/programs/:programId
+ * One program the mentor runs, with each of their clans' full rosters — so the
+ * program page needs a single request rather than one per clan.
+ */
+const mentorProgramDetail = catchAsync(async (req, res) => {
+  const detail = await clanService.getMentorProgramDetail(req.user.id, req.params.programId);
+  if (!detail) throw new NotFoundError('Program not found');
+  res.status(200).json(successResponse('Mentor program retrieved', detail));
+});
+
+/**
  * GET /api/clans/:id
  */
 const getClan = catchAsync(async (req, res) => {
@@ -300,6 +311,7 @@ module.exports = {
   clanInsights,
   myMemberships,
   mentorPrograms,
+  mentorProgramDetail,
   getClan,
   createClan,
   updateClan,

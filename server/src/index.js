@@ -107,7 +107,9 @@ app.get('/', (req, res) => {
 
 // API routes. The global limiter is a backstop against runaway clients and
 // crawlers; the real per-action limits live on the auth and public-intake routes.
-app.use('/api', require('./middlewares/rateLimiter').apiLimiter, routes);
+// It is a PAIR of limiters (reads and writes have separate budgets) — Express
+// flattens the array, and each one skips the other's methods.
+app.use('/api', ...require('./middlewares/rateLimiter').apiLimiter, routes);
 
 // Provider webhooks (Resend delivery/bounce/complaint) — public, provider-signed.
 app.use('/webhooks', require('./routes/webhooks'));

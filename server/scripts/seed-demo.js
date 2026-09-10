@@ -145,6 +145,7 @@ async function cleanupDemo() {
         paranoid: false,
       })).map((t) => t.roadmapTaskId).filter(Boolean)
     )];
+    if (models.TaskProgressEntry) await models.TaskProgressEntry.destroy({ where: { menteeId: { [Op.in]: userIds } }, force: true });
     if (models.RoadmapProgress) await models.RoadmapProgress.destroy(byMentee);
     if (models.PromotionCandidate) await models.PromotionCandidate.destroy({ where: { [Op.or]: [{ menteeId: { [Op.in]: userIds } }, { nominatedBy: { [Op.in]: userIds } }] }, force: true });
     if (models.ClanMemberPermission) await models.ClanMemberPermission.destroy({ where: { userId: { [Op.in]: userIds } }, force: true });
@@ -258,6 +259,24 @@ async function cleanupDemo() {
       await models.RoadmapTask.destroy({ where: { roadmapId: { [Op.in]: rmIds } }, force: true });
     }
     await models.Roadmap.destroy({ where: { programId: inPrograms }, force: true });
+    // Anything that references a clan has to go before the clans do. Recurring
+    // review schedules were added after this cleanup was written, so a re-seed
+    // died on their foreign key.
+    {
+      const clanRows = await models.Clan.findAll({ where: { programId: inPrograms }, attributes: ["id"], paranoid: false });
+      const clanIds = clanRows.map((c) => c.id);
+      if (clanIds.length) {
+        const inClans = { [Op.in]: clanIds };
+        if (models.ReviewSchedule) await models.ReviewSchedule.destroy({ where: { clanId: inClans }, force: true });
+        if (models.AdminMeeting) await models.AdminMeeting.destroy({ where: { clanId: inClans }, force: true });
+        if (models.CrossClanAssignment) {
+          await models.CrossClanAssignment.destroy({ where: { [Op.or]: [{ toClanId: inClans }, { fromClanId: inClans }] }, force: true });
+        }
+        if (models.ClanChangeRequest) {
+          await models.ClanChangeRequest.destroy({ where: { [Op.or]: [{ toClanId: inClans }, { fromClanId: inClans }] }, force: true });
+        }
+      }
+    }
     await models.Clan.destroy({ where: { programId: inPrograms }, force: true });
     const cohorts = await models.Cohort.findAll({ where: { programId: inPrograms }, attributes: ["id"], paranoid: false });
     const cohortIds = cohorts.map((c) => c.id);
@@ -845,6 +864,54 @@ async function seed() {
   console.log(`✅ ${menteeSpecs.length} enrollments, assigned tasks, submissions & feedback created across a ${taskDefs.length}-step roadmap\n`);
 
   // ── Blockers + accepted delays (drive watch/fighting + fairness credit) ───────
+  // ── Day-by-day progress on in-flight tasks ──────────────────────────────────
+  // Deliberately UNEVEN: some mentees log every day, some log twice and go quiet,
+  // one logs nothing at all. The gaps are the whole point of the feature, so the
+  // demo has to contain some.
+  if (models.TaskProgressEntry) {
+    console.log("📝 Adding day-by-day task progress…");
+    const PROGRESS_NOTES = [
+      "Read through the docs and sketched the approach. No code yet.",
+      "Got the basic version working. Tests still failing on edge cases.",
+      "Stuck on this one honestly. Tried three approaches, none of them fit.",
+      "Pairing with Leo helped. Fixed the thing I misunderstood yesterday.",
+      "Refactored it properly now that I know what it should look like.",
+      "Almost done. Just cleaning up and writing the README.",
+      "Spent most of today reading other people's implementations for ideas.",
+      "Small progress. Work was busy so only got an hour in.",
+    ];
+    const keyOf = (d) => d.toISOString().split("T")[0];
+    let progressRows = 0;
+
+    for (const s of menteeSpecs) {
+      const m = mentees[s.local].user;
+      const live = await models.AssignedTask.findAll({
+        where: { menteeId: m.id, status: { [Op.in]: ["in_progress", "submitted"] } },
+        attributes: ["id"], limit: 2,
+      });
+      // How diligently this archetype logs. "new" logs nothing, which is exactly
+      // what a mentor should be able to see.
+      const density = { star: 4, on_track: 3, review: 3, average: 2, fighting: 2, watch: 1, disengaged: 1, new: 0 }[s.archetype] ?? 2;
+      if (!density) continue;
+
+      for (const t of live) {
+        for (let d = density; d >= 1; d--) {
+          // Skip a day here and there so the timeline has real holes in it.
+          if (density > 2 && d === 2) continue;
+          const dateKey = keyOf(daysAgo(d));
+          const note = PROGRESS_NOTES[(menteeSpecs.indexOf(s) + d) % PROGRESS_NOTES.length];
+          try {
+            await models.TaskProgressEntry.create({
+              assignedTaskId: t.id, menteeId: m.id, dateKey, note,
+            });
+            progressRows += 1;
+          } catch { /* unique (task, day) — fine, skip */ }
+        }
+      }
+    }
+    console.log(`✅ ${progressRows} task progress entries across in-flight work (with gaps, on purpose)\n`);
+  }
+
   console.log("🚧 Adding blockers, delays, notes & schedules…");
   const noor = mentees["mentee.noor"].user;
   const ivan = mentees["mentee.ivan"].user;

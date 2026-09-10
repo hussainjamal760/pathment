@@ -10,6 +10,7 @@ import { looksLikeHtml } from '@/lib/utils/html';
 import { toExternalHref } from '@/lib/utils/url';
 import { RichContent } from '@/components/shared/RichContent';
 import { SubmissionFileList } from '@/components/shared/SubmissionFileList';
+import { TaskProgressTimeline } from '@/components/shared/TaskProgressTimeline';
 import type { ApprovalItem } from '@/lib/hooks/mentor';
 
 type Decision = 'approved' | 'approved_notes' | 'changes' | 'rejected';
@@ -162,6 +163,12 @@ export function ReviewDrawer({
             )}
           </div>
         )}
+
+        {/* How they got here, BEFORE the submission itself. Somebody who worked
+            four days and produced something rough deserves a different review
+            from somebody who started at 11pm the night it was due, and the
+            mentor should see that before forming a judgement rather than after. */}
+        <TaskProgressTimeline taskId={item.taskId} mode="mentor" />
 
         {/* Submission */}
         <div>
