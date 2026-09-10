@@ -10,8 +10,11 @@ export interface ApiQueryOptions<T> {
   /** Skip the request until its inputs exist (e.g. an id that is still loading). */
   enabled?: boolean;
   staleTime?: number;
-  /** Background poll. Use only where data is genuinely live. */
-  refetchInterval?: number | false;
+  /**
+   * Background poll. Use only where data is genuinely live. Pass a function to
+   * decide from the latest data — e.g. poll only while something is processing.
+   */
+  refetchInterval?: number | false | ((data: T | undefined) => number | false);
   refetchOnWindowFocus?: boolean;
   /** Shown instead of the raw server message when the request fails. */
   errorMessage?: string;
@@ -51,7 +54,9 @@ export function useApiQuery<T>({
     queryFn,
     enabled,
     staleTime,
-    refetchInterval,
+    refetchInterval: typeof refetchInterval === 'function'
+      ? (q) => refetchInterval(q.state.data as T | undefined)
+      : refetchInterval,
     refetchOnWindowFocus,
   });
 

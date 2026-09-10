@@ -15,6 +15,7 @@ export const qk = {
 
   profile: {
     appearance: ['profile', 'appearance'] as const,
+    me: ['profile', 'me'] as const,
   },
 
   clan: {
@@ -30,13 +31,18 @@ export const qk = {
   messaging: {
     all: ['messaging'] as const,
     notifications: ['messaging', 'notifications'] as const,
+    recentNotifications: (limit: number) => ['messaging', 'notifications', 'recent', limit] as const,
     conversations: (archived: boolean) => ['messaging', 'conversations', archived] as const,
+    /** Sidebar badge only — the derived unread total, not the conversation list. */
+    unreadCount: ['messaging', 'unread-count'] as const,
+    mentorDocuments: ['messaging', 'mentor-documents'] as const,
   },
 
   mentor: {
     all: ['mentor'] as const,
     cohort: ['mentor', 'cohort'] as const,
     approvalsCount: ['mentor', 'approvals-count'] as const,
+    approvals: ['mentor', 'approvals'] as const,
     mentees: ['mentor', 'mentees'] as const,
     programs: ['mentor', 'programs'] as const,
     programDetail: (programId: string) => ['mentor', 'program', programId] as const,
@@ -48,6 +54,14 @@ export const qk = {
     feedbackSnippets: ['mentor', 'feedback-snippets'] as const,
     promotions: ['mentor', 'promotions'] as const,
     transfersConfig: ['mentor', 'transfers-config'] as const,
+    spec: ['mentor', 'spec'] as const,
+    taskDetail: (taskId: string) => ['mentor', 'task', taskId] as const,
+    clanPerformance: (clanId: string) => ['mentor', 'clan-performance', clanId] as const,
+    autoReply: ['mentor', 'auto-reply'] as const,
+    availability: ['mentor', 'availability'] as const,
+    meetings: ['mentor', 'meetings'] as const,
+    taskStats: (mentorId: string) => ['mentor', 'task-stats', mentorId] as const,
+    pendingReviews: (mentorId: string) => ['mentor', 'pending-reviews', mentorId] as const,
   },
 
   mentee: {
@@ -65,6 +79,17 @@ export const qk = {
     programs: ['me', 'programs'] as const,
     roadmaps: ['me', 'roadmaps'] as const,
     progress: ['me', 'progress'] as const,
+    dailyLog: ['me', 'daily-log'] as const,
+    tasks: (params: Record<string, unknown>) => ['me', 'tasks', params] as const,
+    taskStats: (enrollmentId: string | null) => ['me', 'task-stats', enrollmentId ?? 'all'] as const,
+    meetings: ['me', 'meetings'] as const,
+    task: (taskId: string) => ['me', 'task', taskId] as const,
+    bookable: ['me', 'bookable'] as const,
+    enrollments: (menteeId: string) => ['me', 'enrollments', menteeId] as const,
+    publicPrograms: ['me', 'public-programs'] as const,
+    program: (programId: string) => ['me', 'program', programId] as const,
+    programEnrollment: (programId: string, menteeId: string) =>
+      ['me', 'program-enrollment', programId, menteeId] as const,
   },
 
   admin: {
@@ -74,6 +99,44 @@ export const qk = {
     programs: ['admin', 'programs'] as const,
     mentors: ['admin', 'mentors'] as const,
     mentees: ['admin', 'mentees'] as const,
+    activity: (days: number) => ['admin', 'activity', days] as const,
+    moderation: (status: string) => ['admin', 'moderation', status] as const,
+    clanRequests: ['admin', 'clan-requests'] as const,
+    cohorts: (programId?: string) => ['admin', 'cohorts', programId ?? 'all'] as const,
+    orgInsights: ['admin', 'org-insights'] as const,
+    orgRoadmaps: ['admin', 'org-roadmaps'] as const,
+    clanHealth: ['admin', 'clan-health'] as const,
+    aiConnections: ['admin', 'ai-connections'] as const,
+    clanList: (page: number, limit: number, search: string, programId: string) =>
+      ['admin', 'clans', page, limit, search, programId] as const,
+    menteeList: (page: number, limit: number, search: string) =>
+      ['admin', 'mentees', page, limit, search] as const,
+    mentorList: (page: number, limit: number, search: string) =>
+      ['admin', 'mentors', page, limit, search] as const,
+    mentorProfile: (id: string) => ['admin', 'mentor-profile', id] as const,
+    menteeProfileDetail: (id: string) => ['admin', 'mentee-profile', id] as const,
+    programList: (params: Record<string, unknown>) => ['admin', 'program-list', params] as const,
+    enrollmentList: (params: Record<string, unknown>) => ['admin', 'enrollment-list', params] as const,
+    enrollmentStats: ['admin', 'enrollment-stats'] as const,
+    cohort: (cohortId: string) => ['admin', 'cohort', cohortId] as const,
+    program: (programId: string) => ['admin', 'program', programId] as const,
+    programEnrollments: (programId: string) => ['admin', 'program-enrollments', programId] as const,
+    pendingMatches: (programId: string) => ['admin', 'pending-matches', programId] as const,
+    matchSuggestions: (enrollmentIds: string[]) => ['admin', 'match-suggestions', enrollmentIds] as const,
+    availableMentors: (page: number, search: string) => ['admin', 'available-mentors', page, search] as const,
+    invites: (params: Record<string, unknown>) => ['admin', 'invites', params] as const,
+    placementOptions: ['admin', 'placement-options'] as const,
+    applications: (cohortId: string) => ['admin', 'applications', cohortId] as const,
+  },
+
+  community: {
+    all: ['community'] as const,
+    spaces: ['community', 'spaces'] as const,
+    feed: (params: Record<string, unknown>) => ['community', 'feed', params] as const,
+    people: (type: string, id: string) => ['community', 'people', type, id] as const,
+    members: (type: string, id: string) => ['community', 'members', type, id] as const,
+    leaderboard: (type: string, id: string, period: string) =>
+      ['community', 'leaderboard', type, id, period] as const,
   },
 
   announcements: ['announcements'] as const,

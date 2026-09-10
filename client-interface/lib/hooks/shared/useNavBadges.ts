@@ -23,7 +23,7 @@ export function useNavBadges({ userId, isMentor }: { userId?: string; isMentor: 
   const client = useQueryClient();
 
   const { data: unreadMessageCount = 0 } = useApiQuery<number>({
-    queryKey: qk.messaging.conversations(false),
+    queryKey: qk.messaging.unreadCount,
     queryFn: async () => {
       const conversations = await messagingApi.listConversations(50);
       return conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -55,10 +55,10 @@ export function useNavBadges({ userId, isMentor }: { userId?: string; isMentor: 
     if (!socket) return;
 
     const onNotification = (data: { type?: string }) => {
-      if (data?.type === 'message') client.invalidateQueries({ queryKey: qk.messaging.conversations(false) });
+      if (data?.type === 'message') client.invalidateQueries({ queryKey: qk.messaging.unreadCount });
       else if (data?.type === 'task') client.invalidateQueries({ queryKey: qk.mentor.approvalsCount });
     };
-    const onUnreadCount = () => client.invalidateQueries({ queryKey: qk.messaging.conversations(false) });
+    const onUnreadCount = () => client.invalidateQueries({ queryKey: qk.messaging.unreadCount });
 
     socket.on('notification:new', onNotification);
     socket.on('message:unread-count', onUnreadCount);

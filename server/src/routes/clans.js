@@ -12,6 +12,8 @@ router.get('/me/memberships', authenticate, clanController.myMemberships);
 
 // Programs the current mentor runs (their clans + roster counts).
 router.get('/mentor/programs', authenticate, authorize(['mentor', 'admin']), clanController.mentorPrograms);
+// Must sit before '/:id' so 'mentor' is not swallowed as a clan id.
+router.get('/mentor/programs/:programId', authenticate, authorize(['mentor', 'admin']), clanController.mentorProgramDetail);
 
 // List clans (any authenticated user; filterable by program/status/search,
 // paginated when page/limit are supplied — limit is hard-capped at 100).

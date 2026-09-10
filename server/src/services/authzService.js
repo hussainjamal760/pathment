@@ -3,19 +3,12 @@ const { models } = require('../db');
 const { ROLES, roleGrants } = require('../config/roles');
 const { ALL_PERMISSIONS, PERMISSIONS: P } = require('../config/permissions');
 const { AuthorizationError } = require('../utils/errors/errorTypes');
+const { VISIBLE_MEMBERSHIP_STATUSES } = require('../config/membership');
 
 // Permissions that mean "this person mentors someone" - holding any of these at
 // a clan/program scope grants the mentor switch (drives getCapabilities).
 const MENTOR_PERMISSIONS = [P.MENTEE_VIEW, P.MENTEE_MANAGE, P.TASK_ASSIGN, P.TASK_REVIEW];
 
-// Membership statuses that still make a mentee *ours* for viewing purposes.
-// A paused mentee is not gone - the mentor has to open their profile to resume
-// them, and mentorshipPauseService links straight to it. Filtering on 'active'
-// alone made every one of those links 403 with "Mentee not found". This mirrors
-// what the rest of the codebase already does (clanService, reviewMeetingService,
-// menteeTransferService, clanAssignmentService). 'invited' and 'removed' stay
-// out: those are correctly denied.
-const VISIBLE_MEMBERSHIP_STATUSES = ['active', 'paused'];
 
 // In-memory cache of admin-defined custom roles (key → { permissions[], scope }).
 // Invalidated by accessService whenever a custom role changes.
