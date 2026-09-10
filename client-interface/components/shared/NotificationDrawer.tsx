@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, X, Check, Trash2, Clock, ListTodo, MessageSquare, Award, Trophy, Zap, ChevronRight } from 'lucide-react';
@@ -57,14 +57,16 @@ export default function NotificationDrawer({
   const { activeRole } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [showAllRoles, setShowAllRoles] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   // The feed itself is shared: this bell renders twice (desktop sidebar + mobile
   // header) and both are always in the DOM, so owning the state here meant two
   // of every fetch and two sockets. See useNotificationFeed.
   const {
-    notifications, reload, markRead, markAllRead, remove,
+    notifications, loading, reload, markRead, markAllRead, remove,
   } = useNotificationFeed(userId);
+  // Only blank the list when there is genuinely nothing to show; a background
+  // refresh must not replace a populated list with a spinner.
+  const isLoading = loading && notifications.length === 0;
 
   const notificationsPath = getRoleNotificationsPath(pathname || '');
 
@@ -86,26 +88,16 @@ export default function NotificationDrawer({
   );
   const hiddenOtherRoleCount = notifications.length - roleScoped.length;
 
-  const loadNotifications = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await reload();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [reload]);
-
   // Ensure we only render portal on client.
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Load notifications when drawer opens
+  // Opening the drawer asks for a fresh read; the cache serves the current list
+  // meanwhile, so there is no spinner over existing data.
   useEffect(() => {
-    if (isOpen) {
-      loadNotifications();
-    }
-  }, [isOpen, loadNotifications]);
+    if (isOpen) reload();
+  }, [isOpen, reload]);
 
   // Lock background scroll while sheet is open.
   useEffect(() => {

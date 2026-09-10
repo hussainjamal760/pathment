@@ -60,9 +60,14 @@ export function useApiQuery<T>({
     refetchOnWindowFocus,
   });
 
+  // Depend on `query.refetch` (which TanStack keeps referentially stable), NOT
+  // on `query` — that is a fresh object every render, so a `[refetch]` dependency
+  // upstream would re-fire forever. That loop is what left the notification
+  // drawer stuck on "Loading notifications...".
+  const queryRefetch = query.refetch;
   const refetch = useCallback(async () => {
-    await query.refetch();
-  }, [query]);
+    await queryRefetch();
+  }, [queryRefetch]);
 
   return {
     data: query.data,
