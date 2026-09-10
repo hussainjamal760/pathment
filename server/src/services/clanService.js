@@ -4,6 +4,7 @@ const { createAuditLog } = require('../utils/auditContext');
 const { ROLES } = require('../config/roles');
 const authzService = require('./authzService');
 const { PERMISSIONS: P } = require('../config/permissions');
+const { VISIBLE_MEMBERSHIP_STATUSES } = require('../config/membership');
 
 // The permissions a co-mentor holds by default — and therefore the exact set a
 // lead mentor / admin may toggle on or off for an individual co-mentor. Derived
@@ -597,13 +598,21 @@ class ClanService {
    *     fresh enrollment in the new clan's program.
    */
   async reassignMentee(menteeId, toClanId, actorId = null) {
+    const { Op } = require('sequelize');
     const toClan = await models.Clan.findByPk(toClanId, { attributes: ['id', 'programId'] });
     if (!toClan) throw new NotFoundError('Target clan not found');
     const mentee = await models.User.findByPk(menteeId, { attributes: ['id'] });
     if (!mentee) throw new NotFoundError('Mentee not found');
 
+    // Paused counts, or the mentee is added to the target clan without ever
+    // being removed from the old one — a transfer that silently leaves them in
+    // two places. Moving a paused mentee is a normal thing to want to do.
     const oldMemberships = await models.ClanMembership.findAll({
-      where: { userId: menteeId, role: 'mentee', status: 'active' },
+      where: {
+        userId: menteeId,
+        role: 'mentee',
+        status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES }
+      },
       include: [{ model: models.Clan, as: 'clan', attributes: ['id', 'programId'] }]
     });
     if (oldMemberships.some((m) => m.clanId === toClanId)) {
@@ -855,6 +864,74 @@ class ClanService {
       clanCount: p.clans.length,
       menteeCount: p.clans.reduce((s, c) => s + c.menteeCount, 0)
     }));
+  }
+
+  /**
+   * ONE program the mentor runs, with each of their clans' full rosters.
+   *
+   * The page used to fetch the program list and then GET /clans/:id once per
+   * clan, so a twenty-clan program fired twenty-one requests in a burst. Same
+   * scoping as getMentorPrograms: only clans this user actually mentors.
+   */
+  async getMentorProgramDetail(userId, programId) {
+    const { Op } = require('sequelize');
+
+    const memberships = await models.ClanMembership.findAll({
+      where: { userId, role: ['lead_mentor', 'co_mentor'], status: 'active' },
+      include: [{
+        model: models.Clan,
+        as: 'clan',
+        attributes: ['id', 'name', 'programId', 'status'],
+        where: { programId },
+        required: true,
+        include: [
+          { model: models.Program, as: 'program', attributes: ['id', 'name', 'status', 'visibility', 'description'] },
+          {
+            model: models.ClanMembership,
+            as: 'memberships',
+            required: false,
+            where: { status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES } },
+            attributes: ['id', 'role', 'status'],
+            include: [{ model: models.User, as: 'user', attributes: ['id', 'firstName', 'lastName', 'email', 'profilePictureUrl'] }]
+          }
+        ]
+      }]
+    });
+
+    if (!memberships.length) return null;
+
+    const program = memberships[0].clan.program;
+    const clans = memberships.map((m) => {
+      const clan = m.clan;
+      const mentees = [];
+      const coMentors = [];
+      for (const row of clan.memberships || []) {
+        if (!row.user) continue;
+        const person = {
+          id: row.user.id,
+          firstName: row.user.firstName,
+          lastName: row.user.lastName,
+          email: row.user.email,
+          profilePictureUrl: row.user.profilePictureUrl,
+          role: row.role,
+          status: row.status
+        };
+        if (row.role === 'mentee') mentees.push(person);
+        else coMentors.push(person);
+      }
+      return { id: clan.id, name: clan.name, myRole: m.role, mentees, coMentors };
+    });
+
+    return {
+      program: {
+        id: program?.id || programId,
+        name: program?.name || 'Unassigned',
+        status: program?.status || null,
+        visibility: program?.visibility || null,
+        description: program?.description || null
+      },
+      clans
+    };
   }
 }
 

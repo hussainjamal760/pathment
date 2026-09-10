@@ -6,6 +6,7 @@ const {
   ValidationError
 } = require('../utils/errors/errorTypes');
 const schedulingService = require('./schedulingService');
+const { VISIBLE_MEMBERSHIP_STATUSES } = require('../config/membership');
 const logger = require('../utils/logger');
 
 class MessagingService {
@@ -25,7 +26,12 @@ class MessagingService {
     const mentorIds = await schedulingService.getMenteeMentorIds(userId); // matches + clan lead/co mentors
     mentorIds.forEach((id) => allowed.add(id));
 
-    const myClans = await models.ClanMembership.findAll({ where: { userId, status: 'active' }, attributes: ['clanId'] });
+    // Paused counts: a paused mentee is still in their clan, so they keep access
+    // to their clan-mates as well as their mentors.
+    const myClans = await models.ClanMembership.findAll({
+      where: { userId, status: { [Op.in]: VISIBLE_MEMBERSHIP_STATUSES } },
+      attributes: ['clanId']
+    });
     const clanIds = myClans.map((c) => c.clanId);
     if (clanIds.length) {
       const members = await models.ClanMembership.findAll({
