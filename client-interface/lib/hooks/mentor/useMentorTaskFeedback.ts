@@ -31,6 +31,8 @@ export interface UseMentorTaskFeedbackReturn {
   pointsAwarded: number;
   inlineFeedback: InlineFeedbackItem[];
   error: string;
+  /** HTTP status when the load failed — lets the page tell 403 from 404. */
+  errorStatus: number | null;
   ratingError: string;
   feedbackError: string;
   decisionError: string;
@@ -67,7 +69,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
   const [pointsError, setPointsError] = useState('');
   const [submitError, setSubmitError] = useState('');
 
-  const { data: task, loading, error: loadError, refetch } = useApiQuery<any>({
+  const { data: task, loading, error: loadError, errorStatus, refetch } = useApiQuery<any>({
     queryKey: qk.mentor.taskDetail(taskId),
     queryFn: async () => (await taskApi.getTaskById(taskId)).data.task,
     enabled: !!taskId,
@@ -273,6 +275,7 @@ export function useMentorTaskFeedback(taskId: string): UseMentorTaskFeedbackRetu
     pointsAwarded,
     inlineFeedback,
     error,
+    errorStatus,
     ratingError,
     feedbackError,
     decisionError,

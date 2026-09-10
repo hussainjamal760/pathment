@@ -54,6 +54,8 @@ interface UseProgramDetailReturn {
   handleVisibilityUpdate: (newVisibility: string) => Promise<void>;
   updatingStatus: boolean;
   fetchEnrollments: () => Promise<void>;
+  /** HTTP status when the load failed — lets the page tell 403 from 404. */
+  errorStatus: number | null;
   refetch: () => Promise<void>;
 }
 
@@ -68,7 +70,7 @@ export function useProgramDetail(): UseProgramDetailReturn {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null!);
 
-  const { data: program, loading, refetch: fetchProgram } = useApiQuery<ProgramDetailProgram | null>({
+  const { data: program, loading, errorStatus, refetch: fetchProgram } = useApiQuery<ProgramDetailProgram | null>({
     queryKey: qk.admin.program(id),
     queryFn: async () => {
       const response = (await programManagementApi.programs.getById(id)) as {
@@ -203,6 +205,7 @@ export function useProgramDetail(): UseProgramDetailReturn {
     handleVisibilityUpdate,
     updatingStatus,
     fetchEnrollments,
+    errorStatus,
     refetch: fetchProgram,
   };
 }

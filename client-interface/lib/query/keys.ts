@@ -139,5 +139,9 @@ export const qk = {
       ['community', 'leaderboard', type, id, period] as const,
   },
 
+  public: {
+    program: (id: string) => ['public', 'program', id] as const,
+  },
+
   announcements: ['announcements'] as const,
 } as const;

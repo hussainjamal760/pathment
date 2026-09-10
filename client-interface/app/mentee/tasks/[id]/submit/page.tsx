@@ -16,6 +16,7 @@ import FileUploader from '@/components/shared/FileUploader';
 import { ResourceLink } from '@/components/shared/ResourceLink';
 import { submissionService } from '@/lib/services/submissionService';
 import { useTaskDetail } from '@/lib/hooks/mentee';
+import { ResourceError } from '@/components/shared/ResourceError';
 import { PageHeader } from '@/components/admin/ui';
 import { extractApiErrorMessage } from '@/lib/utils/api-error';
 import { looksLikeHtml } from '@/lib/utils/html';
@@ -29,7 +30,7 @@ export default function TaskSubmission({ params }: PageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
 
-  const { task, loading, error: taskError } = useTaskDetail(resolvedParams.id);
+  const { task, loading, error: taskError, errorStatus } = useTaskDetail(resolvedParams.id);
   const { trackEvent } = useActivityTracker();
 
   const [submissionText, setSubmissionText] = useState('');
@@ -158,9 +159,13 @@ export default function TaskSubmission({ params }: PageProps) {
 
   if (taskError || !task) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
-        <p className="text-red-900">{taskError || 'Task not found'}</p>
-      </div>
+      <ResourceError
+        status={errorStatus ?? (task ? null : 404)}
+        resource="task"
+        message={taskError}
+        backHref="/mentee/tasks"
+        backLabel="Back to Tasks"
+      />
     );
   }
 

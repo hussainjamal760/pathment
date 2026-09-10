@@ -104,10 +104,12 @@ interface UseMenteeProfileReturn {
   stats: MenteeStats | null;
   isLoading: boolean;
   error: string | null;
+  /** HTTP status when the load failed — lets the page tell 403 from 404. */
+  errorStatus: number | null;
   refetch: () => Promise<void>;
 }
 
-type MenteeProfileBundle = Omit<UseMenteeProfileReturn, 'isLoading' | 'error' | 'refetch'>;
+type MenteeProfileBundle = Omit<UseMenteeProfileReturn, 'isLoading' | 'error' | 'errorStatus' | 'refetch'>;
 
 const EMPTY: MenteeProfileBundle = {
   mentee: null,
@@ -123,7 +125,7 @@ const EMPTY: MenteeProfileBundle = {
 export function useMenteeProfile(): UseMenteeProfileReturn {
   const { id } = useParams<{ id: string }>();
 
-  const { data, loading, error, refetch } = useApiQuery<MenteeProfileBundle>({
+  const { data, loading, error, errorStatus, refetch } = useApiQuery<MenteeProfileBundle>({
     queryKey: qk.admin.menteeProfileDetail(id ?? ''),
     queryFn: async () => {
       const response = (await menteeApi.getById(id)) as { data?: Partial<MenteeProfileBundle> };
@@ -143,5 +145,5 @@ export function useMenteeProfile(): UseMenteeProfileReturn {
     errorMessage: 'Failed to load mentee profile',
   });
 
-  return { ...(data ?? EMPTY), isLoading: loading, error, refetch };
+  return { ...(data ?? EMPTY), isLoading: loading, error, errorStatus, refetch };
 }
