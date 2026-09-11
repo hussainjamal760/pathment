@@ -19,11 +19,11 @@ const NO_COUNTS: ApprovalCounts = { total: 0, byClan: {} };
  * than refetched on navigation, which is what used to make every route change
  * cost two requests.
  */
-export function useNavBadges({ userId, isMentor }: { userId?: string; isMentor: boolean }) {
+export function useNavBadges({ userId, isMentor, portal }: { userId?: string; isMentor: boolean; portal: string }) {
   const client = useQueryClient();
 
   const { data: unreadMessageCount = 0 } = useApiQuery<number>({
-    queryKey: qk.messaging.unreadCount,
+    queryKey: qk.messaging.unreadCount(portal),
     queryFn: async () => {
       const conversations = await messagingApi.listConversations(50);
       return conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
@@ -55,10 +55,10 @@ export function useNavBadges({ userId, isMentor }: { userId?: string; isMentor: 
     if (!socket) return;
 
     const onNotification = (data: { type?: string }) => {
-      if (data?.type === 'message') client.invalidateQueries({ queryKey: qk.messaging.unreadCount });
+      if (data?.type === 'message') client.invalidateQueries({ queryKey: qk.messaging.unreadCount(portal) });
       else if (data?.type === 'task') client.invalidateQueries({ queryKey: qk.mentor.approvalsCount });
     };
-    const onUnreadCount = () => client.invalidateQueries({ queryKey: qk.messaging.unreadCount });
+    const onUnreadCount = () => client.invalidateQueries({ queryKey: qk.messaging.unreadCount(portal) });
 
     socket.on('notification:new', onNotification);
     socket.on('message:unread-count', onUnreadCount);
@@ -66,7 +66,7 @@ export function useNavBadges({ userId, isMentor }: { userId?: string; isMentor: 
       socket.off('notification:new', onNotification);
       socket.off('message:unread-count', onUnreadCount);
     };
-  }, [userId, client]);
+  }, [userId, client, portal]);
 
   return { unreadMessageCount, approvalCounts };
 }

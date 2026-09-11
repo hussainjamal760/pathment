@@ -33,8 +33,13 @@ export const qk = {
     notifications: ['messaging', 'notifications'] as const,
     recentNotifications: (limit: number) => ['messaging', 'notifications', 'recent', limit] as const,
     conversations: (archived: boolean) => ['messaging', 'conversations', archived] as const,
-    /** Sidebar badge only — the derived unread total, not the conversation list. */
-    unreadCount: ['messaging', 'unread-count'] as const,
+    /**
+     * Sidebar badge only — the derived unread total, not the conversation list.
+     * Keyed by PORTAL: the conversation list is now scoped to the hat the user
+     * has on, so a mentee-portal count and a mentor-portal count are different
+     * numbers and must not share one cache entry.
+     */
+    unreadCount: (portal: string) => ['messaging', 'unread-count', portal] as const,
     mentorDocuments: ['messaging', 'mentor-documents'] as const,
   },
 

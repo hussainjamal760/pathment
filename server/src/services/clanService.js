@@ -5,6 +5,7 @@ const { ROLES } = require('../config/roles');
 const authzService = require('./authzService');
 const { PERMISSIONS: P } = require('../config/permissions');
 const { VISIBLE_MEMBERSHIP_STATUSES } = require('../config/membership');
+const { ensureMenteeProfile } = require('./menteeProfile');
 
 // The permissions a co-mentor holds by default — and therefore the exact set a
 // lead mentor / admin may toggle on or off for an individual co-mentor. Derived
@@ -376,21 +377,7 @@ class ClanService {
         // every /gamification/user/:id/* call answered 404 on their own You
         // screen. Created here for the same reason the enrollment is: this IS
         // the moment they become a mentee.
-        await models.MenteeProfile.findOrCreate({
-          where: { userId },
-          defaults: {
-            userId,
-            interests: [],
-            currentEducation: null,
-            currentOccupation: null,
-            priorExperience: null,
-            preferredLearningStyle: 'visual',
-            learningGoals: [],
-            currentLevel: 1,
-            totalPoints: 0
-          },
-          transaction
-        });
+        await ensureMenteeProfile(userId, { transaction });
 
         let enrollment = await models.Enrollment.findOne({
           where: { menteeId: userId, programId: clan.programId },

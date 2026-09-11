@@ -80,6 +80,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Seed per-request audit context (IP + user-agent) for downstream audit writes.
 app.use(requestContext);
 
+// Which portal the caller has open (mentee / mentor / admin) + the mentor clan
+// selector. Parse-only; it narrows what a multi-role user is shown and grants
+// nothing. See middlewares/portalScope.js.
+app.use(require('./middlewares/portalScope'));
+
 // Record every state-changing request (who/what/when/result) to audit_logs.
 app.use(require('./middlewares/auditTrail'));
 
