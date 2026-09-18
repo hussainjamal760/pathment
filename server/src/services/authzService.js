@@ -420,12 +420,18 @@ class AuthzService {
    * so a co-mentor with `mentee.view` revoked drops out of the list exactly as
    * they already do from the per-record check. Direct 1:1 matches are never
    * filtered: the match itself is the grant.
+   *
+   * Pass `{ clanIds }` to narrow to ONE (or a few) of the clans they mentor —
+   * what the mentor clan selector asks for. Narrowing by clan also drops the
+   * 1:1 matches, because a match is not attached to a clan and so cannot be
+   * said to belong to the one that was picked.
    */
   async resolveMenteeIds(userOrId, opts = {}) {
     const asUser = userOrId && typeof userOrId === 'object' ? userOrId : null;
     const userId = asUser ? asUser.id : userOrId;
     if (!userId) return [];
     const ids = new Set();
+    const clanFilter = Array.isArray(opts.clanIds) ? new Set(opts.clanIds) : null;
 
     // `clansWhereCan` runs `getAssignments`, which reads the base role — so a
     // bare id has to be hydrated before it can be permission-filtered.
@@ -443,17 +449,55 @@ class AuthzService {
       clanSource()
     ]);
 
-    matches.forEach((m) => m.menteeId && ids.add(m.menteeId));
+    if (!clanFilter) matches.forEach((m) => m.menteeId && ids.add(m.menteeId));
 
-    if (clanIds.length) {
+    const scopedClanIds = clanFilter ? clanIds.filter((id) => clanFilter.has(id)) : clanIds;
+    if (scopedClanIds.length) {
       const menteeMemberships = await models.ClanMembership.findAll({
-        where: { clanId: { [Op.in]: clanIds }, status: 'active', role: 'mentee' },
+        where: { clanId: { [Op.in]: scopedClanIds }, status: 'active', role: 'mentee' },
         attributes: ['userId']
       });
       menteeMemberships.forEach((m) => m.userId && ids.add(m.userId));
     }
 
     return [...ids];
+  }
+
+  /**
+   * Who a PORTAL is about — the mentee ids a "my stuff" list should be built
+   * from, given the hat the caller is currently wearing (see
+   * middlewares/portalScope.js). `null` means "do not narrow", which is what an
+   * unknown portal returns so nothing changes for callers that never send one.
+   *
+   *   mentee portal → themselves, and nobody else. Being a mentor elsewhere is
+   *                   irrelevant to the page they have open; this is the whole
+   *                   point of the split.
+   *   mentor portal → the mentees they mentor, narrowed to the clan selector
+   *                   when one is set, and NEVER themselves — a mentor who also
+   *                   learns in a clan reads their own record in the mentee
+   *                   portal, not among the people they are responsible for.
+   *   admin portal  → no narrowing; the admin views are org-wide by definition
+   *                   and their own authorization already decides the answer.
+   *
+   * This only ever removes rows. The caller still authorizes every record it
+   * returns exactly as before.
+   */
+  async menteeIdsForPortal(user, portal = {}, opts = {}) {
+    if (!user || !portal || !portal.role || portal.role === 'admin') return null;
+    const assignments = opts.assignments || (await this.getAssignments(user));
+
+    if (portal.role === 'mentee') {
+      const capabilities = await this.getCapabilities(user, { assignments });
+      return capabilities.includes('mentee') ? [user.id] : [];
+    }
+
+    // mentor
+    const ids = await this.resolveMenteeIds(user, {
+      permission: opts.permission || P.MENTEE_VIEW,
+      assignments,
+      clanIds: portal.clanId ? [portal.clanId] : undefined
+    });
+    return ids.filter((id) => id !== user.id);
   }
 
   /**

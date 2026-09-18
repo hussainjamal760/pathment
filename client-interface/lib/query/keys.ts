@@ -22,6 +22,9 @@ export const qk = {
     all: ['clan'] as const,
     memberships: ['clan', 'memberships'] as const,
     detail: (clanId: string) => ['clan', 'detail', clanId] as const,
+    publicJoin: (clanId: string) => ['clan', 'public-join', clanId] as const,
+    joinRequests: (clanId: string, status = 'pending') =>
+      ['clan', 'join-requests', clanId, status] as const,
   },
 
   changelog: {
@@ -33,8 +36,13 @@ export const qk = {
     notifications: ['messaging', 'notifications'] as const,
     recentNotifications: (limit: number) => ['messaging', 'notifications', 'recent', limit] as const,
     conversations: (archived: boolean) => ['messaging', 'conversations', archived] as const,
-    /** Sidebar badge only — the derived unread total, not the conversation list. */
-    unreadCount: ['messaging', 'unread-count'] as const,
+    /**
+     * Sidebar badge only — the derived unread total, not the conversation list.
+     * Keyed by PORTAL: the conversation list is now scoped to the hat the user
+     * has on, so a mentee-portal count and a mentor-portal count are different
+     * numbers and must not share one cache entry.
+     */
+    unreadCount: (portal: string) => ['messaging', 'unread-count', portal] as const,
     mentorDocuments: ['messaging', 'mentor-documents'] as const,
   },
 
@@ -141,6 +149,7 @@ export const qk = {
 
   public: {
     program: (id: string) => ['public', 'program', id] as const,
+    clanJoin: (token: string, viewer: string) => ['public', 'clan-join', token, viewer] as const,
   },
 
   announcements: ['announcements'] as const,
