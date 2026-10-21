@@ -210,6 +210,18 @@ class PoolService {
     }
   }
 
+  /** Send a fresh invite to a candidate who has not registered yet. The old link stops working. */
+  async resendInvite(poolId, memberId, actor) {
+    const pool = await this.get(poolId);
+    const member = await this._member(poolId, memberId);
+    if (member.userId) throw new ValidationError('This candidate already has an account');
+    if (member.decision) throw new ValidationError('This candidate is no longer in the running');
+    await this._reinvite(pool, member);
+    await member.update({ lastRemindedAt: new Date() });
+    await this._audit(actor, 'POOL_INVITE_RESENT', member.id, { email: member.email }, 'PoolMember');
+    return member;
+  }
+
   /** Withdraw or disqualify a candidate. Their open work is cancelled, which stops its reminders. */
   async removeMember(poolId, memberId, { decision, reason }, actor) {
     const member = await this._member(poolId, memberId);
@@ -353,7 +365,12 @@ class PoolService {
 
   // ── Dashboard, scoring and selection ──────────────────────────────────────
 
-  async dashboard(poolId) {
+  /**
+   * The pool page. Buckets and stats cover everybody; `members` is one page
+   * of the candidates matching `q` / `bucket` / `decision`, ranked by the
+   * latest shortlist when `ranked` is set, so a 1,000-candidate pool stays light.
+   */
+  async dashboard(poolId, { q = '', bucket = null, decision = null, ranked = false, page = 1, limit = 50 } = {}) {
     const pool = await this.get(poolId);
     const members = await this._membersWithWork(poolId);
     const inactivityDays = Number(pool.reminderPolicy?.inactivityDays) || 5;
@@ -380,7 +397,29 @@ class PoolService {
       };
     });
     const buckets = rows.reduce((acc, r) => ({ ...acc, [r.bucket]: (acc[r.bucket] || 0) + 1 }), {});
-    return { pool: this._shape(pool), members: rows, buckets, stats: this._stats(rows), latestSnapshot: (pool.shortlistSnapshots || []).at(-1) || null };
+    const latestSnapshot = (pool.shortlistSnapshots || []).at(-1) || null;
+
+    const needle = String(q).trim().toLowerCase();
+    const decisions = decision ? String(decision).split(',') : null;
+    let matching = rows.filter((r) => (!needle || r.email.includes(needle) || (r.name || '').toLowerCase().includes(needle))
+      && (!bucket || r.bucket === bucket)
+      && (!decisions || decisions.includes(r.decision || 'none')));
+    if (ranked) {
+      const order = new Map((latestSnapshot?.entries || []).map((e) => [e.memberId, e.rank]));
+      matching = matching.filter((r) => order.has(r.id)).sort((a, b) => order.get(a.id) - order.get(b.id));
+    }
+    const size = Math.min(200, Math.max(1, Number(limit) || 50));
+    const current = Math.max(1, Number(page) || 1);
+    return {
+      pool: this._shape(pool),
+      members: matching.slice((current - 1) * size, current * size),
+      total: matching.length,
+      page: current,
+      limit: size,
+      buckets,
+      stats: this._stats(rows),
+      latestSnapshot
+    };
   }
 
   /**
@@ -579,15 +618,20 @@ class PoolService {
   /** What happened to this pool and its candidates, newest first, plus every shortlist proposed. */
   async history(poolId) {
     const pool = await this.get(poolId);
-    const memberIds = (await models.PoolMember.findAll({ where: { poolId }, attributes: ['id'] })).map((m) => m.id);
+    const members = await models.PoolMember.findAll({
+      where: { poolId }, attributes: ['id', 'email'], include: [{ model: models.User, as: 'user', attributes: ['firstName', 'lastName', 'email'] }]
+    });
+    const who = new Map(members.map((m) => [m.id, fullName(m.user) || m.email]));
     const rows = await models.AuditLog.findAll({
-      where: { entityId: { [Op.in]: [poolId, ...memberIds] }, entityType: { [Op.in]: ['CandidatePool', 'PoolMember'] } },
+      where: { entityId: { [Op.in]: [poolId, ...who.keys()] }, entityType: { [Op.in]: ['CandidatePool', 'PoolMember'] } },
       include: [{ model: models.User, as: 'user', attributes: ['firstName', 'lastName', 'email'], required: false }],
       order: [['createdAt', 'DESC']],
       limit: 200
     });
     return {
-      events: rows.map((r) => ({ id: r.id, action: r.action, actor: fullName(r.user), entityId: r.entityId, details: r.newValues, at: r.createdAt })),
+      events: rows.map((r) => ({
+        id: r.id, action: r.action, actor: fullName(r.user), subject: who.get(r.entityId) || null, details: r.newValues, at: r.createdAt
+      })),
       snapshots: [...(pool.shortlistSnapshots || [])].reverse()
     };
   }
@@ -920,7 +964,8 @@ class PoolService {
   /** The numbers an operator watches: who is in, how much work is in, how much is marked. */
   _stats(rows) {
     const live = rows.filter((r) => !CLOSED_DECISIONS.includes(r.decision));
-    const scored = live.filter((r) => r.total != null);
+    // Only people who have had work marked: an unanswered invite is not a score of 0.
+    const scored = live.filter((r) => r.total != null && r.tasksCompleted > 0);
     const tasks = live.reduce((a, r) => a + r.tasksTotal, 0);
     return {
       candidates: live.length,

@@ -840,6 +840,7 @@ export default function TaskDetailsPage({ params }: PageProps) {
             status: task.status,
             deliverable: taskDeliverable,
             acceptanceCriteria,
+            poolMemberId: (task as { poolMemberId?: string | null }).poolMemberId ?? null,
           }}
           onClose={() => setSubmitOpen(false)}
           onSubmitted={refetch}

@@ -20,7 +20,7 @@ const setStatus = catchAsync(async (req, res) => {
 });
 
 const dashboard = catchAsync(async (req, res) => {
-  res.status(200).json(successResponse('Pool retrieved', await poolService.dashboard(req.params.id)));
+  res.status(200).json(successResponse('Pool retrieved', await poolService.dashboard(req.params.id, req.query)));
 });
 
 const importMembers = catchAsync(async (req, res) => {
@@ -42,6 +42,11 @@ const placementPreview = catchAsync(async (req, res) => {
 
 const history = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('History retrieved', await poolService.history(req.params.id)));
+});
+
+const resendInvite = catchAsync(async (req, res) => {
+  const member = await poolService.resendInvite(req.params.id, req.params.memberId, req.user);
+  res.status(200).json(successResponse('Invite sent again', { member }));
 });
 
 const removeMember = catchAsync(async (req, res) => {
@@ -75,6 +80,6 @@ const mine = catchAsync(async (req, res) => {
 
 module.exports = {
   list, create, update, setStatus, dashboard, history,
-  importMembers, importApplications, removeMember, changeDecision,
+  importMembers, importApplications, resendInvite, removeMember, changeDecision,
   assignWork, reviewQueue, proposeShortlist, finalize, placementPreview, place, mine
 };

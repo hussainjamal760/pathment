@@ -6,7 +6,7 @@ import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigat
 import { toast } from 'sonner';
 import { ArrowLeft, CheckCircle2, ClipboardList, Gauge, Loader2, Settings, Users } from 'lucide-react';
 import { MetricTile } from '@/components/shared/MetricTile';
-import { qk, useApiQuery } from '@/lib/query';
+import { qk, useApiQuery, useInvalidate } from '@/lib/query';
 import { poolsApi } from '@/lib/services/pools-api';
 import { useCan } from '@/lib/hooks/usePermissions';
 import type { PoolDashboard, PoolStatus } from '@/lib/types/pool';
@@ -37,11 +37,14 @@ export default function PoolDetailPage() {
   const tab: Tab = asked && TAB_KEYS.includes(asked) ? asked : 'candidates';
   const setTab = (t: Tab) => router.replace(`${pathname}?tab=${t}`, { scroll: false });
   const [editing, setEditing] = useState(false);
+  // The header only needs the pool, stats and buckets; each tab loads its own page of candidates.
   const { data, loading, error, refetch } = useApiQuery<PoolDashboard>({
-    queryKey: qk.admin.pool(id),
-    queryFn: async () => (await poolsApi.get(id))?.data,
+    queryKey: [...qk.admin.pool(id), 'header'],
+    queryFn: async () => (await poolsApi.get(id, { limit: 1 }))?.data,
     errorMessage: 'Failed to load the pool',
   });
+  const invalidate = useInvalidate();
+  const refresh = () => { invalidate(qk.admin.pool(id)); };
 
   if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-7 h-7 animate-spin text-brand-600" /></div>;
   if (error || !data) {
@@ -56,10 +59,10 @@ export default function PoolDetailPage() {
   const { pool } = data;
   const next = NEXT_STATUS[pool.status];
   const setStatus = async (status: PoolStatus) => {
-    try { await poolsApi.setStatus(pool.id, status); toast.success('Pool updated'); refetch(); } catch (e) { toast.error(apiError(e, 'Could not update the pool')); }
+    try { await poolsApi.setStatus(pool.id, status); toast.success('Pool updated'); refresh(); } catch (e) { toast.error(apiError(e, 'Could not update the pool')); }
   };
   const TABS: { key: Tab; label: string; count?: number }[] = [
-    { key: 'candidates', label: 'Candidates', count: data.members.length },
+    { key: 'candidates', label: 'Candidates', count: data.stats.candidates },
     { key: 'work', label: 'Work' },
     { key: 'reviews', label: 'Reviews', count: data.buckets.needs_review },
     { key: 'selection', label: 'Selection' },
@@ -109,13 +112,13 @@ export default function PoolDetailPage() {
         ))}
       </div>
 
-      {tab === 'candidates' && <CandidatesTab data={data} canMembers={can('pool.members')} canAssign={can('pool.assign')} onChanged={refetch} />}
-      {tab === 'work' && <WorkTab data={data} canAssign={can('pool.assign')} onChanged={refetch} />}
-      {tab === 'reviews' && <ReviewsTab poolId={pool.id} onReviewed={refetch} />}
-      {tab === 'selection' && <SelectionTab data={data} canSelect={can('pool.select')} onChanged={refetch} />}
-      {tab === 'history' && <HistoryTab poolId={pool.id} members={data.members} />}
+      {tab === 'candidates' && <CandidatesTab data={data} canMembers={can('pool.members')} canAssign={can('pool.assign')} onChanged={refresh} />}
+      {tab === 'work' && <WorkTab data={data} canAssign={can('pool.assign')} onChanged={refresh} />}
+      {tab === 'reviews' && <ReviewsTab poolId={pool.id} onReviewed={refresh} />}
+      {tab === 'selection' && <SelectionTab data={data} canSelect={can('pool.select')} onChanged={refresh} />}
+      {tab === 'history' && <HistoryTab poolId={pool.id} />}
 
-      {editing && <PoolSettingsDrawer pool={pool} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); refetch(); }} />}
+      {editing && <PoolSettingsDrawer pool={pool} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); refresh(); }} />}
     </div>
   );
 }

@@ -30,10 +30,20 @@ export interface PoolWorkInput {
   course?: { courseId: string };
 }
 
+/** Filters for one page of a pool's candidates. */
+export interface PoolMemberQuery {
+  q?: string;
+  bucket?: string;
+  decision?: string;
+  ranked?: boolean;
+  page?: number;
+  limit?: number;
+}
+
 /** Selection pools (/api/pools). The server checks every call against the pool's programme. */
 export const poolsApi = {
   list: () => apiClient.get('/pools'),
-  get: (id: string) => apiClient.get(`/pools/${id}`),
+  get: (id: string, params?: PoolMemberQuery) => apiClient.get(`/pools/${id}`, { params }),
   history: (id: string) => apiClient.get(`/pools/${id}/history`),
   create: (data: PoolInput) => apiClient.post('/pools', data),
   update: (id: string, data: PoolInput) => apiClient.patch(`/pools/${id}`, data),
@@ -43,6 +53,7 @@ export const poolsApi = {
     apiClient.post(`/pools/${id}/members/from-applications`, statuses ? { statuses } : {}),
   changeDecision: (id: string, memberId: string, decision: PoolDecision, reason: string) =>
     apiClient.post(`/pools/${id}/members/${memberId}/decision`, { decision, reason }),
+  resendInvite: (id: string, memberId: string) => apiClient.post(`/pools/${id}/members/${memberId}/resend-invite`),
   removeMember: (id: string, memberId: string, decision: 'withdrawn' | 'disqualified', reason: string) =>
     apiClient.post(`/pools/${id}/members/${memberId}/remove`, { decision, reason }),
   assignWork: (id: string, data: PoolWorkInput) => apiClient.post(`/pools/${id}/work`, data),

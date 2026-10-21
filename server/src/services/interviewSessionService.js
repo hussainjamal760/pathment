@@ -658,11 +658,17 @@ class InterviewSessionService {
    * comparing the candidate's answer to the reference answer. Stored on the
    * answer; the mentor still decides.
    */
+  /** Selection pools are marked by people only: the spec rules out AI-made scores there. */
+  _assertAiAllowed(task) {
+    if (task?.poolMemberId) throw new ForbiddenError('Selection pool answers are marked by a reviewer, not by AI');
+  }
+
   async aiDraftAnswer(taskId, mentorId, questionId) {
     await clanLifecycleService.assertTaskWritable(taskId);
     const task = await models.AssignedTask.findByPk(taskId);
     if (!task) throw new NotFoundError('Task not found');
     await this._assertReviewerCanWrite(mentorId, task);
+    this._assertAiAllowed(task);
 
     // AI draft is mentor-initiated and runs on the mentor's OWN key, so it's
     // available whenever this is a real interview — not gated to the assign-time
@@ -741,6 +747,7 @@ class InterviewSessionService {
     const task = await models.AssignedTask.findByPk(taskId);
     if (!task) throw new NotFoundError('Task not found');
     await this._assertReviewerCanWrite(mentorId, task);
+    this._assertAiAllowed(task);
 
     const assignment = await models.InterviewAssignment.findOne({ where: { assignedTaskId: taskId } });
     if (!assignment) throw new NotFoundError('This task is not an interview');

@@ -3,7 +3,7 @@ const router = express.Router();
 const c = require('../controllers/poolController');
 const { authenticate } = require('../middlewares/auth');
 const { requirePermission, requirePermissionAnyScope, scope } = require('../middlewares/authz');
-const { validateBody, validateParams } = require('../middlewares/validate');
+const { validateBody, validateParams, validateQuery } = require('../middlewares/validate');
 const { PERMISSIONS: P } = require('../config/permissions');
 const v = require('../validations/poolValidation');
 
@@ -19,13 +19,14 @@ router.get('/', authenticate, requirePermissionAnyScope(P.POOL_REVIEW), c.list);
 router.post('/', authenticate, validateBody(v.create),
   requirePermission(P.POOL_MANAGE, (req) => ({ programId: req.body.programId })), c.create);
 
-router.get('/:id', ...onPool(P.POOL_REVIEW), c.dashboard);
+router.get('/:id', ...onPool(P.POOL_REVIEW), validateQuery(v.dashboardQuery), c.dashboard);
 router.get('/:id/history', ...onPool(P.POOL_REVIEW), c.history);
 router.patch('/:id', ...onPool(P.POOL_MANAGE), validateBody(v.update), c.update);
 router.post('/:id/status', ...onPool(P.POOL_MANAGE), validateBody(v.status), c.setStatus);
 
 router.post('/:id/members', ...onPool(P.POOL_MEMBERS), validateBody(v.importMembers), c.importMembers);
 router.post('/:id/members/from-applications', ...onPool(P.POOL_MEMBERS), validateBody(v.importApplications), c.importApplications);
+router.post('/:id/members/:memberId/resend-invite', ...onPool(P.POOL_MEMBERS, v.memberParams), c.resendInvite);
 router.post('/:id/members/:memberId/remove', ...onPool(P.POOL_MEMBERS, v.memberParams), validateBody(v.removeMember), c.removeMember);
 
 router.post('/:id/work', ...onPool(P.POOL_ASSIGN), validateBody(v.assignWork), c.assignWork);

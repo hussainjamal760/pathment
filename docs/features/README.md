@@ -37,7 +37,6 @@ Every feature file follows the same template so things are easy to find and reme
 | [Programs, Cohorts & Clans](./programs-cohorts-clans.md) | The org structure: programs, intake cohorts, mentor-led clans, memberships, clan change requests, cross-clan help. |
 | [Public Clan Joining Link](./clan-public-join.md) | Shareable multi-use clan URLs: admin permission, Lead Mentor link + approve/reject, visitor register/login → join request. |
 | [Matching & Placement](./matching-and-placement.md) | Clan-based placement + AI mentor-match suggestions. |
-| [Selection Pools](./selection-pools.md) | Test registered candidates before clan placement: import, qualification work, review, explainable scoring, shortlist, confirmed selection, idempotent placement. |
 
 ### Doing the work
 | Feature | What it covers |

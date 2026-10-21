@@ -48,7 +48,7 @@ export function ReviewsTab({ poolId, onReviewed }: { poolId: string; onReviewed:
         ))}
       </div>
       {reviewing?.type === 'interview' && (
-        <InterviewReviewDrawer taskId={reviewing.taskId} onClose={() => setReviewing(null)} onFinalized={done} />
+        <InterviewReviewDrawer taskId={reviewing.taskId} allowAi={false} onClose={() => setReviewing(null)} onFinalized={done} />
       )}
       {reviewing?.type === 'quiz' && (
         <QuizReviewDrawer taskId={reviewing.taskId} onClose={() => setReviewing(null)} onReviewed={done} />

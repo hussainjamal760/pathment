@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { ClipboardList, Inbox, Loader2, Upload, UserMinus } from 'lucide-react';
+import { ClipboardList, Inbox, Loader2, Mail, Search, Upload, UserMinus } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
+import { TablePagination } from '@/components/shared/TablePagination';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 import { poolsApi } from '@/lib/services/pools-api';
 import type { ImportResult, PoolBucket, PoolDashboard, PoolMemberRow } from '@/lib/types/pool';
 import { AssignWorkDrawer } from './WorkTab';
+import { useDebounced, usePoolMembers } from './usePoolMembers';
 import { apiError, BUCKET_CLASS, BUCKET_LABEL, DECISION_CLASS, DECISION_LABEL, field, pill, primaryBtn, secondaryBtn } from './poolUi';
 
 const RESULT_LABEL: Record<ImportResult['result'], string> = {
@@ -29,7 +31,18 @@ export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
   const [removing, setRemoving] = useState<PoolMemberRow | null>(null);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [assigning, setAssigning] = useState(false);
-  const rows = useMemo(() => data.members.filter((m) => bucket === 'all' || m.bucket === bucket), [data.members, bucket]);
+  const [query, setQuery] = useState('');
+  const q = useDebounced(query);
+  const { members: rows, loading, pagination } = usePoolMembers(data.pool.id, { q, ...(bucket === 'all' ? {} : { bucket }) });
+  const [resending, setResending] = useState<string | null>(null);
+
+  const resend = async (m: PoolMemberRow) => {
+    try {
+      setResending(m.id);
+      await poolsApi.resendInvite(data.pool.id, m.id);
+      toast.success(`Invite sent again to ${m.email}`);
+    } catch (e) { toast.error(apiError(e, 'Could not resend the invite')); } finally { setResending(null); }
+  };
   const closed = ['placing', 'closed'].includes(data.pool.status);
   // Work can only be set for people with an account who are still in the running.
   const choosable = (m: PoolMemberRow) => canAssign && !closed && data.pool.status !== 'reviewing' && !!m.userId && !m.decision;
@@ -42,7 +55,7 @@ export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <button onClick={() => setBucket('all')} className={`${pill} ${bucket === 'all' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}>All {data.members.length}</button>
+        <button onClick={() => setBucket('all')} className={`${pill} ${bucket === 'all' ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-600'}`}>All {data.stats.candidates}</button>
         {(Object.keys(data.buckets) as PoolBucket[]).map((b) => (
           <button key={b} onClick={() => setBucket(b)} className={`${pill} ${bucket === b ? 'bg-brand-600 text-white' : BUCKET_CLASS[b]}`}>
             {BUCKET_LABEL[b]} {data.buckets[b]}
@@ -61,7 +74,14 @@ export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      <div className="relative">
+        <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or email" className={`${field} pl-9`} />
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-10"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
+      ) : rows.length === 0 ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-10 text-center text-sm text-slate-500">No candidates here.</div>
       ) : (
         <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
@@ -79,6 +99,12 @@ export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
               <span className={`${pill} ${m.decision ? DECISION_CLASS[m.decision] : BUCKET_CLASS[m.bucket]}`}>
                 {m.decision ? DECISION_LABEL[m.decision] : BUCKET_LABEL[m.bucket]}
               </span>
+              {canMembers && !m.userId && !m.decision && !closed && (
+                <button onClick={() => resend(m)} disabled={resending === m.id} title="Send the invite again"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50">
+                  {resending === m.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}Resend
+                </button>
+              )}
               {canMembers && !m.decision && !closed && (
                 <button aria-label="Withdraw or disqualify" onClick={() => setRemoving(m)} className="p-1.5 text-slate-400 hover:text-red-600"><UserMinus className="w-4 h-4" /></button>
               )}
@@ -86,6 +112,7 @@ export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
           ))}
         </div>
       )}
+      <TablePagination pagination={pagination} isLoading={loading} />
 
       {importing && <ImportDrawer poolId={data.pool.id} fromApplications={importing === 'applications'} onClose={() => setImporting(null)} onDone={onChanged} />}
       {assigning && (

@@ -42,11 +42,14 @@ export function InterviewReviewDrawer({
   onClose,
   onFinalized,
   readOnly = false,
+  allowAi = true,
 }: {
   taskId: string;
   onClose: () => void;
   onFinalized?: () => void;
   readOnly?: boolean;
+  /** False where a person must mark every answer unaided (selection pools). */
+  allowAi?: boolean;
 }) {
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
@@ -303,14 +306,14 @@ export function InterviewReviewDrawer({
             <div className="rounded-xl border border-slate-200 overflow-hidden">
               <div className="flex items-center justify-between gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
                 <span className="text-sm font-medium text-slate-700">All answers · quick score</span>
-                <button onClick={runAiAll} disabled={aiAllBusy}
+                {allowAi && <button onClick={runAiAll} disabled={aiAllBusy}
                   title="Transcribe voice answers with Whisper and score every question against its rubric — uses your AI key (Settings → AI Connections)"
                   className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">
                   {aiAllBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                   {aiAllBusy
                     ? (aiAllProgress ? `Grading ${aiAllProgress.done}/${aiAllProgress.total}…` : 'Grading…')
                     : 'AI grade all'}
-                </button>
+                </button>}
               </div>
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {review.items.map((it, i) => {
@@ -525,14 +528,14 @@ export function InterviewReviewDrawer({
                           className="w-16 bg-transparent border border-slate-300 rounded-lg px-2 py-1 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-500" />
                         <span className="text-slate-400">/ {it.points}</span>
                       </label>
-                      <button onClick={() => runAiDraft(it)} disabled={aiBusy === it.questionId}
+                      {allowAi && <button onClick={() => runAiDraft(it)} disabled={aiBusy === it.questionId}
                         title={it.kind === 'voice'
                           ? 'Transcribes the audio with Whisper and scores it against the rubric — uses your AI key (Settings → AI Connections)'
                           : 'Scores this answer against the rubric — uses your AI key (Settings → AI Connections)'}
                         className="ml-auto inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border border-brand-200 dark:border-brand-800 text-brand-700 dark:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-950/50 disabled:opacity-50">
                         {aiBusy === it.questionId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                         {it.kind === 'voice' && a?.audioUrl ? 'AI grade (from audio)' : 'AI draft'}
-                      </button>
+                      </button>}
                     </div>
                     <input value={sc.note} onChange={(e) => saveScore(it, { note: e.target.value })}
                       placeholder="Note on this answer (optional)"

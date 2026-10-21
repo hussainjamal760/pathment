@@ -3,7 +3,7 @@
 import { History, Loader2 } from 'lucide-react';
 import { qk, useApiQuery } from '@/lib/query';
 import { poolsApi } from '@/lib/services/pools-api';
-import type { PoolHistory, PoolMemberRow } from '@/lib/types/pool';
+import type { PoolHistory } from '@/lib/types/pool';
 
 const ACTION_LABEL: Record<string, string> = {
   POOL_CREATED: 'Created the pool',
@@ -18,13 +18,12 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 /** Who did what, and every shortlist the system proposed. Kept so a decision can be explained later. */
-export function HistoryTab({ poolId, members }: { poolId: string; members: PoolMemberRow[] }) {
+export function HistoryTab({ poolId }: { poolId: string }) {
   const { data, loading } = useApiQuery<PoolHistory>({
     queryKey: qk.admin.poolHistory(poolId),
     queryFn: async () => (await poolsApi.history(poolId))?.data,
     errorMessage: 'Failed to load the history',
   });
-  const who = new Map(members.map((m) => [m.id, m.name || m.email]));
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>;
   if (!data?.events.length) {
@@ -39,7 +38,7 @@ export function HistoryTab({ poolId, members }: { poolId: string; members: PoolM
   const detail = (e: PoolHistory['events'][number]) => {
     const d = e.details || {};
     const parts = [
-      who.get(e.entityId),
+      e.subject,
       typeof d.status === 'string' ? d.status : null,
       typeof d.decision === 'string' ? d.decision.replace('_', ' ') : null,
       typeof d.reason === 'string' ? `“${d.reason}”` : null,

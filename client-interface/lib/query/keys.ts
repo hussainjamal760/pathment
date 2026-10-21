@@ -129,6 +129,7 @@ export const qk = {
     pool: (id: string) => ['admin', 'pools', id] as const,
     poolReviews: (id: string) => ['admin', 'pools', id, 'reviews'] as const,
     poolHistory: (id: string) => ['admin', 'pools', id, 'history'] as const,
+    poolMembers: (id: string, params: object) => ['admin', 'pools', id, 'members', params] as const,
     cohorts: (programId?: string) => ['admin', 'cohorts', programId ?? 'all'] as const,
     orgInsights: ['admin', 'org-insights'] as const,
     orgRoadmaps: ['admin', 'org-roadmaps'] as const,

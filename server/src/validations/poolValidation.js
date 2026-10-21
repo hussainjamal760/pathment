@@ -27,6 +27,14 @@ const poolFields = {
 /** Payloads for /api/pools. Business rules (states, capacity, ties) live in poolService. */
 module.exports = {
   idParams: Joi.object({ id: Joi.string().uuid().required() }),
+  dashboardQuery: Joi.object({
+    q: Joi.string().trim().max(200).allow(''),
+    bucket: Joi.string().max(40),
+    decision: Joi.string().max(120),
+    ranked: Joi.boolean(),
+    page: Joi.number().integer().min(1),
+    limit: Joi.number().integer().min(1).max(200)
+  }),
   memberParams: Joi.object({ id: Joi.string().uuid().required(), memberId: Joi.string().uuid().required() }),
 
   create: Joi.object({

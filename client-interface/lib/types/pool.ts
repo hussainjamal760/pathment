@@ -71,7 +71,11 @@ export interface PoolStats {
 
 export interface PoolDashboard {
   pool: CandidatePool;
+  /** One page of the candidates that match the request's filters. */
   members: PoolMemberRow[];
+  total: number;
+  page: number;
+  limit: number;
   buckets: Partial<Record<PoolBucket, number>>;
   stats: PoolStats;
   latestSnapshot: ShortlistSnapshot | null;
@@ -91,7 +95,7 @@ export interface PlacementPreview {
 }
 
 export interface PoolHistory {
-  events: { id: string; action: string; actor: string | null; entityId: string; details: Record<string, unknown> | null; at: string }[];
+  events: { id: string; action: string; actor: string | null; subject: string | null; details: Record<string, unknown> | null; at: string }[];
   snapshots: ShortlistSnapshot[];
 }
 

@@ -4,10 +4,12 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AlertTriangle, ArrowUpCircle, Check, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { SelectMenu } from '@/components/shared/SelectMenu';
+import { TablePagination } from '@/components/shared/TablePagination';
 import { useAdminScope } from '@/lib/context/AdminScopeContext';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 import { poolsApi } from '@/lib/services/pools-api';
 import type { PlacementPreview, PoolDashboard, PoolDecision, PoolMemberRow } from '@/lib/types/pool';
+import { usePoolMembers } from './usePoolMembers';
 import { apiError, DECISION_CLASS, DECISION_LABEL, field, pill, primaryBtn, secondaryBtn } from './poolUi';
 
 type Override = { decision: PoolDecision; reason: string };
@@ -18,7 +20,11 @@ const CHOICES: PoolDecision[] = ['selected', 'waitlisted', 'not_selected'];
  * only; a person confirms, and every change to the proposal carries a reason.
  */
 export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboard; canSelect: boolean; onChanged: () => void }) {
-  const { pool, members, latestSnapshot: snap } = data;
+  const { pool, latestSnapshot: snap } = data;
+  // Each list is one server page, so a 1,000-candidate pool stays quick.
+  const rankedPage = usePoolMembers(pool.id, { ranked: true });
+  const selectedPage = usePoolMembers(pool.id, { decision: 'selected' }, 100);
+  const othersPage = usePoolMembers(pool.id, { decision: 'waitlisted,not_selected' });
   const confirm = useConfirm();
   const { clans } = useAdminScope();
   const [busy, setBusy] = useState<string | null>(null);
@@ -26,7 +32,7 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
   const [placement, setPlacement] = useState<Record<string, string>>({});
   const [seats, setSeats] = useState<PlacementPreview['clans'] | null>(null);
   const [changing, setChanging] = useState<{ member: PoolMemberRow; decision: PoolDecision; reason: string } | null>(null);
-  const byId = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
+  const entryById = useMemo(() => new Map((snap?.entries ?? []).map((e) => [e.memberId, e])), [snap]);
   const programClans = clans.filter((c) => c.programId === pool.programId && c.kind !== 'standing');
   const stale = snap && snap.policyVersion !== pool.scoringPolicy.version;
   const placing = pool.status === 'placing';
@@ -73,9 +79,11 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
     const free = seats?.find((x) => x.id === c.id)?.free;
     return free == null ? c.name : `${c.name} · ${free} free`;
   };
-  const selected = members.filter((m) => m.decision === 'selected');
-  const others = members.filter((m) => m.decision === 'waitlisted' || m.decision === 'not_selected');
-  const ranked = snap ? snap.entries.map((e) => ({ entry: e, member: byId.get(e.memberId) })).filter((r) => r.member) as { entry: (typeof snap.entries)[number]; member: PoolMemberRow }[] : [];
+  const selected = selectedPage.members;
+  const others = othersPage.members;
+  const ranked = rankedPage.members
+    .map((member) => ({ member, entry: entryById.get(member.id) }))
+    .filter((r): r is { member: PoolMemberRow; entry: NonNullable<typeof r.entry> } => Boolean(r.entry));
 
   return (
     <div className="space-y-5">
@@ -130,6 +138,7 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
             </div>
           )}
         </div>
+        <TablePagination pagination={selectedPage.pagination} isLoading={selectedPage.loading} showPageSize={false} />
 
         {others.length > 0 && (
           <div>
@@ -148,6 +157,7 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
                 </div>
               ))}
             </div>
+            <TablePagination pagination={othersPage.pagination} isLoading={othersPage.loading} showPageSize={false} />
           </div>
         )}
 
@@ -206,6 +216,7 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
           })}
         </div>
       )}
+      {!placing && snap && <TablePagination pagination={rankedPage.pagination} isLoading={rankedPage.loading} showPageSize={false} />}
     </div>
   );
 }

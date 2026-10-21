@@ -32,6 +32,8 @@ export interface SubmitTaskTarget {
   status?: string;
   deliverable?: string | null;
   acceptanceCriteria?: string[];
+  /** Set for selection-pool work, which a pool reviewer marks rather than a mentor. */
+  poolMemberId?: string | null;
 }
 
 /**
@@ -81,7 +83,8 @@ export function SubmitTaskDrawer({
         extensionRequested: false,
         timeSpentHours: timeSpent ? parseFloat(timeSpent) : undefined,
       });
-      toast.success(isResubmit ? 'Re-submitted - your mentor will take another look' : 'Submitted! Your mentor will review it shortly');
+      const who = task.poolMemberId ? 'a reviewer' : 'your mentor';
+      toast.success(isResubmit ? `Re-submitted - ${who} will take another look` : `Submitted! ${who[0].toUpperCase()}${who.slice(1)} will review it shortly`);
       reset();
       onSubmitted?.();
       onClose();
