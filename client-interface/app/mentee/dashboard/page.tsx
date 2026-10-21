@@ -30,6 +30,7 @@ import { PlanStripCard } from "@/components/mentor/PlanStripCard";
 import { AnnouncementsCard } from "@/components/shared/AnnouncementsCard";
 import { ClanWorkspaceNotice } from "@/components/shared/ClanWorkspaceNotice";
 import { TaskDrawer } from "@/components/mentee/TaskDrawer";
+import { QualificationCard } from "@/components/mentee/QualificationCard";
 import {
   SubmitTaskDrawer,
   type SubmitTaskTarget,
@@ -280,6 +281,8 @@ function MenteeDashboardInner() {
           </div>
         )}
       </div>
+
+      <QualificationCard />
 
       <div
         className="grid grid-cols-2 lg:grid-cols-4 gap-4"

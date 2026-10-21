@@ -50,6 +50,17 @@ class NotificationScheduler {
     await this.runReviewSchedules();
     await this.runAdminMeetings();
     await this.runRecurringScheduleTasks();
+    await this.sendPoolReminders();
+  }
+
+  /** Selection-pool candidates: pending invites, work due soon, and inactivity. */
+  async sendPoolReminders() {
+    try {
+      const sent = await require('./poolService').sendReminders();
+      if (sent) console.log(`[scheduler] sent ${sent} pool reminder(s)`);
+    } catch (error) {
+      console.error('[scheduler] pool reminder run failed:', error.message);
+    }
   }
 
   /** Recurring schedule tasks: materialize upcoming occurrences from mentee schedule slots. */
@@ -170,7 +181,9 @@ class NotificationScheduler {
     const tasks = await models.AssignedTask.findAll({
       where: {
         dueDate: { [Op.gte]: now, [Op.lte]: next24h },
-        status: { [Op.in]: ['assigned', 'in_progress', 'submitted', 'revision_needed'] }
+        status: { [Op.in]: ['assigned', 'in_progress', 'submitted', 'revision_needed'] },
+        // Pool work has its own reminders, which stop on a decision or a closed pool.
+        poolMemberId: null
       },
       include: [
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName'] },
@@ -252,7 +265,9 @@ class NotificationScheduler {
     const tasks = await models.AssignedTask.findAll({
       where: {
         dueDate: { [Op.lt]: now },
-        status: { [Op.in]: ['assigned', 'in_progress', 'submitted', 'revision_needed'] }
+        status: { [Op.in]: ['assigned', 'in_progress', 'submitted', 'revision_needed'] },
+        // Pool work has its own reminders, which stop on a decision or a closed pool.
+        poolMemberId: null
       },
       include: [
         { model: models.User, as: 'mentee', attributes: ['id', 'firstName'] },

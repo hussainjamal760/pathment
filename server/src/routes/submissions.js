@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const submissionController = require('../controllers/submissionController');
 const { authenticate, authorize } = require('../middlewares/auth');
-const { requirePermission, scope } = require('../middlewares/authz');
+const { requirePermission, requireAnyPermission, scope } = require('../middlewares/authz');
 const { PERMISSIONS } = require('../config/permissions');
 const upload = require('../middlewares/upload');
 
@@ -63,7 +63,8 @@ router.get(
 router.post(
   '/:submissionId/review',
   authenticate,
-  requirePermission(PERMISSIONS.TASK_REVIEW, scope.submission('submissionId')),
+  // Either clan review or pool review; the service applies the one this task needs.
+  requireAnyPermission([PERMISSIONS.TASK_REVIEW, PERMISSIONS.POOL_REVIEW], scope.submission('submissionId')),
   submissionController.reviewSubmission
 );
 
@@ -76,7 +77,8 @@ router.post(
 router.patch(
   '/:submissionId/review',
   authenticate,
-  requirePermission(PERMISSIONS.TASK_REVIEW, scope.submission('submissionId')),
+  // Either clan review or pool review; the service applies the one this task needs.
+  requireAnyPermission([PERMISSIONS.TASK_REVIEW, PERMISSIONS.POOL_REVIEW], scope.submission('submissionId')),
   submissionController.editReview
 );
 

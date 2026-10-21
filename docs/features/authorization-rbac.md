@@ -15,7 +15,7 @@ grants. `CustomRole` (admin-defined permission bundles). Derived grants come fro
 
 ## Backend
 - **Catalog:** `config/permissions.js` (the permission vocabulary), `config/roles.js` (built-in roles → permission bundles).
-- **Built-in roles:** `super_admin` (org, all), `program_admin` (program), `intake_manager`, `people_admin`, `moderator`, `analyst` (org); `lead_mentor`, `co_mentor`, `core_team` (clan); `mentee` (self). Plus admin-defined **custom roles**.
+- **Built-in roles:** `super_admin` (org, all), `program_admin` (program), `intake_manager`, `people_admin`, `moderator`, `analyst` (org); `pool_reviewer` (program); `lead_mentor`, `co_mentor`, `core_team` (clan); `mentee` (self). Plus admin-defined **custom roles**.
 - **Engine:** `authzService` - `getAssignments(user)` (union of derived + explicit), `can(user, permission, resource)`, `getPermissionUnion(user)` (any-scope, for UI), `hasAdminAccess(user)` (org/program admin-tier), scope resolvers.
 - **Enforcement:** `requirePermission(perm, scopeResolver?)` middleware on routes; `can()` inside services. Server is the source of truth.
 - **Admin API** (`/api/access`, gated `access.manage`): `GET /me/permissions` (any user - drives UI), `/roles`, `/users/:id`, `POST /grants`, `DELETE /grants/:id`, `POST /invites` (invite a new person with a role pre-assigned), `custom-roles` CRUD.

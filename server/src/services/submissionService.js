@@ -18,6 +18,7 @@ const gamificationService = require('./gamificationService');
  * a task value; otherwise the difficulty curve. Approval may award up to this.
  */
 function taskStandardPoints(task) {
+  if (task?.poolMemberId) return 0; // qualification work earns nothing
   const assigned = Number(task?.pointsBase);
   if (Number.isFinite(assigned) && assigned > 0) return Math.round(assigned);
   const step = Number(task?.roadmapTask?.pointsBase);
@@ -540,7 +541,8 @@ class SubmissionService {
     await taskService.updateEnrollmentTaskStats(task.enrollmentId);
 
     // Keep gamification and mentee-profile progress in sync when a task is approved.
-    if (isApproved) {
+    // Qualification work is a test, not learning: it earns nothing.
+    if (isApproved && !task.poolMemberId) {
       await this.updateMenteeGamificationProgress(task.menteeId);
 
       const pointsToAward = updateData.pointsAwarded;
@@ -973,6 +975,8 @@ class SubmissionService {
   async _reviewableTaskWhere(mentorId, extra = {}) {
     const user = await models.User.findByPk(mentorId, { attributes: ['id', 'role'] });
     const clauses = [{ mentorId }];
+    // Qualification work is reviewed from its pool, not from a mentor's queue.
+    extra = { ...extra, poolMemberId: null };
     if (user) {
       const clanIds = await authzService.clansWhereCan(user, PERMISSIONS.TASK_REVIEW);
       if (clanIds.length) {
@@ -1083,14 +1087,16 @@ class SubmissionService {
    * The mentor's approvals queue: pending submissions across their assigned
    * tasks, shaped for the review UI (criteria checklist + submission content).
    */
-  async getMentorApprovalsQueue(mentorId) {
+  async getMentorApprovalsQueue(mentorId, { taskWhere = null } = {}) {
     const submissions = await models.TaskSubmission.findAll({
       where: { status: 'pending' },
       include: [{
         model: models.AssignedTask,
         as: 'assignedTask',
         required: true,
-        where: await this._reviewableTaskWhere(mentorId),
+        // `taskWhere` replaces the mentor's own queue with another one that
+        // shares its shape, e.g. a selection pool's qualification work.
+        where: taskWhere || await this._reviewableTaskWhere(mentorId),
         include: [
           { model: models.RoadmapTask, as: 'roadmapTask', attributes: ['title', 'type', 'description', 'deliverable', 'acceptanceCriteria', 'pointsBase', 'difficulty'] },
           { model: models.User, as: 'mentee', attributes: ['id', 'firstName', 'lastName', 'profilePictureUrl'] }
@@ -1137,7 +1143,9 @@ class SubmissionService {
       ? await models.UserSettings.findAll({ where: { userId: { [Op.in]: menteeIds } }, attributes: ['userId', 'timezone'] })
       : [];
     const tzByUser = new Map(tzRows.map((r) => [r.userId, r.timezone || 'UTC']));
-    const { map: clanByMentee, clanNameById } = await this._clanByMentee(mentorId, menteeIds);
+    const { map: clanByMentee, clanNameById } = mentorId
+      ? await this._clanByMentee(mentorId, menteeIds)
+      : { map: new Map(), clanNameById: new Map() };
 
     return latest.map((s) => {
       const t = s.assignedTask;

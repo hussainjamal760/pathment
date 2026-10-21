@@ -14,6 +14,11 @@ export const PERMISSIONS = {
   INTAKE_MANAGE: 'intake.manage',
   ASSESSMENT_AUTHOR: 'assessment.author',
   INVITE_CREATE: 'invite.create',
+  POOL_MANAGE: 'pool.manage',
+  POOL_MEMBERS: 'pool.members',
+  POOL_ASSIGN: 'pool.assign',
+  POOL_REVIEW: 'pool.review',
+  POOL_SELECT: 'pool.select',
   CLAN_CREATE: 'clan.create',
   CLAN_MANAGE_MEMBERS: 'clan.manage_members',
   /** Upload / change the clan photo. Co-mentors have it by default; lead can revoke. */

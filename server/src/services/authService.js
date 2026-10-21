@@ -358,8 +358,15 @@ class AuthService {
       invite.usedBy = user.id;
       await invite.save({ transaction });
 
+      // A selection-pool candidate: their pool place waits on this email.
+      await require('./poolService').activateForUser(user, { transaction });
+
       return { user };
     });
+
+    require('./poolService').assignConfiguredWorkForUser(result.user.id).catch((e) =>
+      console.warn('pool work assignment failed:', e.message)
+    );
 
     notificationOrchestrator.sendWelcomeEmail(result.user).catch((error) => {
       console.warn('welcome email failed:', error.message);

@@ -25,6 +25,7 @@ const meetingRoutes = require('./meetings');
 const announcementRoutes = require('./announcements');
 const communityRoutes = require('./community');
 const clanRequestRoutes = require('./clanRequests');
+const poolRoutes = require('./pools');
 const rewardsRoutes = require('./rewards');
 const libraryRoutes = require('./library');
 const scheduleRoutes = require('./schedules');
@@ -126,6 +127,7 @@ router.use('/community', communityRoutes);
 
 // Admin clan operations (change requests, cross-clan, policies)
 router.use('/clan-requests', clanRequestRoutes);
+router.use('/pools', poolRoutes);
 
 // Rewards (gifts + redemptions)
 router.use('/rewards', rewardsRoutes);

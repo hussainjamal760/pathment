@@ -62,7 +62,13 @@ EXTENSION_HANDLED: 'extension_handled',
   CERTIFICATE_VERIFICATION_REQUESTED: 'certificate_verification_requested',
   CERTIFICATE_VERIFICATION_COMPLETED: 'certificate_verification_completed',
   // The admin has released a clan: its mentors may now send.
-  CERTIFICATE_CLAN_APPROVED: 'certificate_clan_approved'
+  CERTIFICATE_CLAN_APPROVED: 'certificate_clan_approved',
+  // Selection pools: a candidate is chased, told the outcome, and placed; the
+  // operator hears only when they have something to decide.
+  POOL_REMINDER: 'pool_reminder',
+  POOL_ACTION_NEEDED: 'pool_action_needed',
+  POOL_OUTCOME: 'pool_outcome',
+  POOL_PLACED: 'pool_placed'
 };
 
 // Which role's "hat" a notification concerns, so the bell + list can scope to the
@@ -445,6 +451,32 @@ const NOTIFICATION_MATRIX = {
     audience: 'any',
     preferenceKey: 'admin_meeting_reminder',
     channels: { inApp: true, email: false, chat: false }
+  },
+  [NOTIFICATION_EVENTS.POOL_REMINDER]: {
+    type: 'task',
+    audience: 'mentee',
+    preferenceKey: 'deadline_approaching',
+    channels: { inApp: true, email: true, chat: false }
+  },
+  // Shortlist ready, a tie at the cutoff, a placement that failed.
+  [NOTIFICATION_EVENTS.POOL_ACTION_NEEDED]: {
+    type: 'system',
+    audience: 'admin',
+    preferenceKey: 'pool_action_needed',
+    channels: { inApp: true, email: true, chat: false }
+  },
+  [NOTIFICATION_EVENTS.POOL_OUTCOME]: {
+    type: 'milestone',
+    audience: 'mentee',
+    preferenceKey: 'enrollment_updates',
+    channels: { inApp: true, email: true, chat: false }
+  },
+  // Candidate and the clan's mentor team, once enrolment and membership exist.
+  [NOTIFICATION_EVENTS.POOL_PLACED]: {
+    type: 'milestone',
+    audience: 'any',
+    preferenceKey: 'enrollment_updates',
+    channels: { inApp: true, email: true, chat: false }
   }
 };
 
@@ -499,6 +531,7 @@ const EMAIL_PREFERENCE_CATEGORIES = [
   { group: 'Program', key: 'cross_clan_assigned', label: 'I\'m asked to cover or help another clan' },
   { group: 'Program', key: 'new_mentee_in_clan', label: 'A new mentee joins my clan' },
   { group: 'Program', key: 'promotion_nominated', label: 'A mentee is nominated for promotion (admins)' },
+  { group: 'Program', key: 'pool_action_needed', label: 'A selection pool needs a decision (admins)' },
   { group: 'Program', key: 'standing_clan_request_created', label: 'A mentor requests a standing clan (admins)' },
   { group: 'Milestones', key: 'completion_ready_for_signoff', label: 'Completion is ready for sign-off' },
   { group: 'Milestones', key: 'program_completed', label: 'A program is completed' },

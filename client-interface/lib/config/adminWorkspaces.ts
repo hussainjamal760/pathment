@@ -22,6 +22,11 @@ export const adminWorkspaces: { label: string; tabs: AdminWorkspaceTab[] }[] = [
         label: "Invites",
         permission: "invite.create",
       },
+      {
+        href: "/admin/pools",
+        label: "Selection pools",
+        permission: "pool.review",
+      },
     ],
   },
   {

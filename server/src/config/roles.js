@@ -25,6 +25,7 @@ const ROLES = {
       P.PROGRAM_MANAGE, P.PROGRAM_PUBLISH, P.COHORT_MANAGE,
       P.ROADMAP_AUTHOR, P.ROADMAP_PUBLISH_LOCAL,
       P.INTAKE_MANAGE, P.ASSESSMENT_AUTHOR, P.INVITE_CREATE,
+      P.POOL_MANAGE, P.POOL_MEMBERS, P.POOL_ASSIGN, P.POOL_REVIEW, P.POOL_SELECT,
       P.CLAN_CREATE, P.CLAN_MANAGE_MEMBERS,
       P.TASK_ASSIGN, P.TASK_REVIEW, P.MENTEE_VIEW, P.MENTEE_MANAGE, P.MENTEE_TRANSFER,
       P.CERTIFICATE_VERIFY, P.SCHEDULE_PLAN, P.SCHEDULE_ASSIGN,
@@ -37,6 +38,12 @@ const ROLES = {
     scope: 'org',
     description: 'Owns admissions: cohorts, applications, assessments, invites.',
     permissions: [P.INTAKE_MANAGE, P.ASSESSMENT_AUTHOR, P.INVITE_CREATE, P.ANALYTICS_VIEW]
+  },
+  pool_reviewer: {
+    label: 'Pool reviewer',
+    scope: 'program',
+    description: "Marks a selection pool's qualification work. Not the candidates' mentor.",
+    permissions: [P.POOL_REVIEW]
   },
   people_admin: {
     label: 'People admin',

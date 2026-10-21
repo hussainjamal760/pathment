@@ -27,7 +27,12 @@ function invalidateCustomRoles() { _customRoles.clear(); }
 
 // Built-in roles that constitute "admin area" access (org/program tier - NOT
 // clan roles like lead_mentor). Used by hasAdminAccess().
-const ADMIN_TIER_ROLES = new Set(['super_admin', 'program_admin', 'intake_manager', 'people_admin', 'moderator', 'analyst']);
+/** The pool permission that stands in for a task permission on qualification work. */
+const POOL_TASK_PERMISSION = {
+  [P.TASK_REVIEW]: P.POOL_REVIEW,
+  [P.TASK_ASSIGN]: P.POOL_ASSIGN
+};
+const ADMIN_TIER_ROLES = new Set(['super_admin', 'program_admin', 'intake_manager', 'people_admin', 'moderator', 'analyst', 'pool_reviewer']);
 
 // Scope hierarchy for "minimum scope" checks (org is broadest).
 const SCOPE_RANK = { org: 3, program: 2, clan: 1, self: 0 };
@@ -555,7 +560,10 @@ class AuthzService {
 
     if (task.mentorId && task.mentorId === userId) return true; // the assigning mentor
     const resource = await this.scopeOfAssignedTask(task.id);
-    const perms = Array.isArray(permissions) ? permissions : [permissions];
+    const asked = Array.isArray(permissions) ? permissions : [permissions];
+    // Qualification work answers to the pool's own permissions, never to a
+    // clan's: a mentor of the same programme does not mark candidates' tests.
+    const perms = task.poolMemberId ? asked.map((p) => POOL_TASK_PERMISSION[p]).filter(Boolean) : asked;
     for (const p of perms) {
       if (await this.can(user, p, resource, { assignments })) return true;
     }
@@ -570,11 +578,26 @@ class AuthzService {
     return clan ? { clanId: clan.id, programId: clan.programId } : { clanId };
   }
 
+  /** A selection pool is owned by its programme. */
+  async scopeOfPool(poolId) {
+    if (!poolId) return null;
+    const pool = await models.CandidatePool.findByPk(poolId, { attributes: ['programId'] });
+    return pool ? { programId: pool.programId } : null;
+  }
+
   /** An assigned task: covers the mentee (self), their clan, and the program. */
   async scopeOfAssignedTask(taskId) {
-    const task = await models.AssignedTask.findByPk(taskId, { attributes: ['id', 'menteeId', 'enrollmentId', 'clanId'] });
+    const task = await models.AssignedTask.findByPk(taskId, { attributes: ['id', 'menteeId', 'enrollmentId', 'clanId', 'poolMemberId'] });
     if (!task) return null;
     const out = { userId: task.menteeId };
+    // Pool work has no clan or enrolment: the pool's programme is its scope.
+    if (task.poolMemberId) {
+      const member = await models.PoolMember.findByPk(task.poolMemberId, {
+        attributes: ['id'], include: [{ model: models.CandidatePool, as: 'pool', attributes: ['programId'] }]
+      });
+      if (member?.pool) out.programId = member.pool.programId;
+      return out;
+    }
     if (task.clanId) out.clanId = task.clanId;
     if (task.enrollmentId) {
       const enr = await models.Enrollment.findByPk(task.enrollmentId, { attributes: ['programId'] });

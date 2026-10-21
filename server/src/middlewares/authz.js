@@ -212,6 +212,7 @@ const scope = {
   clan: (param = 'id') => async (req) => authzService.scopeOfClan(req.params[param]),
   program: (param = 'id') => (req) => ({ programId: req.params[param] }),
   task: (param = 'id') => async (req) => authzService.scopeOfAssignedTask(req.params[param]),
+  pool: (param = 'id') => async (req) => authzService.scopeOfPool(req.params[param]),
   enrollment: (param = 'id') => async (req) => authzService.scopeOfEnrollment(req.params[param]),
   submission: (param = 'submissionId') => async (req) => authzService.scopeOfSubmission(req.params[param]),
   delay: (param = 'id') => async (req) => authzService.scopeOfDelay(req.params[param]),

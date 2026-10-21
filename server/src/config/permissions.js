@@ -20,6 +20,14 @@ const PERMISSIONS = {
   ASSESSMENT_AUTHOR: 'assessment.author',
   INVITE_CREATE: 'invite.create',
 
+  // Selection pools (pre-clan qualification). Program-scoped, so a pool is
+  // run by whoever holds these on the pool's programme.
+  POOL_MANAGE: 'pool.manage',                // create, configure, open and close pools
+  POOL_MEMBERS: 'pool.members',              // import, invite, withdraw, disqualify candidates
+  POOL_ASSIGN: 'pool.assign',                // set qualification work for pool members
+  POOL_REVIEW: 'pool.review',                // mark qualification work
+  POOL_SELECT: 'pool.select',                // confirm selection and place into clans
+
   // Clans & people
   CLAN_CREATE: 'clan.create',
   CLAN_MANAGE_MEMBERS: 'clan.manage_members',
@@ -114,6 +122,16 @@ const PERMISSION_GROUPS = [
     permissions: [
       { key: P.INTAKE_MANAGE, label: 'Run intake and applications' },
       { key: P.INVITE_CREATE, label: 'Send invites' }
+    ]
+  },
+  {
+    label: 'Selection pools',
+    permissions: [
+      { key: P.POOL_MANAGE, label: 'Run selection pools' },
+      { key: P.POOL_MEMBERS, label: 'Add and remove candidates' },
+      { key: P.POOL_ASSIGN, label: 'Set qualification work' },
+      { key: P.POOL_REVIEW, label: 'Mark qualification work' },
+      { key: P.POOL_SELECT, label: 'Confirm selection and placement' }
     ]
   },
   {

@@ -157,6 +157,13 @@ module.exports = (sequelize, DataTypes) => {
     // Provenance for an assignment intentionally continued from historical
     // work into a standing clan. It is also the idempotency key: retries reuse
     // the same new assignment instead of creating duplicates.
+    // Qualification work for a selection-pool candidate. Such a task has no
+    // clan and no enrolment, and never counts toward either's progress.
+    poolMemberId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: 'pool_member_id'
+    },
     continuedFromTaskId: {
       type: DataTypes.UUID,
       allowNull: true,
@@ -184,7 +191,8 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['track_id'] },
       { fields: ['schedule_slot_id'] },
       { fields: ['mentee_id', 'clan_id'] },
-      { fields: ['continued_from_task_id'] }
+      { fields: ['continued_from_task_id'] },
+      { fields: ['pool_member_id'] }
     ]
   });
 
@@ -195,6 +203,7 @@ module.exports = (sequelize, DataTypes) => {
     AssignedTask.belongsTo(models.Enrollment, { foreignKey: 'enrollment_id', as: 'enrollment' });
     AssignedTask.belongsTo(models.Track, { foreignKey: 'track_id', as: 'track' });
     if (models.Clan) AssignedTask.belongsTo(models.Clan, { foreignKey: 'clan_id', as: 'clan' });
+    AssignedTask.belongsTo(models.PoolMember, { foreignKey: 'pool_member_id', as: 'poolMember' });
     AssignedTask.belongsTo(models.AssignedTask, { foreignKey: 'continued_from_task_id', as: 'continuedFromTask' });
     AssignedTask.hasMany(models.TaskSubmission, { foreignKey: 'assigned_task_id', as: 'submissions' });
     AssignedTask.hasMany(models.TaskFeedback, { foreignKey: 'assigned_task_id', as: 'feedback' });

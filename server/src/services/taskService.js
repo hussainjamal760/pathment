@@ -455,7 +455,8 @@ class TaskService {
   async getMenteeTasks(menteeId, filters = {}) {
     const clanId = await resolveMenteeClanId(menteeId, filters.clanId, { actorId: filters.actorId });
     const memberships = await listMenteeClans(menteeId);
-    const where = clanScopedWhere({ menteeId }, clanId, memberships.length);
+    // Qualification work lives on the candidate's pool page, not the task list.
+    const where = clanScopedWhere({ menteeId, poolMemberId: null }, clanId, memberships.length);
 
     if (filters.status) {
       where.status = filters.status;
@@ -533,7 +534,7 @@ class TaskService {
    * Get tasks for a mentor (to review)
    */
   async getMentorTasks(mentorId, filters = {}) {
-    const where = { mentorId };
+    const where = { mentorId, poolMemberId: null };
 
     if (filters.status) {
       where.status = filters.status;

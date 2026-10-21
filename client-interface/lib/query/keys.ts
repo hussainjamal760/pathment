@@ -96,6 +96,7 @@ export const qk = {
   me: {
     activity: (days: number) => ['me', 'activity', days] as const,
     programs: ['me', 'programs'] as const,
+    qualification: ['me', 'qualification'] as const,
     roadmaps: (clanId?: string | null) => ['me', 'roadmaps', clanId ?? ''] as const,
     progress: (clanId?: string | null) => ['me', 'progress', clanId ?? ''] as const,
     dailyLog: (clanId?: string | null) => ['me', 'daily-log', clanId ?? ''] as const,
@@ -124,6 +125,9 @@ export const qk = {
     storage: ['admin', 'storage'] as const,
     moderation: (status: string) => ['admin', 'moderation', status] as const,
     clanRequests: ['admin', 'clan-requests'] as const,
+    pools: ['admin', 'pools'] as const,
+    pool: (id: string) => ['admin', 'pools', id] as const,
+    poolReviews: (id: string) => ['admin', 'pools', id, 'reviews'] as const,
     cohorts: (programId?: string) => ['admin', 'cohorts', programId ?? 'all'] as const,
     orgInsights: ['admin', 'org-insights'] as const,
     orgRoadmaps: ['admin', 'org-roadmaps'] as const,

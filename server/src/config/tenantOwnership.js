@@ -23,6 +23,8 @@ const WORKSPACE_MODELS = {
   AssessmentQuestion: 'assessment_questions',
   AssessmentSubmission: 'assessment_submissions',
   CohortAssessment: 'cohort_assessments',
+  CandidatePool: 'candidate_pools',
+  PoolMember: 'pool_members',
   RubricSnippet: 'rubric_snippets',
   InterviewAnswer: 'interview_answers',
   InterviewAssignment: 'interview_assignments',
