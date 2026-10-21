@@ -939,6 +939,11 @@ class InterviewSessionService {
 
       return { submissionId: submission.id, sessionId: session.id, version };
     }).then(async (out) => {
+      if (task.poolMemberId) {
+        await require('./poolService').notifySubmitted(task, out.submissionId)
+          .catch((e) => console.error('pool interview submit notification failed:', e.message));
+        return out;
+      }
       // Notify the mentor — same deep link as normal submissions (Approvals + drawer).
       try {
         const submitter = await models.User.findByPk(menteeId, { attributes: ['firstName', 'lastName'] });

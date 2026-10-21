@@ -34,6 +34,7 @@ async function up() {
       qualification_due_at TIMESTAMPTZ,
       scoring_policy JSONB NOT NULL DEFAULT '{"version":1,"components":[]}',
       reminder_policy JSONB NOT NULL DEFAULT '{}',
+      award_points BOOLEAN NOT NULL DEFAULT false,
       shortlist_snapshots JSONB NOT NULL DEFAULT '[]',
       created_by_id UUID NOT NULL REFERENCES users(id),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

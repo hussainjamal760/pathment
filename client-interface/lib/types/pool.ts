@@ -23,6 +23,9 @@ export interface CandidatePool {
   capacity: number | null;
   selectionQuota: number;
   qualificationDueAt: string | null;
+  opensAt: string | null;
+  closesAt: string | null;
+  awardPoints: boolean;
   scoringPolicy: { version: number; components: ScoreComponent[] };
   reminderPolicy: { enabled?: boolean; inviteAfterDays?: number; inactivityDays?: number };
   program?: { id: string; name: string } | null;
@@ -56,17 +59,40 @@ export interface ShortlistSnapshot {
   blockers: { pendingReview: string[]; tieAtCutoff: string[] };
 }
 
+export interface PoolStats {
+  candidates: number;
+  withAccount: number;
+  tasks: number;
+  tasksCompleted: number;
+  awaitingReview: number;
+  averageScore: number | null;
+  placed: number;
+}
+
 export interface PoolDashboard {
   pool: CandidatePool;
   members: PoolMemberRow[];
   buckets: Partial<Record<PoolBucket, number>>;
+  stats: PoolStats;
   latestSnapshot: ShortlistSnapshot | null;
 }
 
 export interface ImportResult {
   email: string;
-  result: 'added' | 'invited' | 'already_in_pool' | 'duplicate_row' | 'invalid' | 'pool_full';
+  result: 'added' | 'invited' | 'already_in_pool' | 'duplicate_row' | 'invalid' | 'pool_full' | 'failed';
   memberId?: string;
+  reason?: string;
+}
+
+export interface PlacementPreview {
+  suggestions: { memberId: string; clanId: string | null }[];
+  unplaceable: number;
+  clans: { id: string; name: string; hasLead: boolean; free: number | null }[];
+}
+
+export interface PoolHistory {
+  events: { id: string; action: string; actor: string | null; entityId: string; details: Record<string, unknown> | null; at: string }[];
+  snapshots: ShortlistSnapshot[];
 }
 
 /** The candidate's own view: no rank, no score, nobody else. */

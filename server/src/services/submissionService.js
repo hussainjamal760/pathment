@@ -18,7 +18,6 @@ const gamificationService = require('./gamificationService');
  * a task value; otherwise the difficulty curve. Approval may award up to this.
  */
 function taskStandardPoints(task) {
-  if (task?.poolMemberId) return 0; // qualification work earns nothing
   const assigned = Number(task?.pointsBase);
   if (Number.isFinite(assigned) && assigned > 0) return Math.round(assigned);
   const step = Number(task?.roadmapTask?.pointsBase);
@@ -206,6 +205,12 @@ class SubmissionService {
 
     // Return complete submission with files
     const fullSubmission = await this.getSubmissionById(submission.id);
+
+    // Qualification work goes to the pool's reviewers, not to a mentor's queue.
+    if (task.poolMemberId) {
+      await require('./poolService').notifySubmitted(task, submission.id);
+      return fullSubmission;
+    }
 
     const submitter = await models.User.findByPk(task.menteeId, { attributes: ['firstName', 'lastName'] });
     const submitterName = submitter ? `${submitter.firstName} ${submitter.lastName}`.trim() : 'A mentee';
@@ -455,7 +460,9 @@ class SubmissionService {
 
     // Cap = assignment pointsBase (mentor-set) or roadmap/difficulty default.
     // Mentor may award up to that max on approval (XP + coins via existing flow).
-    const standardPoints = taskStandardPoints(task);
+    // Qualification work is a test: it earns nothing unless its pool says so.
+    const earnsPoints = !task.poolMemberId || await require('./poolService').awardsPoints(task.poolMemberId);
+    const standardPoints = earnsPoints ? taskStandardPoints(task) : 0;
 
     // Create feedback
     const feedbackType = inlineFeedback && inlineFeedback.length > 0 ? 'both' : 'general';
@@ -539,10 +546,12 @@ class SubmissionService {
     // Update enrollment task stats so tasksCompleted/tasksTotal/overallProgressPercentage stay current
     const taskService = require('./taskService');
     await taskService.updateEnrollmentTaskStats(task.enrollmentId);
+    if (task.poolMemberId) {
+      await require('./poolService').afterReview(task).catch((e) => console.warn('pool review follow-up failed:', e.message));
+    }
 
     // Keep gamification and mentee-profile progress in sync when a task is approved.
-    // Qualification work is a test, not learning: it earns nothing.
-    if (isApproved && !task.poolMemberId) {
+    if (isApproved && earnsPoints) {
       await this.updateMenteeGamificationProgress(task.menteeId);
 
       const pointsToAward = updateData.pointsAwarded;

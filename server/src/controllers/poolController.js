@@ -27,6 +27,23 @@ const importMembers = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Candidates processed', await poolService.importMembers(req.params.id, req.body, req.user)));
 });
 
+const importApplications = catchAsync(async (req, res) => {
+  res.status(200).json(successResponse('Applicants processed', await poolService.importFromApplications(req.params.id, req.body, req.user)));
+});
+
+const changeDecision = catchAsync(async (req, res) => {
+  const member = await poolService.changeDecision(req.params.id, req.params.memberId, req.body, req.user);
+  res.status(200).json(successResponse('Outcome changed', { member }));
+});
+
+const placementPreview = catchAsync(async (req, res) => {
+  res.status(200).json(successResponse('Placement suggested', await poolService.placementPreview(req.params.id)));
+});
+
+const history = catchAsync(async (req, res) => {
+  res.status(200).json(successResponse('History retrieved', await poolService.history(req.params.id)));
+});
+
 const removeMember = catchAsync(async (req, res) => {
   const member = await poolService.removeMember(req.params.id, req.params.memberId, req.body, req.user);
   res.status(200).json(successResponse('Candidate updated', { member }));
@@ -56,4 +73,8 @@ const mine = catchAsync(async (req, res) => {
   res.status(200).json(successResponse('Your qualification', { pools: await poolService.mine(req.user.id) }));
 });
 
-module.exports = { list, create, update, setStatus, dashboard, importMembers, removeMember, assignWork, reviewQueue, proposeShortlist, finalize, place, mine };
+module.exports = {
+  list, create, update, setStatus, dashboard, history,
+  importMembers, importApplications, removeMember, changeDecision,
+  assignWork, reviewQueue, proposeShortlist, finalize, placementPreview, place, mine
+};

@@ -5,12 +5,14 @@ import { CheckCircle2, Loader2 } from 'lucide-react';
 import { qk, useApiQuery } from '@/lib/query';
 import { poolsApi } from '@/lib/services/pools-api';
 import { ReviewDrawer } from '@/components/mentor/ReviewDrawer';
+import { InterviewReviewDrawer } from '@/components/mentor/InterviewReviewDrawer';
+import { QuizReviewDrawer } from '@/components/mentor/QuizReviewDrawer';
 import type { ApprovalItem } from '@/lib/hooks/mentor/useMentorApprovals';
 
 /**
- * Qualification work waiting on a reviewer. The same review drawer mentors
- * use, so feedback, criteria and "request changes" behave exactly as they do
- * for clan work; the server checks pool.review instead of task.review.
+ * Qualification work waiting on a reviewer. The same review drawers mentors
+ * use (work, quiz, interview), so feedback, criteria and "request changes"
+ * behave exactly as they do for clan work; the server checks pool.review.
  */
 export function ReviewsTab({ poolId, onReviewed }: { poolId: string; onReviewed: () => void }) {
   const [reviewing, setReviewing] = useState<ApprovalItem | null>(null);
@@ -19,6 +21,8 @@ export function ReviewsTab({ poolId, onReviewed }: { poolId: string; onReviewed:
     queryFn: async () => (await poolsApi.reviews(poolId))?.data?.items ?? [],
     errorMessage: 'Failed to load the review queue',
   });
+
+  const done = () => { setReviewing(null); refetch(); onReviewed(); };
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>;
   if (!items?.length) {
@@ -43,8 +47,14 @@ export function ReviewsTab({ poolId, onReviewed }: { poolId: string; onReviewed:
           </button>
         ))}
       </div>
-      {reviewing && (
-        <ReviewDrawer item={reviewing} onClose={() => setReviewing(null)} onReviewed={() => { setReviewing(null); refetch(); onReviewed(); }} />
+      {reviewing?.type === 'interview' && (
+        <InterviewReviewDrawer taskId={reviewing.taskId} onClose={() => setReviewing(null)} onFinalized={done} />
+      )}
+      {reviewing?.type === 'quiz' && (
+        <QuizReviewDrawer taskId={reviewing.taskId} onClose={() => setReviewing(null)} onReviewed={done} />
+      )}
+      {reviewing && reviewing.type !== 'interview' && reviewing.type !== 'quiz' && (
+        <ReviewDrawer item={reviewing} onClose={() => setReviewing(null)} onReviewed={done} />
       )}
     </>
   );

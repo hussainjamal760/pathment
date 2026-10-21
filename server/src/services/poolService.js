@@ -5,7 +5,7 @@ const { createAuditLog } = require('../utils/auditContext');
 const { generateRandomToken, hashToken } = require('../utils/jwt');
 const { inviteLink } = require('../utils/links');
 const { endOfDayInZone } = require('../utils/timezone');
-const { scoreMember, rankMembers, bucketFor, OPEN_STATUSES } = require('../utils/poolScoring');
+const { scoreMember, rankMembers, bucketFor, OPEN_STATUSES, CLOSED_DECISIONS } = require('../utils/poolScoring');
 const notificationOrchestrator = require('./notificationOrchestrator');
 const { NOTIFICATION_EVENTS } = require('../config/notificationMatrix');
 const authzService = require('./authzService');
@@ -14,11 +14,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INVITE_TTL_DAYS = 14;
 const DAY_MS = 86400000;
 const MAX_SNAPSHOTS = 20;
-// Pool work is a test, not a learning task: no Buildment seats are spent on it.
-const POOL_TASK_TYPES = ['custom', 'reading', 'video', 'exercise', 'project', 'open_source', 'quiz', 'interview'];
+const POOL_TASK_TYPES = ['custom', 'reading', 'video', 'exercise', 'project', 'open_source', 'quiz', 'interview', 'course'];
 const FINAL_DECISIONS = ['selected', 'waitlisted', 'not_selected'];
-const WRITABLE_POOL_FIELDS = ['name', 'description', 'capacity', 'selectionQuota', 'opensAt', 'closesAt', 'qualificationDueAt', 'reminderPolicy', 'cohortId'];
+const WRITABLE_POOL_FIELDS = ['name', 'description', 'capacity', 'selectionQuota', 'opensAt', 'closesAt', 'qualificationDueAt', 'reminderPolicy', 'cohortId', 'awardPoints'];
 
+// JSONB stores object keys sorted, so compare snapshots with keys sorted too.
+const canonical = (v) => (Array.isArray(v) ? v.map(canonical)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])])) : v);
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
 const fullName = (u) => (u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email : null);
 
@@ -123,9 +125,10 @@ class PoolService {
    * reported, never duplicated, and an existing account joins straight away
    * instead of being invited again.
    */
-  async importMembers(poolId, { emails = [] }, actor) {
+  async importMembers(poolId, { emails = [], applicationByEmail = new Map() }, actor) {
     const pool = await this.get(poolId);
     if (['placing', 'closed'].includes(pool.status)) throw new ValidationError('This pool no longer takes candidates');
+    if (pool.closesAt && new Date(pool.closesAt) < new Date()) throw new ValidationError('This pool closed to new candidates');
 
     const results = [];
     const seen = new Set();
@@ -141,22 +144,41 @@ class PoolService {
       if (pool.capacity && size >= pool.capacity) { results.push({ email, result: 'pool_full' }); continue; }
 
       try {
+        const applicationId = applicationByEmail.get(email) || null;
         const user = await models.User.findOne({ where: { email }, attributes: ['id'] });
         const member = user
-          ? await models.PoolMember.create({ poolId, email, userId: user.id, status: 'active' })
-          : await this._inviteMember(pool, email, actor);
+          ? await models.PoolMember.create({ poolId, email, applicationId, userId: user.id, status: 'active' })
+          : await this._inviteMember(pool, email, applicationId, actor);
         size += 1;
         results.push({ email, result: user ? 'added' : 'invited', memberId: member.id });
         if (user) await this._assignConfiguredWork(pool, member, actor);
       } catch (error) {
-        if (error.name !== 'SequelizeUniqueConstraintError') throw error;
-        results.push({ email, result: 'already_in_pool' }); // a concurrent retry won
+        // One bad row is reported on that row; it never stops the rest.
+        if (error.name === 'SequelizeUniqueConstraintError') results.push({ email, result: 'already_in_pool' });
+        else if (error.statusCode && error.statusCode < 500) results.push({ email, result: 'failed', reason: error.message });
+        else throw error;
       }
     }
     await this._audit(actor, 'POOL_MEMBERS_IMPORTED', pool.id, {
       added: results.filter((r) => ['added', 'invited'].includes(r.result)).length
     });
     return { results };
+  }
+
+  /**
+   * Bring in applicants from the pool's intake cohort. Defaults to accepted
+   * applications; the application stays linked to the pool place.
+   */
+  async importFromApplications(poolId, { statuses = ['accepted'] }, actor) {
+    const pool = await this.get(poolId);
+    if (!pool.cohortId) throw new ValidationError('Link this pool to an intake cohort first');
+    const applications = await models.Application.findAll({
+      where: { cohortId: pool.cohortId, status: { [Op.in]: statuses } },
+      attributes: ['id', 'email'],
+      order: [['createdAt', 'ASC']]
+    });
+    const applicationByEmail = new Map(applications.map((a) => [normalizeEmail(a.email), a.id]));
+    return this.importMembers(poolId, { emails: [...applicationByEmail.keys()], applicationByEmail }, actor);
   }
 
   /**
@@ -196,7 +218,7 @@ class PoolService {
       await member.update({ decision, decisionReason: reason, decidedById: actor.id, decidedAt: new Date() }, { transaction });
       await this._cancelOpenWork([member.id], actor, reason, transaction);
     });
-    await this._audit(actor, 'POOL_MEMBER_REMOVED', member.id, { decision, reason });
+    await this._audit(actor, 'POOL_MEMBER_REMOVED', member.id, { decision, reason }, 'PoolMember');
     return member;
   }
 
@@ -217,45 +239,116 @@ class PoolService {
     }
 
     const kit = await this._kitFor(data);
+    const course = data.type === 'course' ? (await require('./courseService').prepare(data.course?.courseId)).course : null;
+    const source = kit || course;
     const roadmapTask = await models.RoadmapTask.create({
-      title: data.title || kit?.title,
-      description: data.description || kit?.description || 'No description provided',
+      title: data.title || source?.title,
+      description: data.description || source?.description || 'No description provided',
       type: data.type,
       difficulty: data.difficulty || 'medium',
       taskOrder: 0,
-      deliverable: data.deliverable || 'Complete the assigned work',
+      deliverable: data.deliverable || (course ? 'Finish the course on Buildment' : 'Complete the assigned work'),
       acceptanceCriteria: data.acceptanceCriteria || [],
       estimatedHours: 1,
       isMandatory: true,
       isCustomTask: true,
       pointsBase: 0
     });
+    const chosen = Array.isArray(data.memberIds) && data.memberIds.length ? data.memberIds : null;
     const item = {
       roadmapTaskId: roadmapTask.id,
       dueDate: data.dueDate || null,
       kind: data.type,
-      options: data.quiz || data.interview || null
+      options: data.quiz || data.interview || data.course || null,
+      // Work set for a chosen group is not handed to people who join later.
+      forChosen: Boolean(chosen)
     };
     await this._addToComponent(pool, data.componentKey, item);
 
     const where = { poolId, decision: null, userId: { [Op.ne]: null } };
-    if (Array.isArray(data.memberIds) && data.memberIds.length) where.id = { [Op.in]: data.memberIds };
+    if (chosen) where.id = { [Op.in]: chosen };
     const members = await models.PoolMember.findAll({ where });
     let assigned = 0;
+    const failed = [];
     for (const member of members) {
-      if (await this._assignItem(pool, member, item, actor)) assigned += 1;
+      try {
+        if (await this._assignItem(pool, member, item, actor)) assigned += 1;
+      } catch (error) {
+        failed.push({ memberId: member.id, email: member.email, reason: error.message });
+      }
     }
-    await this._audit(actor, 'POOL_WORK_ASSIGNED', pool.id, { roadmapTaskId: roadmapTask.id, assigned });
-    return { roadmapTaskId: roadmapTask.id, assigned, skippedNoAccount: await models.PoolMember.count({ where: { poolId, userId: null, decision: null } }) };
+    await this._audit(actor, 'POOL_WORK_ASSIGNED', pool.id, { roadmapTaskId: roadmapTask.id, assigned, failed: failed.length });
+    return {
+      roadmapTaskId: roadmapTask.id,
+      assigned,
+      failed,
+      skippedNoAccount: chosen ? 0 : await models.PoolMember.count({ where: { poolId, userId: null, decision: null } })
+    };
   }
 
   /** Submissions waiting on a reviewer, shaped like the mentor approvals queue. */
   async reviewQueue(poolId) {
+    const pool = await this.get(poolId);
     const memberIds = (await models.PoolMember.findAll({ where: { poolId }, attributes: ['id'] })).map((m) => m.id);
     if (!memberIds.length) return [];
-    return require('./submissionService').getMentorApprovalsQueue(null, {
+    const items = await require('./submissionService').getMentorApprovalsQueue(null, {
       taskWhere: { poolMemberId: { [Op.in]: memberIds } }
     });
+    return pool.awardPoints ? items : items.map((i) => ({ ...i, maxPoints: 0 }));
+  }
+
+  /** Whether approving this pool member's work earns points. Off unless the pool turns it on. */
+  async awardsPoints(poolMemberId) {
+    const member = await models.PoolMember.findByPk(poolMemberId, {
+      attributes: ['id'], include: [{ model: models.CandidatePool, as: 'pool', attributes: ['awardPoints'] }]
+    });
+    return Boolean(member?.pool?.awardPoints);
+  }
+
+  /**
+   * Work came in: tell the pool's reviewers (in-app), not a mentor. Called by
+   * every submission path (work, quiz in review mode, interview).
+   */
+  async notifySubmitted(task, submissionId) {
+    const member = await models.PoolMember.findByPk(task.poolMemberId, {
+      include: [
+        { model: models.CandidatePool, as: 'pool', attributes: ['id', 'name', 'programId'] },
+        { model: models.User, as: 'user', attributes: ['firstName', 'lastName', 'email'] }
+      ]
+    });
+    if (!member?.pool) return;
+    const reviewers = await models.RoleAssignment.findAll({
+      where: {
+        role: 'pool_reviewer',
+        [Op.or]: [{ scopeType: 'org' }, { scopeType: 'program', scopeId: member.pool.programId }]
+      },
+      attributes: ['userId']
+    });
+    const ids = [...new Set([task.mentorId, ...reviewers.map((r) => r.userId)].filter(Boolean))];
+    await notificationOrchestrator.dispatch({
+      eventKey: NOTIFICATION_EVENTS.POOL_WORK_SUBMITTED,
+      recipients: ids.map((userId) => ({ userId })),
+      payload: {
+        title: 'Qualification work to review',
+        message: `${fullName(member.user)} submitted work in ${member.pool.name}.`,
+        actionUrl: `/admin/pools/${member.pool.id}?tab=reviews`,
+        actionLabel: 'Review',
+        relatedEntityType: 'pool_submission',
+        relatedEntityId: submissionId
+      }
+    });
+  }
+
+  /** After a review: once nothing in the pool waits on a reviewer, the operators can shortlist. */
+  async afterReview(task) {
+    const member = await models.PoolMember.findByPk(task.poolMemberId, { attributes: ['poolId'] });
+    if (!member) return;
+    const pool = await this.get(member.poolId);
+    const waiting = await models.AssignedTask.count({
+      where: { status: 'submitted' },
+      include: [{ model: models.PoolMember, as: 'poolMember', required: true, where: { poolId: pool.id }, attributes: [] }]
+    });
+    if (!waiting) await this._notifyOperators(pool, 'All qualification work is reviewed', `${pool.name}: nothing is waiting for review. You can propose the shortlist.`);
   }
 
   // ── Dashboard, scoring and selection ──────────────────────────────────────
@@ -287,7 +380,7 @@ class PoolService {
       };
     });
     const buckets = rows.reduce((acc, r) => ({ ...acc, [r.bucket]: (acc[r.bucket] || 0) + 1 }), {});
-    return { pool: this._shape(pool), members: rows, buckets, latestSnapshot: (pool.shortlistSnapshots || []).at(-1) || null };
+    return { pool: this._shape(pool), members: rows, buckets, stats: this._stats(rows), latestSnapshot: (pool.shortlistSnapshots || []).at(-1) || null };
   }
 
   /**
@@ -308,7 +401,8 @@ class PoolService {
       blockers
     };
     const last = (pool.shortlistSnapshots || []).at(-1);
-    const same = last && JSON.stringify({ ...last, generatedAt: undefined, generatedById: undefined }) === JSON.stringify(snapshot);
+    const { generatedAt: _at, generatedById: _by, ...lastBody } = last || {};
+    const same = Boolean(last) && JSON.stringify(canonical(lastBody)) === JSON.stringify(canonical(snapshot));
 
     await sequelize.transaction(async (transaction) => {
       const byId = new Map(ranked.map((r) => [r.id, r]));
@@ -422,6 +516,82 @@ class PoolService {
     return { results };
   }
 
+  /**
+   * Change one outcome while placing, e.g. promote from the waitlist when a
+   * selected candidate drops out. Needs a reason, like any manual change.
+   */
+  async changeDecision(poolId, memberId, { decision, reason }, actor) {
+    const pool = await this.get(poolId);
+    if (pool.status !== 'placing') throw new ValidationError('Outcomes change here only after the selection is confirmed');
+    const member = await this._member(poolId, memberId);
+    if (member.placedAt) throw new ConflictError('This candidate is already placed in a clan');
+    if (CLOSED_DECISIONS.includes(member.decision)) throw new ValidationError('This candidate left the selection');
+    if (decision === 'selected' && !member.userId) throw new ValidationError('This candidate never accepted their invite, so they cannot be placed');
+    await member.update({ decision, decisionReason: reason, decidedById: actor.id, decidedAt: new Date() });
+    await this._audit(actor, 'POOL_DECISION_CHANGED', member.id, { decision, reason }, 'PoolMember');
+    await this._notifyOutcomes(pool, [member]);
+    return member;
+  }
+
+  /**
+   * Suggest a clan for every selected, unplaced candidate: each goes to the
+   * clan with the most free seats, so clans fill evenly. Nothing is written;
+   * the operator reviews it and runs placement.
+   */
+  async placementPreview(poolId) {
+    const pool = await this.get(poolId);
+    const clans = await models.Clan.findAll({
+      where: { programId: pool.programId, frozenAt: null, kind: { [Op.ne]: 'standing' } },
+      attributes: ['id', 'name', 'maxMentees', 'leadMentorId'],
+      order: [['name', 'ASC']]
+    });
+    const taken = await models.ClanMembership.findAll({
+      where: { clanId: { [Op.in]: clans.map((c) => c.id) }, role: 'mentee', status: { [Op.in]: ['active', 'paused'] } },
+      attributes: ['clanId', [sequelize.fn('COUNT', sequelize.col('id')), 'n']],
+      group: ['clanId'],
+      raw: true
+    });
+    const used = new Map(taken.map((t) => [t.clanId, Number(t.n)]));
+    const seats = clans.map((c) => ({
+      id: c.id,
+      name: c.name,
+      hasLead: Boolean(c.leadMentorId),
+      free: c.maxMentees ? Math.max(0, c.maxMentees - (used.get(c.id) || 0)) : Infinity
+    }));
+    const open = seats.filter((c) => c.hasLead);
+    const waiting = await models.PoolMember.findAll({
+      where: { poolId, decision: 'selected', placedAt: null },
+      attributes: ['id', 'email', 'rank'],
+      order: [['rank', 'ASC NULLS LAST'], ['email', 'ASC']]
+    });
+    const suggestions = waiting.map((m) => {
+      const best = open.filter((c) => c.free > 0).sort((a, b) => b.free - a.free)[0];
+      if (best) best.free -= 1;
+      return { memberId: m.id, clanId: best?.id || null };
+    });
+    return {
+      suggestions,
+      unplaceable: suggestions.filter((s) => !s.clanId).length,
+      clans: seats.map((c) => ({ ...c, free: Number.isFinite(c.free) ? c.free : null }))
+    };
+  }
+
+  /** What happened to this pool and its candidates, newest first, plus every shortlist proposed. */
+  async history(poolId) {
+    const pool = await this.get(poolId);
+    const memberIds = (await models.PoolMember.findAll({ where: { poolId }, attributes: ['id'] })).map((m) => m.id);
+    const rows = await models.AuditLog.findAll({
+      where: { entityId: { [Op.in]: [poolId, ...memberIds] }, entityType: { [Op.in]: ['CandidatePool', 'PoolMember'] } },
+      include: [{ model: models.User, as: 'user', attributes: ['firstName', 'lastName', 'email'], required: false }],
+      order: [['createdAt', 'DESC']],
+      limit: 200
+    });
+    return {
+      events: rows.map((r) => ({ id: r.id, action: r.action, actor: fullName(r.user), entityId: r.entityId, details: r.newValues, at: r.createdAt })),
+      snapshots: [...(pool.shortlistSnapshots || [])].reverse()
+    };
+  }
+
   // ── Candidate's own view ──────────────────────────────────────────────────
 
   /** Your qualification work and outcome. Never a rank, score or anybody else. */
@@ -459,6 +629,27 @@ class PoolService {
    * and only about open work, so a submission, a decision, a withdrawal or a
    * closed pool each stops them without anybody having to remember to.
    */
+  /** The scheduler's pass: follow the pool's dates, then chase candidates. */
+  async tick(now = new Date()) {
+    await this.followSchedule(now);
+    return this.sendReminders(now);
+  }
+
+  /**
+   * Dates drive the obvious moves so nobody has to remember them: a draft
+   * opens on its opening date, and qualifying ends when the work is due.
+   */
+  async followSchedule(now = new Date()) {
+    await models.CandidatePool.update({ status: 'open' }, { where: { status: 'draft', opensAt: { [Op.lte]: now } } });
+    const due = await models.CandidatePool.findAll({
+      where: { status: { [Op.in]: ['open', 'qualifying'] }, qualificationDueAt: { [Op.lte]: now } }
+    });
+    for (const pool of due) {
+      await pool.update({ status: 'reviewing' });
+      await this._notifyOperators(pool, 'Qualification has closed', `${pool.name}: the deadline passed. Review the remaining work and propose the shortlist.`);
+    }
+  }
+
   async sendReminders(now = new Date()) {
     const pools = await models.CandidatePool.findAll({ where: { status: { [Op.in]: ['open', 'qualifying'] } } });
     let sent = 0;
@@ -521,10 +712,10 @@ class PoolService {
     if (url) await notificationOrchestrator.sendRegistrationInviteEmail({ email: member.email, role: 'candidate', inviteUrl: url });
   }
 
-  async _inviteMember(pool, email, actor) {
+  async _inviteMember(pool, email, applicationId, actor) {
     return sequelize.transaction(async (transaction) => {
       const { invite, url } = await this._createInvite(pool, email, actor.id, transaction);
-      const member = await models.PoolMember.create({ poolId: pool.id, email, inviteId: invite.id, status: 'invited' }, { transaction });
+      const member = await models.PoolMember.create({ poolId: pool.id, email, applicationId, inviteId: invite.id, status: 'invited' }, { transaction });
       // A reused invite has already been mailed; its link cannot be rebuilt.
       if (url) {
         transaction.afterCommit(() => notificationOrchestrator
@@ -560,7 +751,9 @@ class PoolService {
 
   async _assignConfiguredWork(pool, member, actor) {
     for (const component of pool.scoringPolicy.components || []) {
-      for (const item of component.items || []) await this._assignItem(pool, member, item, actor);
+      for (const item of (component.items || []).filter((i) => !i.forChosen)) {
+        await this._assignItem(pool, member, item, actor).catch((e) => console.warn('pool work assignment failed:', e.message));
+      }
     }
   }
 
@@ -584,6 +777,16 @@ class PoolService {
     });
     if (item.kind === 'quiz') await require('./quizKitService').createAssignmentForTask({ assignedTaskId: task.id, kitId: item.options.kitId, options: item.options });
     if (item.kind === 'interview') await require('./interviewKitService').createAssignmentForTask({ assignedTaskId: task.id, kitId: item.options.kitId, options: item.options });
+    if (item.kind === 'course') {
+      // Each candidate takes a Buildment seat; no seat means no task.
+      const courseService = require('./courseService');
+      try {
+        await courseService.enrollForTask(task, await courseService.prepare(item.options.courseId));
+      } catch (error) {
+        await task.destroy();
+        throw error;
+      }
+    }
     if (member.status === 'active') await member.update({ status: 'qualifying' });
 
     const roadmapTask = await models.RoadmapTask.findByPk(item.roadmapTaskId, { attributes: ['title'] });
@@ -714,6 +917,22 @@ class PoolService {
     });
   }
 
+  /** The numbers an operator watches: who is in, how much work is in, how much is marked. */
+  _stats(rows) {
+    const live = rows.filter((r) => !CLOSED_DECISIONS.includes(r.decision));
+    const scored = live.filter((r) => r.total != null);
+    const tasks = live.reduce((a, r) => a + r.tasksTotal, 0);
+    return {
+      candidates: live.length,
+      withAccount: live.filter((r) => r.userId).length,
+      tasks,
+      tasksCompleted: live.reduce((a, r) => a + r.tasksCompleted, 0),
+      awaitingReview: live.filter((r) => r.pendingReview).length,
+      averageScore: scored.length ? Math.round(scored.reduce((a, r) => a + Number(r.total), 0) / scored.length) : null,
+      placed: rows.filter((r) => r.placedAt).length
+    };
+  }
+
   _normalizeComponents(components) {
     const keys = new Set();
     return components.map((c) => {
@@ -740,8 +959,8 @@ class PoolService {
     };
   }
 
-  _audit(actor, action, entityId, newValues) {
-    return createAuditLog({ userId: actor.id, action, entityType: 'CandidatePool', entityId, newValues });
+  _audit(actor, action, entityId, newValues, entityType = 'CandidatePool') {
+    return createAuditLog({ userId: actor.id, action, entityType, entityId, newValues });
   }
 }
 

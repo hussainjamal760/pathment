@@ -2,27 +2,42 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Upload, UserMinus } from 'lucide-react';
+import { ClipboardList, Inbox, Loader2, Upload, UserMinus } from 'lucide-react';
 import { Drawer } from '@/components/shared/Drawer';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 import { poolsApi } from '@/lib/services/pools-api';
 import type { ImportResult, PoolBucket, PoolDashboard, PoolMemberRow } from '@/lib/types/pool';
+import { AssignWorkDrawer } from './WorkTab';
 import { apiError, BUCKET_CLASS, BUCKET_LABEL, DECISION_CLASS, DECISION_LABEL, field, pill, primaryBtn, secondaryBtn } from './poolUi';
 
 const RESULT_LABEL: Record<ImportResult['result'], string> = {
-  added: 'Added', invited: 'Invited', already_in_pool: 'Already in pool', duplicate_row: 'Repeated in list', invalid: 'Not an email', pool_full: 'Pool full',
+  added: 'Added', invited: 'Invited', already_in_pool: 'Already in pool', duplicate_row: 'Repeated in list', invalid: 'Not an email', pool_full: 'Pool full', failed: 'Not added',
 };
 
 /** Pull emails out of pasted text or a CSV, whatever the separators. */
 const parseEmails = (text: string) => text.split(/[\s,;]+/).map((s) => s.trim()).filter((s) => s.includes('@'));
 
-export function CandidatesTab({ data, canMembers, onChanged }: { data: PoolDashboard; canMembers: boolean; onChanged: () => void }) {
+export function CandidatesTab({ data, canMembers, canAssign, onChanged }: {
+  data: PoolDashboard;
+  canMembers: boolean;
+  canAssign: boolean;
+  onChanged: () => void;
+}) {
   const confirm = useConfirm();
   const [bucket, setBucket] = useState<PoolBucket | 'all'>('all');
-  const [importing, setImporting] = useState(false);
+  const [importing, setImporting] = useState<'emails' | 'applications' | null>(null);
   const [removing, setRemoving] = useState<PoolMemberRow | null>(null);
+  const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [assigning, setAssigning] = useState(false);
   const rows = useMemo(() => data.members.filter((m) => bucket === 'all' || m.bucket === bucket), [data.members, bucket]);
   const closed = ['placing', 'closed'].includes(data.pool.status);
+  // Work can only be set for people with an account who are still in the running.
+  const choosable = (m: PoolMemberRow) => canAssign && !closed && data.pool.status !== 'reviewing' && !!m.userId && !m.decision;
+  const toggle = (id: string) => setChosen((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
 
   return (
     <div className="space-y-4">
@@ -33,9 +48,17 @@ export function CandidatesTab({ data, canMembers, onChanged }: { data: PoolDashb
             {BUCKET_LABEL[b]} {data.buckets[b]}
           </button>
         ))}
-        {canMembers && !closed && (
-          <button onClick={() => setImporting(true)} className={`${secondaryBtn} ml-auto`}><Upload className="w-4 h-4" />Add candidates</button>
-        )}
+        <div className="ml-auto flex flex-wrap gap-2">
+          {chosen.size > 0 && (
+            <button onClick={() => setAssigning(true)} className={secondaryBtn}><ClipboardList className="w-4 h-4" />Assign work to {chosen.size}</button>
+          )}
+          {canMembers && !closed && data.pool.cohortId && (
+            <button onClick={() => setImporting('applications')} className={secondaryBtn}><Inbox className="w-4 h-4" />From applications</button>
+          )}
+          {canMembers && !closed && (
+            <button onClick={() => setImporting('emails')} className={secondaryBtn}><Upload className="w-4 h-4" />Add candidates</button>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -44,6 +67,10 @@ export function CandidatesTab({ data, canMembers, onChanged }: { data: PoolDashb
         <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
           {rows.map((m) => (
             <div key={m.id} className="p-3 flex items-center gap-3">
+              {canAssign && (
+                <input type="checkbox" aria-label={`Choose ${m.name || m.email}`} disabled={!choosable(m)}
+                  checked={chosen.has(m.id)} onChange={() => toggle(m.id)} className="disabled:opacity-30" />
+              )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-slate-900 truncate">{m.name || m.email}</p>
                 <p className="text-xs text-slate-500 truncate">{m.name ? m.email : null}{m.tasksTotal ? `${m.name ? ' · ' : ''}${m.tasksCompleted}/${m.tasksTotal} done` : ''}</p>
@@ -60,7 +87,11 @@ export function CandidatesTab({ data, canMembers, onChanged }: { data: PoolDashb
         </div>
       )}
 
-      {importing && <ImportDrawer poolId={data.pool.id} onClose={() => setImporting(false)} onDone={onChanged} />}
+      {importing && <ImportDrawer poolId={data.pool.id} fromApplications={importing === 'applications'} onClose={() => setImporting(null)} onDone={onChanged} />}
+      {assigning && (
+        <AssignWorkDrawer data={data} memberIds={[...chosen]} onClose={() => setAssigning(false)}
+          onDone={() => { setAssigning(false); setChosen(new Set()); onChanged(); }} />
+      )}
       {removing && (
         <RemoveDrawer
           member={removing}
@@ -81,7 +112,20 @@ export function CandidatesTab({ data, canMembers, onChanged }: { data: PoolDashb
   );
 }
 
-function ImportDrawer({ poolId, onClose, onDone }: { poolId: string; onClose: () => void; onDone: () => void }) {
+const APPLICATION_STATUSES = [
+  { value: 'accepted', label: 'Accepted' },
+  { value: 'under_review', label: 'Under review' },
+  { value: 'assessment_sent', label: 'Assessment sent' },
+  { value: 'waitlisted', label: 'Waitlisted' },
+];
+
+function ImportDrawer({ poolId, fromApplications, onClose, onDone }: {
+  poolId: string;
+  fromApplications: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [statuses, setStatuses] = useState<string[]>(['accepted']);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<ImportResult[] | null>(null);
@@ -91,7 +135,9 @@ function ImportDrawer({ poolId, onClose, onDone }: { poolId: string; onClose: ()
   const submit = async () => {
     try {
       setBusy(true);
-      const res = await poolsApi.importMembers(poolId, emails);
+      const res = fromApplications
+        ? await poolsApi.importApplications(poolId, statuses)
+        : await poolsApi.importMembers(poolId, emails);
       setResults(res.data.results);
       onDone();
     } catch (e) { toast.error(apiError(e, 'Could not add candidates')); } finally { setBusy(false); }
@@ -101,14 +147,14 @@ function ImportDrawer({ poolId, onClose, onDone }: { poolId: string; onClose: ()
     <Drawer
       open
       onClose={onClose}
-      title="Add candidates"
+      title={fromApplications ? 'Add applicants' : 'Add candidates'}
       subtitle="People with an account join now; everyone else gets an invite. Safe to run twice."
       footer={(dismiss) => (
         <div className="flex justify-end gap-2">
           <button onClick={dismiss} className={secondaryBtn}>{results ? 'Done' : 'Cancel'}</button>
           {!results && (
-            <button onClick={submit} disabled={busy || !emails.length} className={primaryBtn}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}Add {emails.length || ''}
+            <button onClick={submit} disabled={busy || (fromApplications ? !statuses.length : !emails.length)} className={primaryBtn}>
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}Add {fromApplications ? 'applicants' : emails.length || ''}
             </button>
           )}
         </div>
@@ -117,10 +163,24 @@ function ImportDrawer({ poolId, onClose, onDone }: { poolId: string; onClose: ()
       {results ? (
         <div className="divide-y divide-slate-100">
           {results.map((r, i) => (
-            <div key={`${r.email}-${i}`} className="py-2 flex items-center justify-between text-sm">
-              <span className="truncate text-slate-700">{r.email}</span>
+            <div key={`${r.email}-${i}`} className="py-2 flex items-center justify-between gap-3 text-sm">
+              <span className="min-w-0">
+                <span className="block truncate text-slate-700">{r.email}</span>
+                {r.reason && <span className="block text-xs text-slate-400">{r.reason}</span>}
+              </span>
               <span className={`${pill} ${['added', 'invited'].includes(r.result) ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{RESULT_LABEL[r.result]}</span>
             </div>
+          ))}
+        </div>
+      ) : fromApplications ? (
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">Applicants from this pool&apos;s intake cohort with these statuses:</p>
+          {APPLICATION_STATUSES.map((s) => (
+            <label key={s.value} className="flex items-center gap-2 text-sm text-slate-700">
+              <input type="checkbox" checked={statuses.includes(s.value)}
+                onChange={(e) => setStatuses((prev) => (e.target.checked ? [...prev, s.value] : prev.filter((x) => x !== s.value)))} />
+              {s.label}
+            </label>
           ))}
         </div>
       ) : (

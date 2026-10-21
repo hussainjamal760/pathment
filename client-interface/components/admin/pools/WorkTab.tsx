@@ -8,6 +8,7 @@ import { SelectMenu } from '@/components/shared/SelectMenu';
 import { poolsApi } from '@/lib/services/pools-api';
 import { quizApi } from '@/lib/services/quiz-api';
 import { interviewApi } from '@/lib/services/interview-api';
+import { coursesApi } from '@/lib/services/courses-api';
 import type { PoolDashboard } from '@/lib/types/pool';
 import { apiError, field, labelCls, primaryBtn, secondaryBtn } from './poolUi';
 
@@ -19,6 +20,7 @@ const WORK_TYPES = [
   { value: 'open_source', label: 'Open-source contribution' },
   { value: 'quiz', label: 'Quiz (auto-graded)' },
   { value: 'interview', label: 'Interview' },
+  { value: 'course', label: 'Buildment course' },
 ];
 
 export function WorkTab({ data, canAssign, onChanged }: { data: PoolDashboard; canAssign: boolean; onChanged: () => void }) {
@@ -52,7 +54,13 @@ export function WorkTab({ data, canAssign, onChanged }: { data: PoolDashboard; c
   );
 }
 
-function AssignWorkDrawer({ data, onClose, onDone }: { data: PoolDashboard; onClose: () => void; onDone: () => void }) {
+/** Set one piece of work for the whole pool, or for `memberIds` when given. */
+export function AssignWorkDrawer({ data, memberIds, onClose, onDone }: {
+  data: PoolDashboard;
+  memberIds?: string[];
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { pool } = data;
   const [form, setForm] = useState({
     componentKey: pool.scoringPolicy.components[0]?.key ?? '',
@@ -66,16 +74,18 @@ function AssignWorkDrawer({ data, onClose, onDone }: { data: PoolDashboard; onCl
   const [kits, setKits] = useState<{ id: string; title: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
-  const usesKit = form.type === 'quiz' || form.type === 'interview';
+  const usesKit = ['quiz', 'interview', 'course'].includes(form.type);
 
   useEffect(() => {
     if (!usesKit) return;
-    const api = form.type === 'quiz' ? quizApi : interviewApi;
-    api.listKits('published').then((r) => setKits(r?.data?.kits ?? [])).catch(() => setKits([]));
+    const load = form.type === 'course'
+      ? coursesApi.list().then((r) => (r?.data?.courses ?? []).map((c: { courseId: string; title: string }) => ({ id: c.courseId, title: c.title })))
+      : (form.type === 'quiz' ? quizApi : interviewApi).listKits('published').then((r) => r?.data?.kits ?? []);
+    load.then(setKits).catch(() => setKits([]));
   }, [form.type, usesKit]);
 
   const submit = async () => {
-    if (usesKit && !form.kitId) { toast.error(`Choose a ${form.type}`); return; }
+    if (usesKit && !form.kitId) { toast.error(`Choose a ${form.type === 'course' ? 'course' : form.type}`); return; }
     if (!usesKit && !form.title.trim()) { toast.error('Give the work a title'); return; }
     try {
       setBusy(true);
@@ -86,10 +96,14 @@ function AssignWorkDrawer({ data, onClose, onDone }: { data: PoolDashboard; onCl
         description: form.description.trim() || undefined,
         acceptanceCriteria: form.criteria.split('\n').map((s) => s.trim()).filter(Boolean),
         dueDate: form.dueDate || undefined,
+        memberIds,
+        ...(form.type === 'course' ? { course: { courseId: form.kitId } } : {}),
         ...(form.type === 'quiz' ? { quiz: { kitId: form.kitId, evaluationMode: 'auto' as const } } : {}),
         ...(form.type === 'interview' ? { interview: { kitId: form.kitId } } : {}),
       });
-      toast.success(`Assigned to ${res.data.assigned} candidate(s)`);
+      const { assigned, failed } = res.data;
+      toast.success(`Assigned to ${assigned} candidate(s)`);
+      if (failed?.length) toast.error(`${failed.length} could not get it: ${failed[0].reason}`);
       onDone();
     } catch (e) { toast.error(apiError(e, 'Could not assign the work')); } finally { setBusy(false); }
   };
@@ -105,7 +119,8 @@ function AssignWorkDrawer({ data, onClose, onDone }: { data: PoolDashboard; onCl
         <div className="flex justify-end gap-2">
           <button onClick={dismiss} className={secondaryBtn}>Cancel</button>
           <button onClick={submit} disabled={busy} className={primaryBtn}>
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}Assign to every candidate
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {memberIds?.length ? `Assign to ${memberIds.length} chosen` : 'Assign to every candidate'}
           </button>
         </div>
       )}
@@ -124,8 +139,9 @@ function AssignWorkDrawer({ data, onClose, onDone }: { data: PoolDashboard; onCl
         </div>
         {usesKit ? (
           <div>
-            <label className={labelCls}>{form.type === 'quiz' ? 'Quiz' : 'Interview kit'}</label>
-            <SelectMenu value={form.kitId} onChange={(v) => set('kitId', v)} className="w-full" placeholder="Published kits only"
+            <label className={labelCls}>{{ quiz: 'Quiz', interview: 'Interview kit', course: 'Course' }[form.type]}</label>
+            <SelectMenu value={form.kitId} onChange={(v) => set('kitId', v)} className="w-full"
+              placeholder={form.type === 'course' ? 'Courses on Buildment (each candidate takes a seat)' : 'Published kits only'}
               options={kits.map((k) => ({ value: k.id, label: k.title }))} />
           </div>
         ) : (

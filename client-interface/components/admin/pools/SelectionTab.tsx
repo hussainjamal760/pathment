@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Check, Loader2, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowUpCircle, Check, Loader2, Sparkles, Wand2 } from 'lucide-react';
 import { SelectMenu } from '@/components/shared/SelectMenu';
 import { useAdminScope } from '@/lib/context/AdminScopeContext';
 import { useConfirm } from '@/lib/context/ConfirmContext';
 import { poolsApi } from '@/lib/services/pools-api';
-import type { PoolDashboard, PoolDecision, PoolMemberRow } from '@/lib/types/pool';
+import type { PlacementPreview, PoolDashboard, PoolDecision, PoolMemberRow } from '@/lib/types/pool';
 import { apiError, DECISION_CLASS, DECISION_LABEL, field, pill, primaryBtn, secondaryBtn } from './poolUi';
 
 type Override = { decision: PoolDecision; reason: string };
@@ -24,13 +24,16 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
   const [busy, setBusy] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, Override>>({});
   const [placement, setPlacement] = useState<Record<string, string>>({});
+  const [seats, setSeats] = useState<PlacementPreview['clans'] | null>(null);
+  const [changing, setChanging] = useState<{ member: PoolMemberRow; decision: PoolDecision; reason: string } | null>(null);
   const byId = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const programClans = clans.filter((c) => c.programId === pool.programId && c.kind !== 'standing');
   const stale = snap && snap.policyVersion !== pool.scoringPolicy.version;
   const placing = pool.status === 'placing';
 
+  /** Run one action; resolves true when it succeeded. */
   const run = async (key: string, fn: () => Promise<unknown>, ok: string) => {
-    try { setBusy(key); await fn(); toast.success(ok); onChanged(); } catch (e) { toast.error(apiError(e, 'Action failed')); } finally { setBusy(null); }
+    try { setBusy(key); await fn(); toast.success(ok); onChanged(); return true; } catch (e) { toast.error(apiError(e, 'Action failed')); return false; } finally { setBusy(null); }
   };
 
   const finalize = async () => {
@@ -49,7 +52,29 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
     }, 'Placement run finished');
   };
 
+  /** Fill every empty choice from the server's even, capacity-aware suggestion. */
+  const suggest = () => run('suggest', async () => {
+    const { data: preview } = await poolsApi.placementPreview(pool.id) as { data: PlacementPreview };
+    setSeats(preview.clans);
+    setPlacement((prev) => ({
+      ...Object.fromEntries(preview.suggestions.filter((s) => s.clanId).map((s) => [s.memberId, s.clanId as string])),
+      ...Object.fromEntries(Object.entries(prev).filter(([, v]) => v)),
+    }));
+    if (preview.unplaceable) toast.error(`${preview.unplaceable} candidate(s) have no clan with a free seat and a lead mentor`);
+  }, 'Clans suggested');
+
+  const saveDecision = () => {
+    if (!changing?.reason.trim()) { toast.error('Give a reason'); return; }
+    run('decision', () => poolsApi.changeDecision(pool.id, changing.member.id, changing.decision, changing.reason.trim()), 'Outcome changed')
+      .then((ok) => { if (ok) setChanging(null); });
+  };
+
+  const clanLabel = (c: { id: string; name: string }) => {
+    const free = seats?.find((x) => x.id === c.id)?.free;
+    return free == null ? c.name : `${c.name} · ${free} free`;
+  };
   const selected = members.filter((m) => m.decision === 'selected');
+  const others = members.filter((m) => m.decision === 'waitlisted' || m.decision === 'not_selected');
   const ranked = snap ? snap.entries.map((e) => ({ entry: e, member: byId.get(e.memberId) })).filter((r) => r.member) as { entry: (typeof snap.entries)[number]; member: PoolMemberRow }[] : [];
 
   return (
@@ -77,6 +102,12 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
       )}
 
       {placing ? (
+        <div className="space-y-4">
+        {canSelect && selected.some((m) => !m.placedClan) && (
+          <button onClick={suggest} disabled={!!busy} className={secondaryBtn}>
+            {busy === 'suggest' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}Suggest clans by free seats
+          </button>
+        )}
         <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
           {selected.length === 0 && <p className="p-4 text-sm text-slate-500">Nobody was selected.</p>}
           {selected.map((m) => (
@@ -85,8 +116,11 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
               {m.placedClan ? (
                 <span className={`${pill} bg-emerald-100 text-emerald-700`}>Placed in {m.placedClan.name}</span>
               ) : canSelect && (
-                <SelectMenu value={placement[m.id] ?? ''} onChange={(v) => setPlacement((p) => ({ ...p, [m.id]: v }))} placeholder="Choose a clan" className="w-56"
-                  options={programClans.map((c) => ({ value: c.id, label: c.name }))} />
+                <>
+                  <SelectMenu value={placement[m.id] ?? ''} onChange={(v) => setPlacement((p) => ({ ...p, [m.id]: v }))} placeholder="Choose a clan" className="w-60"
+                    options={programClans.map((c) => ({ value: c.id, label: clanLabel(c) }))} />
+                  <button onClick={() => setChanging({ member: m, decision: 'waitlisted', reason: '' })} className="text-xs text-slate-500 hover:text-slate-800">Waitlist</button>
+                </>
               )}
             </div>
           ))}
@@ -95,6 +129,41 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
               <button onClick={place} disabled={!!busy} className={primaryBtn}>{busy === 'place' && <Loader2 className="w-4 h-4 animate-spin" />}Place candidates</button>
             </div>
           )}
+        </div>
+
+        {others.length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-slate-700 mb-2">Not placed</h3>
+            <div className="bg-card rounded-2xl border border-slate-200 divide-y divide-slate-100">
+              {others.map((m) => (
+                <div key={m.id} className="p-3 flex items-center gap-3">
+                  <p className="text-sm text-slate-900 flex-1 min-w-0 truncate">{m.name || m.email}</p>
+                  {m.total != null && <span className="text-xs text-slate-500">{m.total}</span>}
+                  <span className={`${pill} ${DECISION_CLASS[m.decision as PoolDecision]}`}>{DECISION_LABEL[m.decision as PoolDecision]}</span>
+                  {canSelect && m.userId && (
+                    <button onClick={() => setChanging({ member: m, decision: 'selected', reason: '' })} className="inline-flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-700">
+                      <ArrowUpCircle className="w-3.5 h-3.5" />Select
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {changing && (
+          <div className="rounded-2xl border border-slate-200 bg-card p-4 space-y-3">
+            <p className="text-sm text-slate-800">
+              {changing.decision === 'selected' ? 'Select' : 'Waitlist'} <span className="font-medium">{changing.member.name || changing.member.email}</span>. The candidate is told.
+            </p>
+            <input autoFocus value={changing.reason} onChange={(e) => setChanging({ ...changing, reason: e.target.value })}
+              placeholder="Reason (kept in the history)" className={field} />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setChanging(null)} className={secondaryBtn}>Cancel</button>
+              <button onClick={saveDecision} disabled={!!busy} className={primaryBtn}>{busy === 'decision' && <Loader2 className="w-4 h-4 animate-spin" />}Confirm</button>
+            </div>
+          </div>
+        )}
         </div>
       ) : !snap ? (
         <div className="bg-card rounded-2xl border border-slate-200 py-10 text-center text-sm text-slate-500">
@@ -106,7 +175,7 @@ export function SelectionTab({ data, canSelect, onChanged }: { data: PoolDashboa
             const tied = snap.blockers.tieAtCutoff.includes(member.id);
             const o = overrides[member.id];
             return (
-              <div key={member.id} className={`p-3 space-y-2 ${entry.proposed ? '' : 'opacity-80'}`}>
+              <div key={member.id} className={`p-3 space-y-2 ${entry.proposed ? '' : 'bg-slate-50/60'}`}>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="w-8 text-sm font-semibold text-slate-500">#{entry.rank}</span>
                   <div className="min-w-0 flex-1">

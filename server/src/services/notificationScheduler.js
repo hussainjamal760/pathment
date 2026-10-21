@@ -56,7 +56,7 @@ class NotificationScheduler {
   /** Selection-pool candidates: pending invites, work due soon, and inactivity. */
   async sendPoolReminders() {
     try {
-      const sent = await require('./poolService').sendReminders();
+      const sent = await require('./poolService').tick();
       if (sent) console.log(`[scheduler] sent ${sent} pool reminder(s)`);
     } catch (error) {
       console.error('[scheduler] pool reminder run failed:', error.message);

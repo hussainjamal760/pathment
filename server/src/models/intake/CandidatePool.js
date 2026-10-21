@@ -26,6 +26,8 @@ module.exports = (sequelize, DataTypes) => {
     qualificationDueAt: { type: DataTypes.DATE, allowNull: true, field: 'qualification_due_at' },
     // { version, components: [{ key, label, weight, roadmapTaskIds: [] }] }
     scoringPolicy: { type: DataTypes.JSONB, allowNull: false, defaultValue: { version: 1, components: [] }, field: 'scoring_policy' },
+    // Qualification work is a test, so it earns nothing unless the pool says so.
+    awardPoints: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false, field: 'award_points' },
     // { enabled, inviteAfterDays, inactivityDays }
     reminderPolicy: { type: DataTypes.JSONB, allowNull: false, defaultValue: {}, field: 'reminder_policy' },
     // Every shortlist ever proposed, newest last, so a policy change never

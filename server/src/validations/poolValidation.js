@@ -16,6 +16,7 @@ const poolFields = {
   closesAt: Joi.date().iso().allow(null),
   qualificationDueAt: Joi.date().iso().allow(null),
   components: Joi.array().items(component).max(12),
+  awardPoints: Joi.boolean(),
   reminderPolicy: Joi.object({
     enabled: Joi.boolean(),
     inviteAfterDays: Joi.number().integer().min(1).max(30),
@@ -41,6 +42,15 @@ module.exports = {
     status: Joi.string().valid('draft', 'open', 'qualifying', 'reviewing', 'closed').required()
   }),
 
+  importApplications: Joi.object({
+    statuses: Joi.array().items(Joi.string().valid('under_review', 'assessment_sent', 'accepted', 'waitlisted')).min(1).default(['accepted'])
+  }),
+
+  decision: Joi.object({
+    decision: Joi.string().valid('selected', 'waitlisted', 'not_selected').required(),
+    reason: Joi.string().trim().min(1).max(2000).required().messages({ 'any.required': 'Give a reason' })
+  }),
+
   importMembers: Joi.object({
     emails: Joi.array().items(Joi.string().trim().max(255)).min(1).max(2000).required()
   }),
@@ -61,7 +71,8 @@ module.exports = {
     dueDate: Joi.string().isoDate().allow(null, ''),
     memberIds: Joi.array().items(Joi.string().uuid()).max(5000),
     quiz: Joi.object({ kitId: Joi.string().uuid().required() }).unknown(true),
-    interview: Joi.object({ kitId: Joi.string().uuid().required() }).unknown(true)
+    interview: Joi.object({ kitId: Joi.string().uuid().required() }).unknown(true),
+    course: Joi.object({ courseId: Joi.string().trim().required() })
   }),
 
   finalize: Joi.object({

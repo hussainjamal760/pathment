@@ -344,6 +344,9 @@ class QuizSessionService {
         pointsPercent: pct,
       });
       finalized = true;
+    } else if (task.poolMemberId) {
+      await require('./poolService').notifySubmitted(task, out.submissionId)
+        .catch((e) => console.error('pool quiz submit notification failed:', e.message));
     } else {
       // Review mode → notify the mentor there's a quiz to confirm.
       try {

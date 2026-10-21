@@ -66,6 +66,7 @@ EXTENSION_HANDLED: 'extension_handled',
   // Selection pools: a candidate is chased, told the outcome, and placed; the
   // operator hears only when they have something to decide.
   POOL_REMINDER: 'pool_reminder',
+  POOL_WORK_SUBMITTED: 'pool_work_submitted',
   POOL_ACTION_NEEDED: 'pool_action_needed',
   POOL_OUTCOME: 'pool_outcome',
   POOL_PLACED: 'pool_placed'
@@ -457,6 +458,13 @@ const NOTIFICATION_MATRIX = {
     audience: 'mentee',
     preferenceKey: 'deadline_approaching',
     channels: { inApp: true, email: true, chat: false }
+  },
+  // In-app only: a busy pool would otherwise mail a reviewer per submission.
+  [NOTIFICATION_EVENTS.POOL_WORK_SUBMITTED]: {
+    type: 'task',
+    audience: 'admin',
+    preferenceKey: 'task_submitted',
+    channels: { inApp: true, email: false, chat: false }
   },
   // Shortlist ready, a tie at the cutoff, a placement that failed.
   [NOTIFICATION_EVENTS.POOL_ACTION_NEEDED]: {

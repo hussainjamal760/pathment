@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ArrowLeft, Loader2, Settings } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, Gauge, Loader2, Settings, Users } from 'lucide-react';
+import { MetricTile } from '@/components/shared/MetricTile';
 import { qk, useApiQuery } from '@/lib/query';
 import { poolsApi } from '@/lib/services/pools-api';
 import { useCan } from '@/lib/hooks/usePermissions';
@@ -14,9 +15,11 @@ import { CandidatesTab } from '@/components/admin/pools/CandidatesTab';
 import { WorkTab } from '@/components/admin/pools/WorkTab';
 import { ReviewsTab } from '@/components/admin/pools/ReviewsTab';
 import { SelectionTab } from '@/components/admin/pools/SelectionTab';
+import { HistoryTab } from '@/components/admin/pools/HistoryTab';
 import { apiError, pill, secondaryBtn, STATUS_CLASS, STATUS_LABEL } from '@/components/admin/pools/poolUi';
 
-type Tab = 'candidates' | 'work' | 'reviews' | 'selection';
+type Tab = 'candidates' | 'work' | 'reviews' | 'selection' | 'history';
+const TAB_KEYS: Tab[] = ['candidates', 'work', 'reviews', 'selection', 'history'];
 
 /** The next step an operator can take the pool to by hand. */
 const NEXT_STATUS: Partial<Record<PoolStatus, { status: PoolStatus; label: string }>> = {
@@ -27,7 +30,12 @@ const NEXT_STATUS: Partial<Record<PoolStatus, { status: PoolStatus; label: strin
 export default function PoolDetailPage() {
   const { id } = useParams<{ id: string }>();
   const can = useCan();
-  const [tab, setTab] = useState<Tab>('candidates');
+  // The tab lives in the URL, so a notification can open ?tab=reviews directly.
+  const router = useRouter();
+  const pathname = usePathname();
+  const asked = useSearchParams().get('tab') as Tab | null;
+  const tab: Tab = asked && TAB_KEYS.includes(asked) ? asked : 'candidates';
+  const setTab = (t: Tab) => router.replace(`${pathname}?tab=${t}`, { scroll: false });
   const [editing, setEditing] = useState(false);
   const { data, loading, error, refetch } = useApiQuery<PoolDashboard>({
     queryKey: qk.admin.pool(id),
@@ -55,7 +63,9 @@ export default function PoolDetailPage() {
     { key: 'work', label: 'Work' },
     { key: 'reviews', label: 'Reviews', count: data.buckets.needs_review },
     { key: 'selection', label: 'Selection' },
+    { key: 'history', label: 'History' },
   ];
+  const { stats } = data;
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -79,6 +89,17 @@ export default function PoolDetailPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <MetricTile compact label="Candidates" value={stats.candidates} icon={Users} tone={0}
+          hint={`${stats.withAccount} with an account`} />
+        <MetricTile compact label="Work done" value={`${stats.tasksCompleted}/${stats.tasks}`} icon={ClipboardList} tone={1}
+          hint="Reviewed pieces of work" />
+        <MetricTile compact label="Awaiting review" value={stats.awaitingReview} icon={CheckCircle2} tone={2}
+          hint="Candidates with unmarked work" />
+        <MetricTile compact label="Average score" value={stats.averageScore ?? '–'} icon={Gauge} tone={3}
+          hint={`${stats.placed} placed so far`} />
+      </div>
+
       <div className="flex flex-wrap items-center gap-0 border-b border-slate-200">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -88,10 +109,11 @@ export default function PoolDetailPage() {
         ))}
       </div>
 
-      {tab === 'candidates' && <CandidatesTab data={data} canMembers={can('pool.members')} onChanged={refetch} />}
+      {tab === 'candidates' && <CandidatesTab data={data} canMembers={can('pool.members')} canAssign={can('pool.assign')} onChanged={refetch} />}
       {tab === 'work' && <WorkTab data={data} canAssign={can('pool.assign')} onChanged={refetch} />}
       {tab === 'reviews' && <ReviewsTab poolId={pool.id} onReviewed={refetch} />}
       {tab === 'selection' && <SelectionTab data={data} canSelect={can('pool.select')} onChanged={refetch} />}
+      {tab === 'history' && <HistoryTab poolId={pool.id} members={data.members} />}
 
       {editing && <PoolSettingsDrawer pool={pool} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); refetch(); }} />}
     </div>
